@@ -35,7 +35,7 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/package-lock.json ./package-lock.json
 
-# Устанавливаем только production зависимости.
+# Устанавливаем только production зависимости.ю
 RUN npm ci --only=production && npm cache clean --force
 
 # Копируем собранное приложение
