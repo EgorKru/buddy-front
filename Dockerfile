@@ -12,8 +12,8 @@ RUN npm ci
 COPY . .
 
 # Собираем приложение (переменные окружения должны быть установлены во время сборки)
-ARG NEXT_PUBLIC_API_URL=http://158.160.148.204:8080/api
-ARG NEXT_PUBLIC_SOCKET_URL=http://158.160.148.204:8080
+ARG NEXT_PUBLIC_API_URL=https://pager.website/api
+ARG NEXT_PUBLIC_SOCKET_URL=https://pager.website
 
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_SOCKET_URL=$NEXT_PUBLIC_SOCKET_URL

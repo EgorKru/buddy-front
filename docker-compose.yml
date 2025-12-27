@@ -4,8 +4,8 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        - NEXT_PUBLIC_API_URL=http://158.160.148.204:8080/api
-        - NEXT_PUBLIC_SOCKET_URL=http://158.160.148.204:8080
+        - NEXT_PUBLIC_API_URL=https://pager.website/api
+        - NEXT_PUBLIC_SOCKET_URL=https://pager.website
     container_name: buddy-frontend
     environment:
       - NODE_ENV=production
