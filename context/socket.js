@@ -27,8 +27,6 @@ export const SocketProvider = (props) => {
       return;
     }
     
-    // Настройки подключения Socket.io
-    // Начинаем с polling (работает через HTTP), потом пробуем websocket
     const connection = io(socketUrl, {
       auth: { token },
       extraHeaders: {

@@ -9,7 +9,6 @@ const useMediaStream = () => {
     useEffect(() => {
         if (isStreamSet.current) return;
         
-        // Проверяем, что мы в браузере и navigator.mediaDevices доступен
         if (typeof window === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             setError("Медиа устройства не поддерживаются в этом браузере или требуется HTTPS")
             return;
@@ -27,8 +26,6 @@ const useMediaStream = () => {
             } catch (e) {
                 console.error("Error in media navigator", e)
                 setError(e.message || "Failed to access camera/microphone")
-                
-                // Пытаемся получить только аудио, если видео не доступно
                 try {
                     const audioStream = await navigator.mediaDevices.getUserMedia({
                         audio: true,
