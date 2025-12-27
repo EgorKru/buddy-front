@@ -1,49 +1,215 @@
 .homeContainer {
-  @apply w-4/12 mx-auto p-2 border border-white rounded mt-8 text-white flex flex-col items-center;
+  min-height: 100vh;
+  background: rgb(18, 18, 20);
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(102, 126, 234, 0.1) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(140, 100, 200, 0.1) 0px, transparent 50%);
+  padding: 40px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: fadeIn 0.5s ease-out;
+}
 
-  h1 {
-    @apply text-xl text-center;
+@keyframes fadeIn {
+  from {
+    opacity: 0;
   }
-
-  button {
-    @apply bg-buttonPrimary py-2 px-4 rounded;
+  to {
+    opacity: 1;
   }
+}
 
-  .header {
-    @apply w-full flex justify-between items-center mb-4;
-    
-    h1 {
-      @apply m-0;
-    }
+.header {
+  width: 100%;
+  max-width: 1200px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 60px;
+  padding: 20px 0;
+  border-bottom: 1px solid rgb(50, 50, 60);
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 700;
+  color: rgb(255, 255, 255);
+  background: linear-gradient(135deg, rgb(255, 255, 255) 0%, rgba(255, 255, 255, 0.7) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.5px;
+}
+
+.userInfo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.userInfo span {
+  color: rgb(200, 200, 210);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.chatButton, .logoutButton {
+  padding: 10px 20px;
+  background: rgb(40, 40, 45);
+  border: 1px solid rgb(50, 50, 60);
+  border-radius: 10px;
+  color: rgb(255, 255, 255);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.chatButton {
+  background: rgb(102, 126, 234);
+  border-color: rgb(120, 140, 250);
+}
+
+.chatButton:hover {
+  background: rgb(88, 110, 220);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.logoutButton:hover {
+  background: rgb(50, 50, 60);
+  border-color: rgb(60, 60, 70);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.mainContent {
+  width: 100%;
+  max-width: 600px;
+  background: rgb(30, 30, 35);
+  border: 1px solid rgb(50, 50, 60);
+  border-radius: 20px;
+  padding: 48px;
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+  animation: slideUp 0.5s ease-out 0.2s both;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
   }
-
-  .userInfo {
-    @apply flex items-center gap-3;
-    
-    span {
-      @apply text-sm;
-    }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
+}
 
-  .chatButton, .logoutButton {
-    @apply bg-buttonPrimary py-1 px-3 rounded text-sm;
-    transition: all 0.2s;
-  }
+.enterRoom {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  margin-bottom: 32px;
+}
 
-  .chatButton:hover, .logoutButton:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  }
+.enterRoom input {
+  width: 100%;
+  padding: 16px 20px;
+  background: rgb(25, 25, 30);
+  border: 1px solid rgb(50, 50, 60);
+  border-radius: 12px;
+  font-size: 16px;
+  color: rgb(255, 255, 255);
+  font-family: inherit;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+}
 
-  .enterRoom {
-    @apply flex flex-col items-center mt-3 w-full;
+.enterRoom input::placeholder {
+  color: rgb(120, 120, 130);
+}
 
-    input {
-      @apply text-black text-lg p-1 rounded w-9/12 mb-3;
-    }
-  }
+.enterRoom input:hover {
+  border-color: rgb(60, 60, 70);
+  background: rgb(28, 28, 33);
+}
 
-  .separatorText {
-    @apply my-3 text-xl;
-  }
+.enterRoom input:focus {
+  outline: none;
+  border-color: rgb(102, 126, 234);
+  background: rgb(30, 30, 35);
+  box-shadow: 
+    0 0 0 3px rgba(102, 126, 234, 0.1),
+    0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.enterRoom button {
+  padding: 16px 24px;
+  background: linear-gradient(135deg, rgb(102, 126, 234) 0%, rgb(88, 110, 220) 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
+}
+
+.enterRoom button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.5);
+  background: linear-gradient(135deg, rgb(110, 130, 240) 0%, rgb(95, 115, 230) 100%);
+}
+
+.enterRoom button:active {
+  transform: translateY(0);
+}
+
+.separatorText {
+  text-align: center;
+  margin: 32px 0;
+  color: rgb(150, 150, 160);
+  font-size: 14px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.separatorText::before,
+.separatorText::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgb(50, 50, 60);
+}
+
+.createButton {
+  width: 100%;
+  padding: 16px 24px;
+  background: rgb(40, 40, 45);
+  border: 1px solid rgb(50, 50, 60);
+  border-radius: 12px;
+  color: rgb(255, 255, 255);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.createButton:hover {
+  background: rgb(50, 50, 60);
+  border-color: rgb(60, 60, 70);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.createButton:active {
+  transform: translateY(0);
 }

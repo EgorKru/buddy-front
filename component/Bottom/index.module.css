@@ -1,13 +1,138 @@
 .bottomMenu {
-  @apply absolute flex justify-between bottom-5 left-0 right-0 mx-auto;
-  width: 300px;
-  .icon {
-    @apply p-4 rounded-full text-white cursor-pointer;
-    background-color: theme("colors.secondary");
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 24px;
+  background: rgb(30, 30, 35);
+  border: 1px solid rgb(50, 50, 60);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+  z-index: 100;
+}
 
-    &:hover,
-    &.active {
-      background-color: theme("colors.buttonPrimary");
-    }
-  }
+.leftSection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.centerSection {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.rightSection {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.iconButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: rgb(180, 180, 190);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  position: relative;
+}
+
+.iconButton:hover {
+  background: rgb(40, 40, 45);
+  color: rgb(255, 255, 255);
+}
+
+.iconEmoji {
+  font-size: 18px;
+}
+
+.count {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgb(255, 255, 255);
+  background: rgb(102, 126, 234);
+  padding: 2px 6px;
+  border-radius: 10px;
+  min-width: 20px;
+  text-align: center;
+}
+
+.activationInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.activationText {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgb(255, 255, 255);
+}
+
+.activationHint {
+  font-size: 11px;
+  color: rgb(150, 150, 160);
+}
+
+.icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border-radius: 50%;
+  background: rgb(40, 40, 45);
+  border: 1px solid rgb(50, 50, 60);
+  color: rgb(255, 255, 255);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.icon:hover {
+  background: rgb(50, 50, 60);
+  border-color: rgb(60, 60, 70);
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.icon:active {
+  transform: scale(0.95);
+}
+
+.icon.active {
+  background: rgb(217, 4, 41);
+  border-color: rgb(240, 20, 60);
+  box-shadow: 0 0 20px rgba(217, 4, 41, 0.5);
+}
+
+.icon.active:hover {
+  background: rgb(240, 20, 60);
+  box-shadow: 0 0 25px rgba(217, 4, 41, 0.7);
+}
+
+.leaveButton {
+  background: rgb(217, 4, 41) !important;
+  border-color: rgb(240, 20, 60) !important;
+}
+
+.leaveButton:hover {
+  background: rgb(240, 20, 60) !important;
+  box-shadow: 0 0 25px rgba(217, 4, 41, 0.7) !important;
 }

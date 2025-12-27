@@ -17,18 +17,21 @@ const CopySection = (props) => {
 
   if (!roomId) return null;
 
+  const meetingLink = typeof window !== 'undefined' ? `${window.location.origin}/${roomId}` : roomId;
+
   return (
     <div className={styles.copyContainer}>
-      <div className={styles.copyHeading}>Copy Room ID:</div>
-      <hr />
+      <div className={styles.copyHeading}>ID комнаты:</div>
       <div className={styles.copyDescription}>
-        <span>{roomId}</span>
-        <CopyToClipboard text={roomId} onCopy={handleCopy}>
-          {copied ? (
-            <Check className="ml-3 cursor-pointer" style={{ color: 'green' }} size={20} />
-          ) : (
-            <Copy className="ml-3 cursor-pointer" size={20} />
-          )}
+        <span className={styles.roomId}>{roomId}</span>
+        <CopyToClipboard text={meetingLink} onCopy={handleCopy}>
+          <button className={styles.copyButton}>
+            {copied ? (
+              <Check size={18} className={styles.checkIcon} />
+            ) : (
+              <Copy size={18} />
+            )}
+          </button>
         </CopyToClipboard>
       </div>
     </div>

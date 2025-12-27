@@ -1,27 +1,108 @@
 .playerContainer {
-  @apply relative overflow-hidden mb-5 h-full;
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 12px;
+  height: 100%;
+  background: rgb(30, 30, 35);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 
 .active {
-  @apply rounded-lg;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.active:hover {
+  border-color: rgb(102, 126, 234);
+  box-shadow: 0 8px 30px rgba(102, 126, 234, 0.3);
 }
 
 .notActive {
-  @apply rounded-md h-min;
+  border-radius: 8px;
+  height: min-content;
   width: 200px;
-  -webkit-box-shadow: 0px 0px 11px -1px rgba(0, 0, 0, 0.75);
-  -moz-box-shadow: 0px 0px 11px -1px rgba(0, 0, 0, 0.75);
-  box-shadow: 0px 0px 11px -1px rgba(0, 0, 0, 0.75);
+  border: 1px solid rgb(50, 50, 60);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  transition: all 0.2s ease;
 }
 
-.icon {
-  @apply text-white absolute right-2 bottom-2;
+.notActive:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6);
+  border-color: rgb(60, 60, 70);
 }
 
-.user {
-  @apply text-white;
+.avatarContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: rgb(25, 25, 30);
+  min-height: 200px;
+}
+
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgb(102, 126, 234), rgb(140, 100, 200));
+  color: rgb(255, 255, 255);
+  font-weight: 600;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+}
+
+.notActive .avatarContainer .avatar {
+  width: 120px;
+  height: 120px;
+  font-size: 40px;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+}
+
+.nameLabel {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px);
+  border-radius: 6px;
+  color: rgb(255, 255, 255);
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: capitalize;
+  max-width: calc(100% - 24px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.micIcon {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px);
+  border-radius: 50%;
+  color: rgb(255, 255, 255);
+  padding: 6px;
 }
 
 .notPlaying {
-  @apply flex items-center justify-center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(25, 25, 30);
+  min-height: 200px;
 }

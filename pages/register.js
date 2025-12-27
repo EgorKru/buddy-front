@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
+import { authAPI, setCurrentUser } from '@/utils/api';
+import { Eye, EyeOff, Sparkles } from 'lucide-react';
+import InteractiveBackground from '@/component/InteractiveBackground';
 import styles from '@/styles/login.module.css';
 
 export default function Register() {
@@ -10,6 +13,7 @@ export default function Register() {
     password: '',
     displayName: '',
   });
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -26,25 +30,11 @@ export default function Register() {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8080/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        router.push('/');
-      } else {
-        const errorData = await response.json().catch(() => ({}));
-        setError(errorData.message || 'Ошибка при регистрации');
-      }
+      const data = await authAPI.register(formData);
+      setCurrentUser(data.user, data.token);
+      router.push('/');
     } catch (err) {
-      setError('Ошибка подключения к серверу');
+      setError(err.message || 'Ошибка при регистрации');
     } finally {
       setLoading(false);
     }
@@ -52,8 +42,21 @@ export default function Register() {
 
   return (
     <div className={styles.container}>
+      <InteractiveBackground />
+      <div className={styles.decorativeElements}>
+        <div className={styles.floatingCircle} style={{ '--delay': '0s', '--duration': '20s' }}></div>
+        <div className={styles.floatingCircle} style={{ '--delay': '5s', '--duration': '25s' }}></div>
+        <div className={styles.floatingCircle} style={{ '--delay': '10s', '--duration': '30s' }}></div>
+      </div>
       <div className={styles.formContainer}>
-        <h1>Регистрация в MeetDraft</h1>
+        <div className={styles.logoContainer}>
+          <div className={styles.logoIcon}>
+            <Sparkles className={styles.sparkleIcon} size={24} />
+            <span className={styles.logoText}>B</span>
+          </div>
+        </div>
+        <h1>Регистрация в Buddy</h1>
+        <p className={styles.subtitle}>Начните свой путь</p>
         <form onSubmit={handleRegister}>
           <div className={styles.formGroup}>
             <label>Имя пользователя</label>
@@ -66,6 +69,7 @@ export default function Register() {
               minLength={3}
               maxLength={20}
               placeholder="Введите имя пользователя"
+              autoComplete="username"
             />
           </div>
           <div className={styles.formGroup}>
@@ -77,6 +81,7 @@ export default function Register() {
               onChange={handleChange}
               required
               placeholder="Введите email"
+              autoComplete="email"
             />
           </div>
           <div className={styles.formGroup}>
@@ -87,19 +92,31 @@ export default function Register() {
               value={formData.displayName}
               onChange={handleChange}
               placeholder="Как вас называть?"
+              autoComplete="name"
             />
           </div>
           <div className={styles.formGroup}>
             <label>Пароль</label>
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              required
-              minLength={6}
-              placeholder="Минимум 6 символов"
-            />
+            <div className={styles.passwordContainer}>
+              <input
+                type={showPassword ? "text" : "password"}
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                required
+                minLength={6}
+                placeholder="Минимум 6 символов"
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                className={styles.passwordToggle}
+                onClick={() => setShowPassword(!showPassword)}
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
           </div>
           {error && <div className={styles.error}>{error}</div>}
           <button type="submit" disabled={loading} className={styles.button}>

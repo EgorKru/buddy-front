@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { io } from "socket.io-client";
+import { getToken } from "@/utils/api";
 
 const SocketContext = createContext(null);
 
@@ -13,14 +14,42 @@ export const SocketProvider = (props) => {
   const [socket, setSocket] = useState(null);
 
   useEffect(() => {
-    const connection = io();
-    console.log("socket connection", connection)
+    // Получаем URL для Socket.io из переменных окружения или используем API URL
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 
+                     process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 
+                     'http://localhost:8080';
+    
+    const token = getToken();
+    
+    // Настройки подключения Socket.io
+    const connection = io(socketUrl, {
+      auth: token ? { token } : undefined,
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 5,
+    });
+    
+    console.log("Socket connecting to:", socketUrl);
     setSocket(connection);
 
-    connection.on('connect_error', async (err) => {
-      console.log("Error establishing socket", err)
-      await fetch('/api/socket')
-    })
+    connection.on('connect', () => {
+      console.log("Socket connected:", connection.id);
+    });
+
+    connection.on('connect_error', (err) => {
+      console.error("Socket connection error:", err);
+      // Можно добавить уведомление пользователю о проблеме с подключением
+    });
+
+    connection.on('disconnect', (reason) => {
+      console.log("Socket disconnected:", reason);
+    });
+
+    connection.on('reconnect', (attemptNumber) => {
+      console.log("Socket reconnected after", attemptNumber, "attempts");
+    });
 
     return () => {
       connection.disconnect();

@@ -9,10 +9,13 @@ import Player from "@/component/Player";
 import Bottom from "@/component/Bottom";
 import CopySection from "@/component/CopySection";
 import ChatPanel from "@/component/ChatPanel";
+import TopBar from "@/component/TopBar";
+import SingleParticipantInfo from "@/component/SingleParticipantInfo";
 
 import styles from "@/styles/room.module.css";
 import { useRouter } from "next/router";
 import { MessageCircle } from "lucide-react";
+import { getCurrentUser } from "@/utils/api";
 
 const Room = () => {
   const socket = useSocket();
@@ -31,6 +34,11 @@ const Room = () => {
 
   const [users, setUsers] = useState({})
   const [chatOpen, setChatOpen] = useState(false)
+  const [meetingStarted, setMeetingStarted] = useState(false)
+  const [playerNames, setPlayerNames] = useState({})
+  
+  const currentUser = getCurrentUser();
+  const currentUserName = currentUser?.displayName || currentUser?.username || "Вы";
 
   useEffect(() => {
     if (!socket || !peer || !stream) return;
@@ -48,6 +56,11 @@ const Room = () => {
             muted: true,
             playing: true,
           },
+        }));
+
+        setPlayerNames((prev) => ({
+          ...prev,
+          [newUser]: `Участник ${newUser.substring(0, 6)}`,
         }));
 
         setUsers((prev) => ({
@@ -142,6 +155,11 @@ const Room = () => {
           },
         }));
 
+        setPlayerNames((prev) => ({
+          ...prev,
+          [callerId]: `Участник ${callerId.substring(0, 6)}`,
+        }));
+
         setUsers((prev) => ({
           ...prev,
           [callerId]: call
@@ -171,7 +189,11 @@ const Room = () => {
         playing: true,
       },
     }));
-  }, [myId, setPlayers, stream]);
+    setPlayerNames((prev) => ({
+      ...prev,
+      [myId]: currentUserName,
+    }));
+  }, [myId, setPlayers, stream, currentUserName]);
 
   // Очистка ресурсов при размонтировании
   useEffect(() => {
@@ -187,65 +209,107 @@ const Room = () => {
     };
   }, [users, stream]);
 
+  const participantCount = Object.keys(players).length;
+  const isSingleParticipant = participantCount <= 1;
+
   if (streamError && !stream) {
     return (
-      <div className={styles.activePlayerContainer}>
-        <div style={{ textAlign: 'center', padding: '20px', color: 'red' }}>
-          <h2>Ошибка доступа к камере/микрофону</h2>
-          <p>{streamError}</p>
-          <p>Пожалуйста, разрешите доступ к камере и микрофону в настройках браузера</p>
+      <div className={styles.roomContainer}>
+        <TopBar roomId={roomId} />
+        <div className={styles.singleParticipantContainer}>
+          <div style={{ textAlign: 'center', padding: '40px', color: 'rgb(255, 100, 100)' }}>
+            <h2 style={{ marginBottom: '16px', fontSize: '24px' }}>Ошибка доступа к камере/микрофону</h2>
+            <p style={{ marginBottom: '8px', color: 'rgb(180, 180, 190)' }}>{streamError}</p>
+            <p style={{ color: 'rgb(150, 150, 160)' }}>Пожалуйста, разрешите доступ к камере и микрофону в настройках браузера</p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <>
-      <div className={styles.activePlayerContainer}>
-        {playerHighlighted && (
-          <Player
-            url={playerHighlighted.url}
-            muted={playerHighlighted.muted}
-            playing={playerHighlighted.playing}
-            isActive
-          />
-        )}
-      </div>
-      <div className={styles.inActivePlayerContainer}>
-        {Object.keys(nonHighlightedPlayers).map((playerId) => {
-          const { url, muted, playing } = nonHighlightedPlayers[playerId];
-          return (
-            <Player
-              key={playerId}
-              url={url}
-              muted={muted}
-              playing={playing}
-              isActive={false}
+    <div className={styles.roomContainer}>
+      <TopBar roomId={roomId} onStart={() => setMeetingStarted(true)} />
+      
+      {isSingleParticipant && !meetingStarted ? (
+        <div className={styles.singleParticipantContainer}>
+          <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+            {playerHighlighted && (
+              <div style={{ flex: 1, marginBottom: '24px' }}>
+                <Player
+                  url={playerHighlighted.url}
+                  muted={playerHighlighted.muted}
+                  playing={playerHighlighted.playing}
+                  isActive
+                  playerId={myId}
+                  playerName={playerNames[myId]}
+                />
+              </div>
+            )}
+            <SingleParticipantInfo 
+              roomId={roomId}
+              onSettingsClick={() => {}}
             />
-          );
-        })}
-      </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className={styles.activePlayerContainer}>
+            {playerHighlighted && (
+              <Player
+                url={playerHighlighted.url}
+                muted={playerHighlighted.muted}
+                playing={playerHighlighted.playing}
+                isActive
+                playerId={myId}
+                playerName={playerNames[myId]}
+              />
+            )}
+            {!playerHighlighted && isSingleParticipant && (
+              <SingleParticipantInfo 
+                roomId={roomId}
+                onSettingsClick={() => {}}
+              />
+            )}
+          </div>
+          <div className={styles.inActivePlayerContainer}>
+            {Object.keys(nonHighlightedPlayers).map((playerId) => {
+              const { url, muted, playing } = nonHighlightedPlayers[playerId];
+              return (
+                <Player
+                  key={playerId}
+                  url={url}
+                  muted={muted}
+                  playing={playing}
+                  isActive={false}
+                  playerId={playerId}
+                  playerName={playerNames[playerId]}
+                />
+              );
+            })}
+          </div>
+        </>
+      )}
+      
       <CopySection roomId={roomId}/>
-      <button 
-        onClick={() => setChatOpen(!chatOpen)} 
-        className={styles.chatToggleButton}
-        title={chatOpen ? "Закрыть чат" : "Открыть чат"}
-      >
-        <MessageCircle size={24} />
-      </button>
+      
+      
       <ChatPanel 
         roomId={roomId} 
         isOpen={chatOpen} 
         onClose={() => setChatOpen(false)} 
       />
+      
       <Bottom
         muted={playerHighlighted?.muted}
         playing={playerHighlighted?.playing}
         toggleAudio={toggleAudio}
         toggleVideo={toggleVideo}
         leaveRoom={leaveRoom}
+        participantCount={participantCount}
+        onChatToggle={() => setChatOpen(!chatOpen)}
       />
-    </>
+    </div>
   );
 };
 

@@ -1,0 +1,52 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 40px;
+  text-align: center;
+  color: rgb(255, 255, 255);
+}
+
+.message {
+  font-size: 16px;
+  line-height: 1.6;
+  color: rgb(255, 255, 255);
+  margin-bottom: 32px;
+  max-width: 500px;
+}
+
+.actions {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.actionButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: rgb(40, 40, 45);
+  border: 1px solid rgb(50, 50, 60);
+  border-radius: 8px;
+  color: rgb(255, 255, 255);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.actionButton:hover {
+  background: rgb(50, 50, 60);
+  border-color: rgb(60, 60, 70);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.actionButton:active {
+  transform: translateY(0);
+}
+
