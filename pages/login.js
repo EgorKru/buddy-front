@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import { authAPI, setCurrentUser } from '@/utils/api';
 import { Eye, EyeOff, Sparkles } from 'lucide-react';
 import InteractiveBackground from '@/component/InteractiveBackground';
@@ -85,7 +86,7 @@ export default function Login() {
           </button>
         </form>
         <p className={styles.link}>
-          Нет аккаунта? <a href="/register">Зарегистрироваться</a>
+          Нет аккаунта? <Link href="/register">Зарегистрироваться</Link>
         </p>
       </div>
     </div>

@@ -121,6 +121,7 @@ export default function Chats() {
             >
               <div className={styles.chatAvatar}>
                 {getChatAvatar(chat) ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={getChatAvatar(chat)} alt="" />
                 ) : (
                   <MessageCircle size={24} />
