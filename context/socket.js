@@ -22,9 +22,10 @@ export const SocketProvider = (props) => {
     const token = getToken();
     
     // Настройки подключения Socket.io
+    // Начинаем с polling (работает через HTTP), потом пробуем websocket
     const connection = io(socketUrl, {
       auth: token ? { token } : undefined,
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'], // Polling более надежен, особенно при проблемах с WebSocket
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,

@@ -16,7 +16,7 @@ export const config = {
          process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 
          'http://localhost:8080',
     options: {
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'], // Polling более надежен, особенно при проблемах с WebSocket
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
