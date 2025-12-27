@@ -8,6 +8,13 @@ const useMediaStream = () => {
 
     useEffect(() => {
         if (isStreamSet.current) return;
+        
+        // Проверяем, что мы в браузере и navigator.mediaDevices доступен
+        if (typeof window === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            setError("Медиа устройства не поддерживаются в этом браузере или требуется HTTPS")
+            return;
+        }
+        
         isStreamSet.current = true;
         (async function initStream() {
             try {
@@ -31,6 +38,7 @@ const useMediaStream = () => {
                     setState(audioStream)
                 } catch (audioError) {
                     console.error("Error getting audio stream", audioError)
+                    setError(audioError.message || "Не удалось получить доступ к микрофону")
                 }
             }
         })()
