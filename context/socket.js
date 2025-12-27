@@ -21,11 +21,20 @@ export const SocketProvider = (props) => {
     
     const token = getToken();
     
+    // Если нет токена, не подключаемся к Socket.IO
+    if (!token) {
+      console.log("Socket: No token, skipping connection");
+      return;
+    }
+    
     // Настройки подключения Socket.io
     // Начинаем с polling (работает через HTTP), потом пробуем websocket
     const connection = io(socketUrl, {
-      auth: token ? { token } : undefined,
-      transports: ['polling', 'websocket'], // Polling более надежен, особенно при проблемах с WebSocket
+      auth: { token },
+      extraHeaders: {
+        'Authorization': `Bearer ${token}`
+      },
+      transports: ['polling', 'websocket'], 
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
