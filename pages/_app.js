@@ -1,11 +1,11 @@
 import "@/styles/globals.css";
 
-import { SocketProvider } from "@/context/socket";
+import { StompProvider } from "@/context/socket";
 
 export default function App({ Component, pageProps }) {
   return (
-    <SocketProvider>
+    <StompProvider>
       <Component {...pageProps} />
-    </SocketProvider>
+    </StompProvider>
   );
 }

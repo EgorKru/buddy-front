@@ -29,6 +29,26 @@
   border-radius: 16px;
   border: 1px solid rgb(50, 50, 60);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  position: relative;
+}
+
+.createButton {
+  margin-left: auto;
+  background: linear-gradient(135deg, rgb(102, 126, 234), rgb(140, 100, 200));
+  border: none;
+  cursor: pointer;
+  padding: 10px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  color: white;
+}
+
+.createButton:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
 .backButton {
@@ -252,5 +272,177 @@
   color: rgb(200, 200, 210);
   font-size: 18px;
   font-weight: 500;
+}
+
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.modal {
+  background: rgb(30, 30, 35);
+  border: 1px solid rgb(50, 50, 60);
+  border-radius: 20px;
+  width: 100%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px;
+  border-bottom: 1px solid rgb(50, 50, 60);
+}
+
+.modalHeader h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: rgb(255, 255, 255);
+}
+
+.modalClose {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: rgb(150, 150, 160);
+  padding: 8px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.modalClose:hover {
+  background: rgb(40, 40, 45);
+  color: rgb(255, 255, 255);
+}
+
+.modalForm {
+  padding: 24px;
+}
+
+.formGroup {
+  margin-bottom: 20px;
+}
+
+.formGroup label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgb(255, 255, 255);
+}
+
+.formGroup .hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: rgb(150, 150, 160);
+}
+
+.input,
+.select {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid rgb(50, 50, 60);
+  border-radius: 12px;
+  background: rgb(40, 40, 45);
+  color: rgb(255, 255, 255);
+  font-size: 16px;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.input:focus,
+.select:focus {
+  border-color: rgb(102, 126, 234);
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.input::placeholder {
+  color: rgb(120, 120, 130);
+}
+
+.error {
+  padding: 12px 16px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 12px;
+  color: rgb(239, 68, 68);
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+.modalActions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+.cancelButton,
+.submitButton {
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.cancelButton {
+  background: rgb(40, 40, 45);
+  color: rgb(255, 255, 255);
+  border: 1px solid rgb(50, 50, 60);
+}
+
+.cancelButton:hover:not(:disabled) {
+  background: rgb(50, 50, 60);
+}
+
+.submitButton {
+  background: linear-gradient(135deg, rgb(102, 126, 234), rgb(140, 100, 200));
+  color: white;
+}
+
+.submitButton:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.cancelButton:disabled,
+.submitButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 

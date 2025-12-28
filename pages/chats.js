@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { MessageCircle, Search, ArrowLeft } from 'lucide-react';
-import { apiRequest, getCurrentUser, isAuthenticated } from '@/utils/api';
+import { MessageCircle, Search, ArrowLeft, Plus, X } from 'lucide-react';
+import { chatAPI, getCurrentUser, isAuthenticated } from '@/utils/api';
 import styles from '@/styles/chats.module.css';
 
 export default function Chats() {
@@ -9,6 +9,12 @@ export default function Chats() {
   const [chats, setChats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [chatType, setChatType] = useState('DIRECT');
+  const [chatName, setChatName] = useState('');
+  const [participantUsernames, setParticipantUsernames] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
   const user = getCurrentUser();
 
   useEffect(() => {
@@ -21,13 +27,74 @@ export default function Chats() {
 
   const loadChats = async () => {
     try {
-      const data = await apiRequest('/chats');
+      const data = await chatAPI.getChats();
       setChats(data);
     } catch (error) {
       console.error('Ошибка загрузки чатов:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCreateChat = async (e) => {
+    e.preventDefault();
+    setCreateError('');
+    
+    if (chatType === 'GROUP' && !chatName.trim()) {
+      setCreateError('Название группы обязательно');
+      return;
+    }
+
+    if (!participantUsernames.trim()) {
+      setCreateError('Укажите участников');
+      return;
+    }
+
+    setCreating(true);
+    try {
+      // Для упрощения: парсим username через запятую
+      // В реальном приложении нужен поиск пользователей
+      const usernames = participantUsernames.split(',').map(u => u.trim()).filter(Boolean);
+      
+      if (chatType === 'DIRECT' && usernames.length !== 1) {
+        setCreateError('Для прямого чата укажите одного пользователя');
+        setCreating(false);
+        return;
+      }
+
+      // Для создания чата нужны ID пользователей, но у нас только username
+      // Используем getDirectChat для прямого чата или создаем через API
+      if (chatType === 'DIRECT') {
+        // Для прямого чата используем специальный эндпоинт
+        // Но он требует userId, а не username. Пока используем заглушку
+        // В реальном приложении нужен поиск пользователей по username
+        setCreateError('Для создания прямого чата используйте поиск пользователя');
+        setCreating(false);
+        return;
+      }
+
+      // Для группового чата пока тоже нужны ID
+      // В реальном приложении нужен API для поиска пользователей
+      setCreateError('Функционал создания группового чата требует API поиска пользователей');
+      setCreating(false);
+    } catch (error) {
+      console.error('Ошибка создания чата:', error);
+      setCreateError(error.message || 'Ошибка при создании чата');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const resetCreateForm = () => {
+    setChatType('DIRECT');
+    setChatName('');
+    setParticipantUsernames('');
+    setCreateError('');
+  };
+
+  const handleCloseModal = () => {
+    setShowCreateModal(false);
+    resetCreateForm();
   };
 
   const filteredChats = chats.filter(chat => {
@@ -92,6 +159,13 @@ export default function Chats() {
           <ArrowLeft size={20} />
         </button>
         <h1>Чаты</h1>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className={styles.createButton}
+          title="Создать чат"
+        >
+          <Plus size={20} />
+        </button>
       </div>
 
       <div className={styles.searchContainer}>
@@ -155,6 +229,91 @@ export default function Chats() {
           ))
         )}
       </div>
+
+      {showCreateModal && (
+        <div className={styles.modalOverlay} onClick={handleCloseModal}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2>Создать чат</h2>
+              <button onClick={handleCloseModal} className={styles.modalClose}>
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleCreateChat} className={styles.modalForm}>
+              <div className={styles.formGroup}>
+                <label>Тип чата</label>
+                <select
+                  value={chatType}
+                  onChange={(e) => setChatType(e.target.value)}
+                  className={styles.select}
+                >
+                  <option value="DIRECT">Прямой чат</option>
+                  <option value="GROUP">Групповой чат</option>
+                </select>
+              </div>
+
+              {chatType === 'GROUP' && (
+                <div className={styles.formGroup}>
+                  <label>Название группы *</label>
+                  <input
+                    type="text"
+                    value={chatName}
+                    onChange={(e) => setChatName(e.target.value)}
+                    placeholder="Введите название группы"
+                    className={styles.input}
+                    required
+                  />
+                </div>
+              )}
+
+              <div className={styles.formGroup}>
+                <label>
+                  {chatType === 'DIRECT' 
+                    ? 'Имя пользователя *' 
+                    : 'Имена пользователей (через запятую) *'}
+                </label>
+                <input
+                  type="text"
+                  value={participantUsernames}
+                  onChange={(e) => setParticipantUsernames(e.target.value)}
+                  placeholder={chatType === 'DIRECT' 
+                    ? 'username' 
+                    : 'username1, username2, ...'}
+                  className={styles.input}
+                  required
+                />
+                <small className={styles.hint}>
+                  {chatType === 'DIRECT'
+                    ? 'Введите имя пользователя для прямого чата'
+                    : 'Введите имена пользователей через запятую'}
+                </small>
+              </div>
+
+              {createError && (
+                <div className={styles.error}>{createError}</div>
+              )}
+
+              <div className={styles.modalActions}>
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  className={styles.cancelButton}
+                  disabled={creating}
+                >
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  className={styles.submitButton}
+                  disabled={creating}
+                >
+                  {creating ? 'Создание...' : 'Создать'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

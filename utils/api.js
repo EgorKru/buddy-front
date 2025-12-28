@@ -98,15 +98,26 @@ export const chatAPI = {
     return apiRequest(`/chats/${chatId}`);
   },
   
+  getDirectChat: async (userId) => {
+    return apiRequest(`/chats/direct/${userId}`);
+  },
+  
+  createChat: async (chatData) => {
+    return apiRequest('/chats', {
+      method: 'POST',
+      body: chatData,
+    });
+  },
+  
   getMessages: async (chatId, params = {}) => {
     const queryString = new URLSearchParams(params).toString();
     return apiRequest(`/chats/${chatId}/messages${queryString ? `?${queryString}` : ''}`);
   },
   
-  sendMessage: async (chatId, content) => {
+  sendMessage: async (chatId, content, type = 'TEXT') => {
     return apiRequest(`/chats/${chatId}/messages`, {
       method: 'POST',
-      body: { content },
+      body: { content, type },
     });
   },
 };
