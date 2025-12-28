@@ -3,15 +3,13 @@
  * Все настройки API и других сервисов
  */
 
-// Функция для определения baseURL с учетом прокси
+// Функция для определения baseURL
+// После исправления CORS на бэкенде используем прямой URL
 const getApiBaseURL = () => {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
   
-  // В браузере, если используем production URL, используем относительный путь для прокси
-  if (typeof window !== 'undefined' && apiUrl.includes('pager.website')) {
-    return '/api';
-  }
-  
+  // CORS настроен на бэкенде, используем прямой URL
+  // Прокси больше не нужен, так как бэкенд разрешает origin http://localhost:3000
   return apiUrl;
 };
 
