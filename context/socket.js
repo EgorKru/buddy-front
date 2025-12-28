@@ -26,6 +26,16 @@ export const StompProvider = (props) => {
       return;
     }
 
+    // В development с production URL могут быть проблемы с CORS
+    // Подключаемся только если уверены, что бэкенд настроен
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    const isProductionUrl = config.stomp.url.includes('pager.website');
+    
+    if (isDevelopment && isProductionUrl) {
+      console.warn("STOMP: Development mode with production URL. CORS must be configured on backend.");
+      console.warn("STOMP: Backend must allow origin 'http://localhost:3000' for WebSocket connections.");
+    }
+
     const wsUrl = config.stomp.url;
     
     // Согласно документации: ВАЖНО использовать SockJS для подключения
