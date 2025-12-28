@@ -109,6 +109,16 @@ export const StompProvider = (props) => {
       onConnect: (frame) => {
         console.log("✅ STOMP: Connected successfully!", frame);
         setConnected(true);
+        
+        // Подписываемся на ошибки
+        try {
+          stompClient.subscribe('/queue/errors', (error) => {
+            console.error('WebSocket error:', error.body);
+            // Можно добавить уведомление пользователю об ошибке
+          });
+        } catch (error) {
+          console.error('STOMP: Failed to subscribe to errors queue:', error);
+        }
       },
       onDisconnect: () => {
         console.log("STOMP: Disconnected");
