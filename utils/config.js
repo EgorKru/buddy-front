@@ -25,7 +25,9 @@ export const config = {
     // WebSocket нельзя проксировать через Next.js, используем прямой URL
     // Production: wss://pager.website/ws -> https://pager.website/ws (для SockJS)
     // Dev: ws://localhost:8080/ws -> http://localhost:8080/ws (для SockJS)
+    // Поддерживаем оба варианта переменных для обратной совместимости
     url: process.env.NEXT_PUBLIC_WS_URL || 
+         (process.env.NEXT_PUBLIC_SOCKET_URL ? `${process.env.NEXT_PUBLIC_SOCKET_URL}/ws` : null) ||
          (process.env.NEXT_PUBLIC_API_URL?.replace('/api', '/ws') || 'ws://localhost:8080/ws'),
     options: {
       reconnectDelay: 5000,

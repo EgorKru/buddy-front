@@ -13,10 +13,10 @@ COPY . .
 
 # Собираем приложение (переменные окружения должны быть установлены во время сборки)
 ARG NEXT_PUBLIC_API_URL=https://pager.website/api
-ARG NEXT_PUBLIC_SOCKET_URL=https://pager.website
+ARG NEXT_PUBLIC_WS_URL=wss://pager.website/ws
 
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
-ENV NEXT_PUBLIC_SOCKET_URL=$NEXT_PUBLIC_SOCKET_URL
+ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL
 ENV NODE_ENV=production
 
 RUN npm run build
