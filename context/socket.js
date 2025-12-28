@@ -11,6 +11,17 @@ export const useStomp = () => {
   return context || { client: null, connected: false };
 };
 
+// Алиас для обратной совместимости (используется в комнатах)
+// ВАЖНО: Для чатов используйте useStomp() и STOMP API
+// Для комнат (video calls) может потребоваться отдельный Socket.IO клиент
+export const useSocket = () => {
+  // Возвращаем null, чтобы код не падал
+  // Комнаты (video calls) требуют Socket.IO, который не настроен
+  // TODO: Настроить Socket.IO для комнат или перевести на STOMP
+  console.warn('useSocket() is deprecated. Use useStomp() for chat functionality.');
+  return null;
+};
+
 export const StompProvider = (props) => {
   const { children } = props;
   const [client, setClient] = useState(null);
