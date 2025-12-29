@@ -309,7 +309,11 @@ export const useMessageSender = (chatId, onMessageSent) => {
     try {
       const subscription = client.subscribe('/user/queue/message-sent', (message) => {
         try {
-          console.log('📬 Получено сообщение в /user/queue/message-sent, raw body:', message.body);
+          console.log('📬 Получено сообщение в /user/queue/message-sent:');
+          console.log('  - Destination:', message.headers?.destination || 'N/A');
+          console.log('  - Subscription:', message.headers?.subscription || 'N/A');
+          console.log('  - Message ID:', message.headers?.['message-id'] || 'N/A');
+          console.log('  - Raw body:', message.body);
           const confirmation = JSON.parse(message.body);
           
           console.log('📬 Получено подтверждение отправки:', confirmation);

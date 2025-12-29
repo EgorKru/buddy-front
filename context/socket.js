@@ -142,6 +142,15 @@ export const StompProvider = (props) => {
         // X-Authorization для совместимости
         'X-Authorization': `Bearer ${token}`,
       },
+      
+      // Добавляем логирование STOMP команд для диагностики
+      beforeConnect: () => {
+        console.log('🔌 STOMP: Подготовка к подключению...');
+        console.log('🔌 STOMP: Connect headers:', {
+          Authorization: 'Bearer ***',
+          'X-Authorization': 'Bearer ***'
+        });
+      },
       reconnectDelay: config.stomp.options.reconnectDelay,
       heartbeatIncoming: config.stomp.options.heartbeatIncoming,
       heartbeatOutgoing: config.stomp.options.heartbeatOutgoing,

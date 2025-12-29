@@ -248,9 +248,13 @@ export default function ChatPage() {
         topic,
         (message) => {
           try {
-            console.log('📨 Получено сообщение через WebSocket, raw body:', message.body);
+            console.log('📨 Получено сообщение через WebSocket:');
+            console.log('  - Destination:', message.headers?.destination || 'N/A');
+            console.log('  - Subscription:', message.headers?.subscription || 'N/A');
+            console.log('  - Message ID:', message.headers?.['message-id'] || 'N/A');
+            console.log('  - Raw body:', message.body);
             const messageDto = JSON.parse(message.body);
-            console.log('📨 Получено сообщение через WebSocket:', messageDto);
+            console.log('📨 Парсированное сообщение:', messageDto);
             const isOwnMessage = messageDto.senderId === user?.id;
             
             // Используем handleServerMessage из хука для обработки
