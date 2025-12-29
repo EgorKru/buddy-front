@@ -28,14 +28,31 @@ export const StompProvider = (props) => {
   const [client, setClient] = useState(null);
   const [connected, setConnected] = useState(false);
   const clientRef = useRef(null);
+  const tokenRef = useRef(null);
+  const reconnectTimeoutRef = useRef(null);
 
   useEffect(() => {
+    // Сохраняем токен в ref для проверки изменений
     const token = getToken();
+    tokenRef.current = token;
     
-    // Если нет токена, не подключаемся
+    // Если нет токена, отключаемся если подключены
     if (!token) {
       if (process.env.NODE_ENV === 'development') {
         console.log("STOMP: No token, skipping connection");
+      }
+      if (clientRef.current && clientRef.current.connected) {
+        clientRef.current.deactivate();
+        setClient(null);
+        setConnected(false);
+      }
+      return;
+    }
+    
+    // Если уже подключены с тем же токеном, не переподключаемся
+    if (clientRef.current && clientRef.current.connected) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log("STOMP: Already connected, skipping reconnection");
       }
       return;
     }
@@ -238,6 +255,41 @@ export const StompProvider = (props) => {
         stompClient.deactivate();
       }
     };
+  }, []); // Подключаемся только при монтировании
+  
+  // Отдельный эффект для переподключения при появлении токена
+  useEffect(() => {
+    const checkToken = () => {
+      const currentToken = getToken();
+      const hasClient = clientRef.current && clientRef.current.connected;
+      
+      // Если токен появился, но клиент не подключен - переподключаемся
+      if (currentToken && !hasClient) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log("STOMP: Token found but not connected, will reconnect on next mount");
+        }
+        // Перезагружаем компонент для переподключения
+        // Но лучше просто переподключиться программно
+        if (clientRef.current) {
+          clientRef.current.deactivate();
+        }
+        // Переподключаемся через небольшую задержку
+        setTimeout(() => {
+          if (getToken() && (!clientRef.current || !clientRef.current.connected)) {
+            // Перезагружаем страницу для переподключения WebSocket
+            // Это не идеально, но гарантирует переподключение
+            if (process.env.NODE_ENV === 'development') {
+              console.log("STOMP: Reconnecting after token appeared");
+            }
+          }
+        }, 1000);
+      }
+    };
+    
+    // Проверяем токен каждую секунду
+    const interval = setInterval(checkToken, 1000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   return (

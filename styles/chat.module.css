@@ -260,6 +260,7 @@
   border-radius: 1rem;
   word-wrap: break-word;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  color: #333;
 }
 
 .message.ownMessage .messageText {
