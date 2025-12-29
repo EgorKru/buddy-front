@@ -39,8 +39,9 @@ Frontend запустится на `http://localhost:3000` (или следую�
 # API Configuration
 NEXT_PUBLIC_API_URL=http://localhost:8080/api
 
-# Socket.io Configuration (опционально, по умолчанию берется из API_URL)
-NEXT_PUBLIC_SOCKET_URL=http://localhost:8080
+# WebSocket Configuration (опционально, по умолчанию берется из API_URL)
+NEXT_PUBLIC_WS_URL=ws://localhost:8080/ws
+# Альтернативно можно использовать NEXT_PUBLIC_SOCKET_URL для обратной совместимости
 
 # Environment
 NODE_ENV=development
@@ -48,21 +49,22 @@ NODE_ENV=development
 
 **Важно:**
 - `NEXT_PUBLIC_API_URL` - URL вашего бэкенда с путем `/api` в конце
-- `NEXT_PUBLIC_SOCKET_URL` - URL для WebSocket соединений (обычно тот же хост, что и API, но без `/api`)
-- Если `NEXT_PUBLIC_SOCKET_URL` не указан, он автоматически берется из `NEXT_PUBLIC_API_URL`
+- `NEXT_PUBLIC_WS_URL` - URL для WebSocket соединений (STOMP через SockJS) с путем `/ws` в конце
+- Если `NEXT_PUBLIC_WS_URL` не указан, он автоматически берется из `NEXT_PUBLIC_API_URL` (заменяя `/api` на `/ws`)
+- Для обратной совместимости также поддерживается `NEXT_PUBLIC_SOCKET_URL` (будет автоматически добавлен `/ws`)
 
 ### Настройка для разных окружений
 
 **Разработка (локально):**
 ```bash
 NEXT_PUBLIC_API_URL=http://localhost:8080/api
-NEXT_PUBLIC_SOCKET_URL=http://localhost:8080
+NEXT_PUBLIC_WS_URL=ws://localhost:8080/ws
 ```
 
 **Продакшн (текущий сервер):**
 ```bash
-NEXT_PUBLIC_API_URL=http://158.160.148.204:8080/api
-NEXT_PUBLIC_SOCKET_URL=http://158.160.148.204:8080
+NEXT_PUBLIC_API_URL=https://pager.website/api
+NEXT_PUBLIC_WS_URL=wss://pager.website/ws
 ```
 
 ## Развертывание на сервере
@@ -79,8 +81,8 @@ cd buddy-front
 
 3. **Создайте файл `.env.production` с настройками:**
 ```bash
-NEXT_PUBLIC_API_URL=http://158.160.148.204:8080/api
-NEXT_PUBLIC_SOCKET_URL=http://158.160.148.204:8080
+NEXT_PUBLIC_API_URL=https://pager.website/api
+NEXT_PUBLIC_WS_URL=wss://pager.website/ws
 NODE_ENV=production
 ```
 
@@ -100,8 +102,8 @@ docker build -t buddy-frontend .
 # Запуск контейнера
 docker run -d \
   -p 3000:3000 \
-  -e NEXT_PUBLIC_API_URL=http://158.160.148.204:8080/api \
-  -e NEXT_PUBLIC_SOCKET_URL=http://158.160.148.204:8080 \
+  -e NEXT_PUBLIC_API_URL=https://pager.website/api \
+  -e NEXT_PUBLIC_WS_URL=wss://pager.website/ws \
   -e NODE_ENV=production \
   --name buddy-frontend \
   buddy-frontend
@@ -120,8 +122,8 @@ npm ci
 
 3. **Создайте файл `.env.production`:**
 ```bash
-NEXT_PUBLIC_API_URL=http://158.160.148.204:8080/api
-NEXT_PUBLIC_SOCKET_URL=http://158.160.148.204:8080
+NEXT_PUBLIC_API_URL=https://pager.website/api
+NEXT_PUBLIC_WS_URL=wss://pager.website/ws
 NODE_ENV=production
 ```
 
@@ -145,10 +147,13 @@ pm2 startup
 
 ### Важные замечания
 
-⚠️ **CORS на бэкенде:** Убедитесь, что на бэкенде в переменной окружения `CORS_ALLOWED_ORIGINS` добавлен URL вашего фронтенда:
-```bash
-CORS_ALLOWED_ORIGINS=http://158.160.148.204:3000,http://your-frontend-domain.com
-```
+⚠️ **CORS на бэкенде:** CORS уже настроен на бэкенде для следующих origins:
+- `http://localhost:3000`
+- `http://localhost:3001`
+- `https://pager.website`
+- `http://158.160.161.57`
+- `http://158.160.161.57:3000`
+- `http://127.0.0.1:3000`
 
 🔒 **Безопасность:** Для production рекомендуется использовать HTTPS и настраивать reverse proxy (nginx) для фронтенда.
 
@@ -211,7 +216,7 @@ await roomAPI.joinRoom(roomId);
 
 ### Socket.io
 
-WebSocket соединение настраивается автоматически через `SocketProvider` в `_app.js`. Socket.io подключается к бэкенду используя `NEXT_PUBLIC_SOCKET_URL`.
+WebSocket соединение (STOMP через SockJS) настраивается автоматически через `StompProvider` в `_app.js`. Подключение использует `NEXT_PUBLIC_WS_URL` или автоматически определяется из `NEXT_PUBLIC_API_URL`.
 
 ## Основные страницы
 

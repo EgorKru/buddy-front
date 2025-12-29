@@ -52,31 +52,50 @@ export default function Chats() {
 
     setCreating(true);
     try {
-      // Для упрощения: парсим username через запятую
-      // В реальном приложении нужен поиск пользователей
-      const usernames = participantUsernames.split(',').map(u => u.trim()).filter(Boolean);
-      
-      if (chatType === 'DIRECT' && usernames.length !== 1) {
-        setCreateError('Для прямого чата укажите одного пользователя');
+      // Парсим ID пользователей (можно вводить через запятую)
+      const participantIds = participantUsernames
+        .split(',')
+        .map(id => id.trim())
+        .filter(Boolean)
+        .map(id => {
+          const numId = parseInt(id, 10);
+          if (isNaN(numId)) {
+            throw new Error(`"${id}" не является валидным ID пользователя`);
+          }
+          return numId;
+        });
+
+      if (participantIds.length === 0) {
+        setCreateError('Укажите хотя бы одного участника');
         setCreating(false);
         return;
       }
 
-      // Для создания чата нужны ID пользователей, но у нас только username
-      // Используем getDirectChat для прямого чата или создаем через API
       if (chatType === 'DIRECT') {
-        // Для прямого чата используем специальный эндпоинт
-        // Но он требует userId, а не username. Пока используем заглушку
-        // В реальном приложении нужен поиск пользователей по username
-        setCreateError('Для создания прямого чата используйте поиск пользователя');
-        setCreating(false);
-        return;
-      }
+        // Для прямого чата используем специальный endpoint
+        if (participantIds.length !== 1) {
+          setCreateError('Для прямого чата укажите одного пользователя');
+          setCreating(false);
+          return;
+        }
 
-      // Для группового чата пока тоже нужны ID
-      // В реальном приложении нужен API для поиска пользователей
-      setCreateError('Функционал создания группового чата требует API поиска пользователей');
-      setCreating(false);
+        const chat = await chatAPI.getDirectChat(participantIds[0]);
+        await loadChats(); // Обновляем список чатов
+        handleCloseModal();
+        router.push(`/chat/${chat.id}`);
+      } else {
+        // Для группового чата создаем через API
+        const chatData = {
+          type: 'GROUP',
+          name: chatName.trim(),
+          participantIds: participantIds,
+        };
+
+        const chat = await chatAPI.createChat(chatData);
+        await loadChats(); // Обновляем список чатов
+        handleCloseModal();
+        router.push(`/chat/${chat.id}`);
+      }
     } catch (error) {
       console.error('Ошибка создания чата:', error);
       setCreateError(error.message || 'Ошибка при создании чата');
@@ -269,23 +288,27 @@ export default function Chats() {
               <div className={styles.formGroup}>
                 <label>
                   {chatType === 'DIRECT' 
-                    ? 'Имя пользователя *' 
-                    : 'Имена пользователей (через запятую) *'}
+                    ? 'ID пользователя *' 
+                    : 'ID пользователей (через запятую) *'}
                 </label>
                 <input
                   type="text"
                   value={participantUsernames}
                   onChange={(e) => setParticipantUsernames(e.target.value)}
                   placeholder={chatType === 'DIRECT' 
-                    ? 'username' 
-                    : 'username1, username2, ...'}
+                    ? '123' 
+                    : '123, 456, 789'}
                   className={styles.input}
                   required
                 />
                 <small className={styles.hint}>
                   {chatType === 'DIRECT'
-                    ? 'Введите имя пользователя для прямого чата'
-                    : 'Введите имена пользователей через запятую'}
+                    ? 'Введите ID пользователя для прямого чата (число)'
+                    : 'Введите ID пользователей через запятую (например: 123, 456, 789)'}
+                  <br />
+                  <span style={{ color: '#888', fontSize: '0.85em' }}>
+                    Примечание: для удобства рекомендуется добавить API поиска пользователей по username
+                  </span>
                 </small>
               </div>
 
