@@ -18,9 +18,37 @@ export const useNotifications = () => {
   }, []);
 
   useEffect(() => {
-    if (client && connected) {
-      // Подписываемся на общие уведомления через WebSocket
-      const notificationsSubscription = client.subscribe('/user/queue/notifications', (message) => {
+    if (!client || !connected || !client.connected || !client.active) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('⚠️ useNotifications: Не могу подписаться, нет подключения:', {
+          hasClient: !!client,
+          connected,
+          clientConnected: client?.connected,
+          clientActive: client?.active
+        });
+      }
+      return;
+    }
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('📡 useNotifications: Подписываемся на уведомления');
+    }
+    
+    // Небольшая задержка для гарантии, что соединение полностью установлено
+    const timeout = setTimeout(() => {
+
+    // Отписываемся от старых подписок
+    subscriptionsRef.current.forEach(sub => {
+      try {
+        sub.unsubscribe();
+      } catch (error) {
+        console.error('Ошибка отписки от старой подписки уведомлений:', error);
+      }
+    });
+    subscriptionsRef.current = [];
+
+    // Подписываемся на общие уведомления через WebSocket
+    const notificationsSubscription = client.subscribe('/user/queue/notifications', (message) => {
         try {
           const notification = JSON.parse(message.body);
           if (process.env.NODE_ENV === 'development') {
@@ -48,12 +76,40 @@ export const useNotifications = () => {
 
       subscriptionsRef.current = [notificationsSubscription, messagesSubscription];
 
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ useNotifications: Успешно подписались на уведомления:', {
+          notificationsId: notificationsSubscription.id,
+          messagesId: messagesSubscription.id
+        });
+      }
+
       return () => {
-        notificationsSubscription.unsubscribe();
-        messagesSubscription.unsubscribe();
+        clearTimeout(timeout);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔌 useNotifications: Отписываемся от уведомлений');
+        }
+        subscriptionsRef.current.forEach(sub => {
+          try {
+            sub.unsubscribe();
+          } catch (error) {
+            console.error('Ошибка отписки от уведомлений:', error);
+          }
+        });
         subscriptionsRef.current = [];
       };
-    }
+    }, 100);
+    
+    return () => {
+      clearTimeout(timeout);
+      subscriptionsRef.current.forEach(sub => {
+        try {
+          sub.unsubscribe();
+        } catch (error) {
+          console.error('Ошибка отписки от уведомлений:', error);
+        }
+      });
+      subscriptionsRef.current = [];
+    };
   }, [client, connected]);
 
   /**

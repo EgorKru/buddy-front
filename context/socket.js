@@ -34,6 +34,7 @@ export const StompProvider = (props) => {
   useEffect(() => {
     // Сохраняем токен в ref для проверки изменений
     const token = getToken();
+    const previousToken = tokenRef.current;
     tokenRef.current = token;
     
     // Если нет токена, отключаемся если подключены
@@ -49,12 +50,26 @@ export const StompProvider = (props) => {
       return;
     }
     
-    // Если уже подключены с тем же токеном, не переподключаемся
-    if (clientRef.current && clientRef.current.connected) {
+    // Если токен изменился или клиент не подключен - переподключаемся
+    const needsReconnect = !clientRef.current || 
+                          !clientRef.current.connected || 
+                          (previousToken !== token && previousToken !== null);
+    
+    if (!needsReconnect && clientRef.current && clientRef.current.connected) {
       if (process.env.NODE_ENV === 'development') {
-        console.log("STOMP: Already connected, skipping reconnection");
+        console.log("STOMP: Already connected with same token, skipping reconnection");
       }
       return;
+    }
+    
+    // Если нужно переподключиться, сначала отключаем старый клиент
+    if (clientRef.current && clientRef.current.connected) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log("STOMP: Disconnecting old client for reconnection");
+      }
+      clientRef.current.deactivate();
+      setClient(null);
+      setConnected(false);
     }
 
     // Логируем информацию о подключении только в dev режиме
@@ -90,9 +105,10 @@ export const StompProvider = (props) => {
       console.log(`STOMP: Using SockJS to connect to`, sockJsUrl);
     }
     
-    // Опция: передать токен через query параметр (альтернатива connectHeaders)
-    const useTokenInUrl = process.env.NEXT_PUBLIC_WS_TOKEN_IN_URL === 'true';
-    const finalWsUrl = useTokenInUrl ? `${sockJsUrl}?token=${token}` : sockJsUrl;
+    // Бэкенд поддерживает токен в query параметре для SockJS handshake
+    // Это помогает при первоначальном подключении
+    // Также передаем токен в connectHeaders для STOMP
+    const finalWsUrl = `${sockJsUrl}?token=${encodeURIComponent(token)}`;
     
     // Создаем STOMP клиент
     const stompClient = new Client({
@@ -133,11 +149,12 @@ export const StompProvider = (props) => {
         
         return sock;
       },
-      // Передача токена через заголовки (основной способ)
-      // Если не работает, можно использовать токен в URL (см. выше)
-      connectHeaders: useTokenInUrl ? {} : {
+      // Передача токена через заголовки STOMP (основной способ)
+      // Бэкенд поддерживает оба заголовка: Authorization и X-Authorization
+      // Токен также передается в URL для SockJS handshake
+      connectHeaders: {
         Authorization: `Bearer ${token}`,
-        // Некоторые бэкенды могут ожидать токен в другом заголовке
+        // X-Authorization для совместимости
         'X-Authorization': `Bearer ${token}`,
       },
       reconnectDelay: config.stomp.options.reconnectDelay,
@@ -151,14 +168,15 @@ export const StompProvider = (props) => {
       onConnect: (frame) => {
         if (process.env.NODE_ENV === 'development') {
           console.log("✅ STOMP: Connected successfully!", frame);
+          console.log("STOMP: Connection headers:", frame.headers);
         }
         setConnected(true);
         
         // Подписываемся на ошибки
         try {
-          stompClient.subscribe('/user/queue/errors', (error) => {
+          const errorSubscription = stompClient.subscribe('/user/queue/errors', (error) => {
             const errorData = JSON.parse(error.body);
-            console.error('WebSocket error:', errorData);
+            console.error('❌ WebSocket error:', errorData);
             // Если ошибка аутентификации, перенаправляем на логин
             if (errorData.message && errorData.message.includes('аутентификации')) {
               if (typeof window !== 'undefined') {
@@ -168,8 +186,11 @@ export const StompProvider = (props) => {
               }
             }
           });
+          if (process.env.NODE_ENV === 'development') {
+            console.log("✅ STOMP: Subscribed to /user/queue/errors");
+          }
         } catch (error) {
-          console.error('STOMP: Failed to subscribe to errors queue:', error);
+          console.error('❌ STOMP: Failed to subscribe to errors queue:', error);
         }
       },
       onDisconnect: () => {
@@ -252,44 +273,33 @@ export const StompProvider = (props) => {
 
     return () => {
       if (stompClient && stompClient.connected) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log("STOMP: Cleaning up connection");
+        }
         stompClient.deactivate();
       }
     };
-  }, []); // Подключаемся только при монтировании
+  }, [token]); // Переподключаемся при изменении токена
   
-  // Отдельный эффект для переподключения при появлении токена
+  // Диагностика состояния подключения (только для разработки)
   useEffect(() => {
-    const checkToken = () => {
-      const currentToken = getToken();
-      const hasClient = clientRef.current && clientRef.current.connected;
+    if (process.env.NODE_ENV === 'development') {
+      const interval = setInterval(() => {
+        const currentToken = getToken();
+        const hasClient = clientRef.current;
+        const isConnected = hasClient && hasClient.connected;
+        
+        console.log('🔍 STOMP Диагностика:', {
+          hasToken: !!currentToken,
+          hasClient: !!hasClient,
+          connected: isConnected,
+          clientState: hasClient ? hasClient.state : 'N/A',
+          clientActive: hasClient ? hasClient.active : false,
+        });
+      }, 10000); // Каждые 10 секунд
       
-      // Если токен появился, но клиент не подключен - переподключаемся
-      if (currentToken && !hasClient) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log("STOMP: Token found but not connected, will reconnect on next mount");
-        }
-        // Перезагружаем компонент для переподключения
-        // Но лучше просто переподключиться программно
-        if (clientRef.current) {
-          clientRef.current.deactivate();
-        }
-        // Переподключаемся через небольшую задержку
-        setTimeout(() => {
-          if (getToken() && (!clientRef.current || !clientRef.current.connected)) {
-            // Перезагружаем страницу для переподключения WebSocket
-            // Это не идеально, но гарантирует переподключение
-            if (process.env.NODE_ENV === 'development') {
-              console.log("STOMP: Reconnecting after token appeared");
-            }
-          }
-        }, 1000);
-      }
-    };
-    
-    // Проверяем токен каждую секунду
-    const interval = setInterval(checkToken, 1000);
-    
-    return () => clearInterval(interval);
+      return () => clearInterval(interval);
+    }
   }, []);
 
   return (

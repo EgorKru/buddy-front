@@ -75,23 +75,50 @@ export const useMessageSender = (chatId, onMessageSent) => {
       // Пробуем отправить через WebSocket
       if (client && connected && client.connected && client.active) {
         try {
+          const destination = '/app/chat.sendMessage';
+          const messagePayload = {
+            chatId: parseInt(chatId),
+            content: messageContent,
+            type,
+          };
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log('📤 Отправка сообщения через WebSocket:', {
+              destination,
+              payload: messagePayload,
+              clientState: {
+                connected: client.connected,
+                active: client.active,
+                state: client.state
+              }
+            });
+          }
+          
           client.publish({
-            destination: '/app/chat.sendMessage',
-            body: JSON.stringify({
-              chatId: parseInt(chatId),
-              content: messageContent,
-              type,
-            }),
+            destination,
+            body: JSON.stringify(messagePayload),
           });
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log('✅ Сообщение отправлено через WebSocket, ждем подтверждения');
+          }
           
           // WebSocket отправка асинхронная, статус обновится при получении ответа
           // Не обновляем статус здесь, ждем подтверждения через подписку
           return optimisticMessage;
         } catch (wsError) {
-          console.error('Ошибка отправки через WebSocket:', wsError);
+          console.error('❌ Ошибка отправки через WebSocket:', wsError);
           throw wsError;
         }
       } else {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('⚠️ WebSocket не подключен, отправляем через REST API:', {
+            hasClient: !!client,
+            connected,
+            clientConnected: client?.connected,
+            clientActive: client?.active
+          });
+        }
         // Fallback: отправляем через REST API
         const serverMessage = await chatAPI.sendMessage(chatId, messageContent, type);
         
@@ -342,11 +369,11 @@ export const useMessageSender = (chatId, onMessageSent) => {
         }
       });
 
-      messageSentSubscriptionRef.current = subscription;
+            messageSentSubscriptionRef.current = subscription;
 
-      if (process.env.NODE_ENV === 'development') {
-        console.log('✅ Подписались на подтверждения отправки сообщений');
-      }
+            if (process.env.NODE_ENV === 'development') {
+              console.log('✅ useMessageSender: Успешно подписались на подтверждения отправки сообщений, Subscription ID:', subscription.id);
+            }
 
       return () => {
         if (messageSentSubscriptionRef.current) {
