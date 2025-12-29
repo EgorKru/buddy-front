@@ -179,6 +179,60 @@ export const getCurrentUser = () => {
 };
 
 /**
+ * API методы для работы с уведомлениями
+ */
+export const notificationAPI = {
+  /**
+   * Получить список уведомлений с пагинацией
+   * @param {number} page - Номер страницы (по умолчанию 0)
+   * @param {number} size - Размер страницы (по умолчанию 20)
+   * @returns {Promise<Object>} Объект с уведомлениями и метаданными пагинации
+   */
+  getNotifications: async (page = 0, size = 20) => {
+    return apiRequest(`/notifications?page=${page}&size=${size}`);
+  },
+
+  /**
+   * Получить непрочитанные уведомления
+   * @returns {Promise<Array>} Список непрочитанных уведомлений
+   */
+  getUnreadNotifications: async () => {
+    return apiRequest('/notifications/unread');
+  },
+
+  /**
+   * Получить количество непрочитанных уведомлений
+   * @returns {Promise<number>} Количество непрочитанных уведомлений
+   */
+  getUnreadCount: async () => {
+    const response = await apiRequest('/notifications/unread/count');
+    return response.count || 0;
+  },
+
+  /**
+   * Отметить уведомление как прочитанное
+   * @param {number} notificationId - ID уведомления
+   * @returns {Promise<void>}
+   */
+  markAsRead: async (notificationId) => {
+    return apiRequest(`/notifications/${notificationId}/read`, {
+      method: 'PUT',
+    });
+  },
+
+  /**
+   * Удалить уведомление
+   * @param {number} notificationId - ID уведомления
+   * @returns {Promise<void>}
+   */
+  deleteNotification: async (notificationId) => {
+    return apiRequest(`/notifications/${notificationId}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+/**
  * Сохранить данные пользователя и токен в localStorage
  * @param {Object} user - Данные пользователя
  * @param {string} token - JWT токен

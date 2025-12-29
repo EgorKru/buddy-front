@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { authAPI, setCurrentUser } from '@/utils/api';
-import { Eye, EyeOff, Sparkles } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import InteractiveBackground from '@/component/InteractiveBackground';
+import Pager3D from '@/component/Pager3D';
 import styles from '@/styles/login.module.css';
 
 export default function Login() {
@@ -40,12 +41,9 @@ export default function Login() {
       </div>
       <div className={styles.formContainer}>
         <div className={styles.logoContainer}>
-          <div className={styles.logoIcon}>
-            <Sparkles className={styles.sparkleIcon} size={24} />
-            <span className={styles.logoText}>B</span>
-          </div>
+          <Pager3D size={90} interactive={true} />
         </div>
-        <h1>Вход в Buddy</h1>
+        <h1>Вход в Pager</h1>
         <p className={styles.subtitle}>Добро пожаловать обратно</p>
         <form onSubmit={handleLogin}>
           <div className={styles.formGroup}>

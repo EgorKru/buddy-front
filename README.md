@@ -1,6 +1,6 @@
-# Buddy Frontend
+# Pager Frontend
 
-Frontend для Buddy - платформы для видеозвонков и мессенджера.
+Frontend для Pager - платформы для видеозвонков и мессенджера.
 
 ## Технологии
 
@@ -76,7 +76,7 @@ NEXT_PUBLIC_WS_URL=wss://pager.website/ws
 2. **Клонируйте репозиторий на сервер:**
 ```bash
 git clone <your-repo-url>
-cd buddy-front
+cd pager-front
 ```
 
 3. **Создайте файл `.env.production` с настройками:**
@@ -105,8 +105,8 @@ docker run -d \
   -e NEXT_PUBLIC_API_URL=https://pager.website/api \
   -e NEXT_PUBLIC_WS_URL=wss://pager.website/ws \
   -e NODE_ENV=production \
-  --name buddy-frontend \
-  buddy-frontend
+  --name pager-frontend \
+  pager-frontend
 ```
 
 ### Развертывание без Docker (напрямую на сервере)
@@ -116,7 +116,7 @@ docker run -d \
 2. **Клонируйте репозиторий и установите зависимости:**
 ```bash
 git clone <your-repo-url>
-cd buddy-front
+cd pager-front
 npm ci
 ```
 
@@ -140,7 +140,7 @@ npm start
 6. **Для постоянного запуска рекомендуется использовать PM2:**
 ```bash
 npm install -g pm2
-pm2 start npm --name "buddy-frontend" -- start
+pm2 start npm --name "pager-frontend" -- start
 pm2 save
 pm2 startup
 ```

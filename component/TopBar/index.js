@@ -41,7 +41,7 @@ const TopBar = ({ roomId, onStart }) => {
   return (
     <div className={styles.topBar}>
       <div className={styles.leftSection}>
-        <div className={styles.logo}>Buddy</div>
+        <div className={styles.logo}>Pager</div>
         {!isRunning && (
           <button className={styles.startButton} onClick={handleStart}>
             <Play size={16} />

@@ -5,11 +5,14 @@ import { useEffect } from 'react';
 import styles from '@/styles/home.module.css'
 import { useState } from 'react';
 import { isAuthenticated, getCurrentUser, authAPI } from '@/utils/api';
+import PagerNotification from '@/component/PagerNotification';
+import { useNotifications } from '@/hooks/useNotifications';
 
 export default function Home() {
   const router = useRouter()
   const [roomId, setRoomId] = useState('')
   const [user, setUser] = useState(null)
+  const { notifications, markAsRead, dismissNotification } = useNotifications();
 
   useEffect(() => {
     const checkAuth = () => {
@@ -93,10 +96,10 @@ export default function Home() {
   return (
     <div className={styles.homeContainer}>
       <div className={styles.header}>
-        <h1>Buddy</h1>
+        <h1>Pager</h1>
         <div className={styles.userInfo}>
           <span>Привет, {user.displayName || user.username}!</span>
-          <button onClick={() => router.push('/chats')} className={styles.chatButton}>
+          <button onClick={() => router.push('/chat/1')} className={styles.chatButton}>
             Чаты
           </button>
           <button onClick={handleLogout} className={styles.logoutButton}>
@@ -120,6 +123,18 @@ export default function Home() {
           Создать новую комнату
         </button>
       </div>
+      
+      <PagerNotification
+        notifications={notifications}
+        onNotificationClick={(notification) => {
+          markAsRead(notification.id);
+          // Можно добавить навигацию к чату или другому действию
+          if (notification.chatId) {
+            router.push(`/chat/${notification.chatId}`);
+          }
+        }}
+        onDismiss={dismissNotification}
+      />
     </div>
   )
 }

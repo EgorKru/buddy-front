@@ -38,7 +38,7 @@ export const config = {
   
   // App Configuration
   app: {
-    name: 'Buddy',
+    name: 'Pager',
     version: '1.0.0',
   },
 };
