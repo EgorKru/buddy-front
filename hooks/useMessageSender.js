@@ -357,11 +357,17 @@ export const useMessageSender = (chatId, onMessageSent) => {
                 }
               }, 1000);
 
-              // Обновляем UI через callback
+              // Обновляем UI через callback - заменяем tempId на реальный messageId
               if (onMessageSent) {
+                console.log('📬 Обновляем UI: заменяем оптимистичное сообщение на подтвержденное:', {
+                  tempId: queuedMessage.tempId,
+                  messageId: confirmation.messageId,
+                  chatId: confirmation.chatId
+                });
                 onMessageSent({
                   id: confirmation.messageId,
                   status: MESSAGE_STATUS.SENT,
+                  chatId: confirmation.chatId,
                 }, queuedMessage.tempId);
               }
             } else {

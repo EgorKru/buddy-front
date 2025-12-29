@@ -112,16 +112,23 @@ export default function ChatPage() {
       return; // Выходим, не продолжаем дальше
     }
     
-    // Если это реальное сообщение (без tempId и isOptimistic)
+    // Если это реальное сообщение (с tempId для замены оптимистичного)
     if (tempId) {
       // Обновляем существующее оптимистичное сообщение
       setMessages(prev => {
+        // Ищем оптимистичное сообщение по tempId
         const index = prev.findIndex(m => 
           (m.tempId === tempId || m.id === tempId) && m.isOptimistic
         );
         
         if (index !== -1) {
-          console.log('✅ Найдено оптимистичное сообщение, заменяем на реальное:', { index, tempId, messageId: message.id });
+          console.log('✅ Найдено оптимистичное сообщение, заменяем на реальное:', { 
+            index, 
+            tempId, 
+            messageId: message.id,
+            oldContent: prev[index].content?.substring(0, 20),
+            newContent: message.content?.substring(0, 20)
+          });
           // Заменяем оптимистичное сообщение на реальное
           const updated = [...prev];
           updated[index] = {
@@ -131,8 +138,15 @@ export default function ChatPage() {
           };
           return updated;
         } else {
-          console.log('➕ Оптимистичное сообщение не найдено, добавляем новое');
-          // Или добавляем новое, если это сообщение от сервера
+          console.log('⚠️ Оптимистичное сообщение не найдено по tempId:', tempId);
+          // Проверяем, нет ли уже сообщения с таким id
+          const existingById = prev.findIndex(m => m.id === message.id);
+          if (existingById !== -1) {
+            console.log('⚠️ Сообщение с таким id уже существует, пропускаем');
+            return prev;
+          }
+          // Добавляем новое, если не нашли оптимистичное
+          console.log('➕ Добавляем новое сообщение (оптимистичное не найдено)');
           return [...prev, { ...message, status: message.status || MESSAGE_STATUS.SENT, isOptimistic: false }];
         }
       });
@@ -145,8 +159,8 @@ export default function ChatPage() {
         }));
       }
     } else {
+      // Новое сообщение (не оптимистичное, без tempId)
       console.log('➕ Новое сообщение (не оптимистичное), добавляем');
-      // Новое сообщение (не оптимистичное)
       setMessages(prev => {
         // Проверяем, нет ли уже такого сообщения
         const exists = prev.find(m => m.id === message.id);
@@ -155,7 +169,7 @@ export default function ChatPage() {
           return prev;
         }
         console.log('✅ Добавляем новое сообщение в список');
-        return [...prev, { ...message, status: MESSAGE_STATUS.SENT }];
+        return [...prev, { ...message, status: message.status || MESSAGE_STATUS.SENT, isOptimistic: false }];
       });
     }
   }, []);
@@ -257,48 +271,32 @@ export default function ChatPage() {
             console.log('📨 Парсированное сообщение:', messageDto);
             const isOwnMessage = messageDto.senderId === user?.id;
             
-            // Используем handleServerMessage из хука для обработки
-            if (isOwnMessage && handleServerMessage) {
-              // Ищем оптимистичное сообщение для замены
-              setMessages(prev => {
-                const optimisticIndex = prev.findIndex(m => 
-                  m.isOptimistic && 
-                  m.content === messageDto.content && 
-                  m.senderId === messageDto.senderId &&
-                  Math.abs(new Date(m.createdAt || m.tempId).getTime() - new Date(messageDto.createdAt).getTime()) < 10000
-                );
-                
-                if (optimisticIndex !== -1) {
-                  const optimisticMsg = prev[optimisticIndex];
-                  handleServerMessage(messageDto, optimisticMsg.tempId);
-                }
-                return prev;
-              });
-            }
-            
             setMessages(prev => {
-              // Проверяем, нет ли уже такого сообщения (избегаем дубликатов)
-              const existing = prev.find(m => m.id === messageDto.id);
-              if (existing) {
-                if (process.env.NODE_ENV === 'development') {
-                  console.log('⚠️ Сообщение уже существует, пропускаем:', messageDto.id);
-                }
+              // 1. Проверяем, нет ли уже сообщения с таким id (избегаем дубликатов)
+              const existingById = prev.findIndex(m => m.id === messageDto.id);
+              if (existingById !== -1) {
+                console.log('⚠️ Сообщение с таким id уже существует, пропускаем:', messageDto.id);
                 return prev;
               }
               
-              // Если это наше сообщение, ищем оптимистичное для замены
+              // 2. Если это наше сообщение, ищем оптимистичное для замены
               if (isOwnMessage) {
+                // Ищем по content и senderId (основной способ)
                 const optimisticIndex = prev.findIndex(m => 
                   m.isOptimistic && 
                   m.content === messageDto.content && 
                   m.senderId === messageDto.senderId &&
-                  Math.abs(new Date(m.createdAt || m.tempId).getTime() - new Date(messageDto.createdAt).getTime()) < 10000
+                  (m.status === MESSAGE_STATUS.SENDING || m.status === MESSAGE_STATUS.PENDING)
                 );
                 
                 if (optimisticIndex !== -1) {
-                  if (process.env.NODE_ENV === 'development') {
-                    console.log('✅ Заменяем оптимистичное сообщение на реальное:', messageDto);
-                  }
+                  console.log('✅ Заменяем оптимистичное сообщение на реальное:', {
+                    optimisticIndex,
+                    tempId: prev[optimisticIndex].tempId,
+                    realId: messageDto.id,
+                    content: messageDto.content.substring(0, 20) + '...'
+                  });
+                  // Заменяем оптимистичное сообщение на реальное
                   const updated = [...prev];
                   updated[optimisticIndex] = {
                     ...messageDto,
@@ -309,11 +307,13 @@ export default function ChatPage() {
                 }
               }
               
-              // Если это новое сообщение от другого пользователя
-              if (process.env.NODE_ENV === 'development') {
-                console.log('➕ Добавляем новое сообщение:', messageDto);
-              }
-              return [...prev, { ...messageDto, status: MESSAGE_STATUS.SENT }];
+              // 3. Если не нашли оптимистичное сообщение, добавляем новое
+              console.log('➕ Добавляем новое сообщение в список (не оптимистичное)');
+              return [...prev, {
+                ...messageDto,
+                status: MESSAGE_STATUS.SENT,
+                isOptimistic: false,
+              }];
             });
           } catch (error) {
             console.error('❌ Ошибка парсинга сообщения:', error);
