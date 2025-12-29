@@ -79,6 +79,22 @@
   overflow: hidden;
 }
 
+@media (max-width: 768px) {
+  .formContainer {
+    padding: 40px 32px;
+    border-radius: 20px;
+    margin: 0 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .formContainer {
+    padding: 32px 24px;
+    border-radius: 16px;
+    margin: 0 12px;
+  }
+}
+
 .formContainer::before {
   content: '';
   position: absolute;

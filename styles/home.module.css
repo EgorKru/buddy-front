@@ -20,13 +20,14 @@
 
 .header {
   width: 100%;
-  max-width: 1200px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 60px;
+  margin-bottom: 40px;
   padding: 20px 0;
   border-bottom: 1px solid rgb(50, 50, 60);
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
 .header h1 {
@@ -39,18 +40,44 @@
   -webkit-text-fill-color: transparent;
   background-clip: text;
   letter-spacing: -0.5px;
+  flex: 1;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .header h1 {
+    text-align: left;
+    flex: none;
+  }
 }
 
 .userInfo {
   display: flex;
   align-items: center;
   gap: 16px;
+  flex-wrap: wrap;
 }
 
 .userInfo span {
   color: rgb(200, 200, 210);
   font-size: 15px;
   font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .userInfo {
+    gap: 8px;
+  }
+  
+  .userInfo span {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .userInfo span {
+    display: none; /* Скрываем приветствие на очень маленьких экранах */
+  }
 }
 
 .chatButton, .logoutButton {
@@ -63,6 +90,21 @@
   font-weight: 500;
   cursor: pointer;
   transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .chatButton, .logoutButton {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .chatButton, .logoutButton {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
 }
 
 .chatButton {
@@ -107,11 +149,20 @@
   padding: 40px 20px;
   transition: margin-left 0.3s ease;
   min-height: 100vh;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .mainContent {
+    padding: 20px 16px;
+  }
 }
 
 @media (min-width: 769px) {
   .mainContent {
     margin-left: 320px;
+    width: calc(100% - 320px);
   }
 }
 
@@ -161,6 +212,21 @@
   animation: slideUp 0.5s ease-out 0.2s both;
 }
 
+@media (max-width: 768px) {
+  .content {
+    padding: 32px 24px;
+    border-radius: 16px;
+    margin: 0 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .content {
+    padding: 24px 16px;
+    margin: 0 8px;
+  }
+}
+
 @keyframes slideUp {
   from {
     opacity: 0;
@@ -193,6 +259,13 @@
   box-sizing: border-box;
 }
 
+@media (max-width: 768px) {
+  .enterRoom input {
+    padding: 14px 18px;
+    font-size: 16px; /* Предотвращает зум на iOS */
+  }
+}
+
 .enterRoom input::placeholder {
   color: rgb(120, 120, 130);
 }
@@ -222,6 +295,14 @@
   cursor: pointer;
   transition: all 0.3s ease;
   box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
+  touch-action: manipulation;
+}
+
+@media (max-width: 768px) {
+  .enterRoom button {
+    padding: 14px 20px;
+    font-size: 15px;
+  }
 }
 
 .enterRoom button:hover {
@@ -264,6 +345,14 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
+  touch-action: manipulation;
+}
+
+@media (max-width: 768px) {
+  .createButton {
+    padding: 14px 20px;
+    font-size: 15px;
+  }
 }
 
 .createButton:hover {

@@ -220,115 +220,26 @@ export default function ChatPage() {
     }
   };
 
+  // Синхронизация очереди при подключении
+  useEffect(() => {
+    if (connected && chatId) {
+      syncQueue();
+    }
+  }, [connected, chatId, syncQueue]);
+
   const sendMessage = async (e) => {
     e.preventDefault();
     if (!newMessage.trim() || !user || sending) return;
 
     const messageContent = newMessage.trim();
-    
-    // Оптимистичное обновление UI - показываем сообщение сразу
-    const optimisticMessage = {
-      id: `temp-${Date.now()}`,
-      content: messageContent,
-      senderId: user.id,
-      senderUsername: user.username,
-      senderDisplayName: user.displayName || user.username,
-      createdAt: new Date().toISOString(),
-      type: 'TEXT',
-      isOptimistic: true, // Флаг для временного сообщения
-    };
-    
-    setMessages(prev => [...prev, optimisticMessage]);
     setNewMessage('');
-    setSending(true);
-    
-    // Fallback: удаляем оптимистичное сообщение через 15 секунд, если оно не было заменено
-    // Это защита от "висящих" сообщений, если что-то пошло не так
-    const fallbackTimeout = setTimeout(() => {
-      setMessages(prev => {
-        const stillOptimistic = prev.find(m => m.id === optimisticMessage.id && m.isOptimistic);
-        if (stillOptimistic) {
-          if (process.env.NODE_ENV === 'development') {
-            console.warn('Оптимистичное сообщение не было заменено за 15 секунд, удаляем:', optimisticMessage);
-          }
-          return prev.filter(m => m.id !== optimisticMessage.id);
-        }
-        return prev;
-      });
-    }, 15000);
 
-    try {
-      // Проверяем реальное состояние WebSocket
-      const isWebSocketReady = client && connected && client.connected && client.active;
-      
-      if (isWebSocketReady) {
-        // Отправляем через WebSocket
-        console.log('📤 Отправка сообщения через WebSocket:', {
-          chatId,
-          content: messageContent,
-          destination: '/app/chat.sendMessage'
-        });
-        try {
-          client.publish({
-            destination: '/app/chat.sendMessage',
-            body: JSON.stringify({
-              chatId: parseInt(chatId),
-              content: messageContent,
-              type: 'TEXT',
-            }),
-          });
-          console.log('✅ Сообщение отправлено через WebSocket, ждем подтверждения через подписку');
-          // WebSocket отправка асинхронная, сообщение придет через подписку
-          // Оптимистичное сообщение будет заменено реальным в subscribeToChat
-          // Fallback таймаут очистится при замене сообщения или через 15 секунд
-        } catch (wsError) {
-          console.error('❌ Ошибка отправки через WebSocket:', wsError);
-          // Если WebSocket ошибка, пробуем через REST API
-          throw wsError;
-        }
-      } else {
-        // Fallback: отправляем через REST API
-        console.log('📤 WebSocket не подключен, отправка через REST API', { 
-          client: !!client, 
-          connected, 
-          clientConnected: client?.connected,
-          clientActive: client?.active
-        });
-        const sentMessage = await chatAPI.sendMessage(chatId, messageContent);
-        // Заменяем оптимистичное сообщение на реальное
-        clearTimeout(fallbackTimeout); // Очищаем fallback таймаут
-        setMessages(prev => 
-          prev.map(m => m.id === optimisticMessage.id ? sentMessage : m)
-        );
-      }
-    } catch (error) {
-      console.error('Ошибка отправки сообщения:', error);
-      // Если это была ошибка WebSocket, пробуем через REST API
-      if (client && connected) {
-        try {
-          if (process.env.NODE_ENV === 'development') {
-            console.log('Повторная попытка через REST API после ошибки WebSocket');
-          }
-          const sentMessage = await chatAPI.sendMessage(chatId, messageContent);
-          clearTimeout(fallbackTimeout); // Очищаем fallback таймаут
-          setMessages(prev => 
-            prev.map(m => m.id === optimisticMessage.id ? sentMessage : m)
-          );
-        } catch (restError) {
-          console.error('Ошибка отправки через REST API:', restError);
-          // Удаляем оптимистичное сообщение только при полной ошибке
-          setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id));
-          setNewMessage(messageContent); // Возвращаем текст обратно
-          alert('Не удалось отправить сообщение. Попробуйте еще раз.');
-        }
-      } else {
-        // Удаляем оптимистичное сообщение при ошибке
-        setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id));
-        setNewMessage(messageContent); // Возвращаем текст обратно
-        alert('Не удалось отправить сообщение. Попробуйте еще раз.');
-      }
-    } finally {
-      setSending(false);
+    // Отправляем через хук (он сам создаст оптимистичное сообщение)
+    const result = await sendMessageHook(messageContent, 'TEXT');
+    
+    if (!result) {
+      // Если отправка не удалась, возвращаем текст в поле ввода
+      setNewMessage(messageContent);
     }
   };
 
