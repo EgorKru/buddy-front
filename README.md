@@ -97,7 +97,7 @@ docker-compose up -d --build
 
 ```bash
 # Сборка образа
-docker build -t buddy-frontend .
+docker build -t pager-frontend .
 
 # Запуск контейнера
 docker run -d \
