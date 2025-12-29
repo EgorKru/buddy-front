@@ -20,16 +20,23 @@ const ChatPanel = ({ roomId, isOpen, onClose }) => {
     scrollToBottom();
   }, [messages]);
 
+  /**
+   * Загрузка сообщений для комнаты
+   * @note В будущем здесь будет интеграция с API для получения сообщений комнаты
+   */
   const loadMessages = async () => {
     try {
-      // Здесь нужно будет получить chatId для комнаты
-      // Пока заглушка
+      // TODO: Реализовать загрузку сообщений для video rooms через API
       setLoading(false);
     } catch (error) {
       console.error('Ошибка загрузки сообщений:', error);
     }
   };
 
+  /**
+   * Отправка сообщения в чат комнаты
+   * @note В будущем здесь будет интеграция с WebSocket/API для отправки сообщений
+   */
   const sendMessage = async (e) => {
     e.preventDefault();
     if (!newMessage.trim() || !user) return;
@@ -46,7 +53,7 @@ const ChatPanel = ({ roomId, isOpen, onClose }) => {
     setMessages([...messages, message]);
     setNewMessage('');
 
-    // TODO: Отправить через WebSocket и сохранить в БД
+    // TODO: Реализовать отправку сообщений через WebSocket/API для video rooms
     try {
       // await apiRequest(`/chats/${chatId}/messages`, {
       //   method: 'POST',

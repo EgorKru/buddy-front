@@ -1,7 +1,6 @@
-import { useSocket } from "@/context/socket"
-import { useRouter } from "next/router"
-
-const { useState, useEffect, useRef } = require("react")
+import { useState, useEffect, useRef } from "react";
+import { useSocket } from "@/context/socket";
+import { useRouter } from "next/router";
 
 const usePeer = () => {
     const socket = useSocket()
@@ -21,22 +20,28 @@ const usePeer = () => {
                 setPeer(myPeer)
 
                 myPeer.on('open', (id) => {
-                    console.log(`your peer id is ${id}`)
-                    setMyId(id)
-                    socket?.emit('join-room', roomId, id)
-                })
+                    if (process.env.NODE_ENV === 'development') {
+                        console.log(`your peer id is ${id}`);
+                    }
+                    setMyId(id);
+                    socket?.emit('join-room', roomId, id);
+                });
 
                 myPeer.on('error', (err) => {
-                    console.error('Peer error:', err)
-                })
+                    console.error('Peer error:', err);
+                });
 
                 myPeer.on('disconnected', () => {
-                    console.log('Peer disconnected')
-                })
+                    if (process.env.NODE_ENV === 'development') {
+                        console.log('Peer disconnected');
+                    }
+                });
 
                 myPeer.on('close', () => {
-                    console.log('Peer connection closed')
-                })
+                    if (process.env.NODE_ENV === 'development') {
+                        console.log('Peer connection closed');
+                    }
+                });
             } catch (err) {
                 console.error('Failed to initialize Peer:', err)
             }

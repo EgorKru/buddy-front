@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
-import { ArrowLeft, Send, Loader2 } from 'lucide-react';
+import { ArrowLeft, Send, Loader2, Menu } from 'lucide-react';
 import { chatAPI, getCurrentUser, isAuthenticated } from '@/utils/api';
 import { useStomp } from '@/context/socket';
+import { getChatName } from '@/utils/chatHelpers';
+import { formatChatDate, formatChatTime } from '@/utils/dateHelpers';
+import ChatSidebar from '@/component/ChatSidebar';
 import styles from '@/styles/chat.module.css';
 
 export default function ChatPage() {
@@ -19,6 +22,7 @@ export default function ChatPage() {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
@@ -55,7 +59,7 @@ export default function ChatPage() {
     } catch (error) {
       console.error('Ошибка загрузки чата:', error);
       if (error.message.includes('404')) {
-        router.push('/chats');
+        router.push('/');
       }
     }
   };
@@ -103,7 +107,9 @@ export default function ChatPage() {
         }
       );
       subscriptionRef.current = subscription;
-      console.log('Подписались на чат:', chatId);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Подписались на чат:', chatId);
+      }
     } catch (error) {
       console.error('Ошибка подписки на чат:', error);
     }
@@ -113,7 +119,9 @@ export default function ChatPage() {
     if (subscriptionRef.current) {
       subscriptionRef.current.unsubscribe();
       subscriptionRef.current = null;
-      console.log('Отписались от чата:', chatId);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Отписались от чата:', chatId);
+      }
     }
   };
 
@@ -162,40 +170,9 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const messageDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-
-    if (messageDate.getTime() === today.getTime()) {
-      return 'Сегодня';
-    } else if (messageDate.getTime() === today.getTime() - 86400000) {
-      return 'Вчера';
-    } else {
-      return date.toLocaleDateString('ru-RU', {
-        day: '2-digit',
-        month: '2-digit',
-        year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
-      });
-    }
-  };
-
-  const formatTime = (dateString) => {
-    return new Date(dateString).toLocaleTimeString('ru-RU', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  const getChatName = () => {
+  const getDisplayChatName = () => {
     if (!chat) return 'Загрузка...';
-    if (chat.name) return chat.name;
-    if (chat.type === 'DIRECT' && chat.participants) {
-      const otherParticipant = chat.participants.find(p => p.id !== user?.id);
-      return otherParticipant?.displayName || otherParticipant?.username || 'Чат';
-    }
-    return 'Групповой чат';
+    return getChatName(chat, user);
   };
 
   if (loading) {
@@ -208,18 +185,31 @@ export default function ChatPage() {
 
   return (
     <div className={styles.container}>
-      <div className={styles.header}>
-        <button onClick={() => router.push('/chats')} className={styles.backButton}>
-          <ArrowLeft size={20} />
-        </button>
-        <div className={styles.chatInfo}>
-          <h1>{getChatName()}</h1>
-          <div className={styles.status}>
-            <span className={`${styles.statusDot} ${connected ? styles.connected : ''}`}></span>
-            <span>{connected ? 'Подключено' : 'Подключение...'}</span>
+      <ChatSidebar 
+        isOpen={sidebarOpen} 
+        onClose={() => setSidebarOpen(false)}
+        currentChatId={chatId}
+      />
+      
+      {sidebarOpen && <div className={styles.sidebarOverlay} onClick={() => setSidebarOpen(false)} />}
+      
+      <div className={styles.mainContent}>
+        <div className={styles.header}>
+          <button 
+            onClick={() => setSidebarOpen(!sidebarOpen)} 
+            className={styles.menuButton}
+            title="Открыть список чатов"
+          >
+            <Menu size={20} />
+          </button>
+          <div className={styles.chatInfo}>
+            <h1>{getDisplayChatName()}</h1>
+            <div className={styles.status}>
+              <span className={`${styles.statusDot} ${connected ? styles.connected : ''}`}></span>
+              <span>{connected ? 'Подключено' : 'Подключение...'}</span>
+            </div>
           </div>
         </div>
-      </div>
 
       <div
         ref={messagesContainerRef}
@@ -241,14 +231,14 @@ export default function ChatPage() {
         ) : (
           messages.map((msg, index) => {
             const showDate = index === 0 || 
-              formatDate(messages[index - 1].createdAt) !== formatDate(msg.createdAt);
+              formatChatDate(messages[index - 1].createdAt) !== formatChatDate(msg.createdAt);
             const isOwn = msg.senderId === user?.id;
 
             return (
               <div key={msg.id}>
                 {showDate && (
                   <div className={styles.dateDivider}>
-                    {formatDate(msg.createdAt)}
+                    {formatChatDate(msg.createdAt)}
                   </div>
                 )}
                 <div
@@ -266,14 +256,14 @@ export default function ChatPage() {
                           {msg.senderDisplayName || msg.senderUsername}
                         </span>
                         <span className={styles.messageTime}>
-                          {formatTime(msg.createdAt)}
+                          {formatChatTime(msg.createdAt)}
                         </span>
                       </div>
                     )}
                     <div className={styles.messageText}>{msg.content}</div>
                     {isOwn && (
                       <span className={styles.messageTime}>
-                        {formatTime(msg.createdAt)}
+                        {formatChatTime(msg.createdAt)}
                       </span>
                     )}
                   </div>
@@ -306,6 +296,7 @@ export default function ChatPage() {
           )}
         </button>
       </form>
+      </div>
     </div>
   );
 }

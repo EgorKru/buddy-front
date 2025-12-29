@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Clock, Link2, Settings, MoreVertical, Play } from "lucide-react";
 import { CopyToClipboard } from "react-copy-to-clipboard";
+import { formatMeetingTime } from "@/utils/dateHelpers";
 import styles from "@/component/TopBar/index.module.css";
 
 const TopBar = ({ roomId, onStart }) => {
@@ -20,18 +21,6 @@ const TopBar = ({ roomId, onStart }) => {
     return () => clearInterval(interval);
   }, [isRunning]);
 
-  const formatTime = (seconds) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    
-    if (hours > 0) {
-      return `${hours.toString().padStart(2, "0")}:${minutes
-        .toString()
-        .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-    }
-    return `${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-  };
 
   const handleStart = () => {
     setIsRunning(true);
@@ -62,7 +51,7 @@ const TopBar = ({ roomId, onStart }) => {
         {isRunning && (
           <div className={styles.timer}>
             <Clock size={16} />
-            <span>{formatTime(meetingTime)}</span>
+            <span>{formatMeetingTime(meetingTime)}</span>
           </div>
         )}
         <div className={styles.meetingLabel}>Встреча</div>

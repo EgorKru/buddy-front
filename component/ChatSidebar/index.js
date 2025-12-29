@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { MessageCircle, Search, ArrowLeft, Plus, X, UserPlus, Loader2 } from 'lucide-react';
-import { chatAPI, getCurrentUser, isAuthenticated } from '@/utils/api';
+import { MessageCircle, Search, Plus, X, UserPlus, Loader2 } from 'lucide-react';
+import { chatAPI, getCurrentUser } from '@/utils/api';
 import { useCreateChat } from '@/hooks/useCreateChat';
 import { getChatName, getChatAvatar } from '@/utils/chatHelpers';
 import { formatChatListTime } from '@/utils/dateHelpers';
-import styles from '@/styles/chats.module.css';
+import styles from '@/component/ChatSidebar/index.module.css';
 
-export default function Chats() {
+export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
   const router = useRouter();
   const user = getCurrentUser();
   const [chats, setChats] = useState([]);
@@ -18,29 +18,8 @@ export default function Chats() {
   const createChat = useCreateChat();
 
   useEffect(() => {
-    if (!isAuthenticated()) {
-      router.push('/login');
-      return;
-    }
     loadChats();
-  }, [router]);
-
-  // Закрываем результаты поиска при клике вне области
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (createChat.showSearchResults && createChat.searchInputRef.current && !createChat.searchInputRef.current.contains(event.target)) {
-        const searchResults = document.querySelector(`.${styles.searchResults}`);
-        if (searchResults && !searchResults.contains(event.target)) {
-          createChat.setShowSearchResults(false);
-        }
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [createChat.showSearchResults]);
+  }, []);
 
   const loadChats = async () => {
     try {
@@ -59,6 +38,7 @@ export default function Chats() {
       await createChat.handleCreateChat(async () => {
         await loadChats();
         handleCloseModal();
+        if (onClose) onClose();
       });
     } catch (error) {
       // Ошибка уже обработана в хуке
@@ -82,61 +62,62 @@ export default function Chats() {
     );
   });
 
-  if (loading) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.loading}>Загрузка чатов...</div>
-      </div>
-    );
-  }
+  if (!isOpen) return null;
 
   return (
-    <div className={styles.container}>
-      <div className={styles.header}>
-        <button onClick={() => router.push('/')} className={styles.backButton}>
-          <ArrowLeft size={20} />
-        </button>
-        <h1>Чаты</h1>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className={styles.createButton}
-          title="Создать чат"
-        >
-          <Plus size={20} />
-        </button>
-      </div>
-
-      <div className={styles.searchContainer}>
-        <Search size={20} className={styles.searchIcon} />
-        <input
-          type="text"
-          placeholder="Поиск чатов..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className={styles.searchInput}
-        />
-      </div>
-
-      <div className={styles.chatsList}>
-        {filteredChats.length === 0 ? (
-          <div className={styles.emptyState}>
-            <MessageCircle size={64} className={styles.emptyIcon} />
-            <p>У вас пока нет чатов</p>
-            <p className={styles.emptyHint}>Начните общение с другими пользователями!</p>
-          </div>
-        ) : (
-          filteredChats.map((chat) => (
-            <div
-              key={chat.id}
-              className={styles.chatItem}
-              onClick={() => router.push(`/chat/${chat.id}`)}
+    <>
+      <div className={styles.sidebar}>
+        <div className={styles.sidebarHeader}>
+          <h2>Чаты</h2>
+          <div className={styles.sidebarActions}>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className={styles.createButton}
+              title="Создать чат"
             >
-              <div className={styles.chatAvatar}>
+              <Plus size={20} />
+            </button>
+            <button onClick={onClose} className={styles.closeButton} title="Закрыть">
+              <X size={20} />
+            </button>
+          </div>
+        </div>
+
+        <div className={styles.searchContainer}>
+          <Search size={18} className={styles.searchIcon} />
+          <input
+            type="text"
+            placeholder="Поиск чатов..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className={styles.searchInput}
+          />
+        </div>
+
+        <div className={styles.chatsList}>
+          {loading ? (
+            <div className={styles.loading}>Загрузка...</div>
+          ) : filteredChats.length === 0 ? (
+            <div className={styles.emptyState}>
+              <MessageCircle size={48} className={styles.emptyIcon} />
+              <p>Нет чатов</p>
+            </div>
+          ) : (
+            filteredChats.map((chat) => (
+              <div
+                key={chat.id}
+                className={`${styles.chatItem} ${currentChatId === String(chat.id) ? styles.active : ''}`}
+                onClick={() => {
+                  router.push(`/chat/${chat.id}`);
+                  if (onClose) onClose();
+                }}
+              >
+                <div className={styles.chatAvatar}>
                 {getChatAvatar(chat, user) ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={getChatAvatar(chat, user)} alt="" />
                 ) : (
-                  <MessageCircle size={24} />
+                  <MessageCircle size={20} />
                 )}
               </div>
               <div className={styles.chatInfo}>
@@ -147,25 +128,23 @@ export default function Chats() {
                       {formatChatListTime(chat.lastMessage.createdAt)}
                     </span>
                   )}
-                </div>
-                {chat.lastMessage && (
-                  <div className={styles.lastMessage}>
-                    <span className={styles.lastMessageSender}>
-                      {chat.lastMessage.senderDisplayName || chat.lastMessage.senderUsername}:
-                    </span>
-                    <span className={styles.lastMessageText}>
-                      {chat.lastMessage.content.substring(0, 50)}
-                      {chat.lastMessage.content.length > 50 ? '...' : ''}
-                    </span>
                   </div>
-                )}
+                  {chat.lastMessage && (
+                    <div className={styles.lastMessage}>
+                      <span className={styles.lastMessageText}>
+                        {chat.lastMessage.content.substring(0, 40)}
+                        {chat.lastMessage.content.length > 40 ? '...' : ''}
+                      </span>
+                    </div>
+                  )}
+                </div>
                 {chat.unreadCount > 0 && (
                   <div className={styles.unreadBadge}>{chat.unreadCount}</div>
                 )}
               </div>
-            </div>
-          ))
-        )}
+            ))
+          )}
+        </div>
       </div>
 
       {showCreateModal && (
@@ -268,13 +247,6 @@ export default function Chats() {
                       ))}
                     </div>
                   )}
-                  {createChat.showSearchResults && createChat.searchResults.length === 0 && createChat.participantUsernames.length >= 2 && !createChat.searching && (
-                    <div className={styles.searchResults}>
-                      <div className={styles.searchResultEmpty}>
-                        Пользователи не найдены
-                      </div>
-                    </div>
-                  )}
                 </div>
                 <small className={styles.hint}>
                   {createChat.chatType === 'DIRECT'
@@ -328,7 +300,7 @@ export default function Chats() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 

@@ -11,14 +11,15 @@ export const useStomp = () => {
   return context || { client: null, connected: false };
 };
 
-// Алиас для обратной совместимости (используется в комнатах)
-// ВАЖНО: Для чатов используйте useStomp() и STOMP API
-// Для комнат (video calls) может потребоваться отдельный Socket.IO клиент
+/**
+ * Алиас для обратной совместимости (используется в комнатах для video calls)
+ * @deprecated Используйте useStomp() для чатов. Для video calls требуется отдельный Socket.IO клиент
+ * @returns {null} Всегда возвращает null, так как Socket.IO не настроен
+ */
 export const useSocket = () => {
-  // Возвращаем null, чтобы код не падал
-  // Комнаты (video calls) требуют Socket.IO, который не настроен
-  // TODO: Настроить Socket.IO для комнат или перевести на STOMP
-  console.warn('useSocket() is deprecated. Use useStomp() for chat functionality.');
+  if (process.env.NODE_ENV === 'development') {
+    console.warn('useSocket() is deprecated. Use useStomp() for chat functionality.');
+  }
   return null;
 };
 
@@ -33,19 +34,25 @@ export const StompProvider = (props) => {
     
     // Если нет токена, не подключаемся
     if (!token) {
-      console.log("STOMP: No token, skipping connection");
+      if (process.env.NODE_ENV === 'development') {
+        console.log("STOMP: No token, skipping connection");
+      }
       return;
     }
 
-    // Логируем информацию о подключении
-    console.log("STOMP: Initializing connection...");
-    console.log("STOMP: WebSocket URL:", config.stomp.url);
+    // Логируем информацию о подключении только в dev режиме
+    if (process.env.NODE_ENV === 'development') {
+      console.log("STOMP: Initializing connection...");
+      console.log("STOMP: WebSocket URL:", config.stomp.url);
+    }
     
     // Проверяем, не отключено ли подключение (для временного решения проблем)
     const disableWebSocket = localStorage.getItem('disable_websocket') === 'true';
     if (disableWebSocket) {
-      console.warn("STOMP: WebSocket подключение отключено пользователем");
-      console.warn("STOMP: Чтобы включить: localStorage.removeItem('disable_websocket')");
+      if (process.env.NODE_ENV === 'development') {
+        console.warn("STOMP: WebSocket подключение отключено пользователем");
+        console.warn("STOMP: Чтобы включить: localStorage.removeItem('disable_websocket')");
+      }
       return;
     }
 
@@ -62,37 +69,42 @@ export const StompProvider = (props) => {
       sockJsUrl = wsUrl.replace('ws://', 'http://').replace('wss://', 'https://');
     }
     
-    console.log(`STOMP: Using SockJS to connect to`, sockJsUrl);
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`STOMP: Using SockJS to connect to`, sockJsUrl);
+    }
     
     // Опция: передать токен через query параметр (альтернатива connectHeaders)
-    // Можно попробовать, если через заголовки не работает
     const useTokenInUrl = process.env.NEXT_PUBLIC_WS_TOKEN_IN_URL === 'true';
     const finalWsUrl = useTokenInUrl ? `${sockJsUrl}?token=${token}` : sockJsUrl;
     
     // Создаем STOMP клиент
     const stompClient = new Client({
-      // Для SockJS не используем brokerURL, только webSocketFactory
       webSocketFactory: () => {
-        console.log("STOMP: Creating SockJS connection to", finalWsUrl);
+        if (process.env.NODE_ENV === 'development') {
+          console.log("STOMP: Creating SockJS connection to", finalWsUrl);
+        }
         const sock = new SockJS(finalWsUrl);
         
         // Добавляем обработчики для диагностики
         sock.onopen = () => {
-          console.log("STOMP: SockJS connection opened successfully");
+          if (process.env.NODE_ENV === 'development') {
+            console.log("STOMP: SockJS connection opened successfully");
+          }
         };
         
         sock.onclose = (event) => {
-          console.log("STOMP: SockJS connection closed", {
-            code: event.code,
-            reason: event.reason,
-            wasClean: event.wasClean,
-          });
+          if (process.env.NODE_ENV === 'development') {
+            console.log("STOMP: SockJS connection closed", {
+              code: event.code,
+              reason: event.reason,
+              wasClean: event.wasClean,
+            });
+          }
         };
         
         sock.onerror = (error) => {
           console.error("STOMP: SockJS connection error", error);
-          // Детальная информация об ошибке
-          if (error.target) {
+          if (process.env.NODE_ENV === 'development' && error.target) {
             console.error("STOMP: Error target:", {
               url: error.target.url,
               readyState: error.target.readyState,
@@ -118,48 +130,57 @@ export const StompProvider = (props) => {
         }
       },
       onConnect: (frame) => {
-        console.log("✅ STOMP: Connected successfully!", frame);
+        if (process.env.NODE_ENV === 'development') {
+          console.log("✅ STOMP: Connected successfully!", frame);
+        }
         setConnected(true);
         
         // Подписываемся на ошибки
         try {
           stompClient.subscribe('/queue/errors', (error) => {
             console.error('WebSocket error:', error.body);
-            // Можно добавить уведомление пользователю об ошибке
           });
         } catch (error) {
           console.error('STOMP: Failed to subscribe to errors queue:', error);
         }
       },
       onDisconnect: () => {
-        console.log("STOMP: Disconnected");
+        if (process.env.NODE_ENV === 'development') {
+          console.log("STOMP: Disconnected");
+        }
         setConnected(false);
       },
       onStompError: (frame) => {
         console.error("❌ STOMP: STOMP Error", frame);
-        console.error("STOMP: Error details:", {
-          command: frame.command,
-          headers: frame.headers,
-          body: frame.body,
-        });
+        if (process.env.NODE_ENV === 'development') {
+          console.error("STOMP: Error details:", {
+            command: frame.command,
+            headers: frame.headers,
+            body: frame.body,
+          });
+        }
         setConnected(false);
       },
       onWebSocketError: (event) => {
         console.error("❌ STOMP: WebSocket error", event);
-        console.error("STOMP: WebSocket error details:", {
-          type: event.type,
-          target: event.target,
-          url: event.target?.url,
-          readyState: event.target?.readyState,
-        });
+        if (process.env.NODE_ENV === 'development') {
+          console.error("STOMP: WebSocket error details:", {
+            type: event.type,
+            target: event.target,
+            url: event.target?.url,
+            readyState: event.target?.readyState,
+          });
+        }
         setConnected(false);
       },
       onWebSocketClose: (event) => {
-        console.log("STOMP: WebSocket closed", {
-          code: event.code,
-          reason: event.reason,
-          wasClean: event.wasClean,
-        });
+        if (process.env.NODE_ENV === 'development') {
+          console.log("STOMP: WebSocket closed", {
+            code: event.code,
+            reason: event.reason,
+            wasClean: event.wasClean,
+          });
+        }
         setConnected(false);
       },
     });

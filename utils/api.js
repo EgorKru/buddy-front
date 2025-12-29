@@ -1,9 +1,11 @@
 import { config, getApiUrl } from './config';
 
-const API_BASE_URL = config.api.baseURL;
-
 /**
  * Базовый метод для выполнения API запросов
+ * @param {string} endpoint - Путь к API endpoint (например, '/chats')
+ * @param {Object} options - Опции запроса (method, body, headers)
+ * @returns {Promise<any>} Ответ от сервера
+ * @throws {Error} Ошибка при выполнении запроса
  */
 export const apiRequest = async (endpoint, options = {}) => {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
@@ -57,7 +59,7 @@ export const apiRequest = async (endpoint, options = {}) => {
 };
 
 /**
- * Методы для аутентификации
+ * API методы для аутентификации
  */
 export const authAPI = {
   login: async (username, password) => {
@@ -87,7 +89,7 @@ export const authAPI = {
 };
 
 /**
- * Методы для работы с чатами
+ * API методы для работы с чатами и сообщениями
  */
 export const chatAPI = {
   getChats: async () => {
@@ -123,9 +125,14 @@ export const chatAPI = {
 };
 
 /**
- * Методы для работы с пользователями
+ * API методы для работы с пользователями
  */
 export const userAPI = {
+  /**
+   * Поиск пользователей по username
+   * @param {string} username - Часть username для поиска
+   * @returns {Promise<Array>} Список найденных пользователей
+   */
   searchUsers: async (username) => {
     if (!username || username.trim().length === 0) {
       return [];
@@ -135,7 +142,7 @@ export const userAPI = {
 };
 
 /**
- * Методы для работы с комнатами
+ * API методы для работы с video комнатами
  */
 export const roomAPI = {
   createRoom: async () => {
@@ -162,7 +169,8 @@ export const roomAPI = {
 };
 
 /**
- * Утилиты для работы с пользователем
+ * Получить текущего авторизованного пользователя из localStorage
+ * @returns {Object|null} Данные пользователя или null
  */
 export const getCurrentUser = () => {
   if (typeof window === 'undefined') return null;
@@ -170,6 +178,11 @@ export const getCurrentUser = () => {
   return userStr ? JSON.parse(userStr) : null;
 };
 
+/**
+ * Сохранить данные пользователя и токен в localStorage
+ * @param {Object} user - Данные пользователя
+ * @param {string} token - JWT токен
+ */
 export const setCurrentUser = (user, token) => {
   if (typeof window !== 'undefined') {
     if (token) {
@@ -181,11 +194,19 @@ export const setCurrentUser = (user, token) => {
   }
 };
 
+/**
+ * Проверить, авторизован ли пользователь
+ * @returns {boolean} true если есть токен в localStorage
+ */
 export const isAuthenticated = () => {
   if (typeof window === 'undefined') return false;
   return !!localStorage.getItem('token');
 };
 
+/**
+ * Получить JWT токен из localStorage
+ * @returns {string|null} Токен или null
+ */
 export const getToken = () => {
   if (typeof window === 'undefined') return null;
   return localStorage.getItem('token');
