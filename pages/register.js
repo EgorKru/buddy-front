@@ -52,7 +52,14 @@ export default function Register() {
       <div className={styles.formContainer}>
         <div className={styles.logoContainer}>
           <div className={styles.logoIcon}>
-            <Radio size={32} className={styles.logoIconSvg} />
+            <div className={styles.logoIconWrapper}>
+              <Radio size={40} className={styles.logoIconSvg} />
+              <div className={styles.logoSignal}>
+                <div className={styles.signalWave}></div>
+                <div className={styles.signalWave}></div>
+                <div className={styles.signalWave}></div>
+              </div>
+            </div>
             <span className={styles.logoText}>Pager</span>
           </div>
         </div>

@@ -61,11 +61,17 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
     );
   });
 
-  if (!isOpen) return null;
+  // На десктопе сайдбар всегда видим, на мобильных - только при isOpen
+  const isDesktop = typeof window !== 'undefined' && window.innerWidth > 768;
+  const shouldShow = isDesktop || isOpen;
+
+  if (!shouldShow) {
+    return null;
+  }
 
   return (
     <>
-      <div className={styles.sidebar}>
+      <div className={`${styles.sidebar} ${shouldShow ? styles.open : ''}`}>
         <div className={styles.sidebarHeader}>
           <h2>Чаты</h2>
           <div className={styles.sidebarActions}>
@@ -76,9 +82,11 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
             >
               <Plus size={20} />
             </button>
-            <button onClick={onClose} className={styles.closeButton} title="Закрыть">
-              <X size={20} />
-            </button>
+            {typeof window !== 'undefined' && window.innerWidth <= 768 && (
+              <button onClick={onClose} className={styles.closeButton} title="Закрыть">
+                <X size={20} />
+              </button>
+            )}
           </div>
         </div>
 

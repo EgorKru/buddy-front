@@ -1,17 +1,18 @@
 import { v4 as uuidv4 } from 'uuid';
 import { useRouter } from 'next/router'
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import styles from '@/styles/home.module.css'
-import { useState } from 'react';
 import { isAuthenticated, getCurrentUser, authAPI } from '@/utils/api';
 import PagerNotification from '@/component/PagerNotification';
 import { useNotifications } from '@/hooks/useNotifications';
+import ChatSidebar from '@/component/ChatSidebar';
 
 export default function Home() {
   const router = useRouter()
   const [roomId, setRoomId] = useState('')
   const [user, setUser] = useState(null)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const { notifications, markAsRead, dismissNotification } = useNotifications();
 
   useEffect(() => {
@@ -95,40 +96,59 @@ export default function Home() {
 
   return (
     <div className={styles.homeContainer}>
-      <div className={styles.header}>
-        <h1>Pager</h1>
-        <div className={styles.userInfo}>
-          <span>Привет, {user.displayName || user.username}!</span>
-          <button onClick={() => router.push('/chat/1')} className={styles.chatButton}>
-            Чаты
-          </button>
-          <button onClick={handleLogout} className={styles.logoutButton}>
-            Выйти
-          </button>
-        </div>
-      </div>
+      <ChatSidebar 
+        isOpen={true} 
+        onClose={() => setSidebarOpen(false)}
+        currentChatId={null}
+      />
+      
+      {sidebarOpen && typeof window !== 'undefined' && window.innerWidth <= 768 && (
+        <div className={styles.sidebarOverlay} onClick={() => setSidebarOpen(false)} />
+      )}
       
       <div className={styles.mainContent}>
-        <div className={styles.enterRoom}>
-          <input 
-            placeholder='Введите ID комнаты' 
-            value={roomId} 
-            onChange={(e) => setRoomId(e?.target?.value)}
-            onKeyPress={handleKeyPress}
-          />
-          <button onClick={joinRoom}>Войти в комнату</button>
+        <div className={styles.header}>
+          <button 
+            onClick={() => setSidebarOpen(!sidebarOpen)} 
+            className={styles.menuButton}
+            title="Открыть список чатов"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <h1>Pager</h1>
+          <div className={styles.userInfo}>
+            <span>Привет, {user.displayName || user.username}!</span>
+            <button onClick={handleLogout} className={styles.logoutButton}>
+              Выйти
+            </button>
+          </div>
         </div>
-        <span className={styles.separatorText}>ИЛИ</span>
-        <button onClick={createAndJoin} className={styles.createButton}>
-          Создать новую комнату
-        </button>
+        
+        <div className={styles.content}>
+          <div className={styles.enterRoom}>
+            <input 
+              placeholder='Введите ID комнаты' 
+              value={roomId} 
+              onChange={(e) => setRoomId(e?.target?.value)}
+              onKeyPress={handleKeyPress}
+            />
+            <button onClick={joinRoom}>Войти в комнату</button>
+          </div>
+          <span className={styles.separatorText}>ИЛИ</span>
+          <button onClick={createAndJoin} className={styles.createButton}>
+            Создать новую комнату
+          </button>
+        </div>
       </div>
       
       <PagerNotification
         notifications={notifications}
         onNotificationClick={(notification) => {
           markAsRead(notification.id);
-          // Можно добавить навигацию к чату или другому действию
           if (notification.chatId) {
             router.push(`/chat/${notification.chatId}`);
           }

@@ -1,10 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { ArrowLeft, Send, Loader2, Menu } from 'lucide-react';
+import { ArrowLeft, Send, Loader2, Menu, Check, CheckCheck, AlertCircle, Clock } from 'lucide-react';
 import { chatAPI, getCurrentUser, isAuthenticated } from '@/utils/api';
 import { useStomp } from '@/context/socket';
 import { getChatName } from '@/utils/chatHelpers';
 import { formatChatDate, formatChatTime } from '@/utils/dateHelpers';
+import { useMessageSender } from '@/hooks/useMessageSender';
+import { MESSAGE_STATUS } from '@/utils/messageQueue';
 import ChatSidebar from '@/component/ChatSidebar';
 import styles from '@/styles/chat.module.css';
 
@@ -18,11 +20,11 @@ export default function ChatPage() {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [messageStatusMap, setMessageStatusMap] = useState({}); // tempId -> status
 
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
@@ -51,6 +53,53 @@ export default function ChatPage() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Callback для обработки отправленных сообщений
+  const handleMessageSent = useCallback((message, tempId) => {
+    if (tempId) {
+      // Обновляем существующее оптимистичное сообщение
+      setMessages(prev => {
+        const index = prev.findIndex(m => 
+          (m.tempId === tempId || m.id === tempId) && m.isOptimistic
+        );
+        
+        if (index !== -1) {
+          // Заменяем оптимистичное сообщение на реальное
+          const updated = [...prev];
+          updated[index] = {
+            ...message,
+            status: message.status || MESSAGE_STATUS.SENT,
+          };
+          return updated;
+        } else {
+          // Или добавляем новое, если это сообщение от сервера
+          return [...prev, { ...message, status: message.status || MESSAGE_STATUS.SENT }];
+        }
+      });
+      
+      // Обновляем статус в карте
+      if (message.status) {
+        setMessageStatusMap(prev => ({
+          ...prev,
+          [tempId]: message.status,
+        }));
+      }
+    } else {
+      // Новое сообщение (не оптимистичное)
+      setMessages(prev => {
+        // Проверяем, нет ли уже такого сообщения
+        const exists = prev.find(m => m.id === message.id);
+        if (exists) return prev;
+        return [...prev, { ...message, status: MESSAGE_STATUS.SENT }];
+      });
+    }
+  }, []);
+
+  // Хук для отправки сообщений
+  const { sendMessage: sendMessageHook, sending, syncQueue, handleServerMessage } = useMessageSender(
+    chatId,
+    handleMessageSent
+  );
 
   const loadChat = async () => {
     try {
@@ -106,6 +155,8 @@ export default function ChatPage() {
             if (process.env.NODE_ENV === 'development') {
               console.log('Получено сообщение через WebSocket:', messageDto);
             }
+            const isOwnMessage = messageDto.senderId === user?.id;
+            
             setMessages(prev => {
               // Проверяем, нет ли уже такого сообщения (избегаем дубликатов)
               const existing = prev.find(m => m.id === messageDto.id);
@@ -113,25 +164,37 @@ export default function ChatPage() {
                 return prev;
               }
               
-              // Если есть оптимистичное сообщение с таким же содержимым от того же отправителя, заменяем его
-              const optimisticIndex = prev.findIndex(m => 
-                m.isOptimistic && 
-                m.content === messageDto.content && 
-                m.senderId === messageDto.senderId &&
-                Math.abs(new Date(m.createdAt).getTime() - new Date(messageDto.createdAt).getTime()) < 10000 // В пределах 10 секунд
-              );
-              
-              if (optimisticIndex !== -1) {
-                if (process.env.NODE_ENV === 'development') {
-                  console.log('✅ Заменяем оптимистичное сообщение на реальное:', messageDto);
+              // Если это наше сообщение, ищем оптимистичное для замены
+              if (isOwnMessage) {
+                const optimisticIndex = prev.findIndex(m => 
+                  m.isOptimistic && 
+                  m.content === messageDto.content && 
+                  m.senderId === messageDto.senderId &&
+                  Math.abs(new Date(m.createdAt || m.tempId).getTime() - new Date(messageDto.createdAt).getTime()) < 10000
+                );
+                
+                if (optimisticIndex !== -1) {
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log('✅ Заменяем оптимистичное сообщение на реальное:', messageDto);
+                  }
+                  const updated = [...prev];
+                  const optimisticMsg = updated[optimisticIndex];
+                  updated[optimisticIndex] = {
+                    ...messageDto,
+                    status: MESSAGE_STATUS.SENT,
+                  };
+                  
+                  // Обновляем статус через handleServerMessage
+                  if (optimisticMsg.tempId && handleServerMessage) {
+                    handleServerMessage(messageDto, optimisticMsg.tempId);
+                  }
+                  
+                  return updated;
                 }
-                const updated = [...prev];
-                // Заменяем оптимистичное сообщение на реальное (убираем флаг isOptimistic)
-                updated[optimisticIndex] = messageDto;
-                return updated;
               }
               
-              return [...prev, messageDto];
+              // Если это новое сообщение от другого пользователя
+              return [...prev, { ...messageDto, status: MESSAGE_STATUS.SENT }];
             });
           } catch (error) {
             console.error('Ошибка парсинга сообщения:', error);
@@ -283,6 +346,23 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // Получает иконку статуса сообщения
+  const getMessageStatusIcon = (status) => {
+    switch (status) {
+      case MESSAGE_STATUS.SENDING:
+      case MESSAGE_STATUS.PENDING:
+        return <Clock size={14} className={styles.statusIcon} />;
+      case MESSAGE_STATUS.SENT:
+        return <Check size={14} className={styles.statusIcon} />;
+      case MESSAGE_STATUS.DELIVERED:
+        return <CheckCheck size={14} className={styles.statusIcon} />;
+      case MESSAGE_STATUS.FAILED:
+        return <AlertCircle size={14} className={styles.statusIconFailed} title="Ошибка отправки" />;
+      default:
+        return <Check size={14} className={styles.statusIcon} />;
+    }
+  };
+
   const getDisplayChatName = () => {
     if (!chat) return 'Загрузка...';
     return getChatName(chat, user);
@@ -373,11 +453,16 @@ export default function ChatPage() {
                         </span>
                       </div>
                     )}
-                    <div className={styles.messageText}>{msg.content}</div>
+                    <div className={`${styles.messageText} ${msg.isOptimistic ? styles.messagePending : ''} ${msg.status === MESSAGE_STATUS.FAILED ? styles.messageFailed : ''}`}>
+                      {msg.content}
+                    </div>
                     {isOwn && (
-                      <span className={styles.messageTime}>
-                        {formatChatTime(msg.createdAt)}
-                      </span>
+                      <div className={styles.messageFooter}>
+                        <span className={styles.messageTime}>
+                          {formatChatTime(msg.createdAt)}
+                        </span>
+                        {getMessageStatusIcon(msg.status || (msg.isOptimistic ? MESSAGE_STATUS.SENDING : MESSAGE_STATUS.SENT))}
+                      </div>
                     )}
                   </div>
                 </div>
