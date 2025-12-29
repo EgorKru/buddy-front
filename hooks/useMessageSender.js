@@ -69,8 +69,12 @@ export const useMessageSender = (chatId, onMessageSent) => {
     lastSentMessageRef.current = queuedMessage;
 
     // Вызываем callback для добавления в UI
+    console.log('📤 Вызываем onMessageSent с оптимистичным сообщением:', optimisticMessage);
     if (onMessageSent) {
-      onMessageSent(optimisticMessage);
+      onMessageSent(optimisticMessage, tempId);
+      console.log('✅ onMessageSent вызван');
+    } else {
+      console.warn('⚠️ onMessageSent не определен!');
     }
 
     setSending(true);
@@ -265,18 +269,24 @@ export const useMessageSender = (chatId, onMessageSent) => {
    * Подписывается на подтверждения отправки сообщений от бэкенда
    */
   useEffect(() => {
-    if (!client || !connected) {
+    if (!client || !connected || !client.connected || !client.active) {
+      console.log('⚠️ useMessageSender: Не могу подписаться на подтверждения:', {
+        hasClient: !!client,
+        connected,
+        clientConnected: client?.connected,
+        clientActive: client?.active
+      });
       return;
     }
 
+    console.log('📡 useMessageSender: Подписываемся на /user/queue/message-sent');
     try {
       const subscription = client.subscribe('/user/queue/message-sent', (message) => {
         try {
+          console.log('📬 Получено сообщение в /user/queue/message-sent:', message.body);
           const confirmation = JSON.parse(message.body);
           
-          if (process.env.NODE_ENV === 'development') {
-            console.log('📬 Получено подтверждение отправки:', confirmation);
-          }
+          console.log('📬 Получено подтверждение отправки:', confirmation);
 
           if (confirmation.status === 'sent') {
             // Сообщение успешно отправлено
@@ -387,9 +397,7 @@ export const useMessageSender = (chatId, onMessageSent) => {
 
             messageSentSubscriptionRef.current = subscription;
 
-            if (process.env.NODE_ENV === 'development') {
-              console.log('✅ useMessageSender: Успешно подписались на подтверждения отправки сообщений, Subscription ID:', subscription.id);
-            }
+            console.log('✅ useMessageSender: Успешно подписались на подтверждения отправки сообщений, Subscription ID:', subscription.id);
 
       return () => {
         if (messageSentSubscriptionRef.current) {

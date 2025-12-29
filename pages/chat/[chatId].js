@@ -61,6 +61,8 @@ export default function ChatPage() {
 
   // Callback для обработки отправленных сообщений
   const handleMessageSent = useCallback((message, tempId) => {
+    console.log('📥 handleMessageSent вызван:', { message, tempId, isOptimistic: message?.isOptimistic });
+    
     if (tempId) {
       // Обновляем существующее оптимистичное сообщение
       setMessages(prev => {
@@ -69,16 +71,19 @@ export default function ChatPage() {
         );
         
         if (index !== -1) {
+          console.log('✅ Найдено оптимистичное сообщение, обновляем:', { index, tempId });
           // Заменяем оптимистичное сообщение на реальное
           const updated = [...prev];
           updated[index] = {
             ...message,
             status: message.status || MESSAGE_STATUS.SENT,
+            isOptimistic: false,
           };
           return updated;
         } else {
+          console.log('➕ Оптимистичное сообщение не найдено, добавляем новое');
           // Или добавляем новое, если это сообщение от сервера
-          return [...prev, { ...message, status: message.status || MESSAGE_STATUS.SENT }];
+          return [...prev, { ...message, status: message.status || MESSAGE_STATUS.SENT, isOptimistic: message.isOptimistic !== false }];
         }
       });
       
@@ -90,11 +95,16 @@ export default function ChatPage() {
         }));
       }
     } else {
+      console.log('➕ Новое сообщение (не оптимистичное), добавляем');
       // Новое сообщение (не оптимистичное)
       setMessages(prev => {
         // Проверяем, нет ли уже такого сообщения
         const exists = prev.find(m => m.id === message.id);
-        if (exists) return prev;
+        if (exists) {
+          console.log('⚠️ Сообщение уже существует, пропускаем');
+          return prev;
+        }
+        console.log('✅ Добавляем новое сообщение в список');
         return [...prev, { ...message, status: MESSAGE_STATUS.SENT }];
       });
     }
@@ -145,15 +155,22 @@ export default function ChatPage() {
 
   const subscribeToChat = () => {
     if (!client || !connected || !chatId) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('⚠️ Не могу подписаться на чат:', { 
-          client: !!client, 
-          connected, 
-          chatId,
-          clientConnected: client?.connected,
-          clientActive: client?.active
-        });
-      }
+      console.log('⚠️ Не могу подписаться на чат:', { 
+        client: !!client, 
+        connected, 
+        chatId,
+        clientConnected: client?.connected,
+        clientActive: client?.active
+      });
+      return;
+    }
+    
+    if (!client.connected || !client.active) {
+      console.log('⚠️ Клиент не подключен или не активен:', {
+        connected: client.connected,
+        active: client.active,
+        state: client.state
+      });
       return;
     }
 
@@ -161,9 +178,7 @@ export default function ChatPage() {
     if (subscriptionRef.current) {
       try {
         subscriptionRef.current.unsubscribe();
-        if (process.env.NODE_ENV === 'development') {
-          console.log('🔌 Отписались от старой подписки на чат:', chatId);
-        }
+        console.log('🔌 Отписались от старой подписки на чат:', chatId);
       } catch (error) {
         console.error('❌ Ошибка отписки от старой подписки:', error);
       }
@@ -172,23 +187,20 @@ export default function ChatPage() {
 
     try {
       const topic = `/topic/chat/${chatId}`;
-      if (process.env.NODE_ENV === 'development') {
-        console.log('📡 Подписываемся на топик:', topic);
-        console.log('📡 Состояние клиента:', {
-          connected: client.connected,
-          active: client.active,
-          state: client.state
-        });
-      }
+      console.log('📡 Подписываемся на топик:', topic);
+      console.log('📡 Состояние клиента:', {
+        connected: client.connected,
+        active: client.active,
+        state: client.state
+      });
       
       const subscription = client.subscribe(
         topic,
         (message) => {
           try {
+            console.log('📨 Получено сообщение через WebSocket, raw body:', message.body);
             const messageDto = JSON.parse(message.body);
-            if (process.env.NODE_ENV === 'development') {
-              console.log('📨 Получено сообщение через WebSocket:', messageDto);
-            }
+            console.log('📨 Получено сообщение через WebSocket:', messageDto);
             const isOwnMessage = messageDto.senderId === user?.id;
             
             // Используем handleServerMessage из хука для обработки
@@ -255,9 +267,7 @@ export default function ChatPage() {
         }
       );
       subscriptionRef.current = subscription;
-      if (process.env.NODE_ENV === 'development') {
-        console.log('✅ Успешно подписались на чат:', chatId, 'Subscription ID:', subscription.id);
-      }
+      console.log('✅ Успешно подписались на чат:', chatId, 'Subscription ID:', subscription.id);
     } catch (error) {
       console.error('❌ Ошибка подписки на чат:', error);
     }
