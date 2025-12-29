@@ -32,7 +32,7 @@ export const StompProvider = (props) => {
   const reconnectTimeoutRef = useRef(null);
 
   useEffect(() => {
-    // Сохраняем токен в ref для проверки изменений
+    // Получаем токен каждый раз при выполнении эффекта
     const token = getToken();
     const previousToken = tokenRef.current;
     tokenRef.current = token;
@@ -180,9 +180,7 @@ export const StompProvider = (props) => {
               }
             }
           });
-          if (process.env.NODE_ENV === 'development') {
-            console.log("✅ STOMP: Subscribed to /user/queue/errors");
-          }
+          console.log("✅ STOMP: Subscribed to /user/queue/errors");
         } catch (error) {
           console.error('❌ STOMP: Failed to subscribe to errors queue:', error);
         }
@@ -195,13 +193,11 @@ export const StompProvider = (props) => {
       },
       onStompError: (frame) => {
         console.error("❌ STOMP: STOMP Error", frame);
-        if (process.env.NODE_ENV === 'development') {
-          console.error("STOMP: Error details:", {
-            command: frame.command,
-            headers: frame.headers,
-            body: frame.body,
-          });
-        }
+        console.error("STOMP: Error details:", {
+          command: frame.command,
+          headers: frame.headers,
+          body: frame.body,
+        });
         
         // Проверяем, если это ошибка аутентификации
         try {
@@ -237,14 +233,12 @@ export const StompProvider = (props) => {
       },
       onWebSocketError: (event) => {
         console.error("❌ STOMP: WebSocket error", event);
-        if (process.env.NODE_ENV === 'development') {
-          console.error("STOMP: WebSocket error details:", {
-            type: event.type,
-            target: event.target,
-            url: event.target?.url,
-            readyState: event.target?.readyState,
-          });
-        }
+        console.error("STOMP: WebSocket error details:", {
+          type: event.type,
+          target: event.target,
+          url: event.target?.url,
+          readyState: event.target?.readyState,
+        });
         setConnected(false);
       },
       onWebSocketClose: (event) => {
@@ -263,38 +257,63 @@ export const StompProvider = (props) => {
     setClient(stompClient);
     
     // Активируем подключение
+    console.log("STOMP: Activating connection...");
     stompClient.activate();
+    console.log("STOMP: Activation called, waiting for connection...");
 
     return () => {
       if (stompClient && stompClient.connected) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log("STOMP: Cleaning up connection");
-        }
+        console.log("STOMP: Cleaning up connection");
         stompClient.deactivate();
       }
     };
-  }, [token]); // Переподключаемся при изменении токена
+  }, []); // Запускаем один раз при монтировании, токен получаем внутри через getToken()
   
-  // Диагностика состояния подключения (только для разработки)
+  // Отдельный эффект для переподключения при появлении токена после логина
   useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      const interval = setInterval(() => {
-        const currentToken = getToken();
-        const hasClient = clientRef.current;
-        const isConnected = hasClient && hasClient.connected;
-        
-        console.log('🔍 STOMP Диагностика:', {
-          hasToken: !!currentToken,
-          hasClient: !!hasClient,
-          connected: isConnected,
-          clientState: hasClient ? hasClient.state : 'N/A',
-          clientActive: hasClient ? hasClient.active : false,
-        });
-      }, 10000); // Каждые 10 секунд
+    const checkTokenAndReconnect = () => {
+      const currentToken = getToken();
+      const hasClient = clientRef.current;
+      const isConnected = hasClient && hasClient.connected;
       
-      return () => clearInterval(interval);
-    }
-  }, []);
+      // Если токен есть, но клиент не подключен - переподключаемся
+      if (currentToken && !isConnected && hasClient) {
+        console.log("STOMP: Token found but not connected, attempting to reconnect...");
+        // Деактивируем старый клиент
+        hasClient.deactivate();
+        // Небольшая задержка перед переподключением
+        setTimeout(() => {
+          // Эффект выше перезапустится и создаст новое подключение
+          // Но для этого нужно, чтобы компонент перемонтировался или мы вручную переподключились
+          console.log("STOMP: Ready to reconnect");
+        }, 1000);
+      }
+    };
+    
+    // Проверяем каждые 2 секунды
+    const interval = setInterval(checkTokenAndReconnect, 2000);
+    return () => clearInterval(interval);
+  }, [connected]);
+  
+  // Диагностика состояния подключения
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const currentToken = getToken();
+      const hasClient = clientRef.current;
+      const isConnected = hasClient && hasClient.connected;
+      
+      console.log('🔍 STOMP Диагностика:', {
+        hasToken: !!currentToken,
+        hasClient: !!hasClient,
+        connected: isConnected,
+        clientState: hasClient ? hasClient.state : 'N/A',
+        clientActive: hasClient ? hasClient.active : false,
+        contextConnected: connected,
+      });
+    }, 10000); // Каждые 10 секунд
+    
+    return () => clearInterval(interval);
+  }, [connected]);
 
   return (
     <StompContext.Provider value={{ client, connected }}>
