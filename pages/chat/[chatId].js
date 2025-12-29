@@ -281,13 +281,40 @@ export default function ChatPage() {
               
               // 2. Если это наше сообщение, ищем оптимистичное для замены
               if (isOwnMessage) {
+                console.log('🔍 Ищем оптимистичное сообщение для замены:', {
+                  messageContent: messageDto.content,
+                  messageSenderId: messageDto.senderId,
+                  messageId: messageDto.id,
+                  totalMessages: prev.length
+                });
+                
+                // Сначала находим все оптимистичные сообщения для отладки
+                const optimisticMessages = prev.filter(m => m.isOptimistic);
+                console.log('🔍 Найдено оптимистичных сообщений:', optimisticMessages.length);
+                optimisticMessages.forEach((m, idx) => {
+                  console.log(`  [${idx}] tempId: ${m.tempId}, content: ${m.content}, senderId: ${m.senderId}, status: ${m.status}, isOptimistic: ${m.isOptimistic}`);
+                });
+                
                 // Ищем по content и senderId (основной способ)
-                const optimisticIndex = prev.findIndex(m => 
-                  m.isOptimistic && 
-                  m.content === messageDto.content && 
-                  m.senderId === messageDto.senderId &&
-                  (m.status === MESSAGE_STATUS.SENDING || m.status === MESSAGE_STATUS.PENDING)
-                );
+                const optimisticIndex = prev.findIndex(m => {
+                  const matches = m.isOptimistic && 
+                    m.content === messageDto.content && 
+                    m.senderId === messageDto.senderId &&
+                    (m.status === MESSAGE_STATUS.SENDING || m.status === MESSAGE_STATUS.PENDING);
+                  
+                  if (m.isOptimistic && m.content === messageDto.content && m.senderId === messageDto.senderId) {
+                    console.log(`🔍 Проверка сообщения ${m.tempId}:`, {
+                      isOptimistic: m.isOptimistic,
+                      contentMatch: m.content === messageDto.content,
+                      senderIdMatch: m.senderId === messageDto.senderId,
+                      status: m.status,
+                      statusMatch: m.status === MESSAGE_STATUS.SENDING || m.status === MESSAGE_STATUS.PENDING,
+                      matches
+                    });
+                  }
+                  
+                  return matches;
+                });
                 
                 if (optimisticIndex !== -1) {
                   console.log('✅ Заменяем оптимистичное сообщение на реальное:', {
@@ -304,6 +331,8 @@ export default function ChatPage() {
                     isOptimistic: false,
                   };
                   return updated;
+                } else {
+                  console.log('⚠️ Оптимистичное сообщение не найдено для замены');
                 }
               }
               
