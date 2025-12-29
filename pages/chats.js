@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
-import { MessageCircle, Search, ArrowLeft, Plus, X } from 'lucide-react';
-import { chatAPI, getCurrentUser, isAuthenticated } from '@/utils/api';
+import { MessageCircle, Search, ArrowLeft, Plus, X, UserPlus, Loader2 } from 'lucide-react';
+import { chatAPI, userAPI, getCurrentUser, isAuthenticated } from '@/utils/api';
 import styles from '@/styles/chats.module.css';
 
 export default function Chats() {
@@ -13,8 +13,14 @@ export default function Chats() {
   const [chatType, setChatType] = useState('DIRECT');
   const [chatName, setChatName] = useState('');
   const [participantUsernames, setParticipantUsernames] = useState('');
+  const [selectedParticipants, setSelectedParticipants] = useState([]);
+  const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
+  const searchTimeoutRef = useRef(null);
+  const searchInputRef = useRef(null);
   const user = getCurrentUser();
 
   useEffect(() => {
@@ -24,6 +30,23 @@ export default function Chats() {
     }
     loadChats();
   }, [router]);
+
+  // Закрываем результаты поиска при клике вне области
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showSearchResults && searchInputRef.current && !searchInputRef.current.contains(event.target)) {
+        const searchResults = document.querySelector(`.${styles.searchResults}`);
+        if (searchResults && !searchResults.contains(event.target)) {
+          setShowSearchResults(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showSearchResults]);
 
   const loadChats = async () => {
     try {
@@ -36,6 +59,62 @@ export default function Chats() {
     }
   };
 
+  const searchUsers = async (query) => {
+    if (!query || query.trim().length < 2) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
+
+    setSearching(true);
+    try {
+      const users = await userAPI.searchUsers(query);
+      // Исключаем текущего пользователя из результатов
+      const filteredUsers = users.filter(u => u.id !== user?.id);
+      setSearchResults(filteredUsers);
+      setShowSearchResults(true);
+    } catch (error) {
+      console.error('Ошибка поиска пользователей:', error);
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleSearchInputChange = (e) => {
+    const value = e.target.value;
+    setParticipantUsernames(value);
+    
+    // Очищаем предыдущий таймаут
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    // Запускаем поиск с задержкой
+    searchTimeoutRef.current = setTimeout(() => {
+      searchUsers(value);
+    }, 300);
+  };
+
+  const handleSelectParticipant = (selectedUser) => {
+    // Проверяем, не добавлен ли уже этот пользователь
+    if (selectedParticipants.some(p => p.id === selectedUser.id)) {
+      return;
+    }
+    
+    setSelectedParticipants([...selectedParticipants, selectedUser]);
+    setParticipantUsernames('');
+    setSearchResults([]);
+    setShowSearchResults(false);
+    if (searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  };
+
+  const handleRemoveParticipant = (userId) => {
+    setSelectedParticipants(selectedParticipants.filter(p => p.id !== userId));
+  };
+
   const handleCreateChat = async (e) => {
     e.preventDefault();
     setCreateError('');
@@ -45,40 +124,23 @@ export default function Chats() {
       return;
     }
 
-    if (!participantUsernames.trim()) {
-      setCreateError('Укажите участников');
+    // Используем выбранных участников
+    const participantIds = selectedParticipants.map(p => p.id);
+
+    if (participantIds.length === 0) {
+      setCreateError('Выберите хотя бы одного участника');
+      return;
+    }
+
+    if (chatType === 'DIRECT' && participantIds.length !== 1) {
+      setCreateError('Для прямого чата выберите одного пользователя');
       return;
     }
 
     setCreating(true);
     try {
-      // Парсим ID пользователей (можно вводить через запятую)
-      const participantIds = participantUsernames
-        .split(',')
-        .map(id => id.trim())
-        .filter(Boolean)
-        .map(id => {
-          const numId = parseInt(id, 10);
-          if (isNaN(numId)) {
-            throw new Error(`"${id}" не является валидным ID пользователя`);
-          }
-          return numId;
-        });
-
-      if (participantIds.length === 0) {
-        setCreateError('Укажите хотя бы одного участника');
-        setCreating(false);
-        return;
-      }
-
       if (chatType === 'DIRECT') {
         // Для прямого чата используем специальный endpoint
-        if (participantIds.length !== 1) {
-          setCreateError('Для прямого чата укажите одного пользователя');
-          setCreating(false);
-          return;
-        }
-
         const chat = await chatAPI.getDirectChat(participantIds[0]);
         await loadChats(); // Обновляем список чатов
         handleCloseModal();
@@ -108,7 +170,13 @@ export default function Chats() {
     setChatType('DIRECT');
     setChatName('');
     setParticipantUsernames('');
+    setSelectedParticipants([]);
+    setSearchResults([]);
+    setShowSearchResults(false);
     setCreateError('');
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
   };
 
   const handleCloseModal = () => {
@@ -288,29 +356,101 @@ export default function Chats() {
               <div className={styles.formGroup}>
                 <label>
                   {chatType === 'DIRECT' 
-                    ? 'ID пользователя *' 
-                    : 'ID пользователей (через запятую) *'}
+                    ? 'Поиск пользователя *' 
+                    : 'Поиск участников *'}
                 </label>
-                <input
-                  type="text"
-                  value={participantUsernames}
-                  onChange={(e) => setParticipantUsernames(e.target.value)}
-                  placeholder={chatType === 'DIRECT' 
-                    ? '123' 
-                    : '123, 456, 789'}
-                  className={styles.input}
-                  required
-                />
+                <div style={{ position: 'relative' }}>
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={participantUsernames}
+                    onChange={handleSearchInputChange}
+                    onFocus={() => {
+                      if (searchResults.length > 0) {
+                        setShowSearchResults(true);
+                      }
+                    }}
+                    placeholder={chatType === 'DIRECT' 
+                      ? 'Введите username для поиска...' 
+                      : 'Введите username для поиска участников...'}
+                    className={styles.input}
+                  />
+                  {searching && (
+                    <div style={{ 
+                      position: 'absolute', 
+                      right: '10px', 
+                      top: '50%', 
+                      transform: 'translateY(-50%)',
+                      color: '#666'
+                    }}>
+                      <Loader2 size={16} className={styles.spinner} />
+                    </div>
+                  )}
+                  {showSearchResults && searchResults.length > 0 && (
+                    <div className={styles.searchResults}>
+                      {searchResults.map((user) => (
+                        <div
+                          key={user.id}
+                          className={styles.searchResultItem}
+                          onClick={() => handleSelectParticipant(user)}
+                        >
+                          <div className={styles.searchResultAvatar}>
+                            {user.avatarUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={user.avatarUrl} alt="" />
+                            ) : (
+                              <div className={styles.searchResultAvatarPlaceholder}>
+                                {user.displayName?.[0] || user.username?.[0] || '?'}
+                              </div>
+                            )}
+                          </div>
+                          <div className={styles.searchResultInfo}>
+                            <div className={styles.searchResultName}>
+                              {user.displayName || user.username}
+                            </div>
+                            <div className={styles.searchResultUsername}>
+                              @{user.username}
+                            </div>
+                          </div>
+                          <UserPlus size={16} className={styles.addIcon} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {showSearchResults && searchResults.length === 0 && participantUsernames.length >= 2 && !searching && (
+                    <div className={styles.searchResults}>
+                      <div className={styles.searchResultEmpty}>
+                        Пользователи не найдены
+                      </div>
+                    </div>
+                  )}
+                </div>
                 <small className={styles.hint}>
                   {chatType === 'DIRECT'
-                    ? 'Введите ID пользователя для прямого чата (число)'
-                    : 'Введите ID пользователей через запятую (например: 123, 456, 789)'}
-                  <br />
-                  <span style={{ color: '#888', fontSize: '0.85em' }}>
-                    Примечание: для удобства рекомендуется добавить API поиска пользователей по username
-                  </span>
+                    ? 'Начните вводить username пользователя и выберите из результатов'
+                    : 'Начните вводить username и выберите участников из результатов'}
                 </small>
               </div>
+
+              {selectedParticipants.length > 0 && (
+                <div className={styles.formGroup}>
+                  <label>Выбранные участники:</label>
+                  <div className={styles.selectedParticipants}>
+                    {selectedParticipants.map((participant) => (
+                      <div key={participant.id} className={styles.participantTag}>
+                        <span>{participant.displayName || participant.username}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveParticipant(participant.id)}
+                          className={styles.removeParticipantButton}
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {createError && (
                 <div className={styles.error}>{createError}</div>

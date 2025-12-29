@@ -123,6 +123,18 @@ export const chatAPI = {
 };
 
 /**
+ * Методы для работы с пользователями
+ */
+export const userAPI = {
+  searchUsers: async (username) => {
+    if (!username || username.trim().length === 0) {
+      return [];
+    }
+    return apiRequest(`/users/search?username=${encodeURIComponent(username.trim())}`);
+  },
+};
+
+/**
  * Методы для работы с комнатами
  */
 export const roomAPI = {
