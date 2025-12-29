@@ -29,7 +29,11 @@ export const useMessageSender = (chatId, onMessageSent) => {
    * Отправляет сообщение через WebSocket или REST API
    */
   const sendMessage = useCallback(async (content, type = 'TEXT') => {
-    if (!content.trim() || sending) return null;
+    console.log('🚀 sendMessage вызван:', { content: content.substring(0, 50), type, sending });
+    if (!content.trim() || sending) {
+      console.log('⚠️ sendMessage: пропуск - пустое сообщение или уже отправляется');
+      return null;
+    }
 
     const messageContent = content.trim();
     
@@ -78,16 +82,14 @@ export const useMessageSender = (chatId, onMessageSent) => {
                                client.active && 
                                (connected || client.state === 1); // 1 = CONNECTED
       
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔍 Проверка WebSocket перед отправкой:', {
-          hasClient: !!client,
-          connected,
-          clientConnected: client?.connected,
-          clientActive: client?.active,
-          clientState: client?.state,
-          isWebSocketReady
-        });
-      }
+      console.log('🔍 Проверка WebSocket перед отправкой:', {
+        hasClient: !!client,
+        connected,
+        clientConnected: client?.connected,
+        clientActive: client?.active,
+        clientState: client?.state,
+        isWebSocketReady
+      });
       
       // Пробуем отправить через WebSocket
       if (isWebSocketReady) {
@@ -99,26 +101,22 @@ export const useMessageSender = (chatId, onMessageSent) => {
             type,
           };
           
-          if (process.env.NODE_ENV === 'development') {
-            console.log('📤 Отправка сообщения через WebSocket:', {
-              destination,
-              payload: messagePayload,
-              clientState: {
-                connected: client.connected,
-                active: client.active,
-                state: client.state
-              }
-            });
-          }
+          console.log('📤 Отправка сообщения через WebSocket:', {
+            destination,
+            payload: messagePayload,
+            clientState: {
+              connected: client.connected,
+              active: client.active,
+              state: client.state
+            }
+          });
           
           client.publish({
             destination,
             body: JSON.stringify(messagePayload),
           });
           
-          if (process.env.NODE_ENV === 'development') {
-            console.log('✅ Сообщение отправлено через WebSocket, ждем подтверждения');
-          }
+          console.log('✅ Сообщение отправлено через WebSocket, ждем подтверждения');
           
           // WebSocket отправка асинхронная, статус обновится при получении ответа
           // Не обновляем статус здесь, ждем подтверждения через подписку
@@ -131,15 +129,13 @@ export const useMessageSender = (chatId, onMessageSent) => {
       }
       
       // Fallback: отправляем через REST API
-      if (process.env.NODE_ENV === 'development') {
-        console.log('⚠️ WebSocket не готов, отправляем через REST API:', {
-          hasClient: !!client,
-          connected,
-          clientConnected: client?.connected,
-          clientActive: client?.active,
-          clientState: client?.state
-        });
-      }
+      console.log('⚠️ WebSocket не готов, отправляем через REST API:', {
+        hasClient: !!client,
+        connected,
+        clientConnected: client?.connected,
+        clientActive: client?.active,
+        clientState: client?.state
+      });
       
       const serverMessage = await chatAPI.sendMessage(chatId, messageContent, type);
       

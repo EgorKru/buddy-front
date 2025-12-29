@@ -39,9 +39,7 @@ export const StompProvider = (props) => {
     
     // Если нет токена, отключаемся если подключены
     if (!token) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log("STOMP: No token, skipping connection");
-      }
+      console.log("STOMP: No token, skipping connection");
       if (clientRef.current && clientRef.current.connected) {
         clientRef.current.deactivate();
         setClient(null);
@@ -56,27 +54,22 @@ export const StompProvider = (props) => {
                           (previousToken !== token && previousToken !== null);
     
     if (!needsReconnect && clientRef.current && clientRef.current.connected) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log("STOMP: Already connected with same token, skipping reconnection");
-      }
+      console.log("STOMP: Already connected with same token, skipping reconnection");
       return;
     }
     
     // Если нужно переподключиться, сначала отключаем старый клиент
     if (clientRef.current && clientRef.current.connected) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log("STOMP: Disconnecting old client for reconnection");
-      }
+      console.log("STOMP: Disconnecting old client for reconnection");
       clientRef.current.deactivate();
       setClient(null);
       setConnected(false);
     }
 
-    // Логируем информацию о подключении только в dev режиме
-    if (process.env.NODE_ENV === 'development') {
-      console.log("STOMP: Initializing connection...");
-      console.log("STOMP: WebSocket URL:", config.stomp.url);
-    }
+    // Логируем информацию о подключении
+    console.log("STOMP: Initializing connection...");
+    console.log("STOMP: WebSocket URL:", config.stomp.url);
+    console.log("STOMP: Token present:", !!token);
     
     // Проверяем, не отключено ли подключение (для временного решения проблем)
     const disableWebSocket = localStorage.getItem('disable_websocket') === 'true';
@@ -101,9 +94,7 @@ export const StompProvider = (props) => {
       sockJsUrl = wsUrl.replace('ws://', 'http://').replace('wss://', 'https://');
     }
     
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`STOMP: Using SockJS to connect to`, sockJsUrl);
-    }
+    console.log(`STOMP: Using SockJS to connect to`, sockJsUrl);
     
     // Бэкенд поддерживает токен в query параметре для SockJS handshake
     // Это помогает при первоначальном подключении
@@ -113,26 +104,20 @@ export const StompProvider = (props) => {
     // Создаем STOMP клиент
     const stompClient = new Client({
       webSocketFactory: () => {
-        if (process.env.NODE_ENV === 'development') {
-          console.log("STOMP: Creating SockJS connection to", finalWsUrl);
-        }
+        console.log("STOMP: Creating SockJS connection to", finalWsUrl);
         const sock = new SockJS(finalWsUrl);
         
         // Добавляем обработчики для диагностики
         sock.onopen = () => {
-          if (process.env.NODE_ENV === 'development') {
-            console.log("STOMP: SockJS connection opened successfully");
-          }
+          console.log("STOMP: SockJS connection opened successfully");
         };
         
         sock.onclose = (event) => {
-          if (process.env.NODE_ENV === 'development') {
-            console.log("STOMP: SockJS connection closed", {
-              code: event.code,
-              reason: event.reason,
-              wasClean: event.wasClean,
-            });
-          }
+          console.log("STOMP: SockJS connection closed", {
+            code: event.code,
+            reason: event.reason,
+            wasClean: event.wasClean,
+          });
         };
         
         sock.onerror = (error) => {
@@ -166,20 +151,16 @@ export const StompProvider = (props) => {
         }
       },
       onConnect: (frame) => {
-        if (process.env.NODE_ENV === 'development') {
-          console.log("✅ STOMP: Connected successfully!", frame);
-          console.log("STOMP: Connection headers:", frame.headers);
-          console.log("STOMP: Client state:", stompClient.state);
-        }
+        console.log("✅ STOMP: Connected successfully!", frame);
+        console.log("STOMP: Connection headers:", frame.headers);
+        console.log("STOMP: Client state:", stompClient.state);
         // Устанавливаем connected синхронно, чтобы компоненты сразу увидели изменение
         setConnected(true);
         
         // Дополнительная проверка через небольшую задержку
         setTimeout(() => {
           if (stompClient.connected && stompClient.active) {
-            if (process.env.NODE_ENV === 'development') {
-              console.log("✅ STOMP: Connection verified, ready to send messages");
-            }
+            console.log("✅ STOMP: Connection verified, ready to send messages");
           } else {
             console.warn("⚠️ STOMP: Connection state mismatch after onConnect");
           }

@@ -282,17 +282,31 @@ export default function ChatPage() {
 
   const sendMessage = async (e) => {
     e.preventDefault();
-    if (!newMessage.trim() || !user || sending) return;
+    console.log('📝 sendMessage вызван на странице чата:', { 
+      newMessage: newMessage.substring(0, 50), 
+      hasUser: !!user, 
+      sending 
+    });
+    
+    if (!newMessage.trim() || !user || sending) {
+      console.log('⚠️ sendMessage: пропуск - пустое сообщение, нет пользователя или уже отправляется');
+      return;
+    }
 
     const messageContent = newMessage.trim();
     setNewMessage('');
 
+    console.log('📤 Вызываем sendMessageHook с содержимым:', messageContent.substring(0, 50));
     // Отправляем через хук (он сам создаст оптимистичное сообщение)
     const result = await sendMessageHook(messageContent, 'TEXT');
+    console.log('📥 sendMessageHook вернул:', result ? 'успех' : 'null');
     
     if (!result) {
       // Если отправка не удалась, возвращаем текст в поле ввода
+      console.warn('⚠️ Отправка не удалась, возвращаем текст в поле ввода');
       setNewMessage(messageContent);
+    } else {
+      console.log('✅ Сообщение успешно отправлено');
     }
   };
 
