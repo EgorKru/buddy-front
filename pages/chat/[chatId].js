@@ -90,25 +90,53 @@ export default function ChatPage() {
   };
 
   const subscribeToChat = () => {
-    if (!client || !connected || !chatId) return;
+    if (!client || !connected || !chatId) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Не могу подписаться на чат:', { client: !!client, connected, chatId });
+      }
+      return;
+    }
 
     try {
       const subscription = client.subscribe(
         `/topic/chat/${chatId}`,
         (message) => {
-          const messageDto = JSON.parse(message.body);
-          setMessages(prev => {
-            // Проверяем, нет ли уже такого сообщения (избегаем дубликатов)
-            if (prev.some(m => m.id === messageDto.id)) {
-              return prev;
+          try {
+            const messageDto = JSON.parse(message.body);
+            if (process.env.NODE_ENV === 'development') {
+              console.log('Получено сообщение через WebSocket:', messageDto);
             }
-            return [...prev, messageDto];
-          });
+            setMessages(prev => {
+              // Проверяем, нет ли уже такого сообщения (избегаем дубликатов)
+              const existing = prev.find(m => m.id === messageDto.id);
+              if (existing) {
+                return prev;
+              }
+              
+              // Если есть оптимистичное сообщение с таким же содержимым от того же отправителя, заменяем его
+              const optimisticIndex = prev.findIndex(m => 
+                m.isOptimistic && 
+                m.content === messageDto.content && 
+                m.senderId === messageDto.senderId &&
+                Math.abs(new Date(m.createdAt) - new Date(messageDto.createdAt)) < 5000 // В пределах 5 секунд
+              );
+              
+              if (optimisticIndex !== -1) {
+                const updated = [...prev];
+                updated[optimisticIndex] = messageDto;
+                return updated;
+              }
+              
+              return [...prev, messageDto];
+            });
+          } catch (error) {
+            console.error('Ошибка парсинга сообщения:', error);
+          }
         }
       );
       subscriptionRef.current = subscription;
       if (process.env.NODE_ENV === 'development') {
-        console.log('Подписались на чат:', chatId);
+        console.log('✅ Подписались на чат:', chatId);
       }
     } catch (error) {
       console.error('Ошибка подписки на чат:', error);
@@ -130,12 +158,29 @@ export default function ChatPage() {
     if (!newMessage.trim() || !user || sending) return;
 
     const messageContent = newMessage.trim();
+    
+    // Оптимистичное обновление UI - показываем сообщение сразу
+    const optimisticMessage = {
+      id: `temp-${Date.now()}`,
+      content: messageContent,
+      senderId: user.id,
+      senderUsername: user.username,
+      senderDisplayName: user.displayName || user.username,
+      createdAt: new Date().toISOString(),
+      type: 'TEXT',
+      isOptimistic: true, // Флаг для временного сообщения
+    };
+    
+    setMessages(prev => [...prev, optimisticMessage]);
     setNewMessage('');
     setSending(true);
 
     try {
       if (client && connected) {
         // Отправляем через WebSocket
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Отправка сообщения через WebSocket:', messageContent);
+        }
         client.publish({
           destination: '/app/chat.sendMessage',
           body: JSON.stringify({
@@ -144,13 +189,28 @@ export default function ChatPage() {
             type: 'TEXT',
           }),
         });
+        // WebSocket отправка асинхронная, сообщение придет через подписку
+        // Удаляем оптимистичное сообщение, когда придет реальное
+        setTimeout(() => {
+          setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id));
+        }, 1000);
       } else {
         // Fallback: отправляем через REST API
-        await chatAPI.sendMessage(chatId, messageContent);
+        if (process.env.NODE_ENV === 'development') {
+          console.log('WebSocket не подключен, отправка через REST API');
+        }
+        const sentMessage = await chatAPI.sendMessage(chatId, messageContent);
+        // Заменяем оптимистичное сообщение на реальное
+        setMessages(prev => 
+          prev.map(m => m.id === optimisticMessage.id ? sentMessage : m)
+        );
       }
     } catch (error) {
       console.error('Ошибка отправки сообщения:', error);
+      // Удаляем оптимистичное сообщение при ошибке
+      setMessages(prev => prev.filter(m => m.id !== optimisticMessage.id));
       setNewMessage(messageContent); // Возвращаем текст обратно
+      alert('Не удалось отправить сообщение. Попробуйте еще раз.');
     } finally {
       setSending(false);
     }
@@ -280,14 +340,15 @@ export default function ChatPage() {
           type="text"
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
-          placeholder="Введите сообщение..."
-          disabled={!connected || sending}
+          placeholder={connected ? "Введите сообщение..." : "Подключение... (отправка через REST API)"}
+          disabled={sending}
           className={styles.messageInput}
         />
         <button
           type="submit"
-          disabled={!newMessage.trim() || !connected || sending}
+          disabled={!newMessage.trim() || sending}
           className={styles.sendButton}
+          title={!connected ? "WebSocket не подключен, сообщение будет отправлено через REST API" : ""}
         >
           {sending ? (
             <Loader2 size={20} className={styles.spinner} />

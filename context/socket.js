@@ -119,7 +119,9 @@ export const StompProvider = (props) => {
       // Передача токена через заголовки (основной способ)
       // Если не работает, можно использовать токен в URL (см. выше)
       connectHeaders: useTokenInUrl ? {} : {
-        Authorization: `Bearer ${token}`
+        Authorization: `Bearer ${token}`,
+        // Некоторые бэкенды могут ожидать токен в другом заголовке
+        'X-Authorization': `Bearer ${token}`,
       },
       reconnectDelay: config.stomp.options.reconnectDelay,
       heartbeatIncoming: config.stomp.options.heartbeatIncoming,
