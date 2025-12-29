@@ -61,8 +61,58 @@ export default function ChatPage() {
 
   // Callback для обработки отправленных сообщений
   const handleMessageSent = useCallback((message, tempId) => {
-    console.log('📥 handleMessageSent вызван:', { message, tempId, isOptimistic: message?.isOptimistic });
+    console.log('📥 handleMessageSent вызван:', { 
+      message: { id: message.id, content: message.content?.substring(0, 20), isOptimistic: message.isOptimistic }, 
+      tempId,
+      messageTempId: message.tempId
+    });
     
+    // Если это оптимистичное сообщение (с tempId и isOptimistic === true), добавляем его в список
+    const actualTempId = tempId || message.tempId;
+    const isOptimisticMessage = message.isOptimistic === true || (!!actualTempId && (message.id?.startsWith('temp-') || !message.id));
+    
+    if (isOptimisticMessage && actualTempId) {
+      console.log('➕ Добавляем оптимистичное сообщение с tempId:', actualTempId);
+      
+      setMessages(prev => {
+        // Проверяем, нет ли уже такого сообщения
+        const existing = prev.find(m => 
+          (m.tempId === actualTempId || m.id === actualTempId) && m.isOptimistic
+        );
+        
+        if (existing) {
+          console.log('⚠️ Оптимистичное сообщение уже существует, обновляем статус');
+          return prev.map(m => 
+            (m.tempId === actualTempId || m.id === actualTempId) && m.isOptimistic
+              ? { ...m, ...message, tempId: actualTempId, id: actualTempId, status: message.status || MESSAGE_STATUS.SENDING }
+              : m
+          );
+        }
+        
+        console.log('✅ Добавляем новое оптимистичное сообщение в список, prev.length:', prev.length);
+        const newMessage = { 
+          ...message, 
+          tempId: actualTempId,
+          id: actualTempId, // Используем tempId как id для оптимистичного сообщения
+          isOptimistic: true, 
+          status: message.status || MESSAGE_STATUS.SENDING 
+        };
+        console.log('✅ Новое оптимистичное сообщение:', newMessage);
+        return [...prev, newMessage];
+      });
+      
+      // Обновляем статус в карте
+      if (message.status) {
+        setMessageStatusMap(prev => ({
+          ...prev,
+          [actualTempId]: message.status,
+        }));
+      }
+      
+      return; // Выходим, не продолжаем дальше
+    }
+    
+    // Если это реальное сообщение (без tempId и isOptimistic)
     if (tempId) {
       // Обновляем существующее оптимистичное сообщение
       setMessages(prev => {
@@ -71,7 +121,7 @@ export default function ChatPage() {
         );
         
         if (index !== -1) {
-          console.log('✅ Найдено оптимистичное сообщение, обновляем:', { index, tempId });
+          console.log('✅ Найдено оптимистичное сообщение, заменяем на реальное:', { index, tempId, messageId: message.id });
           // Заменяем оптимистичное сообщение на реальное
           const updated = [...prev];
           updated[index] = {
@@ -83,7 +133,7 @@ export default function ChatPage() {
         } else {
           console.log('➕ Оптимистичное сообщение не найдено, добавляем новое');
           // Или добавляем новое, если это сообщение от сервера
-          return [...prev, { ...message, status: message.status || MESSAGE_STATUS.SENT, isOptimistic: message.isOptimistic !== false }];
+          return [...prev, { ...message, status: message.status || MESSAGE_STATUS.SENT, isOptimistic: false }];
         }
       });
       

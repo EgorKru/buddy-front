@@ -269,8 +269,9 @@ export const useMessageSender = (chatId, onMessageSent) => {
    * Подписывается на подтверждения отправки сообщений от бэкенда
    */
   useEffect(() => {
-    if (!client || !connected || !client.connected || !client.active) {
-      console.log('⚠️ useMessageSender: Не могу подписаться на подтверждения:', {
+    // Ждем подключения WebSocket
+    if (!client || !connected) {
+      console.log('⚠️ useMessageSender: Ожидаем подключения WebSocket:', {
         hasClient: !!client,
         connected,
         clientConnected: client?.connected,
@@ -278,12 +279,37 @@ export const useMessageSender = (chatId, onMessageSent) => {
       });
       return;
     }
+    
+    // Проверяем, что клиент действительно подключен и активен
+    if (!client.connected || !client.active) {
+      console.log('⚠️ useMessageSender: Клиент не подключен или не активен, ждем...');
+      // Повторяем попытку через небольшую задержку
+      const timeout = setTimeout(() => {
+        if (client.connected && client.active) {
+          // Перезапустим эффект
+          console.log('✅ useMessageSender: Клиент подключен, переподписываемся');
+        }
+      }, 500);
+      return () => clearTimeout(timeout);
+    }
 
     console.log('📡 useMessageSender: Подписываемся на /user/queue/message-sent');
+    
+    // Отписываемся от старой подписки, если есть
+    if (messageSentSubscriptionRef.current) {
+      try {
+        messageSentSubscriptionRef.current.unsubscribe();
+        console.log('🔌 Отписались от старой подписки на подтверждения');
+      } catch (error) {
+        console.error('Ошибка отписки от старой подписки на подтверждения:', error);
+      }
+      messageSentSubscriptionRef.current = null;
+    }
+    
     try {
       const subscription = client.subscribe('/user/queue/message-sent', (message) => {
         try {
-          console.log('📬 Получено сообщение в /user/queue/message-sent:', message.body);
+          console.log('📬 Получено сообщение в /user/queue/message-sent, raw body:', message.body);
           const confirmation = JSON.parse(message.body);
           
           console.log('📬 Получено подтверждение отправки:', confirmation);
