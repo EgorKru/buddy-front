@@ -169,8 +169,21 @@ export const StompProvider = (props) => {
         if (process.env.NODE_ENV === 'development') {
           console.log("✅ STOMP: Connected successfully!", frame);
           console.log("STOMP: Connection headers:", frame.headers);
+          console.log("STOMP: Client state:", stompClient.state);
         }
+        // Устанавливаем connected синхронно, чтобы компоненты сразу увидели изменение
         setConnected(true);
+        
+        // Дополнительная проверка через небольшую задержку
+        setTimeout(() => {
+          if (stompClient.connected && stompClient.active) {
+            if (process.env.NODE_ENV === 'development') {
+              console.log("✅ STOMP: Connection verified, ready to send messages");
+            }
+          } else {
+            console.warn("⚠️ STOMP: Connection state mismatch after onConnect");
+          }
+        }, 100);
         
         // Подписываемся на ошибки
         try {
