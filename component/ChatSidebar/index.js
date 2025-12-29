@@ -41,7 +41,6 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
         if (onClose) onClose();
       });
     } catch (error) {
-      // Ошибка уже обработана в хуке
     }
   };
 

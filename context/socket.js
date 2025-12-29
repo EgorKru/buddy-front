@@ -137,8 +137,17 @@ export const StompProvider = (props) => {
         
         // Подписываемся на ошибки
         try {
-          stompClient.subscribe('/queue/errors', (error) => {
-            console.error('WebSocket error:', error.body);
+          stompClient.subscribe('/user/queue/errors', (error) => {
+            const errorData = JSON.parse(error.body);
+            console.error('WebSocket error:', errorData);
+            // Если ошибка аутентификации, перенаправляем на логин
+            if (errorData.message && errorData.message.includes('аутентификации')) {
+              if (typeof window !== 'undefined') {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = '/login';
+              }
+            }
           });
         } catch (error) {
           console.error('STOMP: Failed to subscribe to errors queue:', error);
@@ -159,6 +168,37 @@ export const StompProvider = (props) => {
             body: frame.body,
           });
         }
+        
+        // Проверяем, если это ошибка аутентификации
+        try {
+          const errorBody = JSON.parse(frame.body || '{}');
+          if (errorBody.message && (
+            errorBody.message.includes('аутентификации') || 
+            errorBody.message.includes('не аутентифицирован') ||
+            errorBody.message.includes('Unauthorized')
+          )) {
+            console.error('WebSocket authentication error, redirecting to login');
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              window.location.href = '/login';
+            }
+          }
+        } catch (e) {
+          // Игнорируем ошибки парсинга, но проверяем текст ошибки напрямую
+          if (frame.body && (
+            frame.body.includes('аутентификации') || 
+            frame.body.includes('не аутентифицирован')
+          )) {
+            console.error('WebSocket authentication error (raw), redirecting to login');
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              window.location.href = '/login';
+            }
+          }
+        }
+        
         setConnected(false);
       },
       onWebSocketError: (event) => {

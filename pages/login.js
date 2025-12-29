@@ -2,9 +2,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { authAPI, setCurrentUser } from '@/utils/api';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Radio } from 'lucide-react';
 import InteractiveBackground from '@/component/InteractiveBackground';
-import Pager3D from '@/component/Pager3D';
 import styles from '@/styles/login.module.css';
 
 export default function Login() {
@@ -41,7 +40,10 @@ export default function Login() {
       </div>
       <div className={styles.formContainer}>
         <div className={styles.logoContainer}>
-          <Pager3D size={90} interactive={true} />
+          <div className={styles.logoIcon}>
+            <Radio size={32} className={styles.logoIconSvg} />
+            <span className={styles.logoText}>Pager</span>
+          </div>
         </div>
         <h1>Вход в Pager</h1>
         <p className={styles.subtitle}>Добро пожаловать обратно</p>

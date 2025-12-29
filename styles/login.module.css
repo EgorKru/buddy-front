@@ -443,7 +443,27 @@
   margin-bottom: 32px;
 }
 
-/* Старые стили логотипа удалены - теперь используется компонент Pager3D */
+.logoIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 24px;
+  background: linear-gradient(135deg, rgb(102, 126, 234), rgb(140, 100, 200));
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
+}
+
+.logoIconSvg {
+  color: white;
+}
+
+.logoText {
+  font-size: 24px;
+  font-weight: 700;
+  color: white;
+  letter-spacing: 1px;
+}
 
 .subtitle {
   text-align: center;

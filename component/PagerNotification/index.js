@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
-import { X, Bell } from 'lucide-react';
+import { X, Bell, Radio } from 'lucide-react';
 import styles from '@/component/PagerNotification/index.module.css';
-import Pager3D from '@/component/Pager3D';
 
 /**
  * Компонент уведомлений в виде пейджера
@@ -59,8 +58,10 @@ export default function PagerNotification({
         className={`${styles.pagerWrapper} ${isExpanded ? styles.expanded : ''}`}
         onClick={handlePagerClick}
       >
-        <div className={styles.pager3dWrapper}>
-          <Pager3D size={60} interactive={true} />
+        <div className={styles.pagerIconWrapper}>
+          <div className={styles.pagerIcon}>
+            <Radio size={24} />
+          </div>
           {unreadCount > 0 && (
             <div className={styles.unreadBadge}>
               {unreadCount > 9 ? '9+' : unreadCount}
