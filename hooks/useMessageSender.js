@@ -29,9 +29,7 @@ export const useMessageSender = (chatId, onMessageSent) => {
    * Отправляет сообщение через WebSocket или REST API
    */
   const sendMessage = useCallback(async (content, type = 'TEXT') => {
-    console.log('🚀 sendMessage вызван:', { content: content.substring(0, 50), type, sending });
     if (!content.trim() || sending) {
-      console.log('⚠️ sendMessage: пропуск - пустое сообщение или уже отправляется');
       return null;
     }
 
@@ -102,19 +100,12 @@ export const useMessageSender = (chatId, onMessageSent) => {
           setSending(false);
           return optimisticMessage;
         } catch (wsError) {
-          console.error('❌ Ошибка отправки через WebSocket:', wsError);
+          console.error('Ошибка отправки через WebSocket:', wsError);
           // Продолжаем к fallback через REST API
         }
       }
       
       // Fallback: отправляем через REST API
-      console.log('⚠️ WebSocket не готов, отправляем через REST API:', {
-        hasClient: !!client,
-        connected,
-        clientConnected: client?.connected,
-        clientActive: client?.active,
-        clientState: client?.state
-      });
       
       const serverMessage = await chatAPI.sendMessage(chatId, messageContent, type);
       
@@ -273,7 +264,6 @@ export const useMessageSender = (chatId, onMessageSent) => {
     if (messageSentSubscriptionRef.current) {
       try {
         messageSentSubscriptionRef.current.unsubscribe();
-        console.log('🔌 Отписались от старой подписки на подтверждения');
       } catch (error) {
         console.error('Ошибка отписки от старой подписки на подтверждения:', error);
       }
