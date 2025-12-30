@@ -224,6 +224,96 @@ export const useMessageSender = (chatId, onMessageSent) => {
   }, [onMessageSent]);
 
   /**
+   * Подписывается на свои сообщения через /user/queue/messages
+   * Это альтернативный способ получения подтверждений - получаем само сообщение
+   */
+  useEffect(() => {
+    // Ждем подключения WebSocket
+    if (!client || !connected) {
+      return;
+    }
+    
+    // Проверяем, что клиент действительно подключен и активен
+    if (!client.connected || !client.active) {
+      return;
+    }
+    
+    // Отписываемся от старой подписки, если есть
+    if (userMessagesSubscriptionRef.current) {
+      try {
+        userMessagesSubscriptionRef.current.unsubscribe();
+      } catch (error) {
+        console.error('Ошибка отписки от старой подписки на /user/queue/messages:', error);
+      }
+      userMessagesSubscriptionRef.current = null;
+    }
+    
+    try {
+      const subscription = client.subscribe('/user/queue/messages', (message) => {
+        try {
+          const messageDto = JSON.parse(message.body);
+          
+          // Найти оптимистичное сообщение по tempId или по content + chatId + senderId
+          if (onMessageSent) {
+            // Сначала ищем по tempId в последнем отправленном сообщении
+            let tempId = null;
+            if (lastSentMessageRef.current && 
+                lastSentMessageRef.current.chatId === messageDto.chatId &&
+                lastSentMessageRef.current.content === messageDto.content &&
+                Number(lastSentMessageRef.current.senderId) === Number(messageDto.senderId)) {
+              tempId = lastSentMessageRef.current.tempId;
+            } else {
+              // Ищем в очереди
+              const queue = getMessageQueue();
+              const matchingMessage = queue.find(msg => 
+                msg.chatId === messageDto.chatId &&
+                msg.content === messageDto.content &&
+                Number(msg.senderId) === Number(messageDto.senderId) &&
+                msg.status === MESSAGE_STATUS.SENDING
+              );
+              if (matchingMessage) {
+                tempId = matchingMessage.tempId;
+              }
+            }
+            
+            if (tempId) {
+              // Обновляем статус в очереди
+              updateMessageStatus(tempId, MESSAGE_STATUS.SENT, messageDto);
+              
+              // Удаляем из очереди после небольшой задержки
+              setTimeout(() => {
+                removeMessageFromQueue(tempId);
+                if (lastSentMessageRef.current?.tempId === tempId) {
+                  lastSentMessageRef.current = null;
+                }
+              }, 1000);
+              
+              // Заменяем оптимистичное сообщение на реальное
+              onMessageSent({
+                ...messageDto,
+                status: MESSAGE_STATUS.SENT,
+              }, tempId);
+            }
+          }
+        } catch (error) {
+          console.error('Ошибка обработки сообщения из /user/queue/messages:', error);
+        }
+      });
+      
+      userMessagesSubscriptionRef.current = subscription;
+      
+      return () => {
+        if (userMessagesSubscriptionRef.current) {
+          userMessagesSubscriptionRef.current.unsubscribe();
+          userMessagesSubscriptionRef.current = null;
+        }
+      };
+    } catch (error) {
+      console.error('Ошибка подписки на /user/queue/messages:', error);
+    }
+  }, [client, connected, onMessageSent]);
+
+  /**
    * Подписывается на подтверждения отправки сообщений от бэкенда
    */
   useEffect(() => {
