@@ -320,8 +320,9 @@ export const useMessageSender = (chatId, onMessageSent) => {
 
           if (confirmation.status === 'sent') {
             // Сообщение успешно отправлено
-            // Ищем сообщение в очереди по chatId и статусу SENDING
-            // Приоритет: последнее отправленное сообщение, затем поиск в очереди
+            // Ищем оптимистичное сообщение по chatId и messageId (или по tempId)
+            console.log('📬 Обработка подтверждения отправки:', confirmation);
+            
             let queuedMessage = null;
             
             // Сначала проверяем последнее отправленное сообщение
@@ -329,10 +330,10 @@ export const useMessageSender = (chatId, onMessageSent) => {
                 lastSentMessageRef.current.chatId === confirmation.chatId &&
                 lastSentMessageRef.current.status === MESSAGE_STATUS.SENDING) {
               queuedMessage = lastSentMessageRef.current;
+              console.log('📬 Найдено в lastSentMessageRef:', queuedMessage.tempId);
             } else {
-              // Ищем в очереди
+              // Ищем в очереди по chatId и статусу SENDING
               const queue = getMessageQueue();
-              // Берем последнее сообщение с нужным chatId и статусом SENDING
               const matchingMessages = queue.filter(msg => 
                 msg.chatId === confirmation.chatId && 
                 msg.status === MESSAGE_STATUS.SENDING
@@ -342,6 +343,7 @@ export const useMessageSender = (chatId, onMessageSent) => {
                 queuedMessage = matchingMessages.sort((a, b) => 
                   new Date(b.createdAt) - new Date(a.createdAt)
                 )[0];
+                console.log('📬 Найдено в очереди:', queuedMessage.tempId);
               }
             }
 
@@ -364,16 +366,21 @@ export const useMessageSender = (chatId, onMessageSent) => {
                   messageId: confirmation.messageId,
                   chatId: confirmation.chatId
                 });
+                // Передаем полное сообщение с реальным id для замены
                 onMessageSent({
                   id: confirmation.messageId,
                   status: MESSAGE_STATUS.SENT,
                   chatId: confirmation.chatId,
+                  content: queuedMessage.content,
+                  type: queuedMessage.type,
+                  senderId: queuedMessage.senderId,
+                  senderUsername: queuedMessage.senderUsername,
+                  senderDisplayName: queuedMessage.senderDisplayName,
+                  createdAt: queuedMessage.createdAt,
                 }, queuedMessage.tempId);
               }
             } else {
-              if (process.env.NODE_ENV === 'development') {
-                console.warn('Не найдено сообщение для подтверждения:', confirmation);
-              }
+              console.warn('⚠️ Не найдено сообщение для подтверждения:', confirmation);
             }
           } else if (confirmation.status === 'failed') {
             // Ошибка отправки

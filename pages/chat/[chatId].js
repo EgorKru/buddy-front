@@ -114,15 +114,24 @@ export default function ChatPage() {
     
     // Если это реальное сообщение (с tempId для замены оптимистичного)
     if (tempId) {
-      // Обновляем существующее оптимистичное сообщение
+      // Обновляем существующее оптимистичное сообщение по tempId или chatId + messageId
       setMessages(prev => {
         // Ищем оптимистичное сообщение по tempId
-        const index = prev.findIndex(m => 
-          (m.tempId === tempId || m.id === tempId) && m.isOptimistic
+        let index = prev.findIndex(m => 
+          (m.tempId === tempId || m.id === tempId) && m.isOptimistic === true
         );
         
+        // Если не нашли по tempId, пробуем найти по chatId и messageId (если есть)
+        if (index === -1 && message.chatId && message.id) {
+          index = prev.findIndex(m => 
+            m.isOptimistic === true &&
+            m.chatId === message.chatId &&
+            (m.tempId === tempId || m.id === tempId)
+          );
+        }
+        
         if (index !== -1) {
-          console.log('✅ Найдено оптимистичное сообщение, заменяем на реальное:', { 
+          console.log('✅ Найдено оптимистичное сообщение по tempId, заменяем на реальное:', { 
             index, 
             tempId, 
             messageId: message.id,
@@ -135,19 +144,25 @@ export default function ChatPage() {
             ...message,
             status: message.status || MESSAGE_STATUS.SENT,
             isOptimistic: false,
+            // Убираем tempId, оставляем только реальный id
+            tempId: undefined,
           };
+          // Удаляем tempId из объекта
+          delete updated[index].tempId;
           return updated;
         } else {
           console.log('⚠️ Оптимистичное сообщение не найдено по tempId:', tempId);
           // Проверяем, нет ли уже сообщения с таким id
-          const existingById = prev.findIndex(m => m.id === message.id);
+          const existingById = prev.findIndex(m => Number(m.id) === Number(message.id));
           if (existingById !== -1) {
             console.log('⚠️ Сообщение с таким id уже существует, пропускаем');
             return prev;
           }
           // Добавляем новое, если не нашли оптимистичное
           console.log('➕ Добавляем новое сообщение (оптимистичное не найдено)');
-          return [...prev, { ...message, status: message.status || MESSAGE_STATUS.SENT, isOptimistic: false }];
+          const newMsg = { ...message, status: message.status || MESSAGE_STATUS.SENT, isOptimistic: false };
+          delete newMsg.tempId;
+          return [...prev, newMsg];
         }
       });
       
@@ -295,28 +310,26 @@ export default function ChatPage() {
               
               // 2. Если это наше сообщение, ищем оптимистичное для замены
               if (isOwnMessage) {
-                console.log('✅ Это наше сообщение, ищем оптимистичное');
+                console.log('✅ Это наше сообщение, ищем оптимистичное для замены');
                 
-                // Находим все оптимистичные сообщения
-                const optimisticMessages = prev.filter(m => m.isOptimistic === true);
-                console.log('🔍 Найдено оптимистичных:', optimisticMessages.length);
-                
-                // Ищем по content и senderId (с учетом типов)
+                // Ищем оптимистичное сообщение с таким же content и status: 'sending'
                 const optimisticIndex = prev.findIndex(m => {
                   const isOptimistic = m.isOptimistic === true;
+                  const hasTempId = !!m.tempId;
                   const contentMatch = m.content === messageDto.content;
                   const senderIdMatch = Number(m.senderId) === Number(messageDto.senderId);
-                  const statusMatch = m.status === MESSAGE_STATUS.SENDING || m.status === MESSAGE_STATUS.PENDING;
+                  const statusSending = m.status === MESSAGE_STATUS.SENDING || m.status === 'sending';
                   
-                  const matches = isOptimistic && contentMatch && senderIdMatch && statusMatch;
+                  const matches = isOptimistic && hasTempId && contentMatch && senderIdMatch && statusSending;
                   
                   if (isOptimistic && contentMatch && senderIdMatch) {
-                    console.log(`🔍 Проверка ${m.tempId}:`, {
+                    console.log(`🔍 Проверка оптимистичного ${m.tempId}:`, {
                       isOptimistic,
+                      hasTempId,
                       contentMatch,
                       senderIdMatch: `${m.senderId} === ${messageDto.senderId}`,
                       status: m.status,
-                      statusMatch,
+                      statusSending,
                       matches
                     });
                   }
@@ -329,7 +342,7 @@ export default function ChatPage() {
                     optimisticIndex,
                     tempId: prev[optimisticIndex].tempId,
                     realId: messageDto.id,
-                    content: messageDto.content.substring(0, 20) + '...'
+                    content: messageDto.content.substring(0, 30)
                   });
                   // Заменяем оптимистичное сообщение на реальное
                   const updated = [...prev];
@@ -337,7 +350,11 @@ export default function ChatPage() {
                     ...messageDto,
                     status: MESSAGE_STATUS.SENT,
                     isOptimistic: false,
+                    // Убираем tempId, оставляем только реальный id
+                    tempId: undefined,
                   };
+                  // Удаляем tempId из объекта
+                  delete updated[optimisticIndex].tempId;
                   return updated;
                 } else {
                   console.log('⚠️ Оптимистичное сообщение не найдено для замены');
