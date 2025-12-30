@@ -247,17 +247,43 @@ export default function ChatPage() {
             
             setMessages(prev => {
               // 1. Проверяем, нет ли уже сообщения с таким id
-              if (prev.some(m => Number(m.id) === Number(messageDto.id))) {
-                return prev;
+              const existingById = prev.findIndex(m => Number(m.id) === Number(messageDto.id));
+              if (existingById !== -1) {
+                return prev; // Уже есть, пропускаем
               }
               
               // 2. Ищем оптимистичное сообщение для замены
-              // Ищем по tempId, content, senderId и status 'sending'
+              // Ищем по более широким критериям: content, senderId, статус и время создания
+              const now = Date.now();
               const optimisticIndex = prev.findIndex(m => {
-                if (!m.tempId) return false;
-                if (m.content !== messageDto.content) return false;
-                if (Number(m.senderId) !== Number(messageDto.senderId)) return false;
-                if (m.status !== MESSAGE_STATUS.SENDING && m.status !== 'sending') return false;
+                // Должно быть оптимистичное сообщение
+                if (!m.tempId && !m.isOptimistic) return false;
+                
+                // Content должен совпадать (trimmed)
+                if (String(m.content || '').trim() !== String(messageDto.content || '').trim()) {
+                  return false;
+                }
+                
+                // SenderId должен совпадать (с приведением типов)
+                if (Number(m.senderId) !== Number(messageDto.senderId)) {
+                  return false;
+                }
+                
+                // Статус должен быть sending
+                const isSending = m.status === MESSAGE_STATUS.SENDING || 
+                                 m.status === 'sending' || 
+                                 m.status === MESSAGE_STATUS.PENDING ||
+                                 m.status === 'pending';
+                if (!isSending) return false;
+                
+                // Сообщение должно быть создано недавно (в последние 60 секунд)
+                // Это защита от замены старых сообщений
+                if (m.createdAt) {
+                  const messageTime = new Date(m.createdAt).getTime();
+                  const timeDiff = now - messageTime;
+                  if (timeDiff > 60000) return false; // Больше 60 секунд
+                }
+                
                 return true;
               });
               
