@@ -309,6 +309,7 @@ export const useMessageSender = (chatId, onMessageSent) => {
     try {
       const subscription = client.subscribe('/user/queue/message-sent', (message) => {
         try {
+          console.log('📬 ===== НАЧАЛО ОБРАБОТКИ ПОДТВЕРЖДЕНИЯ =====');
           console.log('📬 Получено сообщение в /user/queue/message-sent:');
           console.log('  - Destination:', message.headers?.destination || 'N/A');
           console.log('  - Subscription:', message.headers?.subscription || 'N/A');
@@ -317,33 +318,46 @@ export const useMessageSender = (chatId, onMessageSent) => {
           const confirmation = JSON.parse(message.body);
           
           console.log('📬 Получено подтверждение отправки:', confirmation);
+          console.log('📬 onMessageSent callback существует:', !!onMessageSent);
 
           if (confirmation.status === 'sent') {
             // Сообщение успешно отправлено
             // Ищем оптимистичное сообщение по chatId и messageId (или по tempId)
-            console.log('📬 Обработка подтверждения отправки:', confirmation);
+            console.log('📬 Обработка подтверждения отправки (status=sent):', confirmation);
             
             let queuedMessage = null;
             
             // Сначала проверяем последнее отправленное сообщение
+            console.log('📬 Проверка lastSentMessageRef:', {
+              exists: !!lastSentMessageRef.current,
+              chatId: lastSentMessageRef.current?.chatId,
+              confirmationChatId: confirmation.chatId,
+              status: lastSentMessageRef.current?.status,
+              tempId: lastSentMessageRef.current?.tempId
+            });
+            
             if (lastSentMessageRef.current && 
                 lastSentMessageRef.current.chatId === confirmation.chatId &&
                 lastSentMessageRef.current.status === MESSAGE_STATUS.SENDING) {
               queuedMessage = lastSentMessageRef.current;
-              console.log('📬 Найдено в lastSentMessageRef:', queuedMessage.tempId);
+              console.log('✅ 📬 Найдено в lastSentMessageRef:', queuedMessage.tempId);
             } else {
               // Ищем в очереди по chatId и статусу SENDING
               const queue = getMessageQueue();
+              console.log('📬 Поиск в очереди, всего сообщений:', queue.length);
               const matchingMessages = queue.filter(msg => 
                 msg.chatId === confirmation.chatId && 
                 msg.status === MESSAGE_STATUS.SENDING
               );
+              console.log('📬 Найдено подходящих сообщений в очереди:', matchingMessages.length);
               if (matchingMessages.length > 0) {
                 // Берем самое последнее (самое свежее)
                 queuedMessage = matchingMessages.sort((a, b) => 
                   new Date(b.createdAt) - new Date(a.createdAt)
                 )[0];
-                console.log('📬 Найдено в очереди:', queuedMessage.tempId);
+                console.log('✅ 📬 Найдено в очереди:', queuedMessage.tempId);
+              } else {
+                console.log('⚠️ 📬 Не найдено сообщений в очереди для chatId:', confirmation.chatId);
               }
             }
 

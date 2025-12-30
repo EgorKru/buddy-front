@@ -283,6 +283,7 @@ export default function ChatPage() {
             console.log('  - Message ID:', message.headers?.['message-id'] || 'N/A');
             console.log('  - Raw body:', message.body);
             const messageDto = JSON.parse(message.body);
+            console.log('📨 ===== НАЧАЛО ОБРАБОТКИ СООБЩЕНИЯ ИЗ ТОПИКА =====');
             console.log('📨 Получено сообщение через WebSocket, парсинг:', messageDto);
             
             // Получаем текущего пользователя заново для надежности
@@ -295,11 +296,13 @@ export default function ChatPage() {
               currentUserId: currentUser?.id,
               currentUserIdType: typeof currentUser?.id,
               isOwnMessage,
-              content: messageDto.content
+              content: messageDto.content,
+              userExists: !!currentUser
             });
             
             setMessages(prev => {
-              console.log('📨 Обработка в setMessages, всего:', prev.length);
+              console.log('📨 Обработка в setMessages, всего сообщений:', prev.length);
+              console.log('📨 Оптимистичные сообщения:', prev.filter(m => m.isOptimistic === true).length);
               
               // 1. Проверяем, нет ли уже сообщения с таким id (избегаем дубликатов)
               const existingById = prev.findIndex(m => Number(m.id) === Number(messageDto.id));
