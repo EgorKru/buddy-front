@@ -61,19 +61,11 @@ export default function ChatPage() {
 
   // Callback для обработки отправленных сообщений
   const handleMessageSent = useCallback((message, tempId) => {
-    console.log('📥 handleMessageSent вызван:', { 
-      message: { id: message.id, content: message.content?.substring(0, 20), isOptimistic: message.isOptimistic }, 
-      tempId,
-      messageTempId: message.tempId
-    });
-    
     // Если это оптимистичное сообщение (с tempId и isOptimistic === true), добавляем его в список
     const actualTempId = tempId || message.tempId;
     const isOptimisticMessage = message.isOptimistic === true || (!!actualTempId && (message.id?.startsWith('temp-') || !message.id));
     
     if (isOptimisticMessage && actualTempId) {
-      console.log('➕ Добавляем оптимистичное сообщение с tempId:', actualTempId);
-      
       setMessages(prev => {
         // Проверяем, нет ли уже такого сообщения
         const existing = prev.find(m => 
@@ -81,7 +73,6 @@ export default function ChatPage() {
         );
         
         if (existing) {
-          console.log('⚠️ Оптимистичное сообщение уже существует, обновляем статус');
           return prev.map(m => 
             (m.tempId === actualTempId || m.id === actualTempId) && m.isOptimistic
               ? { ...m, ...message, tempId: actualTempId, id: actualTempId, status: message.status || MESSAGE_STATUS.SENDING }
@@ -89,15 +80,13 @@ export default function ChatPage() {
           );
         }
         
-        console.log('✅ Добавляем новое оптимистичное сообщение в список, prev.length:', prev.length);
         const newMessage = { 
           ...message, 
           tempId: actualTempId,
-          id: actualTempId, // Используем tempId как id для оптимистичного сообщения
+          id: actualTempId,
           isOptimistic: true, 
           status: message.status || MESSAGE_STATUS.SENDING 
         };
-        console.log('✅ Новое оптимистичное сообщение:', newMessage);
         return [...prev, newMessage];
       });
       
@@ -163,15 +152,11 @@ export default function ChatPage() {
       }
     } else {
       // Новое сообщение (не оптимистичное, без tempId)
-      console.log('➕ Новое сообщение (не оптимистичное), добавляем');
       setMessages(prev => {
         // Проверяем, нет ли уже такого сообщения
-        const exists = prev.find(m => m.id === message.id);
-        if (exists) {
-          console.log('⚠️ Сообщение уже существует, пропускаем');
+        if (prev.some(m => Number(m.id) === Number(message.id))) {
           return prev;
         }
-        console.log('✅ Добавляем новое сообщение в список');
         return [...prev, { ...message, status: message.status || MESSAGE_STATUS.SENT, isOptimistic: false }];
       });
     }
@@ -254,13 +239,6 @@ export default function ChatPage() {
 
     try {
       const topic = `/topic/chat/${chatId}`;
-      console.log('📡 Подписываемся на топик:', topic);
-      console.log('📡 Состояние клиента:', {
-        connected: client.connected,
-        active: client.active,
-        state: client.state
-      });
-      
       const subscription = client.subscribe(
         topic,
         (message) => {
@@ -303,14 +281,11 @@ export default function ChatPage() {
               }];
             });
           } catch (error) {
-            console.error('❌ ОШИБКА парсинга сообщения из топика:', error);
-            console.error('❌ Stack trace:', error.stack);
-            console.error('❌ Raw message body:', message?.body);
+            console.error('Ошибка парсинга сообщения:', error);
           }
         }
       );
       subscriptionRef.current = subscription;
-      console.log('✅ Успешно подписались на чат:', chatId, 'Subscription ID:', subscription.id);
     } catch (error) {
       console.error('❌ Ошибка подписки на чат:', error);
     }
@@ -335,31 +310,17 @@ export default function ChatPage() {
 
   const sendMessage = async (e) => {
     e.preventDefault();
-    console.log('📝 sendMessage вызван на странице чата:', { 
-      newMessage: newMessage.substring(0, 50), 
-      hasUser: !!user, 
-      sending 
-    });
-    
     if (!newMessage.trim() || !user || sending) {
-      console.log('⚠️ sendMessage: пропуск - пустое сообщение, нет пользователя или уже отправляется');
       return;
     }
 
     const messageContent = newMessage.trim();
     setNewMessage('');
 
-    console.log('📤 Вызываем sendMessageHook с содержимым:', messageContent.substring(0, 50));
-    // Отправляем через хук (он сам создаст оптимистичное сообщение)
     const result = await sendMessageHook(messageContent, 'TEXT');
-    console.log('📥 sendMessageHook вернул:', result ? 'успех' : 'null');
     
     if (!result) {
-      // Если отправка не удалась, возвращаем текст в поле ввода
-      console.warn('⚠️ Отправка не удалась, возвращаем текст в поле ввода');
       setNewMessage(messageContent);
-    } else {
-      console.log('✅ Сообщение успешно отправлено');
     }
   };
 

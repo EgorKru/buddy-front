@@ -69,12 +69,8 @@ export const useMessageSender = (chatId, onMessageSent) => {
     lastSentMessageRef.current = queuedMessage;
 
     // Вызываем callback для добавления в UI
-    console.log('📤 Вызываем onMessageSent с оптимистичным сообщением:', optimisticMessage);
     if (onMessageSent) {
       onMessageSent(optimisticMessage, tempId);
-      console.log('✅ onMessageSent вызван');
-    } else {
-      console.warn('⚠️ onMessageSent не определен!');
     }
 
     setSending(true);
@@ -86,15 +82,6 @@ export const useMessageSender = (chatId, onMessageSent) => {
                                client.active && 
                                (connected || client.state === 1); // 1 = CONNECTED
       
-      console.log('🔍 Проверка WebSocket перед отправкой:', {
-        hasClient: !!client,
-        connected,
-        clientConnected: client?.connected,
-        clientActive: client?.active,
-        clientState: client?.state,
-        isWebSocketReady
-      });
-      
       // Пробуем отправить через WebSocket
       if (isWebSocketReady) {
         try {
@@ -105,22 +92,10 @@ export const useMessageSender = (chatId, onMessageSent) => {
             type,
           };
           
-          console.log('📤 Отправка сообщения через WebSocket:', {
-            destination,
-            payload: messagePayload,
-            clientState: {
-              connected: client.connected,
-              active: client.active,
-              state: client.state
-            }
-          });
-          
           client.publish({
             destination,
             body: JSON.stringify(messagePayload),
           });
-          
-          console.log('✅ Сообщение отправлено через WebSocket, ждем подтверждения');
           
           // WebSocket отправка асинхронная, статус обновится при получении ответа
           // Не обновляем статус здесь, ждем подтверждения через подписку
@@ -293,7 +268,6 @@ export const useMessageSender = (chatId, onMessageSent) => {
       return () => clearTimeout(timeout);
     }
 
-    console.log('📡 useMessageSender: Подписываемся на /user/queue/message-sent');
     
     // Отписываемся от старой подписки, если есть
     if (messageSentSubscriptionRef.current) {
@@ -424,7 +398,6 @@ export const useMessageSender = (chatId, onMessageSent) => {
 
             messageSentSubscriptionRef.current = subscription;
 
-            console.log('✅ useMessageSender: Успешно подписались на подтверждения отправки сообщений, Subscription ID:', subscription.id);
 
       return () => {
         if (messageSentSubscriptionRef.current) {
