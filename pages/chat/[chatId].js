@@ -61,7 +61,7 @@ export default function ChatPage() {
 
   // Callback для обработки отправленных сообщений
   const handleMessageSent = useCallback((message, tempId) => {
-    // Если это оптимистичное сообщение (с tempId), добавляем его в список
+    // Если это оптимистичное сообщение (с tempId и isOptimistic), добавляем его в список
     if (tempId && message.isOptimistic) {
       setMessages(prev => {
         // Проверяем, нет ли уже такого сообщения
@@ -100,6 +100,28 @@ export default function ChatPage() {
           };
           delete updated[optimisticIndex].tempId;
           return updated;
+        }
+        
+        // Если не нашли по tempId, ищем по chatId и status 'sending' (для подтверждений)
+        if (message.chatId) {
+          const optimisticIndexByChat = prev.findIndex(m => 
+            m.tempId &&
+            m.chatId === message.chatId &&
+            (m.status === MESSAGE_STATUS.SENDING || m.status === 'sending')
+          );
+          
+          if (optimisticIndexByChat !== -1) {
+            // Заменить оптимистичное на реальное
+            const updated = [...prev];
+            updated[optimisticIndexByChat] = {
+              ...message,
+              id: message.id,
+              status: message.status || MESSAGE_STATUS.SENT,
+              isOptimistic: false,
+            };
+            delete updated[optimisticIndexByChat].tempId;
+            return updated;
+          }
         }
         
         // Если не нашли, проверяем дубликаты по id

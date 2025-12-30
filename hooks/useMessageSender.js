@@ -113,10 +113,13 @@ export const useMessageSender = (chatId, onMessageSent) => {
       updateMessageStatus(queuedMessage.tempId, MESSAGE_STATUS.SENT, serverMessage);
       removeMessageFromQueue(queuedMessage.tempId);
       
-      // НЕ вызываем callback - сообщение появится через WebSocket топик
+      // Вызываем callback с реальным сообщением для замены оптимистичного
+      if (onMessageSent) {
+        onMessageSent(serverMessage, queuedMessage.tempId);
+      }
       
       setSending(false);
-      return { success: true };
+      return serverMessage;
     } catch (error) {
       console.error('Ошибка отправки сообщения:', error);
       
