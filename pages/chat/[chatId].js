@@ -59,10 +59,60 @@ export default function ChatPage() {
     scrollToBottom();
   }, [messages]);
 
-  // Callback для обработки отправленных сообщений (упрощенный - без оптимистичных сообщений)
+  // Callback для обработки отправленных сообщений
   const handleMessageSent = useCallback((message, tempId) => {
-    // Просто игнорируем - сообщения будут приходить через WebSocket топик
-    // Ничего не делаем здесь
+    // Если это оптимистичное сообщение (с tempId), добавляем его в список
+    if (tempId && message.isOptimistic) {
+      setMessages(prev => {
+        // Проверяем, нет ли уже такого сообщения
+        if (prev.some(m => m.tempId === tempId)) {
+          return prev;
+        }
+        
+        const newMessage = { 
+          ...message, 
+          tempId,
+          id: tempId,
+          isOptimistic: true, 
+          status: MESSAGE_STATUS.SENDING
+        };
+        return [...prev, newMessage];
+      });
+      return;
+    }
+    
+    // Если это реальное сообщение (с tempId для замены оптимистичного)
+    if (tempId) {
+      setMessages(prev => {
+        // Найти оптимистичное сообщение по tempId
+        const optimisticIndex = prev.findIndex(m => 
+          m.tempId === tempId && m.isOptimistic === true
+        );
+        
+        if (optimisticIndex !== -1) {
+          // Заменить оптимистичное на реальное
+          const updated = [...prev];
+          updated[optimisticIndex] = {
+            ...message,
+            id: message.id,
+            status: message.status || MESSAGE_STATUS.SENT,
+            isOptimistic: false,
+          };
+          delete updated[optimisticIndex].tempId;
+          return updated;
+        }
+        
+        // Если не нашли, проверяем дубликаты по id
+        if (prev.some(m => Number(m.id) === Number(message.id))) {
+          return prev;
+        }
+        
+        // Добавляем новое, если не нашли оптимистичное
+        const newMsg = { ...message, status: message.status || MESSAGE_STATUS.SENT, isOptimistic: false };
+        delete newMsg.tempId;
+        return [...prev, newMsg];
+      });
+    }
   }, []);
 
   // Хук для отправки сообщений

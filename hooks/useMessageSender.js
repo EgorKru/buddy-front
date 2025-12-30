@@ -35,10 +35,10 @@ export const useMessageSender = (chatId, onMessageSent) => {
 
     const messageContent = content.trim();
     
-    // Сохраняем сообщение в очередь (без оптимистичного UI)
+    // Создаем оптимистичное сообщение
     const tempId = `temp-${Date.now()}-${Math.random()}`;
     const user = getCurrentUser();
-    const queuedMessage = {
+    const optimisticMessage = {
       id: tempId,
       tempId,
       chatId: parseInt(chatId),
@@ -46,13 +46,18 @@ export const useMessageSender = (chatId, onMessageSent) => {
       type,
       status: MESSAGE_STATUS.SENDING,
       createdAt: new Date().toISOString(),
+      isOptimistic: true,
       senderId: user?.id,
       senderUsername: user?.username,
       senderDisplayName: user?.displayName || user?.username,
-      retryCount: 0,
     };
     
     // Сохраняем в очередь
+    const queuedMessage = {
+      ...optimisticMessage,
+      retryCount: 0,
+    };
+    
     if (!saveMessageToQueue(queuedMessage)) {
       console.error('Не удалось сохранить сообщение в очередь');
       return null;
@@ -60,6 +65,11 @@ export const useMessageSender = (chatId, onMessageSent) => {
     
     // Сохраняем ссылку на последнее отправленное сообщение для связи с подтверждением
     lastSentMessageRef.current = queuedMessage;
+    
+    // Вызываем callback для добавления оптимистичного сообщения в UI
+    if (onMessageSent) {
+      onMessageSent(optimisticMessage, tempId);
+    }
 
     setSending(true);
 
@@ -294,7 +304,21 @@ export const useMessageSender = (chatId, onMessageSent) => {
                 }
               }, 1000);
 
-              // НЕ обновляем UI - сообщение придет через WebSocket топик
+              // Обновляем UI через callback - заменяем tempId на реальный messageId
+              if (onMessageSent) {
+                // Найти оптимистичное сообщение по chatId и content
+                onMessageSent({
+                  id: confirmation.messageId,
+                  status: MESSAGE_STATUS.SENT,
+                  chatId: confirmation.chatId,
+                  content: queuedMessage.content,
+                  type: queuedMessage.type,
+                  senderId: queuedMessage.senderId,
+                  senderUsername: queuedMessage.senderUsername,
+                  senderDisplayName: queuedMessage.senderDisplayName,
+                  createdAt: queuedMessage.createdAt,
+                }, queuedMessage.tempId);
+              }
             } else {
               console.warn('⚠️ Не найдено сообщение для подтверждения:', confirmation);
             }
