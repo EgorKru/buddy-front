@@ -144,8 +144,7 @@ export default function ChatPage() {
         }
         
         // Если не нашли, проверяем дубликаты
-        const existingById = prev.findIndex(m => Number(m.id) === Number(message.id));
-        if (existingById !== -1) {
+        if (prev.some(m => Number(m.id) === Number(message.id))) {
           return prev;
         }
         
@@ -267,36 +266,22 @@ export default function ChatPage() {
         (message) => {
           try {
             const messageDto = JSON.parse(message.body);
-            console.log('📨 ===== НАЧАЛО ОБРАБОТКИ СООБЩЕНИЯ ИЗ ТОПИКА =====');
-            console.log('📨 Получено сообщение через WebSocket, парсинг:', messageDto);
-            
-            // Получаем текущего пользователя заново для надежности
-            const currentUser = getCurrentUser();
-            const isOwnMessage = currentUser && (Number(messageDto.senderId) === Number(currentUser.id));
-            
-            console.log('📨 Проверка владельца:', {
-              messageSenderId: messageDto.senderId,
-              messageSenderIdType: typeof messageDto.senderId,
-              currentUserId: currentUser?.id,
-              currentUserIdType: typeof currentUser?.id,
-              isOwnMessage,
-              content: messageDto.content,
-              userExists: !!currentUser
-            });
             
             setMessages(prev => {
-              // 1. Проверяем, нет ли уже сообщения с таким id (избегаем дубликатов)
+              // 1. Проверяем, нет ли уже сообщения с таким id
               if (prev.some(m => Number(m.id) === Number(messageDto.id))) {
                 return prev;
               }
               
               // 2. Ищем оптимистичное сообщение для замены
-              const optimisticIndex = prev.findIndex(m => 
-                m.tempId &&
-                m.content === messageDto.content &&
-                Number(m.senderId) === Number(messageDto.senderId) &&
-                (m.status === MESSAGE_STATUS.SENDING || m.status === 'sending')
-              );
+              // Ищем по tempId, content, senderId и status 'sending'
+              const optimisticIndex = prev.findIndex(m => {
+                if (!m.tempId) return false;
+                if (m.content !== messageDto.content) return false;
+                if (Number(m.senderId) !== Number(messageDto.senderId)) return false;
+                if (m.status !== MESSAGE_STATUS.SENDING && m.status !== 'sending') return false;
+                return true;
+              });
               
               if (optimisticIndex !== -1) {
                 // Заменяем оптимистичное сообщение на реальное
