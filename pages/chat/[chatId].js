@@ -105,26 +105,30 @@ export default function ChatPage() {
     if (tempId) {
       // Обновляем существующее оптимистичное сообщение
       setMessages(prev => {
-        // Ищем по tempId
+        // Ищем по tempId (точное совпадение)
         let index = prev.findIndex(m => 
-          (m.tempId === tempId || m.id === tempId) && m.isOptimistic === true
+          (m.tempId === tempId || m.id === tempId) && (m.isOptimistic === true || m.tempId)
         );
         
-        // Если не нашли по tempId, ищем по chatId и status 'sending' (для подтверждений)
-        if (index === -1 && message.chatId) {
-          index = prev.findIndex(m => 
-            m.tempId &&
-            m.chatId === message.chatId &&
-            (m.status === MESSAGE_STATUS.SENDING || m.status === 'sending')
-          );
+        // Если не нашли по tempId, ищем по chatId, content и status 'sending' (для подтверждений)
+        if (index === -1 && message.chatId && message.content) {
+          index = prev.findIndex(m => {
+            if (!m.tempId && !m.isOptimistic) return false;
+            if (m.chatId !== message.chatId) return false;
+            if (String(m.content || '').trim() !== String(message.content || '').trim()) return false;
+            const isSending = m.status === MESSAGE_STATUS.SENDING || 
+                             m.status === 'sending' || 
+                             m.status === MESSAGE_STATUS.PENDING ||
+                             m.status === 'pending';
+            return isSending;
+          });
         }
         
         if (index !== -1) {
           // Заменяем оптимистичное сообщение на реальное
           const updated = [...prev];
           updated[index] = {
-            ...prev[index],
-            id: message.id,
+            ...message,
             status: message.status || MESSAGE_STATUS.SENT,
             isOptimistic: false,
           };
@@ -132,7 +136,7 @@ export default function ChatPage() {
           return updated;
         }
         
-        // Если не нашли, проверяем дубликаты
+        // Если не нашли, проверяем дубликаты по id
         if (prev.some(m => Number(m.id) === Number(message.id))) {
           return prev;
         }
