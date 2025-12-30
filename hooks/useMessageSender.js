@@ -316,36 +316,22 @@ export const useMessageSender = (chatId, onMessageSent) => {
             let queuedMessage = null;
             
             // Сначала проверяем последнее отправленное сообщение
-            console.log('📬 Проверка lastSentMessageRef:', {
-              exists: !!lastSentMessageRef.current,
-              chatId: lastSentMessageRef.current?.chatId,
-              confirmationChatId: confirmation.chatId,
-              status: lastSentMessageRef.current?.status,
-              tempId: lastSentMessageRef.current?.tempId
-            });
-            
             if (lastSentMessageRef.current && 
                 lastSentMessageRef.current.chatId === confirmation.chatId &&
                 lastSentMessageRef.current.status === MESSAGE_STATUS.SENDING) {
               queuedMessage = lastSentMessageRef.current;
-              console.log('✅ 📬 Найдено в lastSentMessageRef:', queuedMessage.tempId);
             } else {
               // Ищем в очереди по chatId и статусу SENDING
               const queue = getMessageQueue();
-              console.log('📬 Поиск в очереди, всего сообщений:', queue.length);
               const matchingMessages = queue.filter(msg => 
                 msg.chatId === confirmation.chatId && 
                 msg.status === MESSAGE_STATUS.SENDING
               );
-              console.log('📬 Найдено подходящих сообщений в очереди:', matchingMessages.length);
               if (matchingMessages.length > 0) {
                 // Берем самое последнее (самое свежее)
                 queuedMessage = matchingMessages.sort((a, b) => 
                   new Date(b.createdAt) - new Date(a.createdAt)
                 )[0];
-                console.log('✅ 📬 Найдено в очереди:', queuedMessage.tempId);
-              } else {
-                console.log('⚠️ 📬 Не найдено сообщений в очереди для chatId:', confirmation.chatId);
               }
             }
 
