@@ -20,7 +20,8 @@ jobs:
             cd ~/buddy-front
             git pull
             docker-compose build --no-cache frontend
-            docker-compose down frontend
+            docker-compose down frontend || true
             docker-compose up -d frontend
-            docker-compose logs frontend --tail 50
+            sleep 2
+            docker-compose logs frontend --tail 50 || echo "Logs not available yet"
 
