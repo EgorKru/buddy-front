@@ -308,6 +308,7 @@ export const useMessageSender = (chatId, onMessageSent) => {
     
     try {
       const subscription = client.subscribe('/user/queue/message-sent', (message) => {
+        console.log('🔥🔥🔥 ОБРАБОТЧИК ПОДТВЕРЖДЕНИЯ ВЫЗВАН 🔥🔥🔥');
         try {
           console.log('📬 ===== НАЧАЛО ОБРАБОТКИ ПОДТВЕРЖДЕНИЯ =====');
           console.log('📬 Получено сообщение в /user/queue/message-sent:');

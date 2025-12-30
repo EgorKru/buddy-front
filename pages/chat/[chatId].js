@@ -276,6 +276,7 @@ export default function ChatPage() {
       const subscription = client.subscribe(
         topic,
         (message) => {
+          console.log('🔥🔥🔥 ОБРАБОТЧИК СООБЩЕНИЯ ИЗ ТОПИКА ВЫЗВАН 🔥🔥🔥');
           try {
             console.log('📨 Получено сообщение через WebSocket:');
             console.log('  - Destination:', message.headers?.destination || 'N/A');
