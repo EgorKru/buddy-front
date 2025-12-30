@@ -35,41 +35,31 @@ export const useMessageSender = (chatId, onMessageSent) => {
 
     const messageContent = content.trim();
     
-    // Создаем оптимистичное сообщение
+    // Сохраняем сообщение в очередь (без оптимистичного UI)
     const tempId = `temp-${Date.now()}-${Math.random()}`;
-    const optimisticMessage = {
+    const user = getCurrentUser();
+    const queuedMessage = {
       id: tempId,
-      tempId: tempId,
+      tempId,
+      chatId: parseInt(chatId),
       content: messageContent,
       type,
       status: MESSAGE_STATUS.SENDING,
       createdAt: new Date().toISOString(),
-      isOptimistic: true,
-      senderId: getCurrentUser()?.id,
-      senderUsername: getCurrentUser()?.username,
-      senderDisplayName: getCurrentUser()?.displayName || getCurrentUser()?.username,
-    };
-
-    // Сохраняем chatId для связи с подтверждениями
-    const messageWithChatId = {
-      ...optimisticMessage,
-      chatId: parseInt(chatId),
+      senderId: user?.id,
+      senderUsername: user?.username,
+      senderDisplayName: user?.displayName || user?.username,
+      retryCount: 0,
     };
     
     // Сохраняем в очередь
-    const queuedMessage = saveMessageToQueue(messageWithChatId);
-    if (!queuedMessage) {
+    if (!saveMessageToQueue(queuedMessage)) {
       console.error('Не удалось сохранить сообщение в очередь');
       return null;
     }
     
     // Сохраняем ссылку на последнее отправленное сообщение для связи с подтверждением
     lastSentMessageRef.current = queuedMessage;
-
-    // Вызываем callback для добавления в UI
-    if (onMessageSent) {
-      onMessageSent(optimisticMessage, tempId);
-    }
 
     setSending(true);
 
@@ -113,12 +103,10 @@ export const useMessageSender = (chatId, onMessageSent) => {
       updateMessageStatus(queuedMessage.tempId, MESSAGE_STATUS.SENT, serverMessage);
       removeMessageFromQueue(queuedMessage.tempId);
       
-      // Вызываем callback с реальным сообщением
-      if (onMessageSent) {
-        onMessageSent(serverMessage, queuedMessage.tempId);
-      }
+      // НЕ вызываем callback - сообщение появится через WebSocket топик
       
-      return serverMessage;
+      setSending(false);
+      return { success: true };
     } catch (error) {
       console.error('Ошибка отправки сообщения:', error);
       
@@ -128,14 +116,9 @@ export const useMessageSender = (chatId, onMessageSent) => {
       // Планируем повторную попытку через REST API
       scheduleRetry(queuedMessage, chatId, onMessageSent);
       
-      // Вызываем callback для обновления UI
-      if (onMessageSent) {
-        onMessageSent({
-          ...optimisticMessage,
-          status: MESSAGE_STATUS.FAILED,
-        }, queuedMessage.tempId);
-      }
+      // НЕ вызываем callback - сообщение останется в очереди для повторной попытки
       
+      setSending(false);
       return null;
     } finally {
       setSending(false);
