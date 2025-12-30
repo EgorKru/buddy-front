@@ -22,5 +22,5 @@ jobs:
             docker-compose build --no-cache frontend
             docker-compose down frontend
             docker-compose up -d frontend
-            docker logs pager-frontend --tail 50
+            docker-compose logs frontend --tail 50
 
