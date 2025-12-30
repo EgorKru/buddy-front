@@ -326,11 +326,13 @@ export default function ChatPage() {
               });
               
               if (optimisticIndex !== -1) {
-                console.log('✅ Заменяем оптимистичное сообщение на реальное из топика:', {
+                console.log('✅ 🔥 ЗАМЕНЯЕМ оптимистичное сообщение на реальное из топика:', {
                   optimisticIndex,
                   tempId: prev[optimisticIndex].tempId,
                   realId: messageDto.id,
-                  content: messageDto.content.substring(0, 30)
+                  content: messageDto.content.substring(0, 30),
+                  oldMessage: prev[optimisticIndex],
+                  newMessage: messageDto
                 });
                 // Заменяем оптимистичное сообщение на реальное
                 const updated = [...prev];
@@ -341,7 +343,10 @@ export default function ChatPage() {
                 };
                 // Удаляем tempId из объекта
                 delete updated[optimisticIndex].tempId;
+                console.log('✅ 🔥 ЗАМЕНА ВЫПОЛНЕНА, возвращаем обновленный список, НЕ добавляем новое!');
                 return updated; // ВАЖНО: возвращаем, НЕ добавляем новое!
+              } else {
+                console.log('⚠️ 🔥 Оптимистичное сообщение НЕ НАЙДЕНО для замены, будет добавлено новое');
               }
               
               // 3. Если не нашли оптимистичное сообщение, добавляем новое

@@ -376,10 +376,11 @@ export const useMessageSender = (chatId, onMessageSent) => {
 
               // Обновляем UI через callback - заменяем tempId на реальный messageId
               if (onMessageSent) {
-                console.log('📬 Обновляем UI: заменяем оптимистичное сообщение на подтвержденное:', {
+                console.log('📬 🔥 ВЫЗЫВАЕМ onMessageSent для замены оптимистичного сообщения:', {
                   tempId: queuedMessage.tempId,
                   messageId: confirmation.messageId,
-                  chatId: confirmation.chatId
+                  chatId: confirmation.chatId,
+                  content: queuedMessage.content
                 });
                 // Передаем полное сообщение с реальным id для замены
                 onMessageSent({
@@ -393,6 +394,9 @@ export const useMessageSender = (chatId, onMessageSent) => {
                   senderDisplayName: queuedMessage.senderDisplayName,
                   createdAt: queuedMessage.createdAt,
                 }, queuedMessage.tempId);
+                console.log('📬 ✅ onMessageSent вызван');
+              } else {
+                console.error('❌ onMessageSent НЕ ОПРЕДЕЛЕН!');
               }
             } else {
               console.warn('⚠️ Не найдено сообщение для подтверждения:', confirmation);
