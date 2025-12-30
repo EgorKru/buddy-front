@@ -373,7 +373,9 @@ export default function ChatPage() {
               }];
             });
           } catch (error) {
-            console.error('❌ Ошибка парсинга сообщения:', error);
+            console.error('❌ ОШИБКА парсинга сообщения из топика:', error);
+            console.error('❌ Stack trace:', error.stack);
+            console.error('❌ Raw message body:', message?.body);
           }
         }
       );

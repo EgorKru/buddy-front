@@ -448,7 +448,9 @@ export const useMessageSender = (chatId, onMessageSent) => {
             }
           }
         } catch (error) {
-          console.error('Ошибка обработки подтверждения отправки:', error);
+          console.error('❌ ОШИБКА обработки подтверждения отправки:', error);
+          console.error('❌ Stack trace:', error.stack);
+          console.error('❌ Confirmation data:', message?.body);
         }
       });
 
