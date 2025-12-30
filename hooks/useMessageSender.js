@@ -95,17 +95,17 @@ export const useMessageSender = (chatId, onMessageSent) => {
             body: JSON.stringify(messagePayload),
           });
           
-          // WebSocket отправка асинхронная, статус обновится при получении ответа
-          // Не обновляем статус здесь, ждем подтверждения через подписку
+          // WebSocket отправка успешна - НЕ отправляем через REST API
+          // Статус обновится при получении подтверждения через подписку
           setSending(false);
-          return { success: true };
+          return optimisticMessage;
         } catch (wsError) {
           console.error('Ошибка отправки через WebSocket:', wsError);
-          // Продолжаем к fallback через REST API
+          // Продолжаем к fallback через REST API только при ошибке
         }
       }
       
-      // Fallback: отправляем через REST API
+      // Fallback: отправляем через REST API только если WebSocket недоступен или была ошибка
       
       const serverMessage = await chatAPI.sendMessage(chatId, messageContent, type);
       
