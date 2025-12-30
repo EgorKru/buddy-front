@@ -308,23 +308,10 @@ export const useMessageSender = (chatId, onMessageSent) => {
     
     try {
       const subscription = client.subscribe('/user/queue/message-sent', (message) => {
-        console.log('🔥🔥🔥 ОБРАБОТЧИК ПОДТВЕРЖДЕНИЯ ВЫЗВАН 🔥🔥🔥');
         try {
-          console.log('📬 ===== НАЧАЛО ОБРАБОТКИ ПОДТВЕРЖДЕНИЯ =====');
-          console.log('📬 Получено сообщение в /user/queue/message-sent:');
-          console.log('  - Destination:', message.headers?.destination || 'N/A');
-          console.log('  - Subscription:', message.headers?.subscription || 'N/A');
-          console.log('  - Message ID:', message.headers?.['message-id'] || 'N/A');
-          console.log('  - Raw body:', message.body);
           const confirmation = JSON.parse(message.body);
-          
-          console.log('📬 Получено подтверждение отправки:', confirmation);
-          console.log('📬 onMessageSent callback существует:', !!onMessageSent);
 
           if (confirmation.status === 'sent') {
-            // Сообщение успешно отправлено
-            // Ищем оптимистичное сообщение по chatId и messageId (или по tempId)
-            console.log('📬 Обработка подтверждения отправки (status=sent):', confirmation);
             
             let queuedMessage = null;
             
@@ -376,13 +363,6 @@ export const useMessageSender = (chatId, onMessageSent) => {
 
               // Обновляем UI через callback - заменяем tempId на реальный messageId
               if (onMessageSent) {
-                console.log('📬 🔥 ВЫЗЫВАЕМ onMessageSent для замены оптимистичного сообщения:', {
-                  tempId: queuedMessage.tempId,
-                  messageId: confirmation.messageId,
-                  chatId: confirmation.chatId,
-                  content: queuedMessage.content
-                });
-                // Передаем полное сообщение с реальным id для замены
                 onMessageSent({
                   id: confirmation.messageId,
                   status: MESSAGE_STATUS.SENT,
@@ -394,9 +374,6 @@ export const useMessageSender = (chatId, onMessageSent) => {
                   senderDisplayName: queuedMessage.senderDisplayName,
                   createdAt: queuedMessage.createdAt,
                 }, queuedMessage.tempId);
-                console.log('📬 ✅ onMessageSent вызван');
-              } else {
-                console.error('❌ onMessageSent НЕ ОПРЕДЕЛЕН!');
               }
             } else {
               console.warn('⚠️ Не найдено сообщение для подтверждения:', confirmation);
