@@ -268,56 +268,55 @@ export default function ChatPage() {
             console.log('  - Message ID:', message.headers?.['message-id'] || 'N/A');
             console.log('  - Raw body:', message.body);
             const messageDto = JSON.parse(message.body);
-            console.log('📨 Парсированное сообщение:', messageDto);
-            console.log('📨 Проверка владельца сообщения:', {
+            console.log('📨 Получено сообщение через WebSocket, парсинг:', messageDto);
+            
+            // Получаем текущего пользователя заново для надежности
+            const currentUser = getCurrentUser();
+            const isOwnMessage = currentUser && (Number(messageDto.senderId) === Number(currentUser.id));
+            
+            console.log('📨 Проверка владельца:', {
               messageSenderId: messageDto.senderId,
-              currentUserId: user?.id,
-              isOwnMessage: messageDto.senderId === user?.id,
-              userObject: user
+              messageSenderIdType: typeof messageDto.senderId,
+              currentUserId: currentUser?.id,
+              currentUserIdType: typeof currentUser?.id,
+              isOwnMessage,
+              content: messageDto.content
             });
-            const isOwnMessage = messageDto.senderId === user?.id;
             
             setMessages(prev => {
-              console.log('📨 Обработка сообщения в setMessages, всего сообщений:', prev.length);
+              console.log('📨 Обработка в setMessages, всего:', prev.length);
               
               // 1. Проверяем, нет ли уже сообщения с таким id (избегаем дубликатов)
-              const existingById = prev.findIndex(m => m.id === messageDto.id);
+              const existingById = prev.findIndex(m => Number(m.id) === Number(messageDto.id));
               if (existingById !== -1) {
-                console.log('⚠️ Сообщение с таким id уже существует, пропускаем:', messageDto.id);
+                console.log('⚠️ Сообщение с таким id уже существует:', messageDto.id);
                 return prev;
               }
               
               // 2. Если это наше сообщение, ищем оптимистичное для замены
               if (isOwnMessage) {
-                console.log('✅ Это наше сообщение, ищем оптимистичное для замены');
-                console.log('🔍 Ищем оптимистичное сообщение для замены:', {
-                  messageContent: messageDto.content,
-                  messageSenderId: messageDto.senderId,
-                  messageId: messageDto.id,
-                  totalMessages: prev.length
-                });
+                console.log('✅ Это наше сообщение, ищем оптимистичное');
                 
-                // Сначала находим все оптимистичные сообщения для отладки
-                const optimisticMessages = prev.filter(m => m.isOptimistic);
-                console.log('🔍 Найдено оптимистичных сообщений:', optimisticMessages.length);
-                optimisticMessages.forEach((m, idx) => {
-                  console.log(`  [${idx}] tempId: ${m.tempId}, content: ${m.content}, senderId: ${m.senderId}, status: ${m.status}, isOptimistic: ${m.isOptimistic}`);
-                });
+                // Находим все оптимистичные сообщения
+                const optimisticMessages = prev.filter(m => m.isOptimistic === true);
+                console.log('🔍 Найдено оптимистичных:', optimisticMessages.length);
                 
-                // Ищем по content и senderId (основной способ)
+                // Ищем по content и senderId (с учетом типов)
                 const optimisticIndex = prev.findIndex(m => {
-                  const matches = m.isOptimistic && 
-                    m.content === messageDto.content && 
-                    m.senderId === messageDto.senderId &&
-                    (m.status === MESSAGE_STATUS.SENDING || m.status === MESSAGE_STATUS.PENDING);
+                  const isOptimistic = m.isOptimistic === true;
+                  const contentMatch = m.content === messageDto.content;
+                  const senderIdMatch = Number(m.senderId) === Number(messageDto.senderId);
+                  const statusMatch = m.status === MESSAGE_STATUS.SENDING || m.status === MESSAGE_STATUS.PENDING;
                   
-                  if (m.isOptimistic && m.content === messageDto.content && m.senderId === messageDto.senderId) {
-                    console.log(`🔍 Проверка сообщения ${m.tempId}:`, {
-                      isOptimistic: m.isOptimistic,
-                      contentMatch: m.content === messageDto.content,
-                      senderIdMatch: m.senderId === messageDto.senderId,
+                  const matches = isOptimistic && contentMatch && senderIdMatch && statusMatch;
+                  
+                  if (isOptimistic && contentMatch && senderIdMatch) {
+                    console.log(`🔍 Проверка ${m.tempId}:`, {
+                      isOptimistic,
+                      contentMatch,
+                      senderIdMatch: `${m.senderId} === ${messageDto.senderId}`,
                       status: m.status,
-                      statusMatch: m.status === MESSAGE_STATUS.SENDING || m.status === MESSAGE_STATUS.PENDING,
+                      statusMatch,
                       matches
                     });
                   }
