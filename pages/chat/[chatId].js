@@ -269,9 +269,17 @@ export default function ChatPage() {
             console.log('  - Raw body:', message.body);
             const messageDto = JSON.parse(message.body);
             console.log('📨 Парсированное сообщение:', messageDto);
+            console.log('📨 Проверка владельца сообщения:', {
+              messageSenderId: messageDto.senderId,
+              currentUserId: user?.id,
+              isOwnMessage: messageDto.senderId === user?.id,
+              userObject: user
+            });
             const isOwnMessage = messageDto.senderId === user?.id;
             
             setMessages(prev => {
+              console.log('📨 Обработка сообщения в setMessages, всего сообщений:', prev.length);
+              
               // 1. Проверяем, нет ли уже сообщения с таким id (избегаем дубликатов)
               const existingById = prev.findIndex(m => m.id === messageDto.id);
               if (existingById !== -1) {
@@ -281,6 +289,7 @@ export default function ChatPage() {
               
               // 2. Если это наше сообщение, ищем оптимистичное для замены
               if (isOwnMessage) {
+                console.log('✅ Это наше сообщение, ищем оптимистичное для замены');
                 console.log('🔍 Ищем оптимистичное сообщение для замены:', {
                   messageContent: messageDto.content,
                   messageSenderId: messageDto.senderId,
