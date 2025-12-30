@@ -293,12 +293,13 @@ export default function ChatPage() {
     }
   };
 
-  // Синхронизация очереди при подключении
+  // Синхронизация очереди при подключении (только для текущего чата)
   useEffect(() => {
     if (connected && chatId) {
       syncQueue();
     }
-  }, [connected, chatId, syncQueue]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connected, chatId]); // syncQueue стабилен, не добавляем в зависимости
 
   const sendMessage = async (e) => {
     e.preventDefault();
