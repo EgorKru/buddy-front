@@ -102,13 +102,15 @@ export default function ChatPage() {
           return updated;
         }
         
-        // Если не нашли по tempId, ищем по chatId и status 'sending' (для подтверждений)
-        if (message.chatId) {
-          const optimisticIndexByChat = prev.findIndex(m => 
-            m.tempId &&
-            m.chatId === message.chatId &&
-            (m.status === MESSAGE_STATUS.SENDING || m.status === 'sending')
-          );
+        // Если не нашли по tempId, ищем по chatId, content и status 'sending' (для подтверждений)
+        if (message.chatId && message.content) {
+          const optimisticIndexByChat = prev.findIndex(m => {
+            if (!m.tempId && !m.isOptimistic) return false;
+            if (m.chatId !== message.chatId) return false;
+            if (String(m.content || '').trim() !== String(message.content || '').trim()) return false;
+            const isSending = m.status === MESSAGE_STATUS.SENDING || m.status === 'sending';
+            return isSending;
+          });
           
           if (optimisticIndexByChat !== -1) {
             // Заменить оптимистичное на реальное
@@ -228,8 +230,7 @@ export default function ChatPage() {
               }
               
               // 2. Ищем оптимистичное сообщение для замены
-              // Ищем по более широким критериям: content, senderId, статус и время создания
-              const now = Date.now();
+              // Ищем по content, senderId и статус 'sending'
               const optimisticIndex = prev.findIndex(m => {
                 // Должно быть оптимистичное сообщение
                 if (!m.tempId && !m.isOptimistic) return false;
@@ -246,18 +247,8 @@ export default function ChatPage() {
                 
                 // Статус должен быть sending
                 const isSending = m.status === MESSAGE_STATUS.SENDING || 
-                                 m.status === 'sending' || 
-                                 m.status === MESSAGE_STATUS.PENDING ||
-                                 m.status === 'pending';
+                                 m.status === 'sending';
                 if (!isSending) return false;
-                
-                // Сообщение должно быть создано недавно (в последние 60 секунд)
-                // Это защита от замены старых сообщений
-                if (m.createdAt) {
-                  const messageTime = new Date(m.createdAt).getTime();
-                  const timeDiff = now - messageTime;
-                  if (timeDiff > 60000) return false; // Больше 60 секунд
-                }
                 
                 return true;
               });

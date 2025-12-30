@@ -202,12 +202,8 @@ export const useMessageSender = (chatId, onMessageSent) => {
 
     const results = await syncMessageQueue(sendMessageFn);
     
-    // Обновляем UI для каждого синхронизированного сообщения
-    results.forEach(result => {
-      if (result.success && onMessageSent) {
-        onMessageSent(result.message);
-      }
-    });
+    // НЕ обновляем UI здесь - сообщения придут через WebSocket топик
+    // Это предотвращает дубликаты
 
     return results;
   }, [chatId, onMessageSent]);
