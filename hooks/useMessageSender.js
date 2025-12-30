@@ -98,7 +98,7 @@ export const useMessageSender = (chatId, onMessageSent) => {
           // WebSocket отправка асинхронная, статус обновится при получении ответа
           // Не обновляем статус здесь, ждем подтверждения через подписку
           setSending(false);
-          return optimisticMessage;
+          return { success: true };
         } catch (wsError) {
           console.error('Ошибка отправки через WebSocket:', wsError);
           // Продолжаем к fallback через REST API
@@ -311,20 +311,7 @@ export const useMessageSender = (chatId, onMessageSent) => {
                 }
               }, 1000);
 
-              // Обновляем UI через callback - заменяем tempId на реальный messageId
-              if (onMessageSent) {
-                onMessageSent({
-                  id: confirmation.messageId,
-                  status: MESSAGE_STATUS.SENT,
-                  chatId: confirmation.chatId,
-                  content: queuedMessage.content,
-                  type: queuedMessage.type,
-                  senderId: queuedMessage.senderId,
-                  senderUsername: queuedMessage.senderUsername,
-                  senderDisplayName: queuedMessage.senderDisplayName,
-                  createdAt: queuedMessage.createdAt,
-                }, queuedMessage.tempId);
-              }
+              // НЕ обновляем UI - сообщение придет через WebSocket топик
             } else {
               console.warn('⚠️ Не найдено сообщение для подтверждения:', confirmation);
             }
