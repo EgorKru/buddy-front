@@ -214,28 +214,24 @@ export default function ChatPage() {
                 return prev; // Уже есть, пропускаем
               }
               
-              // 2. Ищем оптимистичное сообщение для замены
-              // Ищем по content, senderId и статус 'sending'
+              // 2. Если это наше сообщение (senderId === currentUserId) - игнорируем
+              // Оно уже обработано через подтверждение из /user/queue/message-sent
+              if (user && Number(messageDto.senderId) === Number(user.id)) {
+                return prev; // Игнорируем свои сообщения из топика
+              }
+              
+              // 3. Ищем оптимистичное сообщение для замены (на случай, если это чужое сообщение)
               const optimisticIndex = prev.findIndex(m => {
-                // Должно быть оптимистичное сообщение
                 if (!m.tempId && !m.isOptimistic) return false;
-                
-                // Content должен совпадать (trimmed)
                 if (String(m.content || '').trim() !== String(messageDto.content || '').trim()) {
                   return false;
                 }
-                
-                // SenderId должен совпадать (с приведением типов)
                 if (Number(m.senderId) !== Number(messageDto.senderId)) {
                   return false;
                 }
-                
-                // Статус должен быть sending
                 const isSending = m.status === MESSAGE_STATUS.SENDING || 
                                  m.status === 'sending';
-                if (!isSending) return false;
-                
-                return true;
+                return isSending;
               });
               
               if (optimisticIndex !== -1) {
@@ -250,7 +246,7 @@ export default function ChatPage() {
                 return updated; // НЕ добавляем новое!
               }
               
-              // 3. Если не нашли оптимистичное сообщение, добавляем новое
+              // 4. Если не нашли оптимистичное сообщение, добавляем новое (чужое сообщение)
               return [...prev, {
                 ...messageDto,
                 status: MESSAGE_STATUS.SENT,
