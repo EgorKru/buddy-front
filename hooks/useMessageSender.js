@@ -67,10 +67,7 @@ export const useMessageSender = (chatId, onMessageSent) => {
     // Сохраняем ссылку на последнее отправленное сообщение для связи с подтверждением
     lastSentMessageRef.current = queuedMessage;
     
-    // Вызываем callback для добавления оптимистичного сообщения в UI
-    if (onMessageSent) {
-      onMessageSent(optimisticMessage, tempId);
-    }
+    // НЕ вызываем callback для оптимистичного сообщения - оно появится только после получения от сервера
 
     setSending(true);
 

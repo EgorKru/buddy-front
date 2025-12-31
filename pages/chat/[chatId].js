@@ -61,24 +61,9 @@ export default function ChatPage() {
 
   // Callback для обработки отправленных сообщений
   const handleMessageSent = useCallback((message, tempId) => {
-    // Если это оптимистичное сообщение (с tempId и isOptimistic), добавляем его в список
+    // Игнорируем оптимистичные сообщения - они не должны отображаться
     if (tempId && message.isOptimistic) {
-      setMessages(prev => {
-        // Проверяем, нет ли уже такого сообщения
-        if (prev.some(m => m.tempId === tempId)) {
-          return prev;
-        }
-        
-        const newMessage = { 
-          ...message, 
-          tempId,
-          id: tempId,
-          isOptimistic: true, 
-          status: MESSAGE_STATUS.SENDING
-        };
-        return [...prev, newMessage];
-      });
-      return;
+      return; // Не добавляем оптимистичное сообщение в UI
     }
     
     // Если это реальное сообщение (с tempId для замены оптимистичного)
