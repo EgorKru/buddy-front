@@ -417,20 +417,28 @@ export const useMessageSender = (chatId, onMessageSent) => {
                 }
               }, 1000);
 
-              // Обновляем UI через callback - заменяем tempId на реальный messageId
+              // Обновляем UI через callback - заменяем оптимистичное сообщение на реальное
               if (onMessageSent) {
-                // Найти оптимистичное сообщение по chatId и content
-                onMessageSent({
-                  id: confirmation.messageId,
-                  status: MESSAGE_STATUS.SENT,
-                  chatId: confirmation.chatId,
-                  content: queuedMessage.content,
-                  type: queuedMessage.type,
-                  senderId: queuedMessage.senderId,
-                  senderUsername: queuedMessage.senderUsername,
-                  senderDisplayName: queuedMessage.senderDisplayName,
-                  createdAt: queuedMessage.createdAt,
-                }, queuedMessage.tempId);
+                // Если в подтверждении есть полное сообщение, используем его
+                if (confirmation.status === 'sent' && confirmation.message) {
+                  onMessageSent({
+                    ...confirmation.message,
+                    status: MESSAGE_STATUS.SENT,
+                  }, queuedMessage.tempId);
+                } else {
+                  // Иначе используем данные из очереди и messageId из подтверждения
+                  onMessageSent({
+                    id: confirmation.messageId,
+                    status: MESSAGE_STATUS.SENT,
+                    chatId: confirmation.chatId,
+                    content: queuedMessage.content,
+                    type: queuedMessage.type,
+                    senderId: queuedMessage.senderId,
+                    senderUsername: queuedMessage.senderUsername,
+                    senderDisplayName: queuedMessage.senderDisplayName,
+                    createdAt: queuedMessage.createdAt,
+                  }, queuedMessage.tempId);
+                }
               }
             } else {
               console.warn('⚠️ Не найдено сообщение для подтверждения:', confirmation);
