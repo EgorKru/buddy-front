@@ -23,6 +23,7 @@ export const useMessageSender = (chatId, onMessageSent) => {
   const [sending, setSending] = useState(false);
   const retryTimeoutRef = useRef(null);
   const messageSentSubscriptionRef = useRef(null);
+  const userMessagesSubscriptionRef = useRef(null);
   const lastSentMessageRef = useRef(null); // Для связи с подтверждениями
 
   /**
