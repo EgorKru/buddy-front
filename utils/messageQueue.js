@@ -132,9 +132,12 @@ export const cleanupOldMessages = () => {
  */
 export const syncMessageQueue = async (sendMessageFn) => {
   const queue = getMessageQueue();
+  // Синхронизируем только сообщения со статусом PENDING или FAILED
+  // НЕ синхронизируем сообщения со статусом SENDING - они уже отправляются
   const pendingMessages = queue.filter(msg => 
-    msg.status === MESSAGE_STATUS.PENDING || 
-    (msg.status === MESSAGE_STATUS.FAILED && (msg.retryCount || 0) < MAX_RETRY_ATTEMPTS)
+    (msg.status === MESSAGE_STATUS.PENDING || 
+     (msg.status === MESSAGE_STATUS.FAILED && (msg.retryCount || 0) < MAX_RETRY_ATTEMPTS)) &&
+    msg.status !== MESSAGE_STATUS.SENDING // Исключаем уже отправляющиеся сообщения
   );
 
   const results = [];

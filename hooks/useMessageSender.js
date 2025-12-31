@@ -96,7 +96,7 @@ export const useMessageSender = (chatId, onMessageSent) => {
           // WebSocket отправка успешна - НЕ отправляем через REST API
           // Статус обновится при получении подтверждения через подписку
           setSending(false);
-          return optimisticMessage;
+          return { success: true };
         } catch (wsError) {
           console.error('Ошибка отправки через WebSocket:', wsError);
           // Продолжаем к fallback через REST API только при ошибке
@@ -192,9 +192,35 @@ export const useMessageSender = (chatId, onMessageSent) => {
    * Синхронизирует очередь сообщений с сервером
    */
   const syncQueue = useCallback(async () => {
-    if (!chatId) return;
+    if (!chatId || !client || !connected) return;
 
+    // Синхронизируем только сообщения со статусом SENDING (не отправленные)
+    // Не синхронизируем сообщения, которые уже были отправлены через WebSocket
     const sendMessageFn = async (message) => {
+      // Проверяем, что сообщение еще не отправлено
+      if (message.status === MESSAGE_STATUS.SENT) {
+        return null; // Пропускаем уже отправленные
+      }
+      
+      // Если WebSocket готов, отправляем через него
+      if (client.connected && client.active) {
+        try {
+          client.publish({
+            destination: '/app/chat.sendMessage',
+            body: JSON.stringify({
+              chatId: parseInt(chatId),
+              content: message.content,
+              type: message.type,
+            }),
+          });
+          return { success: true }; // WebSocket отправка асинхронная
+        } catch (error) {
+          console.error('Ошибка отправки через WebSocket в syncQueue:', error);
+          // Fallback к REST API
+        }
+      }
+      
+      // Fallback: отправляем через REST API
       return await chatAPI.sendMessage(chatId, message.content, message.type);
     };
 
@@ -204,7 +230,7 @@ export const useMessageSender = (chatId, onMessageSent) => {
     // Это предотвращает дубликаты
 
     return results;
-  }, [chatId, onMessageSent]);
+  }, [chatId, client, connected]);
 
   /**
    * Обрабатывает получение сообщения от сервера (через WebSocket)
