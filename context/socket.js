@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useRef } from "react";
 import { Client } from '@stomp/stompjs';
+import SockJS from 'sockjs-client';
 import { getToken } from "@/utils/api";
 import { config } from "@/utils/config";
 import { safeJsonParse } from "@/utils/safe";
@@ -46,12 +47,20 @@ const withTokenQuery = (url, token) => {
   return `${url}${sep}token=${encodeURIComponent(token)}`;
 };
 
+const getTransportPreference = () => {
+  const pref = process.env.NEXT_PUBLIC_STOMP_TRANSPORT;
+  if (pref === 'native' || pref === 'sockjs') return pref;
+  return 'auto';
+};
+
 export const StompProvider = (props) => {
   const { children } = props;
   const [client, setClient] = useState(null);
   const [connected, setConnected] = useState(false);
   const clientRef = useRef(null);
   const tokenRef = useRef(null);
+  const transportRef = useRef('auto');
+  const fallbackTriedRef = useRef(false);
 
   useEffect(() => {
     let destroyed = false;
@@ -68,11 +77,25 @@ export const StompProvider = (props) => {
     };
 
     const connect = (token) => {
-      const wsUrl = ensureNativeWsUrl(config.stomp.url);
-      const finalWsUrl = withTokenQuery(wsUrl, token);
+      transportRef.current = getTransportPreference();
+      fallbackTriedRef.current = false;
+
+      const nativeWsUrl = withTokenQuery(ensureNativeWsUrl(config.stomp.url), token);
+      const sockJsUrl = withTokenQuery(config.stomp.url?.replace('ws://', 'http://').replace('wss://', 'https://'), token);
+
+      const createFactory = () => {
+        const pref = transportRef.current;
+        if (pref === 'sockjs') return () => new SockJS(sockJsUrl);
+        if (pref === 'native') return () => new WebSocket(nativeWsUrl);
+        // auto: try native first, fallback to sockjs if needed
+        return () => {
+          if (fallbackTriedRef.current) return new SockJS(sockJsUrl);
+          return new WebSocket(nativeWsUrl);
+        };
+      };
 
       const stompClient = new Client({
-        webSocketFactory: () => new WebSocket(finalWsUrl),
+        webSocketFactory: createFactory(),
         connectHeaders: {
           Authorization: `Bearer ${token}`,
           'X-Authorization': `Bearer ${token}`,
@@ -128,6 +151,22 @@ export const StompProvider = (props) => {
       clientRef.current = stompClient;
       setClient(stompClient);
       stompClient.activate();
+
+      // Auto-fallback: if native doesn't connect quickly, switch to SockJS and retry once
+      if (transportRef.current === 'auto') {
+        setTimeout(() => {
+          if (destroyed) return;
+          if (stompClient.connected) return;
+          if (fallbackTriedRef.current) return;
+          fallbackTriedRef.current = true;
+          try {
+            stompClient.deactivate();
+          } catch (e) {}
+          if (!destroyed) {
+            connect(token);
+          }
+        }, 2500);
+      }
     };
 
     const ensureConnection = () => {
