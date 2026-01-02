@@ -84,9 +84,11 @@ export const StompProvider = (props) => {
       setConnected(false);
     };
 
-    const connect = (token) => {
+    const connect = (token, useFallback = false) => {
       transportRef.current = getTransportPreference();
-      fallbackTriedRef.current = false;
+      if (useFallback) {
+        fallbackTriedRef.current = true;
+      }
 
       const nativeWsUrl = withTokenQuery(ensureNativeWsUrl(config.stomp.nativeUrl), token);
       const sockJsUrl = withTokenQuery(ensureSockJsHttpUrl(config.stomp.sockjsUrl), token);
@@ -160,18 +162,16 @@ export const StompProvider = (props) => {
       setClient(stompClient);
       stompClient.activate();
 
-      // Auto-fallback: if native doesn't connect quickly, switch to SockJS and retry once
-      if (transportRef.current === 'auto') {
+      if (transportRef.current === 'auto' && !fallbackTriedRef.current) {
         setTimeout(() => {
           if (destroyed) return;
           if (stompClient.connected) return;
           if (fallbackTriedRef.current) return;
-          fallbackTriedRef.current = true;
           try {
             stompClient.deactivate();
           } catch (e) {}
           if (!destroyed) {
-            connect(token);
+            connect(token, true);
           }
         }, 2500);
       }
@@ -195,6 +195,7 @@ export const StompProvider = (props) => {
 
       if (tokenRef.current !== token) {
         tokenRef.current = token;
+        fallbackTriedRef.current = false;
         disconnect();
       }
 

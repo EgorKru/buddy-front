@@ -73,8 +73,6 @@ export default function ChatPage() {
     }
   }, [chatId]);
 
-  // Бэк теперь гарантирует: /topic/chat/{chatId} всегда отдаёт полный MessageDto.
-
   useEffect(() => {
     if (!isAuthenticated()) {
       router.push('/login');
