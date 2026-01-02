@@ -47,6 +47,14 @@ const withTokenQuery = (url, token) => {
   return `${url}${sep}token=${encodeURIComponent(token)}`;
 };
 
+const ensureSockJsHttpUrl = (url) => {
+  if (!url) return null;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('ws://')) return url.replace('ws://', 'http://');
+  if (url.startsWith('wss://')) return url.replace('wss://', 'https://');
+  return url;
+};
+
 const getTransportPreference = () => {
   const pref = process.env.NEXT_PUBLIC_STOMP_TRANSPORT;
   if (pref === 'native' || pref === 'sockjs') return pref;
@@ -80,8 +88,8 @@ export const StompProvider = (props) => {
       transportRef.current = getTransportPreference();
       fallbackTriedRef.current = false;
 
-      const nativeWsUrl = withTokenQuery(ensureNativeWsUrl(config.stomp.url), token);
-      const sockJsUrl = withTokenQuery(config.stomp.url?.replace('ws://', 'http://').replace('wss://', 'https://'), token);
+      const nativeWsUrl = withTokenQuery(ensureNativeWsUrl(config.stomp.nativeUrl), token);
+      const sockJsUrl = withTokenQuery(ensureSockJsHttpUrl(config.stomp.sockjsUrl), token);
 
       const createFactory = () => {
         const pref = transportRef.current;
