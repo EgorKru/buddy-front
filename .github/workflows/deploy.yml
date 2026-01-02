@@ -17,11 +17,14 @@ jobs:
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            set -euo pipefail
             cd ~/buddy-front
+            git remote set-url origin git@github.com:EgorKru/buddy-front.git
+            git remote -v
             git pull
+            git rev-parse --short HEAD
             docker-compose build --no-cache frontend
-            docker-compose down frontend || true
-            docker-compose up -d frontend
+            docker-compose up -d --force-recreate --no-deps frontend
             sleep 2
-            docker-compose logs frontend --tail 50 || echo "Logs not available yet"
+            docker-compose logs frontend --tail 50
 
