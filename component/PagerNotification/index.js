@@ -12,17 +12,18 @@ export default function PagerNotification({
   const [unreadCount, setUnreadCount] = useState(0);
   const [latestNotification, setLatestNotification] = useState(null);
 
+  const unreadNotifications = notifications.filter(n => !n.read);
+
   useEffect(() => {
-    const unread = notifications.filter(n => !n.read).length;
+    const unread = unreadNotifications.length;
     setUnreadCount(unread);
     
-    if (notifications.length > 0) {
-      const latest = notifications
-        .filter(n => !n.read)
+    if (unreadNotifications.length > 0) {
+      const latest = unreadNotifications
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
-      setLatestNotification(latest || notifications[notifications.length - 1]);
+      setLatestNotification(latest);
     }
-  }, [notifications]);
+  }, [unreadNotifications]);
 
   const handlePagerClick = () => {
     unlockPagerAudio();
@@ -43,7 +44,7 @@ export default function PagerNotification({
     }
   };
 
-  if (notifications.length === 0 && !latestNotification) {
+  if (unreadNotifications.length === 0 && !latestNotification) {
     return null;
   }
 
@@ -95,13 +96,13 @@ export default function PagerNotification({
           </div>
           
           <div className={styles.listContent}>
-            {notifications.length === 0 ? (
+            {unreadNotifications.length === 0 ? (
               <div className={styles.emptyState}>
                 <Bell size={24} />
                 <p>Нет уведомлений</p>
               </div>
             ) : (
-              notifications.map((notification) => (
+              unreadNotifications.map((notification) => (
                 <div
                   key={notification.id}
                   className={`${styles.notificationItem} ${!notification.read ? styles.unread : ''}`}

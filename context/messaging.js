@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef } from 'react';
-import { chatAPI, getCurrentUser } from '@/utils/api';
+import { chatAPI, getCurrentUser, isAuthenticated, getToken } from '@/utils/api';
 import { useStomp } from '@/context/socket';
 import { safeJsonParse, safeUnsubscribe } from '@/utils/safe';
 import { playPagerNotificationSound } from '@/utils/pagerSound';
@@ -292,6 +292,7 @@ export const MessagingProvider = ({ children }) => {
   const processedMessageIdsRef = useRef(new Set());
 
   const refreshChats = useCallback(async () => {
+    if (!isAuthenticated()) return;
     if (refreshInFlightRef.current) return;
     refreshInFlightRef.current = true;
     try {
@@ -303,7 +304,21 @@ export const MessagingProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
+    if (!isAuthenticated()) {
+      dispatch({ type: actionTypes.SET_CHATS, payload: { chats: [] } });
+      return;
+    }
     refreshChats();
+  }, [refreshChats]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const token = getToken();
+      if (token) {
+        refreshChats();
+      }
+    }, 1000);
+    return () => clearInterval(interval);
   }, [refreshChats]);
 
   const setActiveChatId = useCallback((chatId) => {
@@ -372,6 +387,7 @@ export const MessagingProvider = ({ children }) => {
   }, [state.activeChatId]);
 
   useEffect(() => {
+    if (!isAuthenticated()) return;
     if (!client || !connected || !client.connected || !client.active) return;
 
     const cleanup = () => {
@@ -406,6 +422,7 @@ export const MessagingProvider = ({ children }) => {
   }, [client, connected, upsertMessage, maybeSound]);
 
   useEffect(() => {
+    if (!isAuthenticated()) return;
     if (!client || !connected || !client.connected || !client.active) return;
 
     const chatIds = new Set(state.chatOrder.map(String));

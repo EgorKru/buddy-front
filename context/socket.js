@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useState, useRef } from "react";
 import { Client } from '@stomp/stompjs';
-import SockJS from 'sockjs-client';
 import { getToken } from "@/utils/api";
 import { config } from "@/utils/config";
 import { safeJsonParse } from "@/utils/safe";
@@ -32,11 +31,19 @@ const handleAuthError = () => {
   }
 };
 
-const convertWebSocketUrl = (wsUrl) => {
-  if (wsUrl.startsWith('ws://') || wsUrl.startsWith('wss://')) {
-    return wsUrl.replace('ws://', 'http://').replace('wss://', 'https://');
-  }
-  return wsUrl;
+const ensureNativeWsUrl = (url) => {
+  if (!url) return null;
+  if (url.startsWith('ws://') || url.startsWith('wss://')) return url;
+  if (url.startsWith('http://')) return url.replace('http://', 'ws://');
+  if (url.startsWith('https://')) return url.replace('https://', 'wss://');
+  return url;
+};
+
+const withTokenQuery = (url, token) => {
+  if (!url || !token) return url;
+  const hasQuery = url.includes('?');
+  const sep = hasQuery ? '&' : '?';
+  return `${url}${sep}token=${encodeURIComponent(token)}`;
 };
 
 export const StompProvider = (props) => {
@@ -61,12 +68,11 @@ export const StompProvider = (props) => {
     };
 
     const connect = (token) => {
-      const wsUrl = config.stomp.url;
-      const sockJsUrl = convertWebSocketUrl(wsUrl);
-      const finalWsUrl = `${sockJsUrl}?token=${encodeURIComponent(token)}`;
+      const wsUrl = ensureNativeWsUrl(config.stomp.url);
+      const finalWsUrl = withTokenQuery(wsUrl, token);
 
       const stompClient = new Client({
-        webSocketFactory: () => new SockJS(finalWsUrl),
+        webSocketFactory: () => new WebSocket(finalWsUrl),
         connectHeaders: {
           Authorization: `Bearer ${token}`,
           'X-Authorization': `Bearer ${token}`,

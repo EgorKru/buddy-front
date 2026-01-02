@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useStomp } from '@/context/socket';
-import { notificationAPI } from '@/utils/api';
+import { isAuthenticated, notificationAPI } from '@/utils/api';
 import { safeJsonParse, safeUnsubscribe } from '@/utils/safe';
 
 const SUBSCRIPTION_DELAY = 100;
@@ -19,10 +19,20 @@ export const useNotifications = () => {
   const subscriptionsRef = useRef([]);
 
   useEffect(() => {
+    if (!isAuthenticated()) {
+      setNotifications([]);
+      setLoading(false);
+      return;
+    }
     loadNotifications();
   }, []);
 
   useEffect(() => {
+    if (!isAuthenticated()) {
+      unsubscribeAll(subscriptionsRef.current);
+      subscriptionsRef.current = [];
+      return;
+    }
     if (!client || !connected || !client.connected || !client.active) {
       return;
     }
@@ -55,6 +65,10 @@ export const useNotifications = () => {
   const loadNotifications = async () => {
     setLoading(true);
     try {
+      if (!isAuthenticated()) {
+        setNotifications([]);
+        return;
+      }
       const data = await notificationAPI.getNotifications(0, DEFAULT_PAGE_SIZE);
       const notificationsList = data.content || data || [];
       const sorted = notificationsList.sort((a, b) =>
