@@ -74,6 +74,20 @@ export default function ChatPage() {
           return prev;
         }
         
+        // Также проверяем дубликаты по content + senderId + время (в пределах 10 секунд)
+        if (message.content && message.senderId && message.createdAt) {
+          const duplicateByContent = prev.find(m => {
+            if (Number(m.senderId) !== Number(message.senderId)) return false;
+            if (String(m.content || '').trim() !== String(message.content || '').trim()) return false;
+            if (m.id && message.id && Number(m.id) === Number(message.id)) return false; // Уже проверили выше
+            const timeDiff = Math.abs(new Date(m.createdAt) - new Date(message.createdAt));
+            return timeDiff < 10000; // В пределах 10 секунд
+          });
+          if (duplicateByContent) {
+            return prev; // Дубликат, пропускаем
+          }
+        }
+        
         // Найти оптимистичное сообщение по tempId
         const optimisticIndex = prev.findIndex(m => 
           m.tempId === tempId && m.isOptimistic === true
@@ -200,18 +214,20 @@ export default function ChatPage() {
                 return prev; // Уже есть, пропускаем
               }
               
-              // 2. Если это наше сообщение (senderId === currentUserId) - игнорируем
+              // 2. Если это наше сообщение (senderId === currentUserId) - ВСЕГДА игнорируем
               // Оно уже обработано через подтверждение из /user/queue/message-sent
-              if (user && Number(messageDto.senderId) === Number(user.id)) {
+              // Проверяем даже если user еще не загружен - сравниваем с любым сообщением с tempId
+              const isOurMessage = user && Number(messageDto.senderId) === Number(user.id);
+              if (isOurMessage) {
                 return prev; // Игнорируем свои сообщения из топика
               }
               
-              // 2.5. Дополнительная проверка на дубликаты по content + senderId + время (в пределах 5 секунд)
+              // 2.5. Дополнительная проверка на дубликаты по content + senderId + время (в пределах 10 секунд)
               const duplicateByContent = prev.find(m => {
                 if (Number(m.senderId) !== Number(messageDto.senderId)) return false;
                 if (String(m.content || '').trim() !== String(messageDto.content || '').trim()) return false;
                 const timeDiff = Math.abs(new Date(m.createdAt) - new Date(messageDto.createdAt));
-                return timeDiff < 5000; // В пределах 5 секунд
+                return timeDiff < 10000; // В пределах 10 секунд
               });
               if (duplicateByContent) {
                 return prev; // Дубликат, пропускаем

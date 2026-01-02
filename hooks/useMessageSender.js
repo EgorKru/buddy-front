@@ -463,14 +463,15 @@ export const useMessageSender = (chatId, onMessageSent) => {
               }, 1000);
 
               // Обновляем UI через callback - заменяем оптимистичное сообщение на реальное
-              if (onMessageSent) {
+              // ВАЖНО: вызываем только если есть tempId (оптимистичное сообщение для замены)
+              if (onMessageSent && queuedMessage.tempId) {
                 // Если в подтверждении есть полное сообщение, используем его
                 if (confirmation.status === 'sent' && confirmation.message) {
                   onMessageSent({
                     ...confirmation.message,
                     status: MESSAGE_STATUS.SENT,
                   }, queuedMessage.tempId);
-                } else {
+                } else if (confirmation.messageId) {
                   // Иначе используем данные из очереди и messageId из подтверждения
                   onMessageSent({
                     id: confirmation.messageId,
