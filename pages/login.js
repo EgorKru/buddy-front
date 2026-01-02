@@ -59,6 +59,8 @@ export default function Login() {
             <label>Имя пользователя</label>
             <input
               type="text"
+              id="login-username"
+              name="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
@@ -71,6 +73,8 @@ export default function Login() {
             <div className={styles.passwordContainer}>
               <input
                 type={showPassword ? "text" : "password"}
+                id="login-password"
+                name="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required

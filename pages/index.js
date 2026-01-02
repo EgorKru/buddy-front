@@ -130,6 +130,8 @@ export default function Home() {
         <div className={styles.content}>
           <div className={styles.enterRoom}>
             <input 
+              id="room-id"
+              name="roomId"
               placeholder='Введите ID комнаты' 
               value={roomId} 
               onChange={(e) => setRoomId(e?.target?.value)}

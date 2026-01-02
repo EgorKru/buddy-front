@@ -130,7 +130,7 @@ export const useMessageSender = (chatId, onMessageSent) => {
             }),
           });
           setSending(false);
-          return { success: true, tempId: optimisticMessage.tempId, optimisticMessage };
+          return { success: true, tempId: optimisticMessage.tempId, optimisticMessage, serverMessage: null };
         } catch (wsError) {}
       }
 
@@ -144,7 +144,7 @@ export const useMessageSender = (chatId, onMessageSent) => {
       }
 
       setSending(false);
-      return { success: true, tempId: optimisticMessage.tempId, optimisticMessage };
+      return { success: true, tempId: optimisticMessage.tempId, optimisticMessage, serverMessage };
     } catch (error) {
       updateMessageStatus(optimisticMessage.tempId, MESSAGE_STATUS.FAILED);
       if (onMessageSent) {
@@ -152,7 +152,7 @@ export const useMessageSender = (chatId, onMessageSent) => {
       }
       scheduleRetry(optimisticMessage, chatId, onMessageSent);
       setSending(false);
-      return null;
+      return { success: false, tempId: optimisticMessage.tempId, optimisticMessage, serverMessage: null };
     } finally {
       setSending(false);
     }

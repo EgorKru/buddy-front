@@ -198,6 +198,19 @@ export default function ChatPage() {
     setNewMessage('');
 
     const result = await sendMessageHook(messageContent, 'TEXT');
+
+    if (result?.serverMessage) {
+      setMessages(prev => {
+        if (prev.some(m => Number(m.id) === Number(result.serverMessage.id))) return prev;
+        return [...prev, { ...result.serverMessage, status: MESSAGE_STATUS.SENT, isOptimistic: false }];
+      });
+    } else if (result?.optimisticMessage) {
+      setMessages(prev => {
+        if (prev.some(m => m.tempId && result.tempId && m.tempId === result.tempId)) return prev;
+        if (prev.some(m => m.id === result.optimisticMessage.id)) return prev;
+        return [...prev, result.optimisticMessage];
+      });
+    }
     
     if (!result) {
       setNewMessage(messageContent);
@@ -346,6 +359,8 @@ export default function ChatPage() {
       <form onSubmit={sendMessage} className={styles.messageForm}>
         <input
           type="text"
+          id="chat-message-input"
+          name="message"
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
           placeholder={connected ? "Введите сообщение..." : "Подключение... (отправка через REST API)"}

@@ -91,6 +91,8 @@ const ChatPanel = ({ roomId, isOpen, onClose }) => {
       <form onSubmit={sendMessage} className={styles.messageForm}>
         <input
           type="text"
+          id="room-chat-message-input"
+          name="message"
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
           placeholder="Написать сообщение..."

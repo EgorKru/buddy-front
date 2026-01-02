@@ -93,6 +93,8 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
           <Search size={18} className={styles.searchIcon} />
           <input
             type="text"
+            id="chat-sidebar-search"
+            name="chatSearch"
             placeholder="Поиск чатов..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -185,6 +187,8 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
                   <label>Название группы *</label>
                   <input
                     type="text"
+                    id="chat-create-group-name"
+                    name="chatName"
                     value={createChat.chatName}
                     onChange={(e) => createChat.setChatName(e.target.value)}
                     placeholder="Введите название группы"
@@ -204,6 +208,8 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
                   <input
                     ref={createChat.searchInputRef}
                     type="text"
+                    id="chat-create-participants"
+                    name="participants"
                     value={createChat.participantUsernames}
                     onChange={createChat.handleSearchInputChange}
                     onFocus={() => {
