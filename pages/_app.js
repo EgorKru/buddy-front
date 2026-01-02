@@ -1,16 +1,16 @@
 import "@/styles/globals.css";
 
 import { StompProvider } from "@/context/socket";
-import { ChatsProvider } from "@/context/chats";
+import { MessagingProvider } from "@/context/messaging";
 import GlobalNotifications from "@/component/GlobalNotifications";
 
 export default function App({ Component, pageProps }) {
   return (
     <StompProvider>
-      <ChatsProvider>
+      <MessagingProvider>
         <Component {...pageProps} />
         <GlobalNotifications />
-      </ChatsProvider>
+      </MessagingProvider>
     </StompProvider>
   );
 }

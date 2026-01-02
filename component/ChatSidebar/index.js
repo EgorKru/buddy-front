@@ -7,7 +7,7 @@ import { useCreateChat } from '@/hooks/useCreateChat';
 import { getChatName, getChatAvatar } from '@/utils/chatHelpers';
 import { formatChatListTime } from '@/utils/dateHelpers';
 import styles from '@/component/ChatSidebar/index.module.css';
-import { useChats } from '@/context/chats';
+import { useChats } from '@/context/messaging';
 
 export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
   const router = useRouter();

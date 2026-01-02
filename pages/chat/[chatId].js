@@ -2,15 +2,14 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { Send, Loader2, Menu, Check, CheckCheck, AlertCircle, Clock } from 'lucide-react';
 import { chatAPI, getCurrentUser, isAuthenticated } from '@/utils/api';
-import { useStomp } from '@/context/socket';
 import { getChatName } from '@/utils/chatHelpers';
 import { formatChatDate, formatChatTime } from '@/utils/dateHelpers';
 import { useMessageSender } from '@/hooks/useMessageSender';
 import { MESSAGE_STATUS } from '@/utils/messageQueue';
 import ChatSidebar from '@/component/ChatSidebar';
 import styles from '@/styles/chat.module.css';
-import { safeJsonParse, safeUnsubscribe } from '@/utils/safe';
-import { useChats } from '@/context/chats';
+import { useChats, useChatMessages } from '@/context/messaging';
+import { useChatRealtime } from '@/hooks/useChatRealtime';
 
 const DUPLICATE_WINDOW_MS = 5000;
 
@@ -26,12 +25,10 @@ const isDuplicate = (a, b) => {
 export default function ChatPage() {
   const router = useRouter();
   const { chatId } = router.query;
-  const { client, connected } = useStomp();
   const user = getCurrentUser();
-  const { setActiveChatId, markChatAsRead, readReceiptsByChatId, bumpChatLastMessage, upsertReadReceipt } = useChats();
+  const { connected, readAtByChatIdByUserId, replaceOptimistic, addOptimistic } = useChats();
 
   const [chat, setChat] = useState(null);
-  const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
@@ -41,8 +38,9 @@ export default function ChatPage() {
 
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
-  const subscriptionRef = useRef(null);
-  const readSubscriptionRef = useRef(null);
+  const messages = useChatMessages(chatId);
+
+  useChatRealtime(chatId);
 
   const loadChat = useCallback(async () => {
     if (!chatId) return;
@@ -64,12 +62,6 @@ export default function ChatPage() {
         page: pageNum,
         size: 50,
       });
-
-      if (append) {
-        setMessages(prev => [...response.content.reverse(), ...prev]);
-      } else {
-        setMessages(response.content.reverse());
-      }
 
       setPage(response.number);
       setHasMore(!response.last);
@@ -95,93 +87,6 @@ export default function ChatPage() {
   }, [chatId, router, loadChat, loadMessages]);
 
   useEffect(() => {
-    if (!chatId) return;
-    setActiveChatId(chatId);
-    markChatAsRead(chatId);
-    return () => setActiveChatId(null);
-  }, [chatId, setActiveChatId, markChatAsRead]);
-
-  useEffect(() => {
-    if (!chatId) return;
-
-    const tryMarkRead = () => {
-      if (typeof document === 'undefined') return;
-      if (document.visibilityState !== 'visible') return;
-      markChatAsRead(chatId);
-    };
-
-    window.addEventListener('focus', tryMarkRead);
-    document.addEventListener('visibilitychange', tryMarkRead);
-
-    return () => {
-      window.removeEventListener('focus', tryMarkRead);
-      document.removeEventListener('visibilitychange', tryMarkRead);
-    };
-  }, [chatId, markChatAsRead]);
-
-  useEffect(() => {
-    if (!chatId || !client || !connected || !client.connected || !client.active) return;
-
-    if (subscriptionRef.current) {
-      safeUnsubscribe(subscriptionRef.current);
-      subscriptionRef.current = null;
-    }
-
-    try {
-      const sub = client.subscribe(`/topic/chat/${chatId}`, (message) => {
-        const messageDto = safeJsonParse(message.body);
-        if (!messageDto) return;
-        if (Number(messageDto.chatId) !== Number(chatId)) return;
-        if (user && Number(messageDto.senderId) === Number(user.id)) return;
-
-        setMessages(prev => {
-          if (prev.some(m => Number(m.id) === Number(messageDto.id))) return prev;
-          if (prev.some(m => isDuplicate(m, messageDto))) return prev;
-          return [...prev, { ...messageDto, status: MESSAGE_STATUS.SENT, isOptimistic: false }];
-        });
-
-        if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-          markChatAsRead(chatId);
-        }
-      });
-
-      subscriptionRef.current = sub;
-    } catch (error) {}
-
-    return () => {
-      if (subscriptionRef.current) {
-        safeUnsubscribe(subscriptionRef.current);
-        subscriptionRef.current = null;
-      }
-    };
-  }, [chatId, client, connected, user, markChatAsRead]);
-
-  useEffect(() => {
-    if (!chatId || !client || !connected || !client.connected || !client.active) return;
-
-    if (readSubscriptionRef.current) {
-      safeUnsubscribe(readSubscriptionRef.current);
-      readSubscriptionRef.current = null;
-    }
-
-    try {
-      const sub = client.subscribe(`/topic/chat/${chatId}/read`, (message) => {
-        const event = safeJsonParse(message.body);
-        if (!event?.chatId || !event?.readerId || !event?.readAt) return;
-        upsertReadReceipt(event.chatId, event.readerId, event.readAt);
-      });
-      readSubscriptionRef.current = sub;
-    } catch (e) {}
-
-    return () => {
-      if (readSubscriptionRef.current) {
-        safeUnsubscribe(readSubscriptionRef.current);
-        readSubscriptionRef.current = null;
-      }
-    };
-  }, [chatId, client, connected, upsertReadReceipt]);
-
-  useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
@@ -189,55 +94,12 @@ export default function ChatPage() {
     if (!confirmation || !confirmation.message) return;
 
     const message = confirmation.message;
-    bumpChatLastMessage(chatId, message, user?.id);
-
-    setMessages(prev => {
-      if (message.id && prev.some(m => Number(m.id) === Number(message.id))) {
-        return prev;
-      }
-
-      if (tempId) {
-        const optimisticIndex = prev.findIndex(m =>
-          m.tempId === tempId && m.isOptimistic === true
-        );
-
-        if (optimisticIndex !== -1) {
-          const updated = [...prev];
-          updated[optimisticIndex] = {
-            ...message,
-            id: message.id,
-            status: confirmation.status === 'sent' ? MESSAGE_STATUS.SENT : MESSAGE_STATUS.FAILED,
-            isOptimistic: false,
-          };
-          delete updated[optimisticIndex].tempId;
-          return updated;
-        }
-      }
-
-      if (message.content && message.senderId) {
-        const optimisticIndex = prev.findIndex(m => {
-          if (!m.isOptimistic) return false;
-          if (Number(m.senderId) !== Number(message.senderId)) return false;
-          if (String(m.content || '').trim() !== String(message.content || '').trim()) return false;
-          return m.status === MESSAGE_STATUS.SENDING || m.status === 'sending';
-        });
-
-        if (optimisticIndex !== -1) {
-          const updated = [...prev];
-          updated[optimisticIndex] = {
-            ...message,
-            id: message.id,
-            status: confirmation.status === 'sent' ? MESSAGE_STATUS.SENT : MESSAGE_STATUS.FAILED,
-            isOptimistic: false,
-          };
-          delete updated[optimisticIndex].tempId;
-          return updated;
-        }
-      }
-
-      return prev;
-    });
-  }, [bumpChatLastMessage, chatId, user?.id]);
+    if (tempId && confirmation.status === 'sent') {
+      replaceOptimistic(chatId, tempId, message, MESSAGE_STATUS.SENT);
+    } else if (tempId && confirmation.status !== 'sent') {
+      replaceOptimistic(chatId, tempId, message, MESSAGE_STATUS.FAILED);
+    }
+  }, [chatId, replaceOptimistic]);
 
   const { sendMessage: sendMessageHook, sending, syncQueue } = useMessageSender(
     chatId,
@@ -263,18 +125,10 @@ export default function ChatPage() {
     const result = await sendMessageHook(messageContent, 'TEXT');
 
     if (result?.serverMessage) {
-      bumpChatLastMessage(chatId, result.serverMessage, user?.id);
-      setMessages(prev => {
-        if (prev.some(m => Number(m.id) === Number(result.serverMessage.id))) return prev;
-        return [...prev, { ...result.serverMessage, status: MESSAGE_STATUS.SENT, isOptimistic: false }];
-      });
+      // serverMessage придёт и в topic, но upsert в store безопасен — добавим сразу для UX
+      addOptimistic(chatId, { ...result.serverMessage, status: MESSAGE_STATUS.SENT, isOptimistic: false });
     } else if (result?.optimisticMessage) {
-      bumpChatLastMessage(chatId, result.optimisticMessage, user?.id);
-      setMessages(prev => {
-        if (prev.some(m => m.tempId && result.tempId && m.tempId === result.tempId)) return prev;
-        if (prev.some(m => m.id === result.optimisticMessage.id)) return prev;
-        return [...prev, result.optimisticMessage];
-      });
+      addOptimistic(chatId, result.optimisticMessage);
     }
     
     if (!result) {
@@ -298,7 +152,7 @@ export default function ChatPage() {
   const getReadMetaForMessage = useCallback((msg) => {
     if (!chatId || !msg?.createdAt || !user?.id) return { isRead: false, readCount: 0, totalOthers: 0 };
 
-    const chatReadMap = readReceiptsByChatId?.[String(chatId)] || {};
+    const chatReadMap = readAtByChatIdByUserId?.[String(chatId)] || {};
     const msgTime = new Date(msg.createdAt).getTime();
     if (Number.isNaN(msgTime)) return { isRead: false, readCount: 0, totalOthers: 0 };
 
@@ -318,7 +172,7 @@ export default function ChatPage() {
     const isRead = readCount > 0;
 
     return { isRead, readCount, totalOthers };
-  }, [chatId, chat?.participants, readReceiptsByChatId, user?.id]);
+  }, [chatId, chat?.participants, readAtByChatIdByUserId, user?.id]);
 
   const getMessageStatusIcon = (status, readMeta) => {
     const isRead = !!readMeta?.isRead;
