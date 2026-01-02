@@ -1,15 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useStomp } from '@/context/socket';
 import { notificationAPI } from '@/utils/api';
+import { safeJsonParse, safeUnsubscribe } from '@/utils/safe';
 
 const SUBSCRIPTION_DELAY = 100;
 const DEFAULT_PAGE_SIZE = 50;
 
 const unsubscribeAll = (subscriptions) => {
   subscriptions.forEach(sub => {
-    try {
-      sub.unsubscribe();
-    } catch (error) {}
+    safeUnsubscribe(sub);
   });
 };
 
@@ -33,10 +32,9 @@ export const useNotifications = () => {
       subscriptionsRef.current = [];
 
       const notificationsSubscription = client.subscribe('/user/queue/notifications', (message) => {
-        try {
-          const notification = JSON.parse(message.body);
-          addNotification(notification);
-        } catch (error) {}
+        const notification = safeJsonParse(message.body);
+        if (!notification) return;
+        addNotification(notification);
       });
 
       subscriptionsRef.current = [notificationsSubscription];

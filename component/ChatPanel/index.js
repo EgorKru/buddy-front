@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { Send, MessageCircle } from 'lucide-react';
-import { apiRequest, getCurrentUser } from '@/utils/api';
+import { getCurrentUser } from '@/utils/api';
 import styles from '@/component/ChatPanel/index.module.css';
 
 const ChatPanel = ({ roomId, isOpen, onClose }) => {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
-  const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
   const user = getCurrentUser();
 
@@ -20,23 +19,10 @@ const ChatPanel = ({ roomId, isOpen, onClose }) => {
     scrollToBottom();
   }, [messages]);
 
-  /**
-   * Загрузка сообщений для комнаты
-   * @note В будущем здесь будет интеграция с API для получения сообщений комнаты
-   */
   const loadMessages = async () => {
-    try {
-      // TODO: Реализовать загрузку сообщений для video rooms через API
-      setLoading(false);
-    } catch (error) {
-      console.error('Ошибка загрузки сообщений:', error);
-    }
+    return;
   };
 
-  /**
-   * Отправка сообщения в чат комнаты
-   * @note В будущем здесь будет интеграция с WebSocket/API для отправки сообщений
-   */
   const sendMessage = async (e) => {
     e.preventDefault();
     if (!newMessage.trim() || !user) return;
@@ -52,17 +38,6 @@ const ChatPanel = ({ roomId, isOpen, onClose }) => {
 
     setMessages([...messages, message]);
     setNewMessage('');
-
-    // TODO: Реализовать отправку сообщений через WebSocket/API для video rooms
-    try {
-      // await apiRequest(`/chats/${chatId}/messages`, {
-      //   method: 'POST',
-      //   body: JSON.stringify({ content: message.content }),
-      // });
-    } catch (error) {
-      console.error('Ошибка отправки сообщения:', error);
-      setMessages(messages.filter(m => m !== message));
-    }
   };
 
   const scrollToBottom = () => {

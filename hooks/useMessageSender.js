@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useStomp } from '@/context/socket';
 import { chatAPI, getCurrentUser } from '@/utils/api';
+import { safeJsonParse, safeUnsubscribe } from '@/utils/safe';
 import {
   saveMessageToQueue,
   updateMessageStatus,
@@ -198,16 +199,15 @@ export const useMessageSender = (chatId, onMessageSent) => {
     if (!client || !connected || !client.connected || !client.active) return;
 
     if (messageSentSubscriptionRef.current) {
-      try {
-        messageSentSubscriptionRef.current.unsubscribe();
-      } catch (error) {}
+      safeUnsubscribe(messageSentSubscriptionRef.current);
       messageSentSubscriptionRef.current = null;
     }
 
     try {
       const subscription = client.subscribe('/user/queue/message-sent', (message) => {
         try {
-          const confirmation = JSON.parse(message.body);
+          const confirmation = safeJsonParse(message.body);
+          if (!confirmation) return;
 
           if (confirmation.status === 'sent') {
             const confirmationKey = confirmation.messageId
@@ -239,7 +239,7 @@ export const useMessageSender = (chatId, onMessageSent) => {
               }, QUEUE_REMOVAL_DELAY);
 
               if (onMessageSent && queuedMessage.tempId) {
-                if (confirmation.status === 'sent' && confirmation.message) {
+                if (confirmation.message) {
                   onMessageSent(confirmation, queuedMessage.tempId);
                 } else if (confirmation.messageId) {
                   const messageDto = {
@@ -252,10 +252,7 @@ export const useMessageSender = (chatId, onMessageSent) => {
                     senderDisplayName: queuedMessage.senderDisplayName,
                     createdAt: queuedMessage.createdAt,
                   };
-                  onMessageSent({
-                    ...confirmation,
-                    message: messageDto,
-                  }, queuedMessage.tempId);
+                  onMessageSent({ ...confirmation, message: messageDto }, queuedMessage.tempId);
                 }
               }
             }
@@ -270,14 +267,8 @@ export const useMessageSender = (chatId, onMessageSent) => {
               updateMessageStatus(queuedMessage.tempId, MESSAGE_STATUS.FAILED);
 
               if (onMessageSent && queuedMessage.tempId) {
-                const messageDto = {
-                  ...queuedMessage,
-                  id: confirmation.messageId || queuedMessage.id,
-                };
-                onMessageSent({
-                  ...confirmation,
-                  message: messageDto,
-                }, queuedMessage.tempId);
+                const messageDto = { ...queuedMessage, id: confirmation.messageId || queuedMessage.id };
+                onMessageSent({ ...confirmation, message: messageDto }, queuedMessage.tempId);
               }
 
               if (confirmation.errorMessage && typeof window !== 'undefined') {
@@ -294,7 +285,7 @@ export const useMessageSender = (chatId, onMessageSent) => {
 
       return () => {
         if (messageSentSubscriptionRef.current) {
-          messageSentSubscriptionRef.current.unsubscribe();
+          safeUnsubscribe(messageSentSubscriptionRef.current);
           messageSentSubscriptionRef.current = null;
         }
       };

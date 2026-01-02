@@ -1,56 +1,63 @@
-import {useState, useEffect, useRef} from 'react'
-
+import { useState, useEffect, useRef } from 'react';
 
 const useMediaStream = () => {
-    const [state, setState] = useState(null)
-    const [error, setError] = useState(null)
-    const isStreamSet = useRef(false)
+  const [stream, setStream] = useState(null);
+  const [error, setError] = useState(null);
+  const streamRef = useRef(null);
 
-    useEffect(() => {
-        if (isStreamSet.current) return;
-        
-        if (typeof window === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            setError("Медиа устройства не поддерживаются в этом браузере или требуется HTTPS")
-            return;
-        }
-        
-        isStreamSet.current = true;
-        (async function initStream() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    audio: true,
-                    video: true
-                })
-                console.log("setting your stream")
-                setState(stream)
-            } catch (e) {
-                console.error("Error in media navigator", e)
-                setError(e.message || "Failed to access camera/microphone")
-                try {
-                    const audioStream = await navigator.mediaDevices.getUserMedia({
-                        audio: true,
-                        video: false
-                    })
-                    console.log("setting audio only stream")
-                    setState(audioStream)
-                } catch (audioError) {
-                    console.error("Error getting audio stream", audioError)
-                    setError(audioError.message || "Не удалось получить доступ к микрофону")
-                }
-            }
-        })()
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
 
-        return () => {
-            if (state) {
-                state.getTracks().forEach(track => track.stop())
-            }
-        }
-    }, [])
-
-    return {
-        stream: state,
-        error
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError('Медиа устройства не поддерживаются в этом браузере или требуется HTTPS');
+      return;
     }
-}
 
-export default useMediaStream
+    let active = true;
+
+    const attachStream = (s) => {
+      streamRef.current = s;
+      setStream(s);
+    };
+
+    const stopStream = (s) => {
+      if (!s) return;
+      s.getTracks().forEach(t => t.stop());
+    };
+
+    const init = async () => {
+      try {
+        const s = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+        if (!active) {
+          stopStream(s);
+          return;
+        }
+        attachStream(s);
+      } catch (e) {
+        setError(e?.message || 'Failed to access camera/microphone');
+        try {
+          const s = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          if (!active) {
+            stopStream(s);
+            return;
+          }
+          attachStream(s);
+        } catch (audioError) {
+          setError(audioError?.message || 'Не удалось получить доступ к микрофону');
+        }
+      }
+    };
+
+    init();
+
+    return () => {
+      active = false;
+      stopStream(streamRef.current);
+      streamRef.current = null;
+    };
+  }, []);
+
+  return { stream, error };
+};
+
+export default useMediaStream;

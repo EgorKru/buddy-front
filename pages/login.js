@@ -22,13 +22,7 @@ export default function Login() {
     try {
       const data = await authAPI.login(username, password);
       setCurrentUser(data.user, data.token);
-      // Перезагружаем страницу для переподключения WebSocket с новым токеном
       router.push('/');
-      setTimeout(() => {
-        if (typeof window !== 'undefined') {
-          window.location.reload();
-        }
-      }, 100);
     } catch (err) {
       setError(err.message || 'Неверное имя пользователя или пароль');
     } finally {

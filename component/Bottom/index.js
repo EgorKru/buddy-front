@@ -6,7 +6,6 @@ import styles from "@/component/Bottom/index.module.css";
 const Bottom = (props) => {
   const { muted, playing, toggleAudio, toggleVideo, leaveRoom, participantCount, onChatToggle } = props;
 
-  // Используем значения по умолчанию, если данные ещё не готовы
   const isMuted = muted ?? true;
   const isPlaying = playing ?? true;
 

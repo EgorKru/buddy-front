@@ -3,6 +3,7 @@ import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { getToken } from "@/utils/api";
 import { config } from "@/utils/config";
+import { safeJsonParse } from "@/utils/safe";
 
 const StompContext = createContext(null);
 
@@ -46,118 +47,118 @@ export const StompProvider = (props) => {
   const tokenRef = useRef(null);
 
   useEffect(() => {
-    const token = getToken();
-    const previousToken = tokenRef.current;
-    tokenRef.current = token;
+    let destroyed = false;
 
-    if (!token) {
-      if (clientRef.current && clientRef.current.connected) {
-        clientRef.current.deactivate();
-        setClient(null);
-        setConnected(false);
+    const disconnect = () => {
+      if (clientRef.current) {
+        try {
+          clientRef.current.deactivate();
+        } catch (e) {}
       }
-      return;
-    }
-
-    const needsReconnect = !clientRef.current ||
-      !clientRef.current.connected ||
-      (previousToken !== token && previousToken !== null);
-
-    if (!needsReconnect && clientRef.current && clientRef.current.connected) {
-      return;
-    }
-
-    if (clientRef.current && clientRef.current.connected) {
-      clientRef.current.deactivate();
+      clientRef.current = null;
       setClient(null);
       setConnected(false);
-    }
+    };
 
-    const disableWebSocket = localStorage.getItem('disable_websocket') === 'true';
-    if (disableWebSocket) {
-      return;
-    }
+    const connect = (token) => {
+      const wsUrl = config.stomp.url;
+      const sockJsUrl = convertWebSocketUrl(wsUrl);
+      const finalWsUrl = `${sockJsUrl}?token=${encodeURIComponent(token)}`;
 
-    const wsUrl = config.stomp.url;
-    const sockJsUrl = convertWebSocketUrl(wsUrl);
-    const finalWsUrl = `${sockJsUrl}?token=${encodeURIComponent(token)}`;
-
-    const stompClient = new Client({
-      webSocketFactory: () => new SockJS(finalWsUrl),
-      connectHeaders: {
-        Authorization: `Bearer ${token}`,
-        'X-Authorization': `Bearer ${token}`,
-      },
-      beforeConnect: () => {},
-      reconnectDelay: config.stomp.options.reconnectDelay,
-      heartbeatIncoming: config.stomp.options.heartbeatIncoming,
-      heartbeatOutgoing: config.stomp.options.heartbeatOutgoing,
-      debug: () => {},
-      onConnect: () => {
-        setConnected(true);
-
-        try {
-          stompClient.subscribe('/user/queue/errors', (error) => {
-            try {
-              const errorData = JSON.parse(error.body);
-              if (errorData.message && isAuthError(errorData.message)) {
+      const stompClient = new Client({
+        webSocketFactory: () => new SockJS(finalWsUrl),
+        connectHeaders: {
+          Authorization: `Bearer ${token}`,
+          'X-Authorization': `Bearer ${token}`,
+        },
+        beforeConnect: () => {},
+        reconnectDelay: config.stomp.options.reconnectDelay,
+        heartbeatIncoming: config.stomp.options.heartbeatIncoming,
+        heartbeatOutgoing: config.stomp.options.heartbeatOutgoing,
+        debug: () => {},
+        onConnect: () => {
+          if (destroyed) return;
+          setConnected(true);
+          try {
+            stompClient.subscribe('/user/queue/errors', (error) => {
+              const errorData = safeJsonParse(error.body);
+              if (errorData?.message && isAuthError(errorData.message)) {
                 handleAuthError();
               }
-            } catch (e) {}
-          });
-        } catch (error) {}
-      },
-      onDisconnect: () => {
-        setConnected(false);
-      },
-      onStompError: (frame) => {
-        try {
-          const errorBody = JSON.parse(frame.body || '{}');
-          if (errorBody.message && isAuthError(errorBody.message)) {
+            });
+          } catch (e) {}
+        },
+        onDisconnect: () => {
+          if (destroyed) return;
+          setConnected(false);
+        },
+        onStompError: (frame) => {
+          const errorBody = safeJsonParse(frame.body || '{}');
+          if (errorBody?.message && isAuthError(errorBody.message)) {
             handleAuthError();
             return;
           }
-        } catch (e) {}
 
-        if (frame.body && isAuthError(frame.body)) {
-          handleAuthError();
-        }
+          if (frame.body && isAuthError(frame.body)) {
+            handleAuthError();
+          }
 
-        setConnected(false);
-      },
-      onWebSocketError: () => {
-        setConnected(false);
-      },
-      onWebSocketClose: () => {
-        setConnected(false);
-      },
-    });
+          if (!destroyed) {
+            setConnected(false);
+          }
+        },
+        onWebSocketError: () => {
+          if (!destroyed) {
+            setConnected(false);
+          }
+        },
+        onWebSocketClose: () => {
+          if (!destroyed) {
+            setConnected(false);
+          }
+        },
+      });
 
-    clientRef.current = stompClient;
-    setClient(stompClient);
-    stompClient.activate();
+      clientRef.current = stompClient;
+      setClient(stompClient);
+      stompClient.activate();
+    };
+
+    const ensureConnection = () => {
+      const disableWebSocket = typeof window !== 'undefined' && localStorage.getItem('disable_websocket') === 'true';
+      if (disableWebSocket) {
+        disconnect();
+        tokenRef.current = getToken();
+        return;
+      }
+
+      const token = getToken();
+
+      if (!token) {
+        tokenRef.current = null;
+        disconnect();
+        return;
+      }
+
+      if (tokenRef.current !== token) {
+        tokenRef.current = token;
+        disconnect();
+      }
+
+      if (!clientRef.current) {
+        connect(tokenRef.current);
+      }
+    };
+
+    ensureConnection();
+    const interval = setInterval(ensureConnection, 1000);
 
     return () => {
-      if (stompClient && stompClient.connected) {
-        stompClient.deactivate();
-      }
+      destroyed = true;
+      clearInterval(interval);
+      disconnect();
     };
   }, []);
-
-  useEffect(() => {
-    const checkTokenAndReconnect = () => {
-      const currentToken = getToken();
-      const hasClient = clientRef.current;
-      const isConnected = hasClient && hasClient.connected;
-
-      if (currentToken && !isConnected && hasClient) {
-        hasClient.deactivate();
-      }
-    };
-
-    const interval = setInterval(checkTokenAndReconnect, 2000);
-    return () => clearInterval(interval);
-  }, [connected]);
 
   return (
     <StompContext.Provider value={{ client, connected }}>

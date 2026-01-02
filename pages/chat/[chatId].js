@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { ArrowLeft, Send, Loader2, Menu, Check, CheckCheck, AlertCircle, Clock } from 'lucide-react';
+import { Send, Loader2, Menu, Check, CheckCheck, AlertCircle, Clock } from 'lucide-react';
 import { chatAPI, getCurrentUser, isAuthenticated } from '@/utils/api';
 import { useStomp } from '@/context/socket';
 import { getChatName } from '@/utils/chatHelpers';
@@ -9,6 +9,7 @@ import { useMessageSender } from '@/hooks/useMessageSender';
 import { MESSAGE_STATUS } from '@/utils/messageQueue';
 import ChatSidebar from '@/component/ChatSidebar';
 import styles from '@/styles/chat.module.css';
+import { safeJsonParse, safeUnsubscribe } from '@/utils/safe';
 
 const DUPLICATE_WINDOW_MS = 5000;
 
@@ -55,25 +56,22 @@ export default function ChatPage() {
     if (!chatId || !client || !connected || !client.connected || !client.active) return;
 
     if (subscriptionRef.current) {
-      try {
-        subscriptionRef.current.unsubscribe();
-      } catch (error) {}
+      safeUnsubscribe(subscriptionRef.current);
       subscriptionRef.current = null;
     }
 
     try {
       const sub = client.subscribe('/user/queue/messages', (message) => {
-        try {
-          const messageDto = JSON.parse(message.body);
-          if (Number(messageDto.chatId) !== Number(chatId)) return;
-          if (user && Number(messageDto.senderId) === Number(user.id)) return;
+        const messageDto = safeJsonParse(message.body);
+        if (!messageDto) return;
+        if (Number(messageDto.chatId) !== Number(chatId)) return;
+        if (user && Number(messageDto.senderId) === Number(user.id)) return;
 
-          setMessages(prev => {
-            if (prev.some(m => Number(m.id) === Number(messageDto.id))) return prev;
-            if (prev.some(m => isDuplicate(m, messageDto))) return prev;
-            return [...prev, { ...messageDto, status: MESSAGE_STATUS.SENT, isOptimistic: false }];
-          });
-        } catch (error) {}
+        setMessages(prev => {
+          if (prev.some(m => Number(m.id) === Number(messageDto.id))) return prev;
+          if (prev.some(m => isDuplicate(m, messageDto))) return prev;
+          return [...prev, { ...messageDto, status: MESSAGE_STATUS.SENT, isOptimistic: false }];
+        });
       });
 
       subscriptionRef.current = sub;
@@ -81,9 +79,7 @@ export default function ChatPage() {
 
     return () => {
       if (subscriptionRef.current) {
-        try {
-          subscriptionRef.current.unsubscribe();
-        } catch (error) {}
+        safeUnsubscribe(subscriptionRef.current);
         subscriptionRef.current = null;
       }
     };

@@ -2,13 +2,6 @@ import { useState, useEffect } from 'react';
 import { X, Bell, Radio } from 'lucide-react';
 import styles from '@/component/PagerNotification/index.module.css';
 
-/**
- * Компонент уведомлений в виде пейджера
- * @param {Object} props
- * @param {Array} props.notifications - Массив уведомлений
- * @param {Function} props.onNotificationClick - Обработчик клика по уведомлению
- * @param {Function} props.onDismiss - Обработчик закрытия уведомления
- */
 export default function PagerNotification({ 
   notifications = [], 
   onNotificationClick,

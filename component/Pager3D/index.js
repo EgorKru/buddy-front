@@ -1,13 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import styles from '@/component/Pager3D/index.module.css';
 
-/**
- * Интерактивный 3D пейджер
- * @param {Object} props
- * @param {number} props.size - Размер пейджера (по умолчанию 90)
- * @param {boolean} props.interactive - Включить интерактивность (по умолчанию true)
- * @param {string} props.className - Дополнительные CSS классы
- */
 export default function Pager3D({ size = 90, interactive = true, className = '' }) {
   const [rotation, setRotation] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -98,9 +91,7 @@ export default function Pager3D({ size = 90, interactive = true, className = '' 
         }}
         onMouseDown={handleMouseDown}
       >
-        {/* Основной корпус */}
         <div className={styles.pagerBody}>
-          {/* Экран */}
           <div className={styles.screen}>
             <div className={styles.screenContent}>
               <div className={styles.screenLine}>PAGER</div>
@@ -108,24 +99,20 @@ export default function Pager3D({ size = 90, interactive = true, className = '' 
             </div>
           </div>
           
-          {/* Кнопки */}
           <div className={styles.buttons}>
             <div className={styles.button}></div>
             <div className={styles.button}></div>
             <div className={styles.button}></div>
           </div>
           
-          {/* Антенна */}
           <div className={styles.antenna}>
             <div className={styles.antennaBase}></div>
             <div className={styles.antennaTop}></div>
           </div>
           
-          {/* Светодиод */}
           <div className={styles.led}></div>
         </div>
         
-        {/* Тени и блики */}
         <div className={styles.shine}></div>
       </div>
     </div>

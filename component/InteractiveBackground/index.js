@@ -17,7 +17,7 @@ const InteractiveBackground = () => {
     const resizeCanvas = () => {
       canvas.width = window.innerWidth * dpr;
       canvas.height = window.innerHeight * dpr;
-      ctx.scale(dpr, dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       canvas.style.width = window.innerWidth + 'px';
       canvas.style.height = window.innerHeight + 'px';
     };
@@ -25,7 +25,6 @@ const InteractiveBackground = () => {
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
-    // Создаем частицы - больше для большей интерактивности
     const particleCount = 150;
     particlesRef.current = [];
 
@@ -56,34 +55,28 @@ const InteractiveBackground = () => {
         this.y += this.speedY;
         this.pulse += this.pulseSpeed;
 
-        // Сохраняем след
         this.trail.push({ x: this.x, y: this.y });
         if (this.trail.length > this.maxTrailLength) {
           this.trail.shift();
         }
 
-        // Отталкивание от мыши - более сильное
         const dx = mouseRef.current.x - this.x;
         const dy = mouseRef.current.y - this.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
         const maxDistance = 200;
-        const minDistance = 50;
 
         if (distance < maxDistance && distance > 0) {
           const force = (maxDistance - distance) / maxDistance;
           const angle = Math.atan2(dy, dx);
           
-          // Более сильное отталкивание
           this.x -= Math.cos(angle) * force * 4;
           this.y -= Math.sin(angle) * force * 4;
           
-          // Увеличиваем непрозрачность при приближении мыши
           this.opacity = Math.min(1, this.baseOpacity + force * 0.5);
         } else {
           this.opacity = this.baseOpacity;
         }
 
-        // Притяжение к другим частицам (слабое)
         particlesRef.current.forEach(other => {
           if (other === this) return;
           const dx = other.x - this.x;
@@ -98,7 +91,6 @@ const InteractiveBackground = () => {
           }
         });
 
-        // Ограничение скорости
         const maxSpeed = 2;
         const speed = Math.sqrt(this.speedX * this.speedX + this.speedY * this.speedY);
         if (speed > maxSpeed) {
@@ -106,7 +98,6 @@ const InteractiveBackground = () => {
           this.speedY = (this.speedY / speed) * maxSpeed;
         }
 
-        // Границы с отскоком
         if (this.x < 0 || this.x > canvas.width / dpr) {
           this.speedX *= -0.8;
           this.x = Math.max(0, Math.min(canvas.width / dpr, this.x));
@@ -118,7 +109,6 @@ const InteractiveBackground = () => {
       }
 
       draw() {
-        // Рисуем след
         this.trail.forEach((point, index) => {
           const trailOpacity = (index / this.trail.length) * this.opacity * 0.3;
           ctx.beginPath();
@@ -127,7 +117,6 @@ const InteractiveBackground = () => {
           ctx.fill();
         });
 
-        // Рисуем саму частицу
         const size = this.size + Math.sin(this.pulse) * 1;
         const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, size);
         gradient.addColorStop(0, this.color.replace(/[\d\.]+\)$/g, `${this.opacity})`));
@@ -139,7 +128,6 @@ const InteractiveBackground = () => {
         ctx.fillStyle = gradient;
         ctx.fill();
         
-        // Свечение
         ctx.shadowBlur = 20;
         ctx.shadowColor = this.color;
         ctx.fill();
@@ -147,12 +135,10 @@ const InteractiveBackground = () => {
       }
     }
 
-    // Инициализация частиц
     for (let i = 0; i < particleCount; i++) {
       particlesRef.current.push(new Particle());
     }
 
-    // Обработка движения мыши
     const handleMouseMove = (e) => {
       mouseRef.current.x = e.clientX;
       mouseRef.current.y = e.clientY;
@@ -160,11 +146,9 @@ const InteractiveBackground = () => {
 
     window.addEventListener('mousemove', handleMouseMove);
 
-    // Анимация
     const animate = () => {
       ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
       
-      // Рисуем связи между близкими частицами - более яркие и частые
       for (let i = 0; i < particlesRef.current.length; i++) {
         for (let j = i + 1; j < particlesRef.current.length; j++) {
           const dx = particlesRef.current[i].x - particlesRef.current[j].x;
@@ -192,17 +176,14 @@ const InteractiveBackground = () => {
         }
       }
 
-      // Обновляем и рисуем частицы
       particlesRef.current.forEach(particle => {
         particle.update();
       });
 
-      // Рисуем частицы после обновления
       particlesRef.current.forEach(particle => {
         particle.draw();
       });
 
-      // Связь с курсором - более яркая и заметная
       particlesRef.current.forEach(particle => {
         const dx = mouseRef.current.x - particle.x;
         const dy = mouseRef.current.y - particle.y;
@@ -226,7 +207,6 @@ const InteractiveBackground = () => {
           ctx.lineTo(particle.x, particle.y);
           ctx.stroke();
           
-          // Добавляем свечение вокруг курсора
           if (distance < 80) {
             const glowSize = (80 - distance) / 80 * 30;
             const glowGradient = ctx.createRadialGradient(

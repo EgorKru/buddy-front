@@ -1,72 +1,47 @@
-import { useState, useEffect, useRef } from "react";
-import { useSocket } from "@/context/socket";
-import { useRouter } from "next/router";
+import { useState, useEffect, useRef } from 'react';
+import { useSocket } from '@/context/socket';
+import { useRouter } from 'next/router';
 
 const usePeer = () => {
-    const socket = useSocket()
-    const roomId = useRouter().query.roomId;
-    const [peer, setPeer] = useState(null)
-    const [myId, setMyId] = useState('')
-    const isPeerSet = useRef(false)
+  const socket = useSocket();
+  const { roomId } = useRouter().query;
+  const [peer, setPeer] = useState(null);
+  const [myId, setMyId] = useState('');
+  const isPeerSet = useRef(false);
+  const peerRef = useRef(null);
 
-    useEffect(() => {
-        if (isPeerSet.current || !roomId || !socket) return;
-        isPeerSet.current = true;
-        let myPeer;
-        (async function initPeer() {
-            try {
-                const Peer = (await import('peerjs')).default
-                myPeer = new Peer()
-                setPeer(myPeer)
+  useEffect(() => {
+    if (isPeerSet.current || !roomId || !socket) return;
+    isPeerSet.current = true;
 
-                myPeer.on('open', (id) => {
-                    if (process.env.NODE_ENV === 'development') {
-                        console.log(`your peer id is ${id}`);
-                    }
-                    setMyId(id);
-                    socket?.emit('join-room', roomId, id);
-                });
+    let active = true;
 
-                myPeer.on('error', (err) => {
-                    console.error('Peer error:', err);
-                });
+    (async () => {
+      try {
+        const Peer = (await import('peerjs')).default;
+        const myPeer = new Peer();
+        peerRef.current = myPeer;
+        if (!active) return;
+        setPeer(myPeer);
 
-                myPeer.on('disconnected', () => {
-                    if (process.env.NODE_ENV === 'development') {
-                        console.log('Peer disconnected');
-                    }
-                });
+        myPeer.on('open', (id) => {
+          setMyId(id);
+          socket?.emit('join-room', roomId, id);
+        });
+      } catch (e) {}
+    })();
 
-                myPeer.on('close', () => {
-                    if (process.env.NODE_ENV === 'development') {
-                        console.log('Peer connection closed');
-                    }
-                });
-            } catch (err) {
-                console.error('Failed to initialize Peer:', err)
-            }
-        })()
-        
-        return () => {
-            if (myPeer && !myPeer.destroyed) {
-                myPeer.destroy()
-            }
-        }
-    }, [roomId, socket])
+    return () => {
+      active = false;
+      const p = peerRef.current;
+      if (p && !p.destroyed) {
+        p.destroy();
+      }
+      peerRef.current = null;
+    };
+  }, [roomId, socket]);
 
-    // Отдельный эффект для очистки при размонтировании
-    useEffect(() => {
-        return () => {
-            if (peer && !peer.destroyed) {
-                peer.destroy()
-            }
-        }
-    }, [peer])
-
-    return {
-        peer,
-        myId
-    }
-}
+  return { peer, myId };
+};
 
 export default usePeer;

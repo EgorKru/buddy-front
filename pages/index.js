@@ -25,7 +25,6 @@ export default function Home() {
       if (currentUser) {
         setUser(currentUser);
       } else {
-        // Если есть токен, но нет пользователя, всё равно редиректим на логин
         router.push('/login');
       }
     };
@@ -46,7 +45,7 @@ export default function Home() {
     }
   }
 
-  const handleKeyPress = (e) => {
+  const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
       joinRoom();
     }
@@ -97,7 +96,7 @@ export default function Home() {
   return (
     <div className={styles.homeContainer}>
       <ChatSidebar 
-        isOpen={true} 
+        isOpen={sidebarOpen} 
         onClose={() => setSidebarOpen(false)}
         currentChatId={null}
       />
@@ -134,7 +133,7 @@ export default function Home() {
               placeholder='Введите ID комнаты' 
               value={roomId} 
               onChange={(e) => setRoomId(e?.target?.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyDown}
             />
             <button onClick={joinRoom}>Войти в комнату</button>
           </div>

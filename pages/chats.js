@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import Image from 'next/image';
 import { MessageCircle, Search, ArrowLeft, Plus, X, UserPlus, Loader2 } from 'lucide-react';
 import { chatAPI, getCurrentUser, isAuthenticated } from '@/utils/api';
 import { useCreateChat } from '@/hooks/useCreateChat';
@@ -25,7 +26,6 @@ export default function Chats() {
     loadChats();
   }, [router]);
 
-  // Закрываем результаты поиска при клике вне области
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (createChat.showSearchResults && createChat.searchInputRef.current && !createChat.searchInputRef.current.contains(event.target)) {
@@ -47,7 +47,6 @@ export default function Chats() {
       const data = await chatAPI.getChats();
       setChats(data);
     } catch (error) {
-      console.error('Ошибка загрузки чатов:', error);
     } finally {
       setLoading(false);
     }
@@ -61,7 +60,6 @@ export default function Chats() {
         handleCloseModal();
       });
     } catch (error) {
-      // Ошибка уже обработана в хуке
     }
   };
 
@@ -133,8 +131,7 @@ export default function Chats() {
             >
               <div className={styles.chatAvatar}>
                 {getChatAvatar(chat, user) ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={getChatAvatar(chat, user)} alt="" />
+                  <Image src={getChatAvatar(chat, user)} alt="" width={32} height={32} unoptimized />
                 ) : (
                   <MessageCircle size={24} />
                 )}
@@ -247,8 +244,7 @@ export default function Chats() {
                         >
                           <div className={styles.searchResultAvatar}>
                             {user.avatarUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={user.avatarUrl} alt="" />
+                              <Image src={user.avatarUrl} alt="" width={32} height={32} unoptimized />
                             ) : (
                               <div className={styles.searchResultAvatarPlaceholder}>
                                 {user.displayName?.[0] || user.username?.[0] || '?'}

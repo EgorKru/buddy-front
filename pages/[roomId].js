@@ -43,12 +43,9 @@ const Room = () => {
   useEffect(() => {
     if (!socket || !peer || !stream) return;
     const handleUserConnected = (newUser) => {
-      console.log(`user connected in room with userId ${newUser}`);
-
       const call = peer.call(newUser, stream);
 
       call.on("stream", (incomingStream) => {
-        console.log(`incoming stream from ${newUser}`);
         setPlayers((prev) => ({
           ...prev,
           [newUser]: {
@@ -70,7 +67,7 @@ const Room = () => {
       });
 
       call.on("error", (err) => {
-        console.error("Call error:", err);
+        return;
       });
     };
     socket.on("user-connected", handleUserConnected);
@@ -83,7 +80,6 @@ const Room = () => {
   useEffect(() => {
     if (!socket) return;
     const handleToggleAudio = (userId) => {
-      console.log(`user with id ${userId} toggled audio`);
       setPlayers((prev) => {
         if (!prev[userId]) return prev;
         return {
@@ -97,7 +93,6 @@ const Room = () => {
     };
 
     const handleToggleVideo = (userId) => {
-      console.log(`user with id ${userId} toggled video`);
       setPlayers((prev) => {
         if (!prev[userId]) return prev;
         return {
@@ -111,10 +106,11 @@ const Room = () => {
     };
 
     const handleUserLeave = (userId) => {
-      console.log(`user ${userId} is leaving the room`);
       setUsers((prev) => {
         if (prev[userId]) {
-          prev[userId].close();
+          try {
+            prev[userId].close();
+          } catch (e) {}
           const newUsers = { ...prev };
           delete newUsers[userId];
           return newUsers;
@@ -135,7 +131,7 @@ const Room = () => {
       socket.off("user-toggle-video", handleToggleVideo);
       socket.off("user-leave", handleUserLeave);
     };
-  }, [players, setPlayers, socket, users]);
+  }, [setPlayers, socket]);
 
   useEffect(() => {
     if (!peer || !stream) return;
@@ -145,7 +141,6 @@ const Room = () => {
       call.answer(stream);
 
       call.on("stream", (incomingStream) => {
-        console.log(`incoming stream from ${callerId}`);
         setPlayers((prev) => ({
           ...prev,
           [callerId]: {
@@ -167,7 +162,7 @@ const Room = () => {
       });
 
       call.on("error", (err) => {
-        console.error("Call error:", err);
+        return;
       });
     };
 
@@ -180,7 +175,6 @@ const Room = () => {
 
   useEffect(() => {
     if (!stream || !myId) return;
-    console.log(`setting my stream ${myId}`);
     setPlayers((prev) => ({
       ...prev,
       [myId]: {
@@ -195,14 +189,13 @@ const Room = () => {
     }));
   }, [myId, setPlayers, stream, currentUserName]);
 
-  // Очистка ресурсов при размонтировании
   useEffect(() => {
     return () => {
-      // Закрываем все активные звонки
       Object.values(users).forEach(call => {
-        call.close();
+        try {
+          call.close();
+        } catch (e) {}
       });
-      // Останавливаем медиа-поток
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
