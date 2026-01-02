@@ -48,6 +48,7 @@ export const useChats = () => {
     markChatAsRead: async () => {},
     readReceiptsByChatId: {},
     bumpChatLastMessage: () => {},
+    upsertReadReceipt: () => {},
   };
 };
 
@@ -65,19 +66,55 @@ export const ChatsProvider = ({ children }) => {
   const lastSoundAtRef = useRef(0);
   const processedNotificationMessageIdsRef = useRef(new Set());
   const processedCleanupRef = useRef(null);
+  const pendingByChatIdRef = useRef(new Map());
+  const pendingCleanupRef = useRef(null);
 
   const refreshChats = useCallback(async () => {
     setLoading(true);
     try {
       const data = await chatAPI.getChats();
       const list = Array.isArray(data) ? data : [];
+      const currentUser = getCurrentUser();
+      const isVisible = typeof document !== 'undefined' && document.visibilityState === 'visible';
+      const activeId = activeChatId ? String(activeChatId) : null;
+
+      const pending = pendingByChatIdRef.current;
+      if (pending.size > 0) {
+        for (const chat of list) {
+          const cid = String(chat?.id);
+          const byMessageId = pending.get(cid);
+          if (!byMessageId || byMessageId.size === 0) continue;
+
+          const messages = Array.from(byMessageId.values())
+            .filter(m => m?.id != null)
+            .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+          for (const msg of messages) {
+            const messageId = String(msg.id);
+            if (processedNotificationMessageIdsRef.current.has(messageId)) continue;
+
+            const isOwn = currentUser?.id && msg?.senderId && Number(currentUser.id) === Number(msg.senderId);
+            const isActive = activeId && activeId === cid;
+            const unreadInc = isOwn ? 0 : (isActive && isVisible ? 0 : 1);
+
+            chat.lastMessage = { ...(chat.lastMessage || {}), ...msg };
+            chat.updatedAt = toIso(msg.createdAt) || chat.updatedAt;
+            chat.unreadCount = Math.max(0, Number(chat.unreadCount || 0) + unreadInc);
+
+            processedNotificationMessageIdsRef.current.add(messageId);
+          }
+
+          pending.delete(cid);
+        }
+      }
+
       setChats(sortChatsByLastActivity(list));
     } catch (e) {
       setChats([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeChatId]);
 
   const refreshChatsThrottled = useCallback(async () => {
     const now = Date.now();
@@ -141,10 +178,6 @@ export const ChatsProvider = ({ children }) => {
     const currentUser = getCurrentUser();
     const isOwnMessage = currentUser?.id && message?.senderId && Number(currentUser.id) === Number(message.senderId);
     const messageId = message?.id != null ? String(message.id) : null;
-    if (messageId) {
-      if (processedNotificationMessageIdsRef.current.has(messageId)) return;
-      processedNotificationMessageIdsRef.current.add(messageId);
-    }
     const nextLastMessage = {
       ...(message?.id ? { id: message.id } : null),
       ...(message?.senderId ? { senderId: message.senderId } : null),
@@ -162,8 +195,30 @@ export const ChatsProvider = ({ children }) => {
     setChats(prev => {
       const idx = prev.findIndex(c => String(c.id) === String(chatId));
       if (idx === -1) {
+        if (messageId) {
+          const cid = String(chatId);
+          const byMessageId = pendingByChatIdRef.current.get(cid) || new Map();
+          if (!byMessageId.has(messageId) && !processedNotificationMessageIdsRef.current.has(messageId)) {
+            byMessageId.set(messageId, {
+              id: message?.id,
+              chatId: message?.chatId || chatId,
+              senderId: message?.senderId,
+              senderUsername: message?.senderUsername,
+              senderDisplayName: message?.senderDisplayName,
+              content: message?.content,
+              type: message?.type,
+              createdAt: message?.createdAt || notification?.createdAt || new Date().toISOString(),
+            });
+            pendingByChatIdRef.current.set(cid, byMessageId);
+          }
+        }
         refreshChatsThrottled();
         return prev;
+      }
+
+      if (messageId) {
+        if (processedNotificationMessageIdsRef.current.has(messageId)) return prev;
+        processedNotificationMessageIdsRef.current.add(messageId);
       }
 
       const current = prev[idx];
@@ -213,6 +268,20 @@ export const ChatsProvider = ({ children }) => {
       if (processedCleanupRef.current) {
         clearInterval(processedCleanupRef.current);
         processedCleanupRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    pendingCleanupRef.current = setInterval(() => {
+      if (pendingByChatIdRef.current.size > 200) {
+        pendingByChatIdRef.current.clear();
+      }
+    }, 10 * 60 * 1000);
+    return () => {
+      if (pendingCleanupRef.current) {
+        clearInterval(pendingCleanupRef.current);
+        pendingCleanupRef.current = null;
       }
     };
   }, []);
@@ -359,8 +428,9 @@ export const ChatsProvider = ({ children }) => {
       markChatAsRead,
       readReceiptsByChatId,
       bumpChatLastMessage,
+      upsertReadReceipt,
     };
-  }, [chats, loading, refreshChats, activeChatId, setActiveChatId, markChatAsRead, readReceiptsByChatId, bumpChatLastMessage]);
+  }, [chats, loading, refreshChats, activeChatId, setActiveChatId, markChatAsRead, readReceiptsByChatId, bumpChatLastMessage, upsertReadReceipt]);
 
   return (
     <ChatsContext.Provider value={value}>

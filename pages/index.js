@@ -4,8 +4,6 @@ import { useEffect, useState } from 'react';
 
 import styles from '@/styles/home.module.css'
 import { isAuthenticated, getCurrentUser, authAPI } from '@/utils/api';
-import PagerNotification from '@/component/PagerNotification';
-import { useNotifications } from '@/hooks/useNotifications';
 import ChatSidebar from '@/component/ChatSidebar';
 
 export default function Home() {
@@ -13,7 +11,6 @@ export default function Home() {
   const [roomId, setRoomId] = useState('')
   const [user, setUser] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const { notifications, markAsRead, dismissNotification } = useNotifications();
 
   useEffect(() => {
     const checkAuth = () => {
@@ -145,17 +142,6 @@ export default function Home() {
           </button>
         </div>
       </div>
-      
-      <PagerNotification
-        notifications={notifications}
-        onNotificationClick={(notification) => {
-          markAsRead(notification.id);
-          if (notification.chatId) {
-            router.push(`/chat/${notification.chatId}`);
-          }
-        }}
-        onDismiss={dismissNotification}
-      />
     </div>
   )
 }

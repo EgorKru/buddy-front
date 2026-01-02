@@ -28,7 +28,7 @@ export default function ChatPage() {
   const { chatId } = router.query;
   const { client, connected } = useStomp();
   const user = getCurrentUser();
-  const { setActiveChatId, markChatAsRead, readReceiptsByChatId, bumpChatLastMessage } = useChats();
+  const { setActiveChatId, markChatAsRead, readReceiptsByChatId, bumpChatLastMessage, upsertReadReceipt } = useChats();
 
   const [chat, setChat] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -42,6 +42,7 @@ export default function ChatPage() {
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const subscriptionRef = useRef(null);
+  const readSubscriptionRef = useRef(null);
 
   const loadChat = useCallback(async () => {
     if (!chatId) return;
@@ -154,6 +155,31 @@ export default function ChatPage() {
       }
     };
   }, [chatId, client, connected, user, markChatAsRead]);
+
+  useEffect(() => {
+    if (!chatId || !client || !connected || !client.connected || !client.active) return;
+
+    if (readSubscriptionRef.current) {
+      safeUnsubscribe(readSubscriptionRef.current);
+      readSubscriptionRef.current = null;
+    }
+
+    try {
+      const sub = client.subscribe(`/topic/chat/${chatId}/read`, (message) => {
+        const event = safeJsonParse(message.body);
+        if (!event?.chatId || !event?.readerId || !event?.readAt) return;
+        upsertReadReceipt(event.chatId, event.readerId, event.readAt);
+      });
+      readSubscriptionRef.current = sub;
+    } catch (e) {}
+
+    return () => {
+      if (readSubscriptionRef.current) {
+        safeUnsubscribe(readSubscriptionRef.current);
+        readSubscriptionRef.current = null;
+      }
+    };
+  }, [chatId, client, connected, upsertReadReceipt]);
 
   useEffect(() => {
     scrollToBottom();
