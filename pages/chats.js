@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
-import { MessageCircle, Search, ArrowLeft, Plus, X, UserPlus, Loader2 } from 'lucide-react';
+import { MessageCircle, Search, ArrowLeft, Plus, X, Loader2, Check, CheckCheck, UserPlus } from 'lucide-react';
 import { getCurrentUser, isAuthenticated } from '@/utils/api';
 import { useCreateChat } from '@/hooks/useCreateChat';
 import { getChatName, getChatAvatar } from '@/utils/chatHelpers';
@@ -12,7 +12,7 @@ import { useChats } from '@/context/chats';
 export default function Chats() {
   const router = useRouter();
   const user = getCurrentUser();
-  const { chats, loading, refreshChats } = useChats();
+  const { chats, loading, refreshChats, readReceiptsByChatId } = useChats();
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   
@@ -69,6 +69,29 @@ export default function Chats() {
       )
     );
   });
+
+  const getLastMessageReadMeta = (chat) => {
+    const lastMessage = chat?.lastMessage;
+    if (!lastMessage?.createdAt || !user?.id) return { isRead: false, readCount: 0, totalOthers: 0 };
+
+    const chatReadMap = readReceiptsByChatId?.[String(chat.id)] || {};
+    const msgTime = new Date(lastMessage.createdAt).getTime();
+    if (Number.isNaN(msgTime)) return { isRead: false, readCount: 0, totalOthers: 0 };
+
+    const participantIds = Array.isArray(chat?.participants)
+      ? chat.participants.map(p => Number(p?.id)).filter(n => Number.isFinite(n))
+      : [];
+    const uniqueParticipantIds = Array.from(new Set(participantIds));
+    const totalOthers = Math.max(0, (uniqueParticipantIds.length || 0) - 1);
+
+    const otherReaders = Object.entries(chatReadMap)
+      .filter(([rid]) => Number(rid) !== Number(user.id))
+      .map(([, readAt]) => new Date(readAt).getTime())
+      .filter(t => !Number.isNaN(t));
+
+    const readCount = otherReaders.reduce((acc, readAtTime) => (readAtTime >= msgTime ? acc + 1 : acc), 0);
+    return { isRead: readCount > 0, readCount, totalOthers };
+  };
 
   if (loading) {
     return (
@@ -138,7 +161,20 @@ export default function Chats() {
                 {chat.lastMessage && (
                   <div className={styles.lastMessage}>
                     <span className={styles.lastMessageSender}>
-                      {chat.lastMessage.senderDisplayName || chat.lastMessage.senderUsername}:
+                      {Number(chat.lastMessage.senderId) === Number(user?.id) ? (
+                        <span title={(() => {
+                          const meta = getLastMessageReadMeta(chat);
+                          if (!meta.readCount) return 'Отправлено';
+                          return meta.totalOthers > 1 ? `Прочитали ${meta.readCount}/${meta.totalOthers}` : 'Прочитано';
+                        })()} style={{ display: 'inline-flex', alignItems: 'center', marginRight: 6 }}>
+                          {(() => {
+                            const meta = getLastMessageReadMeta(chat);
+                            return meta.isRead ? <CheckCheck size={14} /> : <Check size={14} />;
+                          })()}
+                        </span>
+                      ) : (
+                        `${chat.lastMessage.senderDisplayName || chat.lastMessage.senderUsername}:`
+                      )}
                     </span>
                     <span className={styles.lastMessageText}>
                       {chat.lastMessage.content.substring(0, 50)}

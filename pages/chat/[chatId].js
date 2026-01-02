@@ -28,7 +28,7 @@ export default function ChatPage() {
   const { chatId } = router.query;
   const { client, connected } = useStomp();
   const user = getCurrentUser();
-  const { setActiveChatId, markChatAsRead } = useChats();
+  const { setActiveChatId, markChatAsRead, readReceiptsByChatId } = useChats();
 
   const [chat, setChat] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -260,12 +260,39 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const getMessageStatusIcon = (status) => {
+  const getReadMetaForMessage = useCallback((msg) => {
+    if (!chatId || !msg?.createdAt || !user?.id) return { isRead: false, readCount: 0, totalOthers: 0 };
+
+    const chatReadMap = readReceiptsByChatId?.[String(chatId)] || {};
+    const msgTime = new Date(msg.createdAt).getTime();
+    if (Number.isNaN(msgTime)) return { isRead: false, readCount: 0, totalOthers: 0 };
+
+    const participantIds = Array.isArray(chat?.participants)
+      ? chat.participants.map(p => Number(p?.id)).filter(n => Number.isFinite(n))
+      : [];
+
+    const uniqueParticipantIds = Array.from(new Set(participantIds));
+    const totalOthers = Math.max(0, (uniqueParticipantIds.length || 0) - 1);
+
+    const otherReaders = Object.entries(chatReadMap)
+      .filter(([rid]) => Number(rid) !== Number(user.id))
+      .map(([, readAt]) => new Date(readAt).getTime())
+      .filter(t => !Number.isNaN(t));
+
+    const readCount = otherReaders.reduce((acc, readAtTime) => (readAtTime >= msgTime ? acc + 1 : acc), 0);
+    const isRead = readCount > 0;
+
+    return { isRead, readCount, totalOthers };
+  }, [chatId, chat?.participants, readReceiptsByChatId, user?.id]);
+
+  const getMessageStatusIcon = (status, readMeta) => {
+    const isRead = !!readMeta?.isRead;
     switch (status) {
       case MESSAGE_STATUS.SENDING:
       case MESSAGE_STATUS.PENDING:
         return <Clock size={14} className={styles.statusIcon} />;
       case MESSAGE_STATUS.SENT:
+        if (isRead) return <CheckCheck size={14} className={styles.statusIcon} />;
         return <Check size={14} className={styles.statusIcon} />;
       case MESSAGE_STATUS.DELIVERED:
         return <CheckCheck size={14} className={styles.statusIcon} />;
@@ -374,7 +401,18 @@ export default function ChatPage() {
                         <span className={styles.messageTime}>
                           {formatChatTime(msg.createdAt)}
                         </span>
-                        {getMessageStatusIcon(msg.status || (msg.isOptimistic ? MESSAGE_STATUS.SENDING : MESSAGE_STATUS.SENT))}
+                        {(() => {
+                          const status = msg.status || (msg.isOptimistic ? MESSAGE_STATUS.SENDING : MESSAGE_STATUS.SENT);
+                          const readMeta = status === MESSAGE_STATUS.SENT ? getReadMetaForMessage(msg) : null;
+                          const title = readMeta?.readCount
+                            ? (readMeta.totalOthers > 1 ? `Прочитали ${readMeta.readCount}/${readMeta.totalOthers}` : 'Прочитано')
+                            : 'Отправлено';
+                          return (
+                            <span title={title}>
+                              {getMessageStatusIcon(status, readMeta)}
+                            </span>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>

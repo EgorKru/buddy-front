@@ -38,6 +38,7 @@ export const useChats = () => {
     activeChatId: null,
     setActiveChatId: () => {},
     markChatAsRead: async () => {},
+    readReceiptsByChatId: {},
   };
 };
 
@@ -46,7 +47,9 @@ export const ChatsProvider = ({ children }) => {
   const [chats, setChats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeChatId, setActiveChatIdState] = useState(null);
+  const [readReceiptsByChatId, setReadReceiptsByChatId] = useState({});
   const subscriptionRef = useRef(null);
+  const readSubscriptionsRef = useRef(new Map());
   const lastReadAtRef = useRef(new Map());
 
   const refreshChats = useCallback(async () => {
@@ -85,6 +88,28 @@ export const ChatsProvider = ({ children }) => {
     try {
       await chatAPI.markChatAsRead(key);
     } catch (e) {}
+  }, []);
+
+  const upsertReadReceipt = useCallback((chatId, readerId, readAt) => {
+    const cid = String(chatId);
+    const rid = String(readerId);
+    const iso = toIso(readAt);
+    if (!cid || !rid || !iso) return;
+
+    setReadReceiptsByChatId(prev => {
+      const currentChatMap = prev[cid] || {};
+      const existing = currentChatMap[rid];
+      if (existing && new Date(existing).getTime() >= new Date(iso).getTime()) {
+        return prev;
+      }
+      return {
+        ...prev,
+        [cid]: {
+          ...currentChatMap,
+          [rid]: iso,
+        },
+      };
+    });
   }, []);
 
   const handleNotification = useCallback((notification) => {
@@ -161,6 +186,42 @@ export const ChatsProvider = ({ children }) => {
   }, [client, connected, handleNotification]);
 
   useEffect(() => {
+    if (!client || !connected || !client.connected || !client.active) return;
+
+    const nextChatIds = new Set(chats.map(c => String(c.id)));
+
+    for (const [chatId, sub] of readSubscriptionsRef.current.entries()) {
+      if (!nextChatIds.has(chatId)) {
+        safeUnsubscribe(sub);
+        readSubscriptionsRef.current.delete(chatId);
+      }
+    }
+
+    for (const chatId of nextChatIds) {
+      if (readSubscriptionsRef.current.has(chatId)) continue;
+      try {
+        const sub = client.subscribe(`/topic/chat/${chatId}/read`, (message) => {
+          const event = safeJsonParse(message.body);
+          if (!event?.chatId || !event?.readerId || !event?.readAt) return;
+          upsertReadReceipt(event.chatId, event.readerId, event.readAt);
+        });
+        readSubscriptionsRef.current.set(chatId, sub);
+      } catch (e) {}
+    }
+
+    return () => {};
+  }, [client, connected, chats, upsertReadReceipt]);
+
+  useEffect(() => {
+    return () => {
+      for (const sub of readSubscriptionsRef.current.values()) {
+        safeUnsubscribe(sub);
+      }
+      readSubscriptionsRef.current.clear();
+    };
+  }, []);
+
+  useEffect(() => {
     if (!activeChatId) return;
 
     const tryMarkRead = () => {
@@ -186,8 +247,9 @@ export const ChatsProvider = ({ children }) => {
       activeChatId,
       setActiveChatId,
       markChatAsRead,
+      readReceiptsByChatId,
     };
-  }, [chats, loading, refreshChats, activeChatId, setActiveChatId, markChatAsRead]);
+  }, [chats, loading, refreshChats, activeChatId, setActiveChatId, markChatAsRead, readReceiptsByChatId]);
 
   return (
     <ChatsContext.Provider value={value}>
