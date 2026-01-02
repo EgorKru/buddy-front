@@ -44,6 +44,7 @@ export default function ChatPage() {
   const subscriptionRef = useRef(null);
   const queueSubscriptionsRef = useRef({ messages: null, notifications: null });
   const lastLatestFetchAtRef = useRef(0);
+  const latestFetchInFlightRef = useRef(false);
 
   const loadChat = useCallback(async () => {
     if (!chatId) return;
@@ -82,22 +83,40 @@ export default function ChatPage() {
     }
   }, [chatId]);
 
-  const fetchLatestMessage = useCallback(async () => {
+  const fetchRecentMessages = useCallback(async () => {
     if (!chatId) return;
     const now = Date.now();
     if (now - lastLatestFetchAtRef.current < 500) return;
     lastLatestFetchAtRef.current = now;
 
     try {
-      const response = await chatAPI.getMessages(chatId, { page: 0, size: 1 });
-      const latest = response?.content?.[0];
-      if (!latest?.id) return;
+      if (latestFetchInFlightRef.current) return;
+      latestFetchInFlightRef.current = true;
+
+      const response = await chatAPI.getMessages(chatId, { page: 0, size: 20 });
+      const items = Array.isArray(response?.content) ? response.content : [];
+      if (items.length === 0) return;
+
+      // API обычно возвращает newest-first, для ленты нам нужно oldest-first
+      const batch = [...items].reverse();
 
       setMessages(prev => {
-        if (prev.some(m => Number(m.id) === Number(latest.id))) return prev;
-        return [...prev, { ...latest, status: MESSAGE_STATUS.SENT, isOptimistic: false }];
+        const existingIds = new Set(prev.map(m => String(m.id)));
+        const toAdd = batch
+          .filter(m => m?.id != null)
+          .filter(m => !existingIds.has(String(m.id)))
+          .map(m => ({ ...m, status: MESSAGE_STATUS.SENT, isOptimistic: false }));
+
+        if (toAdd.length === 0) return prev;
+
+        const merged = [...prev, ...toAdd];
+        merged.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        return merged;
       });
     } catch (e) {}
+    finally {
+      latestFetchInFlightRef.current = false;
+    }
   }, [chatId]);
 
   const getChatIdFromNotification = (n) => {
@@ -197,7 +216,7 @@ export default function ChatPage() {
 
     cleanup();
 
-    const handleIncomingNotification = async (raw) => {
+      const handleIncomingNotification = async (raw) => {
       const notif = safeJsonParse(raw);
       if (!notif) return;
 
@@ -208,7 +227,7 @@ export default function ChatPage() {
 
       const hasFullMessageDto = msg?.id && msg?.senderId && msg?.createdAt && msg?.content != null;
       if (!hasFullMessageDto) {
-        await fetchLatestMessage();
+        await fetchRecentMessages();
         if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
           markChatAsRead(chatId);
         }
@@ -241,7 +260,7 @@ export default function ChatPage() {
     } catch (e) {}
 
     return () => cleanup();
-  }, [chatId, client, connected, fetchLatestMessage, markChatAsRead, user]);
+  }, [chatId, client, connected, fetchRecentMessages, markChatAsRead, user]);
 
   useEffect(() => {
     scrollToBottom();
