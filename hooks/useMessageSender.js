@@ -35,15 +35,6 @@ const createOptimisticMessage = (content, type, chatId, user) => {
   };
 };
 
-const findMatchingQueuedMessage = (queue, messageDto) => {
-  return queue.find(msg =>
-    msg.chatId === messageDto.chatId &&
-    msg.content === messageDto.content &&
-    Number(msg.senderId) === Number(messageDto.senderId) &&
-    msg.status === MESSAGE_STATUS.SENDING
-  );
-};
-
 const findQueuedMessageForConfirmation = (lastSent, queue, chatId) => {
   if (lastSent && lastSent.chatId === chatId && lastSent.status === MESSAGE_STATUS.SENDING) {
     return lastSent;
@@ -55,18 +46,11 @@ const findQueuedMessageForConfirmation = (lastSent, queue, chatId) => {
   return null;
 };
 
-const createMessageKey = (messageDto) => {
-  return messageDto.id
-    ? `id:${messageDto.id}`
-    : `content:${messageDto.chatId}:${messageDto.content}:${messageDto.senderId}:${messageDto.createdAt}`;
-};
-
 export const useMessageSender = (chatId, onMessageSent) => {
   const { client, connected } = useStomp();
   const [sending, setSending] = useState(false);
   const retryTimeoutRef = useRef(null);
   const messageSentSubscriptionRef = useRef(null);
-  const userMessagesSubscriptionRef = useRef(null);
   const lastSentMessageRef = useRef(null);
   const processedMessagesRef = useRef(new Set());
 
@@ -95,23 +79,19 @@ export const useMessageSender = (chatId, onMessageSent) => {
       try {
         updateMessageStatus(message.tempId, MESSAGE_STATUS.SENDING);
 
-        if (onMessageSentCallback) {
-          onMessageSentCallback({
-            ...message,
-            status: MESSAGE_STATUS.SENDING,
-          }, message.tempId);
-        }
-
         const serverMessage = await chatAPI.sendMessage(targetChatId, message.content, message.type);
 
         updateMessageStatus(message.tempId, MESSAGE_STATUS.SENT, serverMessage);
         removeMessageFromQueue(message.tempId);
 
         if (onMessageSentCallback) {
-          onMessageSentCallback(serverMessage, message.tempId);
+          onMessageSentCallback({ status: 'sent', message: serverMessage }, message.tempId);
         }
       } catch (error) {
         updateMessageStatus(message.tempId, MESSAGE_STATUS.FAILED);
+        if (onMessageSentCallback) {
+          onMessageSentCallback({ status: 'failed', message: message }, message.tempId);
+        }
         scheduleRetry({
           ...message,
           retryCount: retryCount + 1,
@@ -149,7 +129,7 @@ export const useMessageSender = (chatId, onMessageSent) => {
             }),
           });
           setSending(false);
-          return { success: true };
+          return { success: true, tempId: optimisticMessage.tempId, optimisticMessage };
         } catch (wsError) {}
       }
 
@@ -159,13 +139,16 @@ export const useMessageSender = (chatId, onMessageSent) => {
       removeMessageFromQueue(optimisticMessage.tempId);
 
       if (onMessageSent) {
-        onMessageSent(serverMessage, optimisticMessage.tempId);
+        onMessageSent({ status: 'sent', message: serverMessage }, optimisticMessage.tempId);
       }
 
       setSending(false);
-      return serverMessage;
+      return { success: true, tempId: optimisticMessage.tempId, optimisticMessage };
     } catch (error) {
       updateMessageStatus(optimisticMessage.tempId, MESSAGE_STATUS.FAILED);
+      if (onMessageSent) {
+        onMessageSent({ status: 'failed', message: optimisticMessage }, optimisticMessage.tempId);
+      }
       scheduleRetry(optimisticMessage, chatId, onMessageSent);
       setSending(false);
       return null;
@@ -207,86 +190,9 @@ export const useMessageSender = (chatId, onMessageSent) => {
     }
 
     if (onMessageSent) {
-      onMessageSent(serverMessage, tempId);
+      onMessageSent({ status: 'sent', message: serverMessage }, tempId);
     }
   }, [onMessageSent]);
-
-  useEffect(() => {
-    if (!client || !connected || !client.connected || !client.active) return;
-
-    if (userMessagesSubscriptionRef.current) {
-      try {
-        userMessagesSubscriptionRef.current.unsubscribe();
-      } catch (error) {}
-      userMessagesSubscriptionRef.current = null;
-    }
-
-    try {
-      const subscription = client.subscribe('/user/queue/messages', (message) => {
-        try {
-          const messageDto = JSON.parse(message.body);
-          const messageKey = createMessageKey(messageDto);
-
-          if (processedMessagesRef.current.has(messageKey)) return;
-
-          if (onMessageSent) {
-            let tempId = null;
-
-            if (lastSentMessageRef.current &&
-              lastSentMessageRef.current.chatId === messageDto.chatId &&
-              lastSentMessageRef.current.content === messageDto.content &&
-              Number(lastSentMessageRef.current.senderId) === Number(messageDto.senderId)) {
-              tempId = lastSentMessageRef.current.tempId;
-            } else {
-              const queue = getMessageQueue();
-              const matchingMessage = findMatchingQueuedMessage(queue, messageDto);
-              if (matchingMessage) {
-                tempId = matchingMessage.tempId;
-              }
-            }
-
-            if (tempId) {
-              processedMessagesRef.current.add(messageKey);
-              if (messageDto.id) {
-                processedMessagesRef.current.add(`id:${messageDto.id}`);
-              }
-
-              updateMessageStatus(tempId, MESSAGE_STATUS.SENT, messageDto);
-
-              setTimeout(() => {
-                removeMessageFromQueue(tempId);
-                if (lastSentMessageRef.current?.tempId === tempId) {
-                  lastSentMessageRef.current = null;
-                }
-              }, QUEUE_REMOVAL_DELAY);
-
-              onMessageSent({
-                ...messageDto,
-                status: MESSAGE_STATUS.SENT,
-              }, tempId);
-            } else {
-              const user = getCurrentUser();
-              if (user && Number(messageDto.senderId) === Number(user.id)) {
-                processedMessagesRef.current.add(messageKey);
-                if (messageDto.id) {
-                  processedMessagesRef.current.add(`id:${messageDto.id}`);
-                }
-              }
-            }
-          }
-        } catch (error) {}
-      });
-
-      userMessagesSubscriptionRef.current = subscription;
-
-      return () => {
-        if (userMessagesSubscriptionRef.current) {
-          userMessagesSubscriptionRef.current.unsubscribe();
-          userMessagesSubscriptionRef.current = null;
-        }
-      };
-    } catch (error) {}
-  }, [client, connected, onMessageSent]);
 
   useEffect(() => {
     if (!client || !connected || !client.connected || !client.active) return;

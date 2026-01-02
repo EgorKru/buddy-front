@@ -10,6 +10,16 @@ import { MESSAGE_STATUS } from '@/utils/messageQueue';
 import ChatSidebar from '@/component/ChatSidebar';
 import styles from '@/styles/chat.module.css';
 
+const DUPLICATE_WINDOW_MS = 5000;
+
+const isDuplicate = (a, b) => {
+  if (a?.id && b?.id && Number(a.id) === Number(b.id)) return true;
+  if (Number(a?.senderId) !== Number(b?.senderId)) return false;
+  if (String(a?.content || '').trim() !== String(b?.content || '').trim()) return false;
+  const timeDiff = Math.abs(new Date(a?.createdAt) - new Date(b?.createdAt));
+  return timeDiff < DUPLICATE_WINDOW_MS;
+};
+
 
 export default function ChatPage() {
   const router = useRouter();
@@ -42,14 +52,42 @@ export default function ChatPage() {
   }, [chatId, router]);
 
   useEffect(() => {
-    if (chatId && client && connected && client.connected && client.active) {
-      const timeout = setTimeout(() => subscribeToChat(), 100);
-      return () => {
-        clearTimeout(timeout);
-        unsubscribeFromChat();
-      };
+    if (!chatId || !client || !connected || !client.connected || !client.active) return;
+
+    if (subscriptionRef.current) {
+      try {
+        subscriptionRef.current.unsubscribe();
+      } catch (error) {}
+      subscriptionRef.current = null;
     }
-  }, [chatId, client, connected]);
+
+    try {
+      const sub = client.subscribe('/user/queue/messages', (message) => {
+        try {
+          const messageDto = JSON.parse(message.body);
+          if (Number(messageDto.chatId) !== Number(chatId)) return;
+          if (user && Number(messageDto.senderId) === Number(user.id)) return;
+
+          setMessages(prev => {
+            if (prev.some(m => Number(m.id) === Number(messageDto.id))) return prev;
+            if (prev.some(m => isDuplicate(m, messageDto))) return prev;
+            return [...prev, { ...messageDto, status: MESSAGE_STATUS.SENT, isOptimistic: false }];
+          });
+        } catch (error) {}
+      });
+
+      subscriptionRef.current = sub;
+    } catch (error) {}
+
+    return () => {
+      if (subscriptionRef.current) {
+        try {
+          subscriptionRef.current.unsubscribe();
+        } catch (error) {}
+        subscriptionRef.current = null;
+      }
+    };
+  }, [chatId, client, connected, user]);
 
   useEffect(() => {
     scrollToBottom();
@@ -145,70 +183,6 @@ export default function ChatPage() {
       setLoading(false);
     } finally {
       setLoadingMore(false);
-    }
-  };
-
-  const subscribeToChat = () => {
-    if (!client || !connected || !chatId) {
-      return;
-    }
-
-    if (!client.connected || !client.active) {
-      return;
-    }
-
-    if (subscriptionRef.current) {
-      try {
-        subscriptionRef.current.unsubscribe();
-      } catch (error) {}
-      subscriptionRef.current = null;
-    }
-
-    try {
-      const topic = `/topic/chat/${chatId}`;
-      const subscription = client.subscribe(topic, (message) => {
-        try {
-          const messageDto = JSON.parse(message.body);
-
-          setMessages(prev => {
-            const existingById = prev.findIndex(m => Number(m.id) === Number(messageDto.id));
-            if (existingById !== -1) {
-              return prev;
-            }
-
-            const isOurMessage = user && Number(messageDto.senderId) === Number(user.id);
-            if (isOurMessage) {
-              return prev;
-            }
-
-            const duplicateByContent = prev.find(m => {
-              if (Number(m.senderId) !== Number(messageDto.senderId)) return false;
-              if (String(m.content || '').trim() !== String(messageDto.content || '').trim()) return false;
-              if (m.id && messageDto.id && Number(m.id) === Number(messageDto.id)) return true;
-              const timeDiff = Math.abs(new Date(m.createdAt) - new Date(messageDto.createdAt));
-              return timeDiff < 5000;
-            });
-
-            if (duplicateByContent) {
-              return prev;
-            }
-
-            return [...prev, {
-              ...messageDto,
-              status: MESSAGE_STATUS.SENT,
-              isOptimistic: false,
-            }];
-          });
-        } catch (error) {}
-      });
-      subscriptionRef.current = subscription;
-    } catch (error) {}
-  };
-
-  const unsubscribeFromChat = () => {
-    if (subscriptionRef.current) {
-      subscriptionRef.current.unsubscribe();
-      subscriptionRef.current = null;
     }
   };
 
