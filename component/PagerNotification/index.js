@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Bell, Radio } from 'lucide-react';
 import styles from '@/component/PagerNotification/index.module.css';
+import { unlockPagerAudio } from '@/utils/pagerSound';
 
 export default function PagerNotification({ 
   notifications = [], 
@@ -24,6 +25,7 @@ export default function PagerNotification({
   }, [notifications]);
 
   const handlePagerClick = () => {
+    unlockPagerAudio();
     setIsExpanded(!isExpanded);
   };
 
@@ -53,7 +55,7 @@ export default function PagerNotification({
       >
         <div className={styles.pagerIconWrapper}>
           <div className={styles.pagerIcon}>
-            <Radio size={24} />
+            <Radio size={22} />
           </div>
           {unreadCount > 0 && (
             <div className={styles.unreadBadge}>
@@ -64,9 +66,6 @@ export default function PagerNotification({
         
         {latestNotification && !isExpanded && (
           <div className={styles.notificationPreview}>
-            <div className={styles.notificationIcon}>
-              <Bell size={14} />
-            </div>
             <div className={styles.notificationText}>
               <div className={styles.notificationTitle}>
                 {latestNotification.title || 'Новое сообщение'}

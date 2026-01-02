@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { chatAPI, getCurrentUser } from '@/utils/api';
 import { useStomp } from '@/context/socket';
 import { safeJsonParse, safeUnsubscribe } from '@/utils/safe';
+import { playPagerNotificationSound } from '@/utils/pagerSound';
 
 const ChatsContext = createContext(null);
 
@@ -188,22 +189,7 @@ export const ChatsProvider = ({ children }) => {
           const now = Date.now();
           if (!disabled && now - lastSoundAtRef.current > 500) {
             lastSoundAtRef.current = now;
-            const AudioCtx = window.AudioContext || window.webkitAudioContext;
-            if (AudioCtx) {
-              const ctx = new AudioCtx();
-              const o = ctx.createOscillator();
-              const g = ctx.createGain();
-              o.type = 'sine';
-              o.frequency.value = 880;
-              g.gain.value = 0.04;
-              o.connect(g);
-              g.connect(ctx.destination);
-              o.start();
-              o.stop(ctx.currentTime + 0.08);
-              setTimeout(() => {
-                try { ctx.close(); } catch (e) {}
-              }, 150);
-            }
+            playPagerNotificationSound({ pattern: 'pager' });
           }
         }
       } catch (e) {}
