@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
-import { MessageCircle, Search, Plus, X, Loader2, Check, CheckCheck } from 'lucide-react';
+import { MessageCircle, Search, Plus, X, Loader2, Check, CheckCheck, UserPlus } from 'lucide-react';
 import { getCurrentUser } from '@/utils/api';
 import { useCreateChat } from '@/hooks/useCreateChat';
 import { getChatName, getChatAvatar } from '@/utils/chatHelpers';
