@@ -63,6 +63,8 @@ export const ChatsProvider = ({ children }) => {
   const lastReadAtRef = useRef(new Map());
   const lastRefreshAtRef = useRef(0);
   const lastSoundAtRef = useRef(0);
+  const processedNotificationMessageIdsRef = useRef(new Set());
+  const processedCleanupRef = useRef(null);
 
   const refreshChats = useCallback(async () => {
     setLoading(true);
@@ -138,6 +140,11 @@ export const ChatsProvider = ({ children }) => {
     const message = getNotificationMessage(notification);
     const currentUser = getCurrentUser();
     const isOwnMessage = currentUser?.id && message?.senderId && Number(currentUser.id) === Number(message.senderId);
+    const messageId = message?.id != null ? String(message.id) : null;
+    if (messageId) {
+      if (processedNotificationMessageIdsRef.current.has(messageId)) return;
+      processedNotificationMessageIdsRef.current.add(messageId);
+    }
     const nextLastMessage = {
       ...(message?.id ? { id: message.id } : null),
       ...(message?.senderId ? { senderId: message.senderId } : null),
@@ -195,6 +202,20 @@ export const ChatsProvider = ({ children }) => {
       } catch (e) {}
     }
   }, [activeChatId, markChatAsRead, refreshChatsThrottled]);
+
+  useEffect(() => {
+    processedCleanupRef.current = setInterval(() => {
+      if (processedNotificationMessageIdsRef.current.size > 2000) {
+        processedNotificationMessageIdsRef.current.clear();
+      }
+    }, 5 * 60 * 1000);
+    return () => {
+      if (processedCleanupRef.current) {
+        clearInterval(processedCleanupRef.current);
+        processedCleanupRef.current = null;
+      }
+    };
+  }, []);
 
   const bumpChatLastMessage = useCallback((chatId, message, currentUserId) => {
     if (!chatId || !message) return;

@@ -42,9 +42,6 @@ export default function ChatPage() {
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const subscriptionRef = useRef(null);
-  const queueSubscriptionsRef = useRef({ messages: null, notifications: null });
-  const lastLatestFetchAtRef = useRef(0);
-  const latestFetchInFlightRef = useRef(false);
 
   const loadChat = useCallback(async () => {
     if (!chatId) return;
@@ -83,49 +80,7 @@ export default function ChatPage() {
     }
   }, [chatId]);
 
-  const fetchRecentMessages = useCallback(async () => {
-    if (!chatId) return;
-    const now = Date.now();
-    if (now - lastLatestFetchAtRef.current < 500) return;
-    lastLatestFetchAtRef.current = now;
-
-    try {
-      if (latestFetchInFlightRef.current) return;
-      latestFetchInFlightRef.current = true;
-
-      const response = await chatAPI.getMessages(chatId, { page: 0, size: 20 });
-      const items = Array.isArray(response?.content) ? response.content : [];
-      if (items.length === 0) return;
-
-      // API обычно возвращает newest-first, для ленты нам нужно oldest-first
-      const batch = [...items].reverse();
-
-      setMessages(prev => {
-        const existingIds = new Set(prev.map(m => String(m.id)));
-        const toAdd = batch
-          .filter(m => m?.id != null)
-          .filter(m => !existingIds.has(String(m.id)))
-          .map(m => ({ ...m, status: MESSAGE_STATUS.SENT, isOptimistic: false }));
-
-        if (toAdd.length === 0) return prev;
-
-        const merged = [...prev, ...toAdd];
-        merged.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-        return merged;
-      });
-    } catch (e) {}
-    finally {
-      latestFetchInFlightRef.current = false;
-    }
-  }, [chatId]);
-
-  const getChatIdFromNotification = (n) => {
-    return n?.chatId ?? n?.message?.chatId ?? n?.payload?.chatId ?? null;
-  };
-
-  const getMessageFromNotification = (n) => {
-    return n?.message ?? n?.payload?.message ?? n;
-  };
+  // Бэк теперь гарантирует: /topic/chat/{chatId} всегда отдаёт полный MessageDto.
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -199,68 +154,6 @@ export default function ChatPage() {
       }
     };
   }, [chatId, client, connected, user, markChatAsRead]);
-
-  useEffect(() => {
-    if (!chatId || !client || !connected || !client.connected || !client.active) return;
-
-    const cleanup = () => {
-      if (queueSubscriptionsRef.current.messages) {
-        safeUnsubscribe(queueSubscriptionsRef.current.messages);
-        queueSubscriptionsRef.current.messages = null;
-      }
-      if (queueSubscriptionsRef.current.notifications) {
-        safeUnsubscribe(queueSubscriptionsRef.current.notifications);
-        queueSubscriptionsRef.current.notifications = null;
-      }
-    };
-
-    cleanup();
-
-      const handleIncomingNotification = async (raw) => {
-      const notif = safeJsonParse(raw);
-      if (!notif) return;
-
-      const incomingChatId = getChatIdFromNotification(notif);
-      if (!incomingChatId || Number(incomingChatId) !== Number(chatId)) return;
-
-      const msg = getMessageFromNotification(notif);
-
-      const hasFullMessageDto = msg?.id && msg?.senderId && msg?.createdAt && msg?.content != null;
-      if (!hasFullMessageDto) {
-        await fetchRecentMessages();
-        if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-          markChatAsRead(chatId);
-        }
-        return;
-      }
-
-      if (user && Number(msg.senderId) === Number(user.id)) return;
-
-      setMessages(prev => {
-        if (prev.some(m => Number(m.id) === Number(msg.id))) return prev;
-        if (prev.some(m => isDuplicate(m, msg))) return prev;
-        return [...prev, { ...msg, status: MESSAGE_STATUS.SENT, isOptimistic: false }];
-      });
-
-      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        markChatAsRead(chatId);
-      }
-    };
-
-    try {
-      queueSubscriptionsRef.current.messages = client.subscribe('/user/queue/messages', (message) => {
-        handleIncomingNotification(message.body);
-      });
-    } catch (e) {}
-
-    try {
-      queueSubscriptionsRef.current.notifications = client.subscribe('/user/queue/notifications', (message) => {
-        handleIncomingNotification(message.body);
-      });
-    } catch (e) {}
-
-    return () => cleanup();
-  }, [chatId, client, connected, fetchRecentMessages, markChatAsRead, user]);
 
   useEffect(() => {
     scrollToBottom();
