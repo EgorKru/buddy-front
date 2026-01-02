@@ -2,14 +2,13 @@ import { useState, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { chatAPI, userAPI, getCurrentUser } from '@/utils/api';
 
-/**
- * Хук для создания чатов (прямых и групповых)
- * @returns {Object} Объект с функциями и состоянием для создания чата
- */
+const SEARCH_DELAY = 300;
+const MIN_SEARCH_LENGTH = 2;
+
 export const useCreateChat = () => {
   const router = useRouter();
   const user = getCurrentUser();
-  
+
   const [chatType, setChatType] = useState('DIRECT');
   const [chatName, setChatName] = useState('');
   const [participantUsernames, setParticipantUsernames] = useState('');
@@ -19,15 +18,12 @@ export const useCreateChat = () => {
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
-  
+
   const searchTimeoutRef = useRef(null);
   const searchInputRef = useRef(null);
 
-  /**
-   * Поиск пользователей по username
-   */
   const searchUsers = async (query) => {
-    if (!query || query.trim().length < 2) {
+    if (!query || query.trim().length < MIN_SEARCH_LENGTH) {
       setSearchResults([]);
       setShowSearchResults(false);
       return;
@@ -40,37 +36,30 @@ export const useCreateChat = () => {
       setSearchResults(filteredUsers);
       setShowSearchResults(true);
     } catch (error) {
-      console.error('Ошибка поиска пользователей:', error);
       setSearchResults([]);
     } finally {
       setSearching(false);
     }
   };
 
-  /**
-   * Обработка изменения поля поиска
-   */
   const handleSearchInputChange = (e) => {
     const value = e.target.value;
     setParticipantUsernames(value);
-    
+
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
-    
+
     searchTimeoutRef.current = setTimeout(() => {
       searchUsers(value);
-    }, 300);
+    }, SEARCH_DELAY);
   };
 
-  /**
-   * Выбор участника из результатов поиска
-   */
   const handleSelectParticipant = (selectedUser) => {
     if (selectedParticipants.some(p => p.id === selectedUser.id)) {
       return;
     }
-    
+
     setSelectedParticipants([...selectedParticipants, selectedUser]);
     setParticipantUsernames('');
     setSearchResults([]);
@@ -80,19 +69,13 @@ export const useCreateChat = () => {
     }
   };
 
-  /**
-   * Удаление участника из списка
-   */
   const handleRemoveParticipant = (userId) => {
     setSelectedParticipants(selectedParticipants.filter(p => p.id !== userId));
   };
 
-  /**
-   * Создание чата
-   */
   const handleCreateChat = async (onSuccess) => {
     setCreateError('');
-    
+
     if (chatType === 'GROUP' && !chatName.trim()) {
       setCreateError('Название группы обязательно');
       return;
@@ -123,15 +106,14 @@ export const useCreateChat = () => {
         };
         chat = await chatAPI.createChat(chatData);
       }
-      
+
       if (onSuccess) {
         await onSuccess();
       }
-      
+
       router.push(`/chat/${chat.id}`);
       return chat;
     } catch (error) {
-      console.error('Ошибка создания чата:', error);
       setCreateError(error.message || 'Ошибка при создании чата');
       throw error;
     } finally {
@@ -139,9 +121,6 @@ export const useCreateChat = () => {
     }
   };
 
-  /**
-   * Сброс формы создания чата
-   */
   const resetForm = () => {
     setChatType('DIRECT');
     setChatName('');
@@ -156,7 +135,6 @@ export const useCreateChat = () => {
   };
 
   return {
-    // State
     chatType,
     setChatType,
     chatName,
@@ -169,8 +147,6 @@ export const useCreateChat = () => {
     creating,
     createError,
     searchInputRef,
-    
-    // Handlers
     handleSearchInputChange,
     handleSelectParticipant,
     handleRemoveParticipant,
@@ -179,4 +155,3 @@ export const useCreateChat = () => {
     setShowSearchResults,
   };
 };
-

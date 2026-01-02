@@ -10,6 +10,7 @@ import { MESSAGE_STATUS } from '@/utils/messageQueue';
 import ChatSidebar from '@/component/ChatSidebar';
 import styles from '@/styles/chat.module.css';
 
+
 export default function ChatPage() {
   const router = useRouter();
   const { chatId } = router.query;
@@ -24,7 +25,6 @@ export default function ChatPage() {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [messageStatusMap, setMessageStatusMap] = useState({}); // tempId -> status
 
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
@@ -43,11 +43,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (chatId && client && connected && client.connected && client.active) {
-      // Небольшая задержка для гарантии, что соединение полностью установлено
-      const timeout = setTimeout(() => {
-        subscribeToChat();
-      }, 100);
-      
+      const timeout = setTimeout(() => subscribeToChat(), 100);
       return () => {
         clearTimeout(timeout);
         unsubscribeFromChat();
@@ -59,86 +55,60 @@ export default function ChatPage() {
     scrollToBottom();
   }, [messages]);
 
-  // Callback для обработки отправленных сообщений
-  const handleMessageSent = useCallback((message, tempId) => {
-    // Игнорируем оптимистичные сообщения - они не должны отображаться
-    if (tempId && message.isOptimistic) {
-      return; // Не добавляем оптимистичное сообщение в UI
-    }
-    
-    // Если это реальное сообщение (с tempId для замены оптимистичного)
-    if (tempId) {
-      setMessages(prev => {
-        // Сначала проверяем дубликаты по id - если сообщение уже есть, ничего не делаем
-        if (message.id && prev.some(m => Number(m.id) === Number(message.id))) {
-          return prev;
-        }
-        
-        // Также проверяем дубликаты по content + senderId + время (в пределах 10 секунд)
-        if (message.content && message.senderId && message.createdAt) {
-          const duplicateByContent = prev.find(m => {
-            if (Number(m.senderId) !== Number(message.senderId)) return false;
-            if (String(m.content || '').trim() !== String(message.content || '').trim()) return false;
-            if (m.id && message.id && Number(m.id) === Number(message.id)) return false; // Уже проверили выше
-            const timeDiff = Math.abs(new Date(m.createdAt) - new Date(message.createdAt));
-            return timeDiff < 10000; // В пределах 10 секунд
-          });
-          if (duplicateByContent) {
-            return prev; // Дубликат, пропускаем
-          }
-        }
-        
-        // Найти оптимистичное сообщение по tempId
-        const optimisticIndex = prev.findIndex(m => 
+  const handleMessageSent = useCallback((confirmation, tempId) => {
+    if (!confirmation || !confirmation.message) return;
+
+    const message = confirmation.message;
+
+    setMessages(prev => {
+      if (message.id && prev.some(m => Number(m.id) === Number(message.id))) {
+        return prev;
+      }
+
+      if (tempId) {
+        const optimisticIndex = prev.findIndex(m =>
           m.tempId === tempId && m.isOptimistic === true
         );
-        
+
         if (optimisticIndex !== -1) {
-          // Заменить оптимистичное на реальное
           const updated = [...prev];
           updated[optimisticIndex] = {
             ...message,
             id: message.id,
-            status: message.status || MESSAGE_STATUS.SENT,
+            status: confirmation.status === 'sent' ? MESSAGE_STATUS.SENT : MESSAGE_STATUS.FAILED,
             isOptimistic: false,
           };
           delete updated[optimisticIndex].tempId;
           return updated;
         }
-        
-        // Если не нашли по tempId, ищем по chatId, content и status 'sending' (для подтверждений)
-        if (message.chatId && message.content) {
-          const optimisticIndexByChat = prev.findIndex(m => {
-            if (!m.tempId && !m.isOptimistic) return false;
-            if (m.chatId !== message.chatId) return false;
-            if (String(m.content || '').trim() !== String(message.content || '').trim()) return false;
-            const isSending = m.status === MESSAGE_STATUS.SENDING || m.status === 'sending';
-            return isSending;
-          });
-          
-          if (optimisticIndexByChat !== -1) {
-            // Заменить оптимистичное на реальное
-            const updated = [...prev];
-            updated[optimisticIndexByChat] = {
-              ...message,
-              id: message.id,
-              status: message.status || MESSAGE_STATUS.SENT,
-              isOptimistic: false,
-            };
-            delete updated[optimisticIndexByChat].tempId;
-            return updated;
-          }
-        }
-        
-        // Если не нашли оптимистичное сообщение и нет ID - это не наше сообщение для замены
-        // Не добавляем новое сообщение здесь - оно придет через топик чата
-        return prev;
-      });
-    }
-  }, []);
+      }
 
-  // Хук для отправки сообщений
-  const { sendMessage: sendMessageHook, sending, syncQueue, handleServerMessage } = useMessageSender(
+      if (message.content && message.senderId) {
+        const optimisticIndex = prev.findIndex(m => {
+          if (!m.isOptimistic) return false;
+          if (Number(m.senderId) !== Number(message.senderId)) return false;
+          if (String(m.content || '').trim() !== String(message.content || '').trim()) return false;
+          return m.status === MESSAGE_STATUS.SENDING || m.status === 'sending';
+        });
+
+        if (optimisticIndex !== -1) {
+          const updated = [...prev];
+          updated[optimisticIndex] = {
+            ...message,
+            id: message.id,
+            status: confirmation.status === 'sent' ? MESSAGE_STATUS.SENT : MESSAGE_STATUS.FAILED,
+            isOptimistic: false,
+          };
+          delete updated[optimisticIndex].tempId;
+          return updated;
+        }
+      }
+
+      return prev;
+    });
+  }, [user]);
+
+  const { sendMessage: sendMessageHook, sending, syncQueue } = useMessageSender(
     chatId,
     handleMessageSent
   );
@@ -148,7 +118,6 @@ export default function ChatPage() {
       const chatData = await chatAPI.getChat(chatId);
       setChat(chatData);
     } catch (error) {
-      console.error('Ошибка загрузки чата:', error);
       if (error.message.includes('404')) {
         router.push('/');
       }
@@ -173,7 +142,6 @@ export default function ChatPage() {
       setHasMore(!response.last);
       setLoading(false);
     } catch (error) {
-      console.error('Ошибка загрузки сообщений:', error);
       setLoading(false);
     } finally {
       setLoadingMore(false);
@@ -184,97 +152,57 @@ export default function ChatPage() {
     if (!client || !connected || !chatId) {
       return;
     }
-    
+
     if (!client.connected || !client.active) {
       return;
     }
 
-    // Отписываемся от старой подписки, если есть
     if (subscriptionRef.current) {
       try {
         subscriptionRef.current.unsubscribe();
-      } catch (error) {
-        // Игнорируем ошибки отписки
-      }
+      } catch (error) {}
       subscriptionRef.current = null;
     }
 
     try {
       const topic = `/topic/chat/${chatId}`;
-      const subscription = client.subscribe(
-        topic,
-        (message) => {
-          try {
-            const messageDto = JSON.parse(message.body);
-            
-            setMessages(prev => {
-              // 1. Проверяем, нет ли уже сообщения с таким id
-              const existingById = prev.findIndex(m => Number(m.id) === Number(messageDto.id));
-              if (existingById !== -1) {
-                return prev; // Уже есть, пропускаем
-              }
-              
-              // 2. Если это наше сообщение (senderId === currentUserId) - ВСЕГДА игнорируем
-              // Оно уже обработано через подтверждение из /user/queue/message-sent
-              // Проверяем даже если user еще не загружен - сравниваем с любым сообщением с tempId
-              const isOurMessage = user && Number(messageDto.senderId) === Number(user.id);
-              if (isOurMessage) {
-                return prev; // Игнорируем свои сообщения из топика
-              }
-              
-              // 2.5. Дополнительная проверка на дубликаты по content + senderId + время (в пределах 10 секунд)
-              const duplicateByContent = prev.find(m => {
-                if (Number(m.senderId) !== Number(messageDto.senderId)) return false;
-                if (String(m.content || '').trim() !== String(messageDto.content || '').trim()) return false;
-                const timeDiff = Math.abs(new Date(m.createdAt) - new Date(messageDto.createdAt));
-                return timeDiff < 10000; // В пределах 10 секунд
-              });
-              if (duplicateByContent) {
-                return prev; // Дубликат, пропускаем
-              }
-              
-              // 3. Ищем оптимистичное сообщение для замены (на случай, если это чужое сообщение)
-              const optimisticIndex = prev.findIndex(m => {
-                if (!m.tempId && !m.isOptimistic) return false;
-                if (String(m.content || '').trim() !== String(messageDto.content || '').trim()) {
-                  return false;
-                }
-                if (Number(m.senderId) !== Number(messageDto.senderId)) {
-                  return false;
-                }
-                const isSending = m.status === MESSAGE_STATUS.SENDING || 
-                                 m.status === 'sending';
-                return isSending;
-              });
-              
-              if (optimisticIndex !== -1) {
-                // Заменяем оптимистичное сообщение на реальное
-                const updated = [...prev];
-                updated[optimisticIndex] = {
-                  ...messageDto,
-                  status: MESSAGE_STATUS.SENT,
-                  isOptimistic: false,
-                };
-                delete updated[optimisticIndex].tempId;
-                return updated; // НЕ добавляем новое!
-              }
-              
-              // 4. Если не нашли оптимистичное сообщение, добавляем новое (чужое сообщение)
-              return [...prev, {
-                ...messageDto,
-                status: MESSAGE_STATUS.SENT,
-                isOptimistic: false,
-              }];
+      const subscription = client.subscribe(topic, (message) => {
+        try {
+          const messageDto = JSON.parse(message.body);
+
+          setMessages(prev => {
+            const existingById = prev.findIndex(m => Number(m.id) === Number(messageDto.id));
+            if (existingById !== -1) {
+              return prev;
+            }
+
+            const isOurMessage = user && Number(messageDto.senderId) === Number(user.id);
+            if (isOurMessage) {
+              return prev;
+            }
+
+            const duplicateByContent = prev.find(m => {
+              if (Number(m.senderId) !== Number(messageDto.senderId)) return false;
+              if (String(m.content || '').trim() !== String(messageDto.content || '').trim()) return false;
+              if (m.id && messageDto.id && Number(m.id) === Number(messageDto.id)) return true;
+              const timeDiff = Math.abs(new Date(m.createdAt) - new Date(messageDto.createdAt));
+              return timeDiff < 5000;
             });
-          } catch (error) {
-            // Игнорируем ошибки парсинга
-          }
-        }
-      );
+
+            if (duplicateByContent) {
+              return prev;
+            }
+
+            return [...prev, {
+              ...messageDto,
+              status: MESSAGE_STATUS.SENT,
+              isOptimistic: false,
+            }];
+          });
+        } catch (error) {}
+      });
       subscriptionRef.current = subscription;
-    } catch (error) {
-      // Игнорируем ошибки подписки
-    }
+    } catch (error) {}
   };
 
   const unsubscribeFromChat = () => {
@@ -284,24 +212,20 @@ export default function ChatPage() {
     }
   };
 
-  // Синхронизация очереди при подключении (только для текущего чата)
   useEffect(() => {
     if (connected && chatId) {
       syncQueue();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connected, chatId]); // syncQueue стабилен, не добавляем в зависимости
+  }, [connected, chatId, syncQueue]);
 
   const sendMessage = async (e) => {
     e.preventDefault();
-    e.stopPropagation(); // Предотвращаем всплытие события
+    e.stopPropagation();
     
-    if (!newMessage.trim() || !user || sending) {
-      return;
-    }
+    if (!newMessage.trim() || !user || sending) return;
 
     const messageContent = newMessage.trim();
-    setNewMessage(''); // Очищаем поле сразу, чтобы предотвратить повторную отправку
+    setNewMessage('');
 
     const result = await sendMessageHook(messageContent, 'TEXT');
     
@@ -314,7 +238,6 @@ export default function ChatPage() {
     if (!messagesContainerRef.current) return;
     
     const container = messagesContainerRef.current;
-    // Если прокрутили вверх достаточно далеко, загружаем старые сообщения
     if (container.scrollTop < 100 && hasMore && !loadingMore) {
       loadMessages(page + 1, true);
     }
@@ -324,7 +247,6 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Получает иконку статуса сообщения
   const getMessageStatusIcon = (status) => {
     switch (status) {
       case MESSAGE_STATUS.SENDING:
@@ -477,4 +399,3 @@ export default function ChatPage() {
     </div>
   );
 }
-
