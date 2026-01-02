@@ -290,6 +290,7 @@ export const MessagingProvider = ({ children }) => {
   const refreshInFlightRef = useRef(false);
   const lastSoundAtRef = useRef(0);
   const processedMessageIdsRef = useRef(new Set());
+  const lastTokenRef = useRef(null);
 
   const refreshChats = useCallback(async () => {
     if (!isAuthenticated()) return;
@@ -312,14 +313,51 @@ export const MessagingProvider = ({ children }) => {
   }, [refreshChats]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
+    const handleAuthMaybeChanged = () => {
       const token = getToken();
-      if (token) {
+      if (!token) {
+        lastTokenRef.current = null;
+        dispatch({ type: actionTypes.SET_CHATS, payload: { chats: [] } });
+        return;
+      }
+      if (lastTokenRef.current !== token) {
+        lastTokenRef.current = token;
         refreshChats();
       }
-    }, 1000);
-    return () => clearInterval(interval);
+    };
+
+    handleAuthMaybeChanged();
+
+    const onStorage = (e) => {
+      if (e?.key === 'token') {
+        handleAuthMaybeChanged();
+      }
+    };
+
+    const onFocus = () => handleAuthMaybeChanged();
+    const onVisibility = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        handleAuthMaybeChanged();
+      }
+    };
+
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, [refreshChats]);
+
+  useEffect(() => {
+    if (!isAuthenticated()) return;
+    if (connected) {
+      refreshChats();
+    }
+  }, [connected, refreshChats]);
 
   const setActiveChatId = useCallback((chatId) => {
     dispatch({ type: actionTypes.SET_ACTIVE_CHAT, payload: { chatId } });
