@@ -10,6 +10,7 @@ import { MESSAGE_STATUS } from '@/utils/messageQueue';
 import ChatSidebar from '@/component/ChatSidebar';
 import styles from '@/styles/chat.module.css';
 import { safeJsonParse, safeUnsubscribe } from '@/utils/safe';
+import { useChats } from '@/context/chats';
 
 const DUPLICATE_WINDOW_MS = 5000;
 
@@ -27,6 +28,7 @@ export default function ChatPage() {
   const { chatId } = router.query;
   const { client, connected } = useStomp();
   const user = getCurrentUser();
+  const { setActiveChatId, markChatAsRead } = useChats();
 
   const [chat, setChat] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -41,6 +43,43 @@ export default function ChatPage() {
   const messagesContainerRef = useRef(null);
   const subscriptionRef = useRef(null);
 
+  const loadChat = useCallback(async () => {
+    if (!chatId) return;
+    try {
+      const chatData = await chatAPI.getChat(chatId);
+      setChat(chatData);
+    } catch (error) {
+      if (error?.message?.includes('404')) {
+        router.push('/');
+      }
+    }
+  }, [chatId, router]);
+
+  const loadMessages = useCallback(async (pageNum = 0, append = false) => {
+    if (!chatId) return;
+    try {
+      setLoadingMore(true);
+      const response = await chatAPI.getMessages(chatId, {
+        page: pageNum,
+        size: 50,
+      });
+
+      if (append) {
+        setMessages(prev => [...response.content.reverse(), ...prev]);
+      } else {
+        setMessages(response.content.reverse());
+      }
+
+      setPage(response.number);
+      setHasMore(!response.last);
+      setLoading(false);
+    } catch (error) {
+      setLoading(false);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [chatId]);
+
   useEffect(() => {
     if (!isAuthenticated()) {
       router.push('/login');
@@ -50,7 +89,32 @@ export default function ChatPage() {
       loadChat();
       loadMessages(0);
     }
-  }, [chatId, router]);
+  }, [chatId, router, loadChat, loadMessages]);
+
+  useEffect(() => {
+    if (!chatId) return;
+    setActiveChatId(chatId);
+    markChatAsRead(chatId);
+    return () => setActiveChatId(null);
+  }, [chatId, setActiveChatId, markChatAsRead]);
+
+  useEffect(() => {
+    if (!chatId) return;
+
+    const tryMarkRead = () => {
+      if (typeof document === 'undefined') return;
+      if (document.visibilityState !== 'visible') return;
+      markChatAsRead(chatId);
+    };
+
+    window.addEventListener('focus', tryMarkRead);
+    document.addEventListener('visibilitychange', tryMarkRead);
+
+    return () => {
+      window.removeEventListener('focus', tryMarkRead);
+      document.removeEventListener('visibilitychange', tryMarkRead);
+    };
+  }, [chatId, markChatAsRead]);
 
   useEffect(() => {
     if (!chatId || !client || !connected || !client.connected || !client.active) return;
@@ -61,7 +125,7 @@ export default function ChatPage() {
     }
 
     try {
-      const sub = client.subscribe('/user/queue/messages', (message) => {
+      const sub = client.subscribe(`/topic/chat/${chatId}`, (message) => {
         const messageDto = safeJsonParse(message.body);
         if (!messageDto) return;
         if (Number(messageDto.chatId) !== Number(chatId)) return;
@@ -140,47 +204,13 @@ export default function ChatPage() {
 
       return prev;
     });
-  }, [user]);
+  }, []);
 
   const { sendMessage: sendMessageHook, sending, syncQueue } = useMessageSender(
     chatId,
     handleMessageSent
   );
 
-  const loadChat = async () => {
-    try {
-      const chatData = await chatAPI.getChat(chatId);
-      setChat(chatData);
-    } catch (error) {
-      if (error.message.includes('404')) {
-        router.push('/');
-      }
-    }
-  };
-
-  const loadMessages = async (pageNum = 0, append = false) => {
-    try {
-      setLoadingMore(true);
-      const response = await chatAPI.getMessages(chatId, {
-        page: pageNum,
-        size: 50,
-      });
-      
-      if (append) {
-        setMessages(prev => [...response.content.reverse(), ...prev]);
-      } else {
-        setMessages(response.content.reverse());
-      }
-      
-      setPage(response.number);
-      setHasMore(!response.last);
-      setLoading(false);
-    } catch (error) {
-      setLoading(false);
-    } finally {
-      setLoadingMore(false);
-    }
-  };
 
   useEffect(() => {
     if (connected && chatId) {

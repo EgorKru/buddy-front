@@ -106,6 +106,12 @@ export const chatAPI = {
       body: { content, type },
     });
   },
+
+  markChatAsRead: async (chatId) => {
+    return apiRequest(`/chats/${chatId}/read`, {
+      method: 'PUT',
+    });
+  },
 };
 
 export const userAPI = {

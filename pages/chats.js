@@ -2,17 +2,17 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
 import { MessageCircle, Search, ArrowLeft, Plus, X, UserPlus, Loader2 } from 'lucide-react';
-import { chatAPI, getCurrentUser, isAuthenticated } from '@/utils/api';
+import { getCurrentUser, isAuthenticated } from '@/utils/api';
 import { useCreateChat } from '@/hooks/useCreateChat';
 import { getChatName, getChatAvatar } from '@/utils/chatHelpers';
 import { formatChatListTime } from '@/utils/dateHelpers';
 import styles from '@/styles/chats.module.css';
+import { useChats } from '@/context/chats';
 
 export default function Chats() {
   const router = useRouter();
   const user = getCurrentUser();
-  const [chats, setChats] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { chats, loading, refreshChats } = useChats();
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   
@@ -23,8 +23,8 @@ export default function Chats() {
       router.push('/login');
       return;
     }
-    loadChats();
-  }, [router]);
+    refreshChats();
+  }, [router, refreshChats]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -40,23 +40,13 @@ export default function Chats() {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [createChat.showSearchResults]);
-
-  const loadChats = async () => {
-    try {
-      const data = await chatAPI.getChats();
-      setChats(data);
-    } catch (error) {
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [createChat]);
 
   const handleCreateChat = async (e) => {
     e.preventDefault();
     try {
       await createChat.handleCreateChat(async () => {
-        await loadChats();
+        await refreshChats();
         handleCloseModal();
       });
     } catch (error) {
