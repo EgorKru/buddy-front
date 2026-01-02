@@ -25,6 +25,18 @@ export const useMessageSender = (chatId, onMessageSent) => {
   const messageSentSubscriptionRef = useRef(null);
   const userMessagesSubscriptionRef = useRef(null);
   const lastSentMessageRef = useRef(null); // Для связи с подтверждениями
+  const processedMessagesRef = useRef(new Set()); // Для дедупликации сообщений
+  
+  // Очистка старых записей дедупликации (каждые 5 минут)
+  useEffect(() => {
+    const cleanupInterval = setInterval(() => {
+      if (processedMessagesRef.current.size > 100) {
+        processedMessagesRef.current.clear();
+      }
+    }, 5 * 60 * 1000);
+    
+    return () => clearInterval(cleanupInterval);
+  }, []);
 
   /**
    * Отправляет сообщение через WebSocket или REST API
@@ -277,6 +289,15 @@ export const useMessageSender = (chatId, onMessageSent) => {
         try {
           const messageDto = JSON.parse(message.body);
           
+          // Дедупликация: проверяем, не обработали ли мы уже это сообщение
+          const messageKey = messageDto.id ? `id:${messageDto.id}` : 
+            `content:${messageDto.chatId}:${messageDto.content}:${messageDto.senderId}:${messageDto.createdAt}`;
+          
+          if (processedMessagesRef.current.has(messageKey)) {
+            // Уже обработано, пропускаем
+            return;
+          }
+          
           // Найти оптимистичное сообщение по tempId или по content + chatId + senderId
           if (onMessageSent) {
             // Сначала ищем по tempId в последнем отправленном сообщении
@@ -301,6 +322,9 @@ export const useMessageSender = (chatId, onMessageSent) => {
             }
             
             if (tempId) {
+              // Помечаем как обработанное
+              processedMessagesRef.current.add(messageKey);
+              
               // Обновляем статус в очереди
               updateMessageStatus(tempId, MESSAGE_STATUS.SENT, messageDto);
               
@@ -382,6 +406,15 @@ export const useMessageSender = (chatId, onMessageSent) => {
           const confirmation = JSON.parse(message.body);
 
           if (confirmation.status === 'sent') {
+            // Дедупликация: проверяем, не обработали ли мы уже это подтверждение
+            const confirmationKey = confirmation.messageId ? 
+              `confirm:${confirmation.messageId}` : 
+              `confirm:${confirmation.chatId}:${Date.now()}`;
+            
+            if (processedMessagesRef.current.has(confirmationKey)) {
+              // Уже обработано, пропускаем
+              return;
+            }
             
             let queuedMessage = null;
             
@@ -406,6 +439,14 @@ export const useMessageSender = (chatId, onMessageSent) => {
             }
 
             if (queuedMessage) {
+              // Помечаем как обработанное
+              processedMessagesRef.current.add(confirmationKey);
+              
+              // Если есть messageId, также помечаем по нему
+              if (confirmation.messageId) {
+                processedMessagesRef.current.add(`id:${confirmation.messageId}`);
+              }
+              
               // Обновляем статус в очереди
               updateMessageStatus(queuedMessage.tempId, MESSAGE_STATUS.SENT);
               

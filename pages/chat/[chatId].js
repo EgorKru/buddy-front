@@ -284,12 +284,14 @@ export default function ChatPage() {
 
   const sendMessage = async (e) => {
     e.preventDefault();
+    e.stopPropagation(); // Предотвращаем всплытие события
+    
     if (!newMessage.trim() || !user || sending) {
       return;
     }
 
     const messageContent = newMessage.trim();
-    setNewMessage('');
+    setNewMessage(''); // Очищаем поле сразу, чтобы предотвратить повторную отправку
 
     const result = await sendMessageHook(messageContent, 'TEXT');
     
