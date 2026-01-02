@@ -69,6 +69,11 @@ export default function ChatPage() {
     // Если это реальное сообщение (с tempId для замены оптимистичного)
     if (tempId) {
       setMessages(prev => {
+        // Сначала проверяем дубликаты по id - если сообщение уже есть, ничего не делаем
+        if (message.id && prev.some(m => Number(m.id) === Number(message.id))) {
+          return prev;
+        }
+        
         // Найти оптимистичное сообщение по tempId
         const optimisticIndex = prev.findIndex(m => 
           m.tempId === tempId && m.isOptimistic === true
@@ -111,15 +116,9 @@ export default function ChatPage() {
           }
         }
         
-        // Если не нашли, проверяем дубликаты по id
-        if (prev.some(m => Number(m.id) === Number(message.id))) {
-          return prev;
-        }
-        
-        // Добавляем новое, если не нашли оптимистичное
-        const newMsg = { ...message, status: message.status || MESSAGE_STATUS.SENT, isOptimistic: false };
-        delete newMsg.tempId;
-        return [...prev, newMsg];
+        // Если не нашли оптимистичное сообщение и нет ID - это не наше сообщение для замены
+        // Не добавляем новое сообщение здесь - оно придет через топик чата
+        return prev;
       });
     }
   }, []);
@@ -169,22 +168,10 @@ export default function ChatPage() {
 
   const subscribeToChat = () => {
     if (!client || !connected || !chatId) {
-      console.log('⚠️ Не могу подписаться на чат:', { 
-        client: !!client, 
-        connected, 
-        chatId,
-        clientConnected: client?.connected,
-        clientActive: client?.active
-      });
       return;
     }
     
     if (!client.connected || !client.active) {
-      console.log('⚠️ Клиент не подключен или не активен:', {
-        connected: client.connected,
-        active: client.active,
-        state: client.state
-      });
       return;
     }
 
@@ -192,9 +179,8 @@ export default function ChatPage() {
     if (subscriptionRef.current) {
       try {
         subscriptionRef.current.unsubscribe();
-        console.log('🔌 Отписались от старой подписки на чат:', chatId);
       } catch (error) {
-        console.error('❌ Ошибка отписки от старой подписки:', error);
+        // Игнорируем ошибки отписки
       }
       subscriptionRef.current = null;
     }
@@ -218,6 +204,17 @@ export default function ChatPage() {
               // Оно уже обработано через подтверждение из /user/queue/message-sent
               if (user && Number(messageDto.senderId) === Number(user.id)) {
                 return prev; // Игнорируем свои сообщения из топика
+              }
+              
+              // 2.5. Дополнительная проверка на дубликаты по content + senderId + время (в пределах 5 секунд)
+              const duplicateByContent = prev.find(m => {
+                if (Number(m.senderId) !== Number(messageDto.senderId)) return false;
+                if (String(m.content || '').trim() !== String(messageDto.content || '').trim()) return false;
+                const timeDiff = Math.abs(new Date(m.createdAt) - new Date(messageDto.createdAt));
+                return timeDiff < 5000; // В пределах 5 секунд
+              });
+              if (duplicateByContent) {
+                return prev; // Дубликат, пропускаем
               }
               
               // 3. Ищем оптимистичное сообщение для замены (на случай, если это чужое сообщение)
@@ -254,13 +251,13 @@ export default function ChatPage() {
               }];
             });
           } catch (error) {
-            console.error('Ошибка парсинга сообщения:', error);
+            // Игнорируем ошибки парсинга
           }
         }
       );
       subscriptionRef.current = subscription;
     } catch (error) {
-      console.error('❌ Ошибка подписки на чат:', error);
+      // Игнорируем ошибки подписки
     }
   };
 
@@ -268,9 +265,6 @@ export default function ChatPage() {
     if (subscriptionRef.current) {
       subscriptionRef.current.unsubscribe();
       subscriptionRef.current = null;
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Отписались от чата:', chatId);
-      }
     }
   };
 

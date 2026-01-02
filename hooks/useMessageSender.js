@@ -157,7 +157,6 @@ export const useMessageSender = (chatId, onMessageSent) => {
     const maxRetries = 3;
     
     if (retryCount >= maxRetries) {
-      console.warn('Достигнуто максимальное количество попыток для сообщения:', message.tempId);
       return;
     }
 
@@ -279,7 +278,7 @@ export const useMessageSender = (chatId, onMessageSent) => {
       try {
         userMessagesSubscriptionRef.current.unsubscribe();
       } catch (error) {
-        console.error('Ошибка отписки от старой подписки на /user/queue/messages:', error);
+        // Игнорируем ошибки отписки
       }
       userMessagesSubscriptionRef.current = null;
     }
@@ -322,8 +321,11 @@ export const useMessageSender = (chatId, onMessageSent) => {
             }
             
             if (tempId) {
-              // Помечаем как обработанное
+              // Помечаем как обработанное ДО вызова onMessageSent
               processedMessagesRef.current.add(messageKey);
+              if (messageDto.id) {
+                processedMessagesRef.current.add(`id:${messageDto.id}`);
+              }
               
               // Обновляем статус в очереди
               updateMessageStatus(tempId, MESSAGE_STATUS.SENT, messageDto);
@@ -341,6 +343,16 @@ export const useMessageSender = (chatId, onMessageSent) => {
                 ...messageDto,
                 status: MESSAGE_STATUS.SENT,
               }, tempId);
+            } else {
+              // Если не нашли tempId, но это наше сообщение - помечаем как обработанное
+              // чтобы не обрабатывать его снова
+              const user = getCurrentUser();
+              if (user && Number(messageDto.senderId) === Number(user.id)) {
+                processedMessagesRef.current.add(messageKey);
+                if (messageDto.id) {
+                  processedMessagesRef.current.add(`id:${messageDto.id}`);
+                }
+              }
             }
           }
         } catch (error) {
@@ -367,26 +379,12 @@ export const useMessageSender = (chatId, onMessageSent) => {
   useEffect(() => {
     // Ждем подключения WebSocket
     if (!client || !connected) {
-      console.log('⚠️ useMessageSender: Ожидаем подключения WebSocket:', {
-        hasClient: !!client,
-        connected,
-        clientConnected: client?.connected,
-        clientActive: client?.active
-      });
       return;
     }
     
     // Проверяем, что клиент действительно подключен и активен
     if (!client.connected || !client.active) {
-      console.log('⚠️ useMessageSender: Клиент не подключен или не активен, ждем...');
-      // Повторяем попытку через небольшую задержку
-      const timeout = setTimeout(() => {
-        if (client.connected && client.active) {
-          // Перезапустим эффект
-          console.log('✅ useMessageSender: Клиент подключен, переподписываемся');
-        }
-      }, 500);
-      return () => clearTimeout(timeout);
+      return;
     }
 
     
@@ -412,6 +410,12 @@ export const useMessageSender = (chatId, onMessageSent) => {
               `confirm:${confirmation.chatId}:${Date.now()}`;
             
             if (processedMessagesRef.current.has(confirmationKey)) {
+              // Уже обработано, пропускаем
+              return;
+            }
+            
+            // Также проверяем по messageId, если он есть
+            if (confirmation.messageId && processedMessagesRef.current.has(`id:${confirmation.messageId}`)) {
               // Уже обработано, пропускаем
               return;
             }
@@ -481,8 +485,6 @@ export const useMessageSender = (chatId, onMessageSent) => {
                   }, queuedMessage.tempId);
                 }
               }
-            } else {
-              console.warn('⚠️ Не найдено сообщение для подтверждения:', confirmation);
             }
           } else if (confirmation.status === 'failed') {
             // Ошибка отправки
@@ -520,25 +522,16 @@ export const useMessageSender = (chatId, onMessageSent) => {
               }
 
               // Показываем ошибку пользователю
-              if (confirmation.errorMessage) {
-                console.error('Ошибка отправки сообщения:', confirmation.errorMessage);
-                if (typeof window !== 'undefined') {
-                  alert(`Не удалось отправить сообщение: ${confirmation.errorMessage}`);
-                }
+              if (confirmation.errorMessage && typeof window !== 'undefined') {
+                alert(`Не удалось отправить сообщение: ${confirmation.errorMessage}`);
               }
 
               // Планируем повторную попытку через REST API
               scheduleRetry(queuedMessage, confirmation.chatId, onMessageSent);
-            } else {
-              if (process.env.NODE_ENV === 'development') {
-                console.warn('Не найдено сообщение для обработки ошибки:', confirmation);
-              }
             }
           }
         } catch (error) {
-          console.error('❌ ОШИБКА обработки подтверждения отправки:', error);
-          console.error('❌ Stack trace:', error.stack);
-          console.error('❌ Confirmation data:', message?.body);
+          // Игнорируем ошибки обработки
         }
       });
 
