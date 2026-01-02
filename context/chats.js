@@ -16,7 +16,14 @@ const getNotificationChatId = (n) => {
 };
 
 const getNotificationMessage = (n) => {
-  return n?.message ?? n?.payload?.message ?? n;
+  if (n?.message || n?.payload?.message) return n?.message ?? n?.payload?.message;
+  if (n?.content || n?.createdAt) {
+    return {
+      content: n?.content,
+      createdAt: n?.createdAt,
+    };
+  }
+  return n;
 };
 
 const sortChatsByLastActivity = (list) => {
@@ -39,6 +46,7 @@ export const useChats = () => {
     setActiveChatId: () => {},
     markChatAsRead: async () => {},
     readReceiptsByChatId: {},
+    bumpChatLastMessage: () => {},
   };
 };
 
@@ -49,8 +57,11 @@ export const ChatsProvider = ({ children }) => {
   const [activeChatId, setActiveChatIdState] = useState(null);
   const [readReceiptsByChatId, setReadReceiptsByChatId] = useState({});
   const subscriptionRef = useRef(null);
+  const notificationsSubscriptionRef = useRef(null);
   const readSubscriptionsRef = useRef(new Map());
   const lastReadAtRef = useRef(new Map());
+  const lastRefreshAtRef = useRef(0);
+  const lastSoundAtRef = useRef(0);
 
   const refreshChats = useCallback(async () => {
     setLoading(true);
@@ -64,6 +75,13 @@ export const ChatsProvider = ({ children }) => {
       setLoading(false);
     }
   }, []);
+
+  const refreshChatsThrottled = useCallback(async () => {
+    const now = Date.now();
+    if (now - lastRefreshAtRef.current < 1000) return;
+    lastRefreshAtRef.current = now;
+    await refreshChats();
+  }, [refreshChats]);
 
   useEffect(() => {
     refreshChats();
@@ -131,10 +149,14 @@ export const ChatsProvider = ({ children }) => {
 
     const isVisible = typeof document !== 'undefined' && document.visibilityState === 'visible';
     const isActive = activeChatId && String(activeChatId) === String(chatId);
+    const shouldSound = !isOwnMessage && (!isActive || !isVisible);
 
     setChats(prev => {
       const idx = prev.findIndex(c => String(c.id) === String(chatId));
-      if (idx === -1) return prev;
+      if (idx === -1) {
+        refreshChatsThrottled();
+        return prev;
+      }
 
       const current = prev[idx];
       const unreadInc = isOwnMessage ? 0 : (isActive && isVisible ? 0 : 1);
@@ -158,7 +180,70 @@ export const ChatsProvider = ({ children }) => {
     if (isActive && isVisible) {
       markChatAsRead(chatId);
     }
-  }, [activeChatId, markChatAsRead]);
+
+    if (shouldSound) {
+      try {
+        if (typeof window !== 'undefined') {
+          const disabled = localStorage.getItem('disable_notification_sound') === 'true';
+          const now = Date.now();
+          if (!disabled && now - lastSoundAtRef.current > 500) {
+            lastSoundAtRef.current = now;
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) {
+              const ctx = new AudioCtx();
+              const o = ctx.createOscillator();
+              const g = ctx.createGain();
+              o.type = 'sine';
+              o.frequency.value = 880;
+              g.gain.value = 0.04;
+              o.connect(g);
+              g.connect(ctx.destination);
+              o.start();
+              o.stop(ctx.currentTime + 0.08);
+              setTimeout(() => {
+                try { ctx.close(); } catch (e) {}
+              }, 150);
+            }
+          }
+        }
+      } catch (e) {}
+    }
+  }, [activeChatId, markChatAsRead, refreshChatsThrottled]);
+
+  const bumpChatLastMessage = useCallback((chatId, message, currentUserId) => {
+    if (!chatId || !message) return;
+    const cid = String(chatId);
+
+    const nextLastMessage = {
+      ...(message?.id ? { id: message.id } : null),
+      ...(message?.senderId ? { senderId: message.senderId } : (currentUserId ? { senderId: currentUserId } : null)),
+      ...(message?.senderUsername ? { senderUsername: message.senderUsername } : null),
+      ...(message?.senderDisplayName ? { senderDisplayName: message.senderDisplayName } : null),
+      ...(message?.content ? { content: message.content } : null),
+      ...(message?.type ? { type: message.type } : null),
+      ...(toIso(message?.createdAt) ? { createdAt: toIso(message.createdAt) } : { createdAt: new Date().toISOString() }),
+    };
+
+    setChats(prev => {
+      const idx = prev.findIndex(c => String(c.id) === cid);
+      if (idx === -1) {
+        refreshChatsThrottled();
+        return prev;
+      }
+
+      const current = prev[idx];
+      const updatedChat = {
+        ...current,
+        lastMessage: { ...(current.lastMessage || {}), ...nextLastMessage },
+        updatedAt: toIso(nextLastMessage.createdAt) || current.updatedAt,
+      };
+
+      const next = [...prev];
+      next.splice(idx, 1);
+      next.unshift(updatedChat);
+      return next;
+    });
+  }, [refreshChatsThrottled]);
 
   useEffect(() => {
     if (!client || !connected || !client.connected || !client.active) return;
@@ -166,6 +251,10 @@ export const ChatsProvider = ({ children }) => {
     if (subscriptionRef.current) {
       safeUnsubscribe(subscriptionRef.current);
       subscriptionRef.current = null;
+    }
+    if (notificationsSubscriptionRef.current) {
+      safeUnsubscribe(notificationsSubscriptionRef.current);
+      notificationsSubscriptionRef.current = null;
     }
 
     try {
@@ -177,10 +266,24 @@ export const ChatsProvider = ({ children }) => {
       subscriptionRef.current = sub;
     } catch (e) {}
 
+    try {
+      const sub = client.subscribe('/user/queue/notifications', (message) => {
+        const notification = safeJsonParse(message.body);
+        if (!notification) return;
+        if (!getNotificationChatId(notification)) return;
+        handleNotification(notification);
+      });
+      notificationsSubscriptionRef.current = sub;
+    } catch (e) {}
+
     return () => {
       if (subscriptionRef.current) {
         safeUnsubscribe(subscriptionRef.current);
         subscriptionRef.current = null;
+      }
+      if (notificationsSubscriptionRef.current) {
+        safeUnsubscribe(notificationsSubscriptionRef.current);
+        notificationsSubscriptionRef.current = null;
       }
     };
   }, [client, connected, handleNotification]);
@@ -248,8 +351,9 @@ export const ChatsProvider = ({ children }) => {
       setActiveChatId,
       markChatAsRead,
       readReceiptsByChatId,
+      bumpChatLastMessage,
     };
-  }, [chats, loading, refreshChats, activeChatId, setActiveChatId, markChatAsRead, readReceiptsByChatId]);
+  }, [chats, loading, refreshChats, activeChatId, setActiveChatId, markChatAsRead, readReceiptsByChatId, bumpChatLastMessage]);
 
   return (
     <ChatsContext.Provider value={value}>

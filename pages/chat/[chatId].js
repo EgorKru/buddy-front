@@ -28,7 +28,7 @@ export default function ChatPage() {
   const { chatId } = router.query;
   const { client, connected } = useStomp();
   const user = getCurrentUser();
-  const { setActiveChatId, markChatAsRead, readReceiptsByChatId } = useChats();
+  const { setActiveChatId, markChatAsRead, readReceiptsByChatId, bumpChatLastMessage } = useChats();
 
   const [chat, setChat] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -136,6 +136,10 @@ export default function ChatPage() {
           if (prev.some(m => isDuplicate(m, messageDto))) return prev;
           return [...prev, { ...messageDto, status: MESSAGE_STATUS.SENT, isOptimistic: false }];
         });
+
+        if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+          markChatAsRead(chatId);
+        }
       });
 
       subscriptionRef.current = sub;
@@ -147,7 +151,7 @@ export default function ChatPage() {
         subscriptionRef.current = null;
       }
     };
-  }, [chatId, client, connected, user]);
+  }, [chatId, client, connected, user, markChatAsRead]);
 
   useEffect(() => {
     scrollToBottom();
@@ -157,6 +161,7 @@ export default function ChatPage() {
     if (!confirmation || !confirmation.message) return;
 
     const message = confirmation.message;
+    bumpChatLastMessage(chatId, message, user?.id);
 
     setMessages(prev => {
       if (message.id && prev.some(m => Number(m.id) === Number(message.id))) {
@@ -204,7 +209,7 @@ export default function ChatPage() {
 
       return prev;
     });
-  }, []);
+  }, [bumpChatLastMessage, chatId, user?.id]);
 
   const { sendMessage: sendMessageHook, sending, syncQueue } = useMessageSender(
     chatId,
@@ -230,11 +235,13 @@ export default function ChatPage() {
     const result = await sendMessageHook(messageContent, 'TEXT');
 
     if (result?.serverMessage) {
+      bumpChatLastMessage(chatId, result.serverMessage, user?.id);
       setMessages(prev => {
         if (prev.some(m => Number(m.id) === Number(result.serverMessage.id))) return prev;
         return [...prev, { ...result.serverMessage, status: MESSAGE_STATUS.SENT, isOptimistic: false }];
       });
     } else if (result?.optimisticMessage) {
+      bumpChatLastMessage(chatId, result.optimisticMessage, user?.id);
       setMessages(prev => {
         if (prev.some(m => m.tempId && result.tempId && m.tempId === result.tempId)) return prev;
         if (prev.some(m => m.id === result.optimisticMessage.id)) return prev;

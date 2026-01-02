@@ -226,8 +226,9 @@
 
 .unreadBadge {
   position: absolute;
-  top: 20px;
+  top: 50%;
   right: 24px;
+  transform: translateY(-50%);
   background: rgb(102, 126, 234);
   color: white;
   border-radius: 12px;
