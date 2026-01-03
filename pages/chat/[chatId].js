@@ -217,8 +217,15 @@ export default function ChatPage() {
 
     const useNewProtocol = typeof window !== 'undefined' && localStorage.getItem('use_voice_protocol') !== 'false';
 
+    if (typeof window !== 'undefined') {
+      console.log('[Voice] Protocol:', useNewProtocol ? 'NEW (Pager Voice Protocol)' : 'SIMPLE (REST + WebSocket)');
+    }
+
     if (useNewProtocol) {
       try {
+        if (typeof window !== 'undefined') {
+          console.log('[Voice] Initiating new protocol...');
+        }
         voiceProtocol.initiate();
         
         await new Promise((resolve, reject) => {
@@ -246,9 +253,15 @@ export default function ChatPage() {
           }, 100);
         });
       } catch (error) {
+        if (typeof window !== 'undefined') {
+          console.warn('[Voice] New protocol failed, falling back to simple method:', error);
+        }
         await handleVoiceSendSimple();
       }
     } else {
+      if (typeof window !== 'undefined') {
+        console.log('[Voice] Using simple method (protocol disabled)');
+      }
       await handleVoiceSendSimple();
     }
   }, [audioBlob, user, sending, voiceProtocol, handleVoiceSendSimple, resetVoice]);

@@ -95,6 +95,9 @@ export const useVoiceProtocol = (chatId) => {
 
   const handleSignalResponse = useCallback((response) => {
     if (!response?.type) return;
+    if (typeof window !== 'undefined') {
+      console.log('[Voice Protocol] Received signal:', response.type, { relaySessionId: response.relaySessionId, remoteEndpoint: response.remoteEndpoint, hasSdp: !!response.sdp });
+    }
     switch (response.type) {
       case VOICE_SIGNAL_TYPES.OFFER:
         if (response.relaySessionId) {
@@ -182,27 +185,35 @@ export const useVoiceProtocol = (chatId) => {
         webrtcPeerRef.current = webrtc;
         const offer = await webrtc.createOffer();
 
+        const payload = {
+          type: VOICE_SIGNAL_TYPES.INITIATE,
+          chatId: parseInt(chatId),
+          sdp: offer.sdp,
+          localEndpoint: offer.localEndpoint,
+          ...codecParams,
+        };
+        if (typeof window !== 'undefined') {
+          console.log('[Voice Protocol] Sending INITIATE with WebRTC SDP:', { type: payload.type, chatId: payload.chatId, hasSdp: !!payload.sdp });
+        }
         client.publish({
           destination: '/app/voice.signal',
-          body: JSON.stringify({
-            type: VOICE_SIGNAL_TYPES.INITIATE,
-            chatId: parseInt(chatId),
-            sdp: offer.sdp,
-            localEndpoint: offer.localEndpoint,
-            ...codecParams,
-          }),
+          body: JSON.stringify(payload),
         });
         return;
       } catch (error) {}
     }
 
+    const payload = {
+      type: VOICE_SIGNAL_TYPES.INITIATE,
+      chatId: parseInt(chatId),
+      ...codecParams,
+    };
+    if (typeof window !== 'undefined') {
+      console.log('[Voice Protocol] Sending INITIATE without WebRTC (fallback):', { type: payload.type, chatId: payload.chatId });
+    }
     client.publish({
       destination: '/app/voice.signal',
-      body: JSON.stringify({
-        type: VOICE_SIGNAL_TYPES.INITIATE,
-        chatId: parseInt(chatId),
-        ...codecParams,
-      }),
+      body: JSON.stringify(payload),
     });
   }, [client, connected, chatId]);
 
@@ -271,9 +282,16 @@ export const useVoiceProtocol = (chatId) => {
 
     if (dataChannelRef.current && dataChannelRef.current.readyState === 'open') {
       if (webrtcPeerRef.current) {
+        if (typeof window !== 'undefined') {
+          console.log('[Voice Protocol] Sending audio via WebRTC DataChannel');
+        }
         webrtcPeerRef.current.sendAudioData(audioData);
         return;
       }
+    }
+
+    if (typeof window !== 'undefined') {
+      console.log('[Voice Protocol] Sending audio via WebSocket fallback');
     }
 
     if (!client || !connected || !client.connected || !client.active) {
