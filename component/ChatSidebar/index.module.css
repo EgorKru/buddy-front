@@ -173,6 +173,11 @@
   border-left: 3px solid rgb(102, 126, 234);
 }
 
+.chatAvatarWrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
 .chatAvatar {
   width: 48px;
   height: 48px;
@@ -183,6 +188,17 @@
   justify-content: center;
   color: white;
   flex-shrink: 0;
+}
+
+.onlineIndicator {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 12px;
+  height: 12px;
+  background: rgb(34, 197, 94);
+  border: 2px solid rgb(30, 30, 35);
+  border-radius: 50%;
 }
 
 .chatAvatar img {

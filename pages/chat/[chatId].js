@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import { Send, Loader2, Menu, Check, CheckCheck, AlertCircle, Clock } from 'lucide-react';
 import { chatAPI, getCurrentUser, isAuthenticated } from '@/utils/api';
 import { getChatName } from '@/utils/chatHelpers';
-import { formatChatDate, formatChatTime } from '@/utils/dateHelpers';
+import { formatChatDate, formatChatTime, getOnlineStatus } from '@/utils/dateHelpers';
 import { useMessageSender } from '@/hooks/useMessageSender';
 import { MESSAGE_STATUS } from '@/utils/messageQueue';
 import ChatSidebar from '@/component/ChatSidebar';
@@ -195,6 +195,14 @@ export default function ChatPage() {
     return getChatName(chat, user);
   };
 
+  const getOtherParticipantStatus = () => {
+    if (!chat?.participants || !user?.id) return { text: '', online: false };
+    if (chat.type !== 'DIRECT') return { text: `${chat.participants?.length || 0} участников`, online: false };
+    
+    const other = chat.participants.find(p => Number(p.id) !== Number(user.id));
+    return getOnlineStatus(other, user.id);
+  };
+
   if (loading) {
     return (
       <div className={styles.container}>
@@ -224,6 +232,18 @@ export default function ChatPage() {
           </button>
           <div className={styles.chatInfo}>
             <h1>{getDisplayChatName()}</h1>
+            {(() => {
+              const status = getOtherParticipantStatus();
+              if (!status.text) return null;
+              return (
+                <div className={styles.onlineStatus}>
+                  {status.online && <span className={styles.onlineDot} />}
+                  <span className={status.online ? styles.onlineText : styles.offlineText}>
+                    {status.text}
+                  </span>
+                </div>
+              );
+            })()}
           </div>
         </div>
 

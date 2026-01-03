@@ -167,6 +167,30 @@
   background: #4caf50;
 }
 
+.onlineStatus {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+}
+
+.onlineDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  flex-shrink: 0;
+}
+
+.onlineText {
+  color: #22c55e;
+  font-weight: 500;
+}
+
+.offlineText {
+  color: #888;
+}
+
 .messagesContainer {
   flex: 1;
   overflow-y: auto;

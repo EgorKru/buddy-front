@@ -5,7 +5,7 @@ import { MessageCircle, Search, Plus, X, Loader2, Check, CheckCheck, UserPlus } 
 import { getCurrentUser } from '@/utils/api';
 import { useCreateChat } from '@/hooks/useCreateChat';
 import { getChatName, getChatAvatar } from '@/utils/chatHelpers';
-import { formatChatListTime } from '@/utils/dateHelpers';
+import { formatChatListTime, getOnlineStatus } from '@/utils/dateHelpers';
 import styles from '@/component/ChatSidebar/index.module.css';
 import { useChats } from '@/context/messaging';
 
@@ -74,6 +74,13 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
     return { isRead: readCount > 0, readCount, totalOthers };
   };
 
+  const getOtherParticipantOnline = (chat) => {
+    if (!chat?.participants || !user?.id) return false;
+    if (chat.type !== 'DIRECT') return false;
+    const other = chat.participants.find(p => Number(p.id) !== Number(user.id));
+    return other?.online || false;
+  };
+
   const isDesktop = typeof window !== 'undefined' && window.innerWidth > 768;
   const shouldShow = isDesktop || isOpen;
 
@@ -133,19 +140,24 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
                   if (onClose) onClose();
                 }}
               >
-                <div className={styles.chatAvatar}>
-                {getChatAvatar(chat, user) ? (
-                  <Image
-                    src={getChatAvatar(chat, user)}
-                    alt=""
-                    width={32}
-                    height={32}
-                    unoptimized
-                  />
-                ) : (
-                  <MessageCircle size={20} />
-                )}
-              </div>
+                <div className={styles.chatAvatarWrapper}>
+                  <div className={styles.chatAvatar}>
+                    {getChatAvatar(chat, user) ? (
+                      <Image
+                        src={getChatAvatar(chat, user)}
+                        alt=""
+                        width={32}
+                        height={32}
+                        unoptimized
+                      />
+                    ) : (
+                      <MessageCircle size={20} />
+                    )}
+                  </div>
+                  {getOtherParticipantOnline(chat) && (
+                    <span className={styles.onlineIndicator} title="Онлайн" />
+                  )}
+                </div>
               <div className={styles.chatInfo}>
                 <div className={styles.chatHeader}>
                   <span className={styles.chatName}>{getChatName(chat, user)}</span>
