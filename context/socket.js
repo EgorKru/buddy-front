@@ -148,8 +148,14 @@ export const StompProvider = (props) => {
           if (!destroyed) {
             setConnected(false);
             if (transportRef.current === 'auto' && !fallbackTriedRef.current) {
+              fallbackTriedRef.current = true;
+              clientRef.current = null;
               try { stompClient.deactivate(); } catch (e) {}
-              connect(token, true);
+              setTimeout(() => {
+                if (!destroyed && !clientRef.current) {
+                  connect(token, true);
+                }
+              }, 100);
             }
           }
         },
@@ -188,7 +194,7 @@ export const StompProvider = (props) => {
       }
 
       if (!clientRef.current) {
-        connect(tokenRef.current);
+        connect(tokenRef.current, fallbackTriedRef.current);
       }
     };
 
