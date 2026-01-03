@@ -57,8 +57,8 @@ const ensureSockJsHttpUrl = (url) => {
 
 const getTransportPreference = () => {
   const pref = process.env.NEXT_PUBLIC_STOMP_TRANSPORT;
-  if (pref === 'native' || pref === 'sockjs') return pref;
-  return 'auto';
+  if (pref === 'native' || pref === 'sockjs' || pref === 'auto') return pref;
+  return 'native';
 };
 
 export const StompProvider = (props) => {
