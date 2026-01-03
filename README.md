@@ -2,13 +2,27 @@
 
 Frontend для Pager - платформы для видеозвонков и мессенджера.
 
+## 🎉 Версия 1.0.0 - MVP (Минимально жизнеспособный продукт)
+
+**Первая стабильная версия MVP** включает:
+
+- **Реалтайм мессенджер** с WebSocket (STOMP)
+- **Онлайн-статус пользователей** в реальном времени
+- **Read receipts** (галочки прочтения сообщений)
+- **Уведомления** с звуком пейджера и badge в браузере
+- **Видеозвонки** через WebRTC (PeerJS)
+- **Групповые и прямые чаты**
+- **Авторизация и регистрация**
+
 ## Технологии
 
-- Next.js 13.5
-- React 18
-- Socket.io Client
-- PeerJS (WebRTC)
-- Tailwind CSS
+- **Next.js 13.5** - React фреймворк
+- **React 18** - UI библиотека
+- **@stomp/stompjs** - STOMP протокол для WebSocket
+- **Native WebSocket** - прямое WebSocket соединение (без SockJS)
+- **PeerJS** - WebRTC для видеозвонков
+- **Tailwind CSS** - стилизация
+- **Lucide React** - иконки
 
 ## Требования
 
@@ -23,205 +37,256 @@ npm install
 
 ## Запуск
 
+### Разработка
+
 ```bash
 npm run dev
 ```
 
-Frontend запустится на `http://localhost:3000` (или следующем доступном порту)
+Frontend запустится на `http://localhost:3000`
+
+### Production
+
+```bash
+npm run build
+npm start
+```
 
 ## Конфигурация
 
 ### Переменные окружения
 
-Создайте файл `.env.local` в корне проекта (можно скопировать из `.env.example`):
+Создайте файл `.env.local` в корне проекта:
 
 ```bash
 # API Configuration
 NEXT_PUBLIC_API_URL=http://localhost:8080/api
 
-# WebSocket Configuration (опционально, по умолчанию берется из API_URL)
-NEXT_PUBLIC_WS_URL=ws://localhost:8080/ws
-# Альтернативно можно использовать NEXT_PUBLIC_SOCKET_URL для обратной совместимости
+# WebSocket Configuration
+# Native WebSocket (рекомендуется)
+NEXT_PUBLIC_WS_NATIVE_URL=wss://pager.website/ws-native
+
+# SockJS fallback (опционально)
+NEXT_PUBLIC_WS_SOCKJS_URL=https://pager.website/ws
 
 # Environment
 NODE_ENV=development
 ```
 
 **Важно:**
-- `NEXT_PUBLIC_API_URL` - URL вашего бэкенда с путем `/api` в конце
-- `NEXT_PUBLIC_WS_URL` - URL для WebSocket соединений (STOMP через SockJS) с путем `/ws` в конце
-- Если `NEXT_PUBLIC_WS_URL` не указан, он автоматически берется из `NEXT_PUBLIC_API_URL` (заменяя `/api` на `/ws`)
-- Для обратной совместимости также поддерживается `NEXT_PUBLIC_SOCKET_URL` (будет автоматически добавлен `/ws`)
+- `NEXT_PUBLIC_API_URL` - URL бэкенда с путем `/api`
+- `NEXT_PUBLIC_WS_NATIVE_URL` - Native WebSocket endpoint (рекомендуется)
+- `NEXT_PUBLIC_WS_SOCKJS_URL` - SockJS fallback (если native не работает)
+- Если переменные не указаны, используются значения по умолчанию из `utils/config.js`
 
 ### Настройка для разных окружений
 
 **Разработка (локально):**
 ```bash
 NEXT_PUBLIC_API_URL=http://localhost:8080/api
-NEXT_PUBLIC_WS_URL=ws://localhost:8080/ws
+NEXT_PUBLIC_WS_NATIVE_URL=ws://localhost:8080/ws-native
 ```
 
-**Продакшн (текущий сервер):**
+**Продакшн:**
 ```bash
 NEXT_PUBLIC_API_URL=https://pager.website/api
-NEXT_PUBLIC_WS_URL=wss://pager.website/ws
+NEXT_PUBLIC_WS_NATIVE_URL=wss://pager.website/ws-native
 ```
 
-## Развертывание на сервере
+## Развертывание
 
-### С использованием Docker
+### Автоматическое развертывание (GitHub Actions)
 
-1. **Убедитесь, что Docker и Docker Compose установлены на сервере**
+Проект использует GitHub Actions для автоматического деплоя на сервер:
 
-2. **Клонируйте репозиторий на сервер:**
+1. При push в ветку `main` автоматически запускается workflow
+2. Код клонируется на сервер
+3. Docker контейнер пересобирается и перезапускается
+4. Логи выводятся в GitHub Actions
+
+Workflow файл: `.github/workflows/deploy.yml`
+
+### Ручное развертывание с Docker
+
+1. **Клонируйте репозиторий на сервер:**
 ```bash
-git clone <your-repo-url>
-cd pager-front
+git clone git@github.com:EgorKru/buddy-front.git
+cd buddy-front
 ```
 
-3. **Создайте файл `.env.production` с настройками:**
+2. **Создайте файл `.env.production`:**
 ```bash
 NEXT_PUBLIC_API_URL=https://pager.website/api
-NEXT_PUBLIC_WS_URL=wss://pager.website/ws
+NEXT_PUBLIC_WS_NATIVE_URL=wss://pager.website/ws-native
 NODE_ENV=production
 ```
 
-4. **Соберите и запустите контейнер:**
+3. **Соберите и запустите контейнер:**
 ```bash
-docker-compose up -d --build
+docker-compose build --no-cache frontend
+docker-compose up -d --force-recreate frontend
 ```
 
-5. **Приложение будет доступно по адресу:** `http://your-server-ip:3000`
-
-### Сборка Docker образа вручную
-
+4. **Проверьте логи:**
 ```bash
-# Сборка образа
-docker build -t pager-frontend .
-
-# Запуск контейнера
-docker run -d \
-  -p 3000:3000 \
-  -e NEXT_PUBLIC_API_URL=https://pager.website/api \
-  -e NEXT_PUBLIC_WS_URL=wss://pager.website/ws \
-  -e NODE_ENV=production \
-  --name pager-frontend \
-  pager-frontend
+docker-compose logs frontend --tail 50
 ```
 
-### Развертывание без Docker (напрямую на сервере)
+## Архитектура
 
-1. **Установите Node.js 18+ на сервере**
+### WebSocket соединение
 
-2. **Клонируйте репозиторий и установите зависимости:**
-```bash
-git clone <your-repo-url>
-cd pager-front
-npm ci
-```
+Приложение использует **STOMP протокол** поверх **native WebSocket**:
 
-3. **Создайте файл `.env.production`:**
-```bash
-NEXT_PUBLIC_API_URL=https://pager.website/api
-NEXT_PUBLIC_WS_URL=wss://pager.website/ws
-NODE_ENV=production
-```
+- **Primary:** Native WebSocket → `wss://pager.website/ws-native`
+- **Fallback:** SockJS (если native не работает) → `https://pager.website/ws`
 
-4. **Соберите приложение:**
-```bash
-npm run build
-```
+Подключение управляется через `StompProvider` в `context/socket.js`.
 
-5. **Запустите production сервер:**
-```bash
-npm start
-```
+### State Management
 
-6. **Для постоянного запуска рекомендуется использовать PM2:**
-```bash
-npm install -g pm2
-pm2 start npm --name "pager-frontend" -- start
-pm2 save
-pm2 startup
-```
+Централизованное управление состоянием через React Context:
 
-### Важные замечания
+- **`MessagingProvider`** (`context/messaging.js`) - управляет чатами, сообщениями, read receipts
+- **`StompProvider`** (`context/socket.js`) - управляет WebSocket соединением
 
-⚠️ **CORS на бэкенде:** CORS уже настроен на бэкенде для следующих origins:
-- `http://localhost:3000`
-- `http://localhost:3001`
-- `https://pager.website`
-- `http://158.160.161.57`
-- `http://158.160.161.57:3000`
-- `http://127.0.0.1:3000`
+### Real-time обновления
 
-🔒 **Безопасность:** Для production рекомендуется использовать HTTPS и настраивать reverse proxy (nginx) для фронтенда.
+Все обновления приходят через WebSocket подписки:
 
-🌐 **Настройка Nginx (опционально):**
-Если вы хотите использовать Nginx как reverse proxy для фронтенда:
-
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-```
+- `/user/queue/messages` - новые сообщения
+- `/user/queue/notifications` - уведомления
+- `/user/queue/presence` - онлайн-статус пользователей
+- `/topic/chat/{chatId}` - сообщения в конкретном чате
+- `/topic/chat/{chatId}/read` - read receipts
 
 ## Структура проекта
 
-- `pages/` - Страницы Next.js
-- `component/` - React компоненты
-- `hooks/` - Custom React hooks
-- `context/` - React Context providers
-- `utils/` - Утилиты и API клиент
-  - `api.js` - API клиент с методами для работы с бэкендом
-  - `config.js` - Конфигурация приложения
-- `styles/` - CSS модули
+```
+buddy-front/
+├── pages/              # Next.js страницы
+│   ├── _app.js        # Главный App компонент
+│   ├── index.js       # Главная страница (комнаты)
+│   ├── login.js       # Страница входа
+│   ├── register.js    # Страница регистрации
+│   ├── chats.js       # Список чатов
+│   └── chat/[chatId].js # Страница чата
+│
+├── component/          # React компоненты
+│   ├── ChatSidebar/   # Боковая панель с чатами
+│   ├── GlobalNotifications/ # Глобальные уведомления
+│   ├── PagerNotification/   # Уведомления в стиле пейджера
+│   └── ...
+│
+├── context/            # React Context providers
+│   ├── messaging.js   # Управление чатами и сообщениями
+│   └── socket.js      # WebSocket соединение
+│
+├── hooks/              # Custom React hooks
+│   ├── useMessageSender.js  # Отправка сообщений
+│   ├── useChatRealtime.js   # Real-time логика чата
+│   ├── useNotifications.js # Управление уведомлениями
+│   └── ...
+│
+├── utils/              # Утилиты
+│   ├── api.js         # API клиент
+│   ├── config.js      # Конфигурация
+│   ├── safe.js        # Безопасные утилиты
+│   ├── pagerSound.js  # Звук уведомлений
+│   └── ...
+│
+└── styles/             # CSS модули
+```
+
+## Основные страницы
+
+- `/` - Главная страница (создание/вход в видеокомнаты)
+- `/login` - Вход в систему
+- `/register` - Регистрация нового пользователя
+- `/chats` - Список всех чатов
+- `/chat/[chatId]` - Открытый чат с сообщениями
+- `/[roomId]` - Видеокомната с встроенным чатом
 
 ## Работа с API
 
-### Использование API клиента
+### API клиент
 
 Проект использует централизованный API клиент в `utils/api.js`:
 
 ```javascript
-import { authAPI, chatAPI, roomAPI } from '@/utils/api';
+import { authAPI, chatAPI, roomAPI, userAPI } from '@/utils/api';
 
 // Аутентификация
 const data = await authAPI.login(username, password);
 await authAPI.register(userData);
 
-// Работа с чатами
+// Чаты
 const chats = await chatAPI.getChats();
-const messages = await chatAPI.getMessages(chatId);
-await chatAPI.sendMessage(chatId, 'Текст сообщения');
+const chat = await chatAPI.getChat(chatId);
+const messages = await chatAPI.getMessages(chatId, { page: 0, size: 50 });
+await chatAPI.sendMessage(chatId, content, type);
+await chatAPI.markChatAsRead(chatId);
 
-// Работа с комнатами
+// Комнаты
 const room = await roomAPI.createRoom();
 await roomAPI.joinRoom(roomId);
+
+// Пользователи
+const users = await userAPI.searchUsers(query);
 ```
 
 ### Авторизация
 
-Токен автоматически добавляется в заголовки всех запросов. При 401 ошибке пользователь автоматически перенаправляется на страницу входа.
+Токен JWT автоматически добавляется в заголовки всех запросов. При 401 ошибке пользователь автоматически перенаправляется на `/login`.
 
-### Socket.io
+### WebSocket подписки
 
-WebSocket соединение (STOMP через SockJS) настраивается автоматически через `StompProvider` в `_app.js`. Подключение использует `NEXT_PUBLIC_WS_URL` или автоматически определяется из `NEXT_PUBLIC_API_URL`.
+WebSocket соединение настраивается автоматически через `StompProvider` в `_app.js`. 
 
-## Основные страницы
+Подписки управляются в:
+- `context/messaging.js` - подписки на сообщения, уведомления, presence
+- `hooks/useChatRealtime.js` - подписки для конкретного чата
 
-- `/` - Главная страница (создание/вход в комнаты)
-- `/login` - Вход
-- `/register` - Регистрация
-- `/chats` - Список чатов
-- `/[roomId]` - Видеокомната с чатом
+## Особенности реализации
+
+### Real-time синхронизация
+
+- **Нормализованный store** - единый источник истины для всех данных
+- **Idempотентные upserts** - безопасная обработка дубликатов
+- **Оптимистичные обновления** - мгновенный UI при отправке сообщений
+
+### Read receipts
+
+- Отслеживание прочтения через `/topic/chat/{chatId}/read`
+- Зелёные галочки для прочитанных сообщений
+- Обновление в реальном времени
+
+### Онлайн-статус
+
+- Presence events через `/user/queue/presence`
+- Обновление статуса в реальном времени
+- Отображение "онлайн" или "был X минут назад"
+
+### Уведомления
+
+- Звук пейджера при новых сообщениях
+- Badge в браузере (favicon + title)
+- Глобальные уведомления в стиле пейджера
+
+## Разработка
+
+### Линтинг
+
+```bash
+npm run lint
+```
+
+### Структура кода
+
+- **Без комментариев** - код самодокументируемый
+- **Без console.log** - только необходимые логи
+- **Чистый код** - следует best practices
+
+## Лицензия
+
+Private project
