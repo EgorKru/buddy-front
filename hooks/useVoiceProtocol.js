@@ -19,6 +19,8 @@ const DEFAULT_CODEC = {
 };
 
 export const useVoiceProtocol = (chatId) => {
+  const isBrowser = typeof window !== 'undefined';
+  
   const { client, connected } = useStomp();
   const [sessionState, setSessionState] = useState(null);
   const [relaySessionId, setRelaySessionId] = useState(null);
@@ -30,8 +32,6 @@ export const useVoiceProtocol = (chatId) => {
   const onCompleteCallbackRef = useRef(null);
   const webrtcPeerRef = useRef(null);
   const dataChannelRef = useRef(null);
-  
-  const isBrowser = typeof window !== 'undefined';
 
   const cleanup = useCallback(() => {
     if (sendingIntervalRef.current) {
@@ -92,6 +92,27 @@ export const useVoiceProtocol = (chatId) => {
       }
     }
   }, []);
+
+  const sendFinalMessage = useCallback((fileUrl) => {
+    if (!isBrowser) return;
+    if (!fileUrl) return;
+    if (!client || !connected || !client.connected || !client.active) {
+      return;
+    }
+    if (typeof window !== 'undefined') {
+      console.log('[Voice Protocol] Sending final message with fileUrl:', fileUrl);
+    }
+    try {
+      client.publish({
+        destination: '/app/chat.sendMessage',
+        body: JSON.stringify({
+          chatId: parseInt(chatId),
+          type: 'VOICE',
+          fileUrl: fileUrl,
+        }),
+      });
+    } catch (e) {}
+  }, [isBrowser, client, connected, chatId]);
 
   const handleSignalResponse = useCallback((response) => {
     if (!response?.type) return;
@@ -158,6 +179,7 @@ export const useVoiceProtocol = (chatId) => {
   }, [cleanup, handleWebRTCOffer, handleWebRTCAnswer, sendFinalMessage]);
 
   useEffect(() => {
+    if (!isBrowser) return;
     if (!client || !connected || !client.connected || !client.active) {
       if (signalSubscriptionRef.current) {
         safeUnsubscribe(signalSubscriptionRef.current);
@@ -204,6 +226,7 @@ export const useVoiceProtocol = (chatId) => {
   }, [client, connected, handleSignalResponse]);
 
   const initiate = useCallback(async (codecParams = DEFAULT_CODEC) => {
+    if (!isBrowser) return;
     if (!client || !connected || !client.connected || !client.active) {
       throw new Error('WebSocket not connected');
     }
@@ -212,7 +235,7 @@ export const useVoiceProtocol = (chatId) => {
     setRelaySessionId(null);
     setRemoteEndpoint(null);
 
-    if (typeof window !== 'undefined' && window.RTCPeerConnection) {
+    if (window.RTCPeerConnection) {
       try {
         const webrtc = new WebRTCPeer(chatId, (dataChannel) => {
           dataChannelRef.current = dataChannel;
@@ -267,6 +290,7 @@ export const useVoiceProtocol = (chatId) => {
   }, [chatId, messageId, relaySessionId]);
 
   const sendSignal = useCallback((type, localEndpoint = null, extraFields = {}) => {
+    if (!isBrowser) return;
     if (!client || !connected || !client.connected || !client.active) {
       throw new Error('WebSocket not connected');
     }
@@ -275,7 +299,7 @@ export const useVoiceProtocol = (chatId) => {
       destination: '/app/voice.signal',
       body: JSON.stringify(payload),
     });
-  }, [client, connected, createSignalPayload]);
+  }, [isBrowser, client, connected, createSignalPayload]);
 
   const sendOffer = useCallback(async (localEndpoint = null) => {
     if (typeof window !== 'undefined' && window.RTCPeerConnection && webrtcPeerRef.current && !localEndpoint) {
@@ -302,9 +326,10 @@ export const useVoiceProtocol = (chatId) => {
   }, [sendSignal]);
 
   const sendComplete = useCallback(() => {
+    if (!isBrowser) return;
     if (!client || !connected || !client.connected || !client.active) return;
     sendSignal(VOICE_SIGNAL_TYPES.COMPLETE);
-  }, [client, connected, sendSignal]);
+  }, [isBrowser, client, connected, sendSignal]);
 
   const convertToBase64 = useCallback((buffer) => {
     const bytes = new Uint8Array(buffer);
@@ -316,6 +341,7 @@ export const useVoiceProtocol = (chatId) => {
   }, []);
 
   const sendAudioData = useCallback((audioData, onComplete = null) => {
+    if (!isBrowser) return;
     if (onComplete) onCompleteCallbackRef.current = onComplete;
 
     if (dataChannelRef.current && dataChannelRef.current.readyState === 'open') {
@@ -354,9 +380,10 @@ export const useVoiceProtocol = (chatId) => {
     } else if (audioData instanceof Blob) {
       audioData.arrayBuffer().then(publishAudio);
     }
-  }, [client, connected, chatId, relaySessionId, convertToBase64]);
+  }, [isBrowser, client, connected, chatId, relaySessionId, convertToBase64]);
 
   const startSendingAudio = useCallback((audioChunks, onComplete = null) => {
+    if (!isBrowser) return;
     if (sendingIntervalRef.current) {
       clearInterval(sendingIntervalRef.current);
     }
@@ -380,7 +407,7 @@ export const useVoiceProtocol = (chatId) => {
         }
       }
     }, 20);
-  }, [sendReady, sendAudioData, sendComplete]);
+  }, [isBrowser, sendReady, sendAudioData, sendComplete]);
 
   useEffect(() => {
     return () => {
@@ -391,26 +418,6 @@ export const useVoiceProtocol = (chatId) => {
       }
     };
   }, [cleanup]);
-
-  const sendFinalMessage = useCallback((fileUrl) => {
-    if (!fileUrl) return;
-    if (!client || !connected || !client.connected || !client.active) {
-      return;
-    }
-    if (typeof window !== 'undefined') {
-      console.log('[Voice Protocol] Sending final message with fileUrl:', fileUrl);
-    }
-    try {
-      client.publish({
-        destination: '/app/chat.sendMessage',
-        body: JSON.stringify({
-          chatId: parseInt(chatId),
-          type: 'VOICE',
-          fileUrl: fileUrl,
-        }),
-      });
-    } catch (e) {}
-  }, [client, connected, chatId]);
 
   return {
     sessionState,
