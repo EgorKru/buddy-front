@@ -62,10 +62,20 @@ export const formatMeetingTime = (seconds) => {
   return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 };
 
+const parseServerDate = (dateString) => {
+  if (!dateString) return null;
+  let str = String(dateString);
+  if (!str.endsWith('Z') && !str.includes('+') && !str.includes('-', 10)) {
+    str = str + 'Z';
+  }
+  return new Date(str);
+};
+
 export const formatLastSeen = (dateString) => {
   if (!dateString) return '';
 
-  const date = new Date(dateString);
+  const date = parseServerDate(dateString);
+  if (!date || isNaN(date.getTime())) return '';
   const now = new Date();
   const diffMs = now - date;
   const diffMins = Math.floor(diffMs / 60000);
