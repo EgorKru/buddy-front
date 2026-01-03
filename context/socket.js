@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useState, useRef } from "react";
 import { Client } from '@stomp/stompjs';
-import SockJS from 'sockjs-client';
 import { getToken } from "@/utils/api";
 import { config } from "@/utils/config";
 import { safeJsonParse } from "@/utils/safe";
@@ -47,17 +46,9 @@ const withTokenQuery = (url, token) => {
   return `${url}${sep}token=${encodeURIComponent(token)}`;
 };
 
-const ensureSockJsHttpUrl = (url) => {
-  if (!url) return null;
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  if (url.startsWith('ws://')) return url.replace('ws://', 'http://');
-  if (url.startsWith('wss://')) return url.replace('wss://', 'https://');
-  return url;
-};
-
 const getTransportPreference = () => {
   const pref = process.env.NEXT_PUBLIC_STOMP_TRANSPORT;
-  if (pref === 'native' || pref === 'sockjs' || pref === 'auto') return pref;
+  if (pref === 'native') return pref;
   return 'native';
 };
 
@@ -67,8 +58,7 @@ export const StompProvider = (props) => {
   const [connected, setConnected] = useState(false);
   const clientRef = useRef(null);
   const tokenRef = useRef(null);
-  const transportRef = useRef('auto');
-  const fallbackTriedRef = useRef(false);
+  const transportRef = useRef('native');
 
   useEffect(() => {
     let destroyed = false;
@@ -84,22 +74,12 @@ export const StompProvider = (props) => {
       setConnected(false);
     };
 
-    const connect = (token, useFallback = false) => {
+    const connect = (token) => {
       transportRef.current = getTransportPreference();
-      fallbackTriedRef.current = useFallback;
-
-      const nativeWsUrl = withTokenQuery(ensureNativeWsUrl(config.stomp.nativeUrl), token);
-      const sockJsUrl = withTokenQuery(ensureSockJsHttpUrl(config.stomp.sockjsUrl), token);
+      const wsUrl = withTokenQuery(ensureNativeWsUrl(config.stomp.nativeUrl), token);
 
       const createFactory = () => {
-        const pref = transportRef.current;
-        if (pref === 'sockjs') return () => new SockJS(sockJsUrl);
-        if (pref === 'native') return () => new WebSocket(nativeWsUrl);
-        // auto: try native first, fallback to sockjs if needed
-        return () => {
-          if (fallbackTriedRef.current) return new SockJS(sockJsUrl);
-          return new WebSocket(nativeWsUrl);
-        };
+        return () => new WebSocket(wsUrl);
       };
 
       const stompClient = new Client({
@@ -147,16 +127,6 @@ export const StompProvider = (props) => {
         onWebSocketError: () => {
           if (!destroyed) {
             setConnected(false);
-            if (transportRef.current === 'auto' && !fallbackTriedRef.current) {
-              fallbackTriedRef.current = true;
-              clientRef.current = null;
-              try { stompClient.deactivate(); } catch (e) {}
-              setTimeout(() => {
-                if (!destroyed && !clientRef.current) {
-                  connect(token, true);
-                }
-              }, 100);
-            }
           }
         },
         onWebSocketClose: () => {
@@ -189,12 +159,11 @@ export const StompProvider = (props) => {
 
       if (tokenRef.current !== token) {
         tokenRef.current = token;
-        fallbackTriedRef.current = false;
         disconnect();
       }
 
       if (!clientRef.current) {
-        connect(tokenRef.current, fallbackTriedRef.current);
+        connect(tokenRef.current);
       }
     };
 

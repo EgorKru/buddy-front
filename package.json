@@ -18,7 +18,6 @@
     "react-copy-to-clipboard": "^5.1.0",
     "react-dom": "^18",
     "react-player": "^2.13.0",
-    "sockjs-client": "^1.6.1",
     "uuid": "^9.0.1"
   },
   "devDependencies": {
