@@ -102,7 +102,7 @@ export const chatAPI = {
 
   sendMessage: async (chatId, content, type = 'TEXT', fileUrl = null) => {
     const body = { 
-      content: type === 'VOICE' && !content ? '🎤 Голосовое сообщение' : content, 
+      content: type === 'VOICE' ? '' : content, 
       type 
     };
     if (type === 'VOICE' && fileUrl) {
@@ -150,7 +150,7 @@ export const chatAPI = {
   sendVoiceMessage: async (chatId, voiceData, voiceMimeType = 'audio/webm') => {
     return apiRequest(`/chats/${chatId}/messages`, {
       method: 'POST',
-      body: { type: 'VOICE', voiceData, voiceMimeType },
+      body: { type: 'VOICE', voiceData, voiceMimeType, content: '' },
     });
   },
 

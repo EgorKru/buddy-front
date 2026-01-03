@@ -132,11 +132,11 @@ export const useMessageSender = (chatId, onMessageSent) => {
           if (type === 'VOICE') {
             if (fileUrl) {
               payload.fileUrl = fileUrl;
-              payload.content = messageContent;
+              payload.content = '';
             } else if (voiceData) {
               payload.voiceData = voiceData;
               payload.voiceMimeType = voiceMimeType || 'audio/webm';
-              payload.content = messageContent;
+              payload.content = '';
             } else {
               throw new Error('Neither fileUrl nor voiceData provided for VOICE message');
             }
@@ -158,7 +158,7 @@ export const useMessageSender = (chatId, onMessageSent) => {
       }
 
       const serverMessage = type === 'VOICE'
-        ? (fileUrl ? await chatAPI.sendMessage(chatId, messageContent, 'VOICE', fileUrl) : await chatAPI.sendVoiceMessage(chatId, voiceData, voiceMimeType))
+        ? (fileUrl ? await chatAPI.sendMessage(chatId, '', 'VOICE', fileUrl) : await chatAPI.sendVoiceMessage(chatId, voiceData, voiceMimeType))
         : await chatAPI.sendMessage(chatId, messageContent, type);
 
       updateMessageStatus(optimisticMessage.tempId, MESSAGE_STATUS.SENT, serverMessage);
