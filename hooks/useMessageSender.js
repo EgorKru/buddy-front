@@ -102,14 +102,14 @@ export const useMessageSender = (chatId, onMessageSent) => {
     }, delay);
   }, [chatId]);
 
-  const sendMessage = useCallback(async (content, type = 'TEXT', voiceData = null, voiceMimeType = null) => {
-    if (type === 'VOICE' && !voiceData) return null;
+  const sendMessage = useCallback(async (content, type = 'TEXT', fileUrl = null, voiceData = null, voiceMimeType = null) => {
+    if (type === 'VOICE' && !fileUrl && !voiceData) return null;
     if (type !== 'VOICE' && !content.trim()) return null;
     if (sending) return null;
 
     const messageContent = type === 'VOICE' ? '🎤 Голосовое сообщение' : content.trim();
     const user = getCurrentUser();
-    const optimisticMessage = createOptimisticMessage(messageContent, type, chatId, user);
+    const optimisticMessage = createOptimisticMessage(messageContent, type, chatId, user, fileUrl);
 
     if (!saveMessageToQueue(optimisticMessage)) return null;
 
@@ -130,8 +130,16 @@ export const useMessageSender = (chatId, onMessageSent) => {
           };
 
           if (type === 'VOICE') {
-            payload.voiceData = voiceData;
-            payload.voiceMimeType = voiceMimeType || 'audio/webm';
+            if (fileUrl) {
+              payload.fileUrl = fileUrl;
+              payload.content = '';
+            } else if (voiceData) {
+              payload.voiceData = voiceData;
+              payload.voiceMimeType = voiceMimeType || 'audio/webm';
+              payload.content = '';
+            } else {
+              throw new Error('Neither fileUrl nor voiceData provided for VOICE message');
+            }
           } else {
             payload.content = messageContent;
           }
@@ -142,11 +150,15 @@ export const useMessageSender = (chatId, onMessageSent) => {
           });
           setSending(false);
           return { success: true, tempId: optimisticMessage.tempId, optimisticMessage, serverMessage: null };
-        } catch (wsError) {}
+        } catch (wsError) {
+          if (type === 'VOICE' && fileUrl) {
+            throw wsError;
+          }
+        }
       }
 
       const serverMessage = type === 'VOICE'
-        ? await chatAPI.sendVoiceMessage(chatId, voiceData, voiceMimeType)
+        ? (fileUrl ? await chatAPI.sendMessage(chatId, '', 'VOICE', fileUrl) : await chatAPI.sendVoiceMessage(chatId, voiceData, voiceMimeType))
         : await chatAPI.sendMessage(chatId, messageContent, type);
 
       updateMessageStatus(optimisticMessage.tempId, MESSAGE_STATUS.SENT, serverMessage);

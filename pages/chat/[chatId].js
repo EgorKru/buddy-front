@@ -169,10 +169,32 @@ export default function ChatPage() {
     if (!audioBlob || !user || sending) return;
 
     try {
-      const base64 = await convertToBase64(audioBlob);
-      const mimeType = audioBlob.type || 'audio/webm';
+      let fileUrl = null;
 
-      const result = await sendMessageHook(null, 'VOICE', base64, mimeType);
+      try {
+        const uploadResponse = await chatAPI.uploadVoiceFile(chatId, audioBlob);
+        fileUrl = uploadResponse?.fileUrl;
+      } catch (uploadError) {
+        const base64 = await convertToBase64(audioBlob);
+        const mimeType = audioBlob.type || 'audio/webm';
+        const result = await sendMessageHook(null, 'VOICE', null, base64, mimeType);
+
+        if (result?.serverMessage) {
+          addOptimistic(chatId, { ...result.serverMessage, status: MESSAGE_STATUS.SENT, isOptimistic: false });
+        } else if (result?.optimisticMessage) {
+          addOptimistic(chatId, result.optimisticMessage);
+        }
+
+        resetVoice();
+        sentAudioBlobRef.current = null;
+        return;
+      }
+
+      if (!fileUrl) {
+        throw new Error('Failed to upload voice file: no fileUrl returned');
+      }
+
+      const result = await sendMessageHook(null, 'VOICE', fileUrl);
 
       if (result?.serverMessage) {
         addOptimistic(chatId, { ...result.serverMessage, status: MESSAGE_STATUS.SENT, isOptimistic: false });

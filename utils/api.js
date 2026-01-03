@@ -100,11 +100,48 @@ export const chatAPI = {
     return apiRequest(`/chats/${chatId}/messages${queryString ? `?${queryString}` : ''}`);
   },
 
-  sendMessage: async (chatId, content, type = 'TEXT') => {
+  sendMessage: async (chatId, content, type = 'TEXT', fileUrl = null) => {
+    const body = { content, type };
+    if (type === 'VOICE' && fileUrl) {
+      body.fileUrl = fileUrl;
+    }
     return apiRequest(`/chats/${chatId}/messages`, {
       method: 'POST',
-      body: { content, type },
+      body,
     });
+  },
+
+  uploadVoiceFile: async (chatId, audioBlob) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const formData = new FormData();
+    formData.append('file', audioBlob, 'voice.webm');
+
+    const headers = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(getApiUrl(`/chats/${chatId}/files/voice`), {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (response.status === 401) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
+      throw new Error('Unauthorized');
+    }
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Upload failed' }));
+      throw new Error(error.message || `Upload failed with status ${response.status}`);
+    }
+
+    return await response.json();
   },
 
   sendVoiceMessage: async (chatId, voiceData, voiceMimeType = 'audio/webm') => {
