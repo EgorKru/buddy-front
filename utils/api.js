@@ -101,7 +101,10 @@ export const chatAPI = {
   },
 
   sendMessage: async (chatId, content, type = 'TEXT', fileUrl = null) => {
-    const body = { content, type };
+    const body = { 
+      content: type === 'VOICE' && !content ? '🎤 Голосовое сообщение' : content, 
+      type 
+    };
     if (type === 'VOICE' && fileUrl) {
       body.fileUrl = fileUrl;
     }
