@@ -229,26 +229,52 @@ export default function ChatPage() {
         voiceProtocol.initiate();
         
         await new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => reject(new Error('Voice protocol timeout')), 5000);
+          const timeout = setTimeout(() => {
+            if (typeof window !== 'undefined') {
+              console.warn('[Voice] Protocol timeout - no response from server');
+            }
+            reject(new Error('Voice protocol timeout'));
+          }, 10000);
+          
           const checkState = setInterval(() => {
             const { sessionState, relaySessionId } = voiceProtocol;
+            if (typeof window !== 'undefined') {
+              console.log('[Voice] Checking state:', sessionState, 'relaySessionId:', relaySessionId);
+            }
+            
             if (sessionState === 'ready' || sessionState === 'relay' || sessionState === 'p2p') {
               clearInterval(checkState);
               clearTimeout(timeout);
               
               if (relaySessionId) {
+                if (typeof window !== 'undefined') {
+                  console.log('[Voice] Sending ANSWER (relay mode)');
+                }
                 voiceProtocol.sendAnswer();
               } else {
+                if (typeof window !== 'undefined') {
+                  console.log('[Voice] Sending OFFER (P2P mode)');
+                }
                 voiceProtocol.sendOffer();
               }
               
               setTimeout(() => {
+                if (typeof window !== 'undefined') {
+                  console.log('[Voice] Starting audio transmission');
+                }
                 voiceProtocol.startSendingAudio([audioBlob], () => {
+                  if (typeof window !== 'undefined') {
+                    console.log('[Voice] Audio transmission completed');
+                  }
                   resetVoice();
                   sentAudioBlobRef.current = null;
                   resolve();
                 });
               }, 500);
+            } else if (sessionState === 'error') {
+              clearInterval(checkState);
+              clearTimeout(timeout);
+              reject(new Error('Voice protocol error'));
             }
           }, 100);
         });

@@ -96,10 +96,19 @@ export const useVoiceProtocol = (chatId) => {
   const handleSignalResponse = useCallback((response) => {
     if (!response?.type) return;
     if (typeof window !== 'undefined') {
-      console.log('[Voice Protocol] Received signal:', response.type, { relaySessionId: response.relaySessionId, remoteEndpoint: response.remoteEndpoint, hasSdp: !!response.sdp });
+      console.log('[Voice Protocol] Received signal:', response.type, { 
+        relaySessionId: response.relaySessionId, 
+        remoteEndpoint: response.remoteEndpoint, 
+        hasSdp: !!response.sdp,
+        fileUrl: response.fileUrl,
+        messageId: response.messageId 
+      });
     }
     switch (response.type) {
       case VOICE_SIGNAL_TYPES.OFFER:
+        if (response.messageId) {
+          setMessageId(response.messageId);
+        }
         if (response.relaySessionId) {
           setRelaySessionId(response.relaySessionId);
           setSessionState('relay');
@@ -111,9 +120,14 @@ export const useVoiceProtocol = (chatId) => {
           }
         } else if (response.sdp) {
           handleWebRTCOffer(response.sdp);
+        } else {
+          setSessionState('ready');
         }
         break;
       case VOICE_SIGNAL_TYPES.ANSWER:
+        if (response.messageId) {
+          setMessageId(response.messageId);
+        }
         if (response.relaySessionId) setRelaySessionId(response.relaySessionId);
         if (response.remoteEndpoint) setRemoteEndpoint(response.remoteEndpoint);
         if (response.sdp) {
@@ -122,9 +136,18 @@ export const useVoiceProtocol = (chatId) => {
         setSessionState('ready');
         break;
       case VOICE_SIGNAL_TYPES.READY:
+        if (response.messageId) {
+          setMessageId(response.messageId);
+        }
         setSessionState('ready');
         break;
       case VOICE_SIGNAL_TYPES.COMPLETE:
+        if (response.fileUrl) {
+          sendFinalMessage(response.fileUrl);
+        }
+        if (response.messageId) {
+          setMessageId(response.messageId);
+        }
         cleanup();
         if (onCompleteCallbackRef.current) {
           onCompleteCallbackRef.current();
@@ -132,7 +155,7 @@ export const useVoiceProtocol = (chatId) => {
         }
         break;
     }
-  }, [cleanup, handleWebRTCOffer, handleWebRTCAnswer]);
+  }, [cleanup, handleWebRTCOffer, handleWebRTCAnswer, sendFinalMessage]);
 
   useEffect(() => {
     if (!client || !connected || !client.connected || !client.active) {
@@ -150,12 +173,27 @@ export const useVoiceProtocol = (chatId) => {
 
     try {
       const subscription = client.subscribe('/user/queue/voice-signal', (message) => {
+        if (typeof window !== 'undefined') {
+          console.log('[Voice Protocol] Raw message received:', message.body);
+        }
         const response = safeJsonParse(message.body);
-        if (!response) return;
+        if (!response) {
+          if (typeof window !== 'undefined') {
+            console.warn('[Voice Protocol] Failed to parse response');
+          }
+          return;
+        }
         handleSignalResponse(response);
       });
       signalSubscriptionRef.current = subscription;
-    } catch (e) {}
+      if (typeof window !== 'undefined') {
+        console.log('[Voice Protocol] Subscribed to /user/queue/voice-signal');
+      }
+    } catch (e) {
+      if (typeof window !== 'undefined') {
+        console.error('[Voice Protocol] Failed to subscribe:', e);
+      }
+    }
 
     return () => {
       if (signalSubscriptionRef.current) {
@@ -354,6 +392,26 @@ export const useVoiceProtocol = (chatId) => {
     };
   }, [cleanup]);
 
+  const sendFinalMessage = useCallback((fileUrl) => {
+    if (!fileUrl) return;
+    if (!client || !connected || !client.connected || !client.active) {
+      return;
+    }
+    if (typeof window !== 'undefined') {
+      console.log('[Voice Protocol] Sending final message with fileUrl:', fileUrl);
+    }
+    try {
+      client.publish({
+        destination: '/app/chat.sendMessage',
+        body: JSON.stringify({
+          chatId: parseInt(chatId),
+          type: 'VOICE',
+          fileUrl: fileUrl,
+        }),
+      });
+    } catch (e) {}
+  }, [client, connected, chatId]);
+
   return {
     sessionState,
     relaySessionId,
@@ -366,6 +424,7 @@ export const useVoiceProtocol = (chatId) => {
     sendComplete,
     sendAudioData,
     startSendingAudio,
+    sendFinalMessage,
     cleanup,
   };
 };
