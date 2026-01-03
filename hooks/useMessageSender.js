@@ -151,15 +151,19 @@ export const useMessageSender = (chatId, onMessageSent) => {
           setSending(false);
           return { success: true, tempId: optimisticMessage.tempId, optimisticMessage, serverMessage: null };
         } catch (wsError) {
-          if (type === 'VOICE' && fileUrl) {
-            throw wsError;
+          if (type === 'VOICE') {
+            setSending(false);
+            throw new Error('Failed to send voice message via WebSocket. Please ensure WebSocket is connected.');
           }
         }
       }
 
-      const serverMessage = type === 'VOICE'
-        ? (fileUrl ? await chatAPI.sendMessage(chatId, '', 'VOICE', fileUrl) : await chatAPI.sendVoiceMessage(chatId, voiceData, voiceMimeType))
-        : await chatAPI.sendMessage(chatId, messageContent, type);
+      if (type === 'VOICE') {
+        setSending(false);
+        throw new Error('Voice messages can only be sent via WebSocket. WebSocket is not connected.');
+      }
+
+      const serverMessage = await chatAPI.sendMessage(chatId, messageContent, type);
 
       updateMessageStatus(optimisticMessage.tempId, MESSAGE_STATUS.SENT, serverMessage);
       removeMessageFromQueue(optimisticMessage.tempId);
@@ -188,6 +192,25 @@ export const useMessageSender = (chatId, onMessageSent) => {
 
     const sendMessageFn = async (message) => {
       if (message.status === MESSAGE_STATUS.SENT) return null;
+
+      if (message.type === 'VOICE') {
+        if (!message.fileUrl) return null;
+        if (client.connected && client.active) {
+          try {
+            client.publish({
+              destination: '/app/chat.sendMessage',
+              body: JSON.stringify({
+                chatId: parseInt(chatId),
+                type: 'VOICE',
+                fileUrl: message.fileUrl,
+                content: '',
+              }),
+            });
+            return { success: true };
+          } catch (error) {}
+        }
+        return null;
+      }
 
       if (client.connected && client.active) {
         try {
@@ -324,3 +347,4 @@ export const useMessageSender = (chatId, onMessageSent) => {
     handleServerMessage,
   };
 };
+
