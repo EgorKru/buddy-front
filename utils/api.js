@@ -150,7 +150,7 @@ export const chatAPI = {
   sendVoiceMessage: async (chatId, voiceData, voiceMimeType = 'audio/webm') => {
     return apiRequest(`/chats/${chatId}/messages`, {
       method: 'POST',
-      body: { type: 'VOICE', voiceData, voiceMimeType, content: '' },
+      body: { type: 'VOICE', voiceData, voiceMimeType },
     });
   },
 

@@ -132,11 +132,9 @@ export const useMessageSender = (chatId, onMessageSent) => {
           if (type === 'VOICE') {
             if (fileUrl) {
               payload.fileUrl = fileUrl;
-              payload.content = '';
             } else if (voiceData) {
               payload.voiceData = voiceData;
               payload.voiceMimeType = voiceMimeType || 'audio/webm';
-              payload.content = '';
             } else {
               throw new Error('Neither fileUrl nor voiceData provided for VOICE message');
             }
@@ -203,7 +201,6 @@ export const useMessageSender = (chatId, onMessageSent) => {
                 chatId: parseInt(chatId),
                 type: 'VOICE',
                 fileUrl: message.fileUrl,
-                content: '',
               }),
             });
             return { success: true };
