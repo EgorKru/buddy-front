@@ -439,10 +439,10 @@ export const MessagingProvider = ({ children }) => {
       if (!msg || !cid) return;
       const currentUser = getCurrentUser();
       const isOwn = currentUser?.id && msg?.senderId && Number(currentUser.id) === Number(msg.senderId);
-      const isVisible = typeof document !== 'undefined' && document.visibilityState === 'visible';
-      const active = state.activeChatId && String(state.activeChatId) === String(cid);
       if (isOwn) return;
-      if (active && isVisible) return;
+
+      const active = state.activeChatId && String(state.activeChatId) === String(cid);
+      if (active) return;
 
       const now = Date.now();
       if (now - lastSoundAtRef.current < 500) return;
@@ -540,6 +540,69 @@ export const MessagingProvider = ({ children }) => {
   }, []);
 
   const chats = useMemo(() => state.chatOrder.map(id => state.chatsById[id]).filter(Boolean), [state.chatOrder, state.chatsById]);
+
+  const updateFaviconBadge = useCallback((count) => {
+    if (typeof window === 'undefined') return;
+    try {
+      let link = document.querySelector("link[rel*='icon']") || document.createElement('link');
+      link.type = 'image/png';
+      link.rel = 'shortcut icon';
+
+      if (count > 0) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 32;
+        canvas.height = 32;
+        const ctx = canvas.getContext('2d');
+
+        ctx.fillStyle = '#1e1e23';
+        ctx.fillRect(0, 0, 32, 32);
+        ctx.fillStyle = '#667eea';
+        ctx.beginPath();
+        ctx.arc(16, 16, 12, 0, 2 * Math.PI);
+        ctx.fill();
+
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.arc(26, 6, 8, 0, 2 * Math.PI);
+        ctx.fill();
+
+        if (count > 0) {
+          ctx.fillStyle = 'white';
+          ctx.font = 'bold 11px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          const text = count > 99 ? '99+' : String(count);
+          ctx.fillText(text, 26, 6);
+        }
+
+        link.href = canvas.toDataURL();
+        if (!document.querySelector("link[rel*='icon']")) {
+          document.getElementsByTagName('head')[0].appendChild(link);
+        }
+      } else {
+        link.href = '/favicon.ico';
+        if (!document.querySelector("link[rel*='icon']")) {
+          document.getElementsByTagName('head')[0].appendChild(link);
+        }
+      }
+    } catch (e) {}
+  }, []);
+
+  const totalUnread = useMemo(() => {
+    return chats.reduce((sum, chat) => sum + (chat?.unreadCount || 0), 0);
+  }, [chats]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const baseTitle = 'Pager';
+    if (totalUnread > 0) {
+      document.title = `(${totalUnread}) ${baseTitle}`;
+      updateFaviconBadge(totalUnread);
+    } else {
+      document.title = baseTitle;
+      updateFaviconBadge(0);
+    }
+  }, [totalUnread, updateFaviconBadge]);
 
   const value = useMemo(() => {
     return {
