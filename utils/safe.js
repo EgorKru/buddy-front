@@ -11,8 +11,15 @@ export const safeJsonParse = (value) => {
 export const safeUnsubscribe = (sub) => {
   if (!sub) return;
   try {
-    sub.unsubscribe();
-  } catch (e) {}
+    if (typeof sub.unsubscribe === 'function') {
+      sub.unsubscribe();
+    }
+  } catch (e) {
+    const errorMsg = e?.message || String(e || '');
+    if (errorMsg.includes('CLOSING') || errorMsg.includes('CLOSED') || errorMsg.includes('WebSocket')) {
+      return;
+    }
+  }
 };
 
 

@@ -36,7 +36,13 @@ export const useChatRealtime = (chatId) => {
   }, [chatId, setActiveChatId, markChatAsRead, loadInitial]);
 
   useEffect(() => {
-    if (!chatId || !client || !connected || !client.connected || !client.active) return;
+    if (!chatId || !client || !connected || !client.connected || !client.active) {
+      if (topicSubRef.current) {
+        safeUnsubscribe(topicSubRef.current);
+        topicSubRef.current = null;
+      }
+      return;
+    }
 
     if (topicSubRef.current) {
       safeUnsubscribe(topicSubRef.current);
