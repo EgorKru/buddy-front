@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
-import { Send, Loader2, Menu, Check, CheckCheck, AlertCircle, Clock } from 'lucide-react';
+import { Send, Loader2, Menu, Check, CheckCheck, AlertCircle, Clock, ArrowLeft } from 'lucide-react';
 import { chatAPI, getCurrentUser, isAuthenticated } from '@/utils/api';
 import { getChatName } from '@/utils/chatHelpers';
 import { formatChatDate, formatChatTime, getOnlineStatus } from '@/utils/dateHelpers';
@@ -232,6 +232,13 @@ export default function ChatPage() {
       
       <div className={styles.mainContent}>
         <div className={styles.header}>
+          <button 
+            onClick={() => router.push('/chats')} 
+            className={styles.backButton}
+            title="Вернуться к списку чатов"
+          >
+            <ArrowLeft size={20} />
+          </button>
           <button 
             onClick={() => setSidebarOpen(!sidebarOpen)} 
             className={styles.menuButton}

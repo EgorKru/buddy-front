@@ -117,6 +117,7 @@
   border-radius: 50%;
   cursor: pointer;
   transition: background 0.2s;
+  color: #333;
 }
 
 .backButton:hover {
