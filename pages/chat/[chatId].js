@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import { Send, Loader2, Menu, Check, CheckCheck, AlertCircle, Clock } from 'lucide-react';
 import { chatAPI, getCurrentUser, isAuthenticated } from '@/utils/api';
@@ -26,9 +26,12 @@ export default function ChatPage() {
   const router = useRouter();
   const { chatId } = router.query;
   const user = getCurrentUser();
-  const { connected, readAtByChatIdByUserId, replaceOptimistic, addOptimistic } = useChats();
+  const { connected, readAtByChatIdByUserId, replaceOptimistic, addOptimistic, chats, refreshChats } = useChats();
 
-  const [chat, setChat] = useState(null);
+  const chat = useMemo(() => {
+    if (!chatId) return null;
+    return chats.find(c => String(c?.id) === String(chatId)) || null;
+  }, [chatId, chats]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
@@ -45,14 +48,15 @@ export default function ChatPage() {
   const loadChat = useCallback(async () => {
     if (!chatId) return;
     try {
-      const chatData = await chatAPI.getChat(chatId);
-      setChat(chatData);
+      await refreshChats();
+      setLoading(false);
     } catch (error) {
+      setLoading(false);
       if (error?.message?.includes('404')) {
         router.push('/');
       }
     }
-  }, [chatId, router]);
+  }, [chatId, router, refreshChats]);
 
   const loadMessages = useCallback(async (pageNum = 0, append = false) => {
     if (!chatId) return;
@@ -79,10 +83,15 @@ export default function ChatPage() {
       return;
     }
     if (chatId) {
-      loadChat();
+      if (!chat) {
+        setLoading(true);
+        loadChat();
+      } else {
+        setLoading(false);
+      }
       loadMessages(0);
     }
-  }, [chatId, router, loadChat, loadMessages]);
+  }, [chatId, router, loadChat, loadMessages, chat]);
 
   useEffect(() => {
     scrollToBottom();
