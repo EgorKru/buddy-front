@@ -18,14 +18,15 @@ const DEDUP_CLEANUP_INTERVAL = 5 * 60 * 1000;
 const DEDUP_CLEANUP_THRESHOLD = 100;
 const QUEUE_REMOVAL_DELAY = 1000;
 
-const createOptimisticMessage = (content, type, chatId, user) => {
+const createOptimisticMessage = (content, type, chatId, user, fileUrl = null) => {
   const tempId = `temp-${Date.now()}-${Math.random()}`;
   return {
     id: tempId,
     tempId,
     chatId: parseInt(chatId),
-    content: content.trim(),
+    content: type === 'VOICE' ? '🎤 Голосовое сообщение' : content.trim(),
     type,
+    fileUrl,
     status: MESSAGE_STATUS.SENDING,
     createdAt: new Date().toISOString(),
     isOptimistic: true,
@@ -101,10 +102,12 @@ export const useMessageSender = (chatId, onMessageSent) => {
     }, delay);
   }, [chatId]);
 
-  const sendMessage = useCallback(async (content, type = 'TEXT') => {
-    if (!content.trim() || sending) return null;
+  const sendMessage = useCallback(async (content, type = 'TEXT', voiceData = null, voiceMimeType = null) => {
+    if (type === 'VOICE' && !voiceData) return null;
+    if (type !== 'VOICE' && !content.trim()) return null;
+    if (sending) return null;
 
-    const messageContent = content.trim();
+    const messageContent = type === 'VOICE' ? '🎤 Голосовое сообщение' : content.trim();
     const user = getCurrentUser();
     const optimisticMessage = createOptimisticMessage(messageContent, type, chatId, user);
 
@@ -121,20 +124,30 @@ export const useMessageSender = (chatId, onMessageSent) => {
 
       if (isWebSocketReady) {
         try {
+          const payload = {
+            chatId: parseInt(chatId),
+            type,
+          };
+
+          if (type === 'VOICE') {
+            payload.voiceData = voiceData;
+            payload.voiceMimeType = voiceMimeType || 'audio/webm';
+          } else {
+            payload.content = messageContent;
+          }
+
           client.publish({
             destination: '/app/chat.sendMessage',
-            body: JSON.stringify({
-              chatId: parseInt(chatId),
-              content: messageContent,
-              type,
-            }),
+            body: JSON.stringify(payload),
           });
           setSending(false);
           return { success: true, tempId: optimisticMessage.tempId, optimisticMessage, serverMessage: null };
         } catch (wsError) {}
       }
 
-      const serverMessage = await chatAPI.sendMessage(chatId, messageContent, type);
+      const serverMessage = type === 'VOICE'
+        ? await chatAPI.sendVoiceMessage(chatId, voiceData, voiceMimeType)
+        : await chatAPI.sendMessage(chatId, messageContent, type);
 
       updateMessageStatus(optimisticMessage.tempId, MESSAGE_STATUS.SENT, serverMessage);
       removeMessageFromQueue(optimisticMessage.tempId);

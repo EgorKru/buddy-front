@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
-import { Send, Loader2, Menu, Check, CheckCheck, AlertCircle, Clock, ArrowLeft } from 'lucide-react';
+import { Send, Loader2, Menu, Check, CheckCheck, AlertCircle, Clock, ArrowLeft, Mic, X } from 'lucide-react';
 import { chatAPI, getCurrentUser, isAuthenticated } from '@/utils/api';
 import { getChatName } from '@/utils/chatHelpers';
 import { formatChatDate, formatChatTime, getOnlineStatus } from '@/utils/dateHelpers';
 import { useMessageSender } from '@/hooks/useMessageSender';
+import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import { MESSAGE_STATUS } from '@/utils/messageQueue';
 import ChatSidebar from '@/component/ChatSidebar';
+import VoiceMessagePlayer from '@/component/VoiceMessagePlayer';
 import styles from '@/styles/chat.module.css';
 import { useChats, useChatMessages } from '@/context/messaging';
 import { useChatRealtime } from '@/hooks/useChatRealtime';
@@ -41,6 +43,7 @@ export default function ChatPage() {
 
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
+  const sentAudioBlobRef = useRef(null);
   const messages = useChatMessages(chatId);
 
   useChatRealtime(chatId);
@@ -113,6 +116,18 @@ export default function ChatPage() {
     handleMessageSent
   );
 
+  const {
+    isRecording,
+    recordingTime,
+    audioBlob,
+    error: voiceError,
+    startRecording,
+    stopRecording,
+    cancelRecording,
+    reset: resetVoice,
+    convertToBase64,
+  } = useVoiceRecorder();
+
 
   useEffect(() => {
     if (connected && chatId) {
@@ -132,7 +147,6 @@ export default function ChatPage() {
     const result = await sendMessageHook(messageContent, 'TEXT');
 
     if (result?.serverMessage) {
-      // serverMessage придёт и в topic, но upsert в store безопасен — добавим сразу для UX
       addOptimistic(chatId, { ...result.serverMessage, status: MESSAGE_STATUS.SENT, isOptimistic: false });
     } else if (result?.optimisticMessage) {
       addOptimistic(chatId, result.optimisticMessage);
@@ -142,6 +156,49 @@ export default function ChatPage() {
       setNewMessage(messageContent);
     }
   };
+
+  const handleVoiceRecord = async () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  };
+
+  const handleVoiceSend = useCallback(async () => {
+    if (!audioBlob || !user || sending) return;
+
+    try {
+      const base64 = await convertToBase64(audioBlob);
+      const mimeType = audioBlob.type || 'audio/webm';
+
+      const result = await sendMessageHook(null, 'VOICE', base64, mimeType);
+
+      if (result?.serverMessage) {
+        addOptimistic(chatId, { ...result.serverMessage, status: MESSAGE_STATUS.SENT, isOptimistic: false });
+      } else if (result?.optimisticMessage) {
+        addOptimistic(chatId, result.optimisticMessage);
+      }
+
+      resetVoice();
+      sentAudioBlobRef.current = null;
+    } catch (error) {
+      resetVoice();
+      sentAudioBlobRef.current = null;
+    }
+  }, [audioBlob, user, sending, convertToBase64, sendMessageHook, chatId, addOptimistic, resetVoice]);
+
+  const handleVoiceCancel = () => {
+    cancelRecording();
+    sentAudioBlobRef.current = null;
+  };
+
+  useEffect(() => {
+    if (audioBlob && !isRecording && !sending && sentAudioBlobRef.current !== audioBlob) {
+      sentAudioBlobRef.current = audioBlob;
+      handleVoiceSend();
+    }
+  }, [audioBlob, isRecording, sending, handleVoiceSend]);
 
   const handleScroll = () => {
     if (!messagesContainerRef.current) return;
@@ -312,9 +369,13 @@ export default function ChatPage() {
                         </span>
                       </div>
                     )}
-                    <div className={`${styles.messageText} ${msg.isOptimistic ? styles.messagePending : ''} ${msg.status === MESSAGE_STATUS.FAILED ? styles.messageFailed : ''}`}>
-                      {msg.content}
-                    </div>
+                    {msg.type === 'VOICE' && msg.fileUrl ? (
+                      <VoiceMessagePlayer fileUrl={msg.fileUrl} duration={msg.duration} />
+                    ) : (
+                      <div className={`${styles.messageText} ${msg.isOptimistic ? styles.messagePending : ''} ${msg.status === MESSAGE_STATUS.FAILED ? styles.messageFailed : ''}`}>
+                        {msg.content}
+                      </div>
+                    )}
                     {isOwn && (
                       <div className={styles.messageFooter}>
                         <span className={styles.messageTime}>
@@ -343,6 +404,24 @@ export default function ChatPage() {
         <div ref={messagesEndRef} />
       </div>
 
+      {isRecording && (
+        <div className={styles.voiceRecordingBar}>
+          <div className={styles.voiceRecordingInfo}>
+            <div className={styles.voiceRecordingIndicator} />
+            <span className={styles.voiceRecordingTime}>
+              {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleVoiceCancel}
+            className={styles.voiceCancelButton}
+            title="Отменить запись"
+          >
+            <X size={20} />
+          </button>
+        </div>
+      )}
       <form onSubmit={sendMessage} className={styles.messageForm}>
         <input
           type="text"
@@ -350,13 +429,22 @@ export default function ChatPage() {
           name="message"
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
-          placeholder="Введите сообщение..."
-          disabled={sending}
+          placeholder={isRecording ? "Идет запись..." : "Введите сообщение..."}
+          disabled={sending || isRecording}
           className={styles.messageInput}
         />
         <button
+          type="button"
+          onClick={handleVoiceRecord}
+          className={`${styles.voiceButton} ${isRecording ? styles.voiceButtonRecording : ''}`}
+          title={isRecording ? "Остановить запись" : "Записать голосовое сообщение"}
+          disabled={sending}
+        >
+          <Mic size={20} />
+        </button>
+        <button
           type="submit"
-          disabled={!newMessage.trim() || sending}
+          disabled={!newMessage.trim() || sending || isRecording}
           className={styles.sendButton}
           title="Отправить сообщение"
         >

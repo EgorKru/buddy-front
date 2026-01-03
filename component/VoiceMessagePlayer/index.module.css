@@ -1,0 +1,78 @@
+.voiceMessage {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: rgba(102, 126, 234, 0.1);
+  border-radius: 1rem;
+  min-width: 200px;
+  max-width: 300px;
+}
+
+.playButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: #667eea;
+  color: white;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.playButton:hover:not(:disabled) {
+  background: #5568d3;
+  transform: scale(1.05);
+}
+
+.playButton:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.voiceInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.progressBar {
+  width: 100%;
+  height: 4px;
+  background: rgba(102, 126, 234, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 0.25rem;
+}
+
+.progressFill {
+  height: 100%;
+  background: #667eea;
+  border-radius: 2px;
+  transition: width 0.1s linear;
+}
+
+.duration {
+  font-size: 0.75rem;
+  color: #666;
+  font-family: 'Courier New', monospace;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+

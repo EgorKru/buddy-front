@@ -107,6 +107,19 @@ export const chatAPI = {
     });
   },
 
+  sendVoiceMessage: async (chatId, voiceData, voiceMimeType = 'audio/webm') => {
+    return apiRequest(`/chats/${chatId}/messages`, {
+      method: 'POST',
+      body: { type: 'VOICE', voiceData, voiceMimeType },
+    });
+  },
+
+  getVoiceFileUrl: (filePath) => {
+    if (!filePath) return null;
+    const cleanPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
+    return getApiUrl(`/chats/files/voice/${cleanPath}`);
+  },
+
   markChatAsRead: async (chatId) => {
     return apiRequest(`/chats/${chatId}/read`, {
       method: 'PUT',
