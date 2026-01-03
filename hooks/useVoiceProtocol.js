@@ -30,77 +30,31 @@ export const useVoiceProtocol = (chatId) => {
   const onCompleteCallbackRef = useRef(null);
   const webrtcPeerRef = useRef(null);
   const dataChannelRef = useRef(null);
+  
+  const isBrowser = typeof window !== 'undefined';
 
-  useEffect(() => {
-    if (!client || !connected || !client.connected || !client.active) {
-      if (signalSubscriptionRef.current) {
-        safeUnsubscribe(signalSubscriptionRef.current);
-        signalSubscriptionRef.current = null;
-      }
+  const cleanup = useCallback(() => {
+    if (sendingIntervalRef.current) {
+      clearInterval(sendingIntervalRef.current);
+      sendingIntervalRef.current = null;
+    }
+    if (webrtcPeerRef.current) {
+      webrtcPeerRef.current.close();
+      webrtcPeerRef.current = null;
+    }
+    dataChannelRef.current = null;
+    setSessionState(null);
+    setRelaySessionId(null);
+    setRemoteEndpoint(null);
+    setMessageId(null);
+  }, []);
+
+  const handleWebRTCOffer = useCallback(async (offerSdp) => {
+    if (typeof window === 'undefined' || !window.RTCPeerConnection) {
+      setSessionState('error');
       return;
     }
 
-    if (signalSubscriptionRef.current) {
-      safeUnsubscribe(signalSubscriptionRef.current);
-      signalSubscriptionRef.current = null;
-    }
-
-    try {
-      const subscription = client.subscribe('/user/queue/voice-signal', (message) => {
-        const response = safeJsonParse(message.body);
-        if (!response) return;
-        handleSignalResponse(response);
-      });
-      signalSubscriptionRef.current = subscription;
-    } catch (e) {}
-
-    return () => {
-      if (signalSubscriptionRef.current) {
-        safeUnsubscribe(signalSubscriptionRef.current);
-        signalSubscriptionRef.current = null;
-      }
-    };
-  }, [client, connected, handleSignalResponse]);
-
-  const handleSignalResponse = useCallback((response) => {
-    if (!response?.type) return;
-    switch (response.type) {
-      case VOICE_SIGNAL_TYPES.OFFER:
-        if (response.relaySessionId) {
-          setRelaySessionId(response.relaySessionId);
-          setSessionState('relay');
-        } else if (response.remoteEndpoint) {
-          setRemoteEndpoint(response.remoteEndpoint);
-          setSessionState('p2p');
-          if (response.sdp) {
-            handleWebRTCOffer(response.sdp);
-          }
-        } else if (response.sdp) {
-          handleWebRTCOffer(response.sdp);
-        }
-        break;
-      case VOICE_SIGNAL_TYPES.ANSWER:
-        if (response.relaySessionId) setRelaySessionId(response.relaySessionId);
-        if (response.remoteEndpoint) setRemoteEndpoint(response.remoteEndpoint);
-        if (response.sdp) {
-          handleWebRTCAnswer(response.sdp);
-        }
-        setSessionState('ready');
-        break;
-      case VOICE_SIGNAL_TYPES.READY:
-        setSessionState('ready');
-        break;
-      case VOICE_SIGNAL_TYPES.COMPLETE:
-        cleanup();
-        if (onCompleteCallbackRef.current) {
-          onCompleteCallbackRef.current();
-          onCompleteCallbackRef.current = null;
-        }
-        break;
-    }
-  }, [cleanup]);
-
-  const handleWebRTCOffer = useCallback(async (offerSdp) => {
     try {
       const webrtc = new WebRTCPeer(chatId, (dataChannel) => {
         dataChannelRef.current = dataChannel;
@@ -139,6 +93,75 @@ export const useVoiceProtocol = (chatId) => {
     }
   }, []);
 
+  const handleSignalResponse = useCallback((response) => {
+    if (!response?.type) return;
+    switch (response.type) {
+      case VOICE_SIGNAL_TYPES.OFFER:
+        if (response.relaySessionId) {
+          setRelaySessionId(response.relaySessionId);
+          setSessionState('relay');
+        } else if (response.remoteEndpoint) {
+          setRemoteEndpoint(response.remoteEndpoint);
+          setSessionState('p2p');
+          if (response.sdp) {
+            handleWebRTCOffer(response.sdp);
+          }
+        } else if (response.sdp) {
+          handleWebRTCOffer(response.sdp);
+        }
+        break;
+      case VOICE_SIGNAL_TYPES.ANSWER:
+        if (response.relaySessionId) setRelaySessionId(response.relaySessionId);
+        if (response.remoteEndpoint) setRemoteEndpoint(response.remoteEndpoint);
+        if (response.sdp) {
+          handleWebRTCAnswer(response.sdp);
+        }
+        setSessionState('ready');
+        break;
+      case VOICE_SIGNAL_TYPES.READY:
+        setSessionState('ready');
+        break;
+      case VOICE_SIGNAL_TYPES.COMPLETE:
+        cleanup();
+        if (onCompleteCallbackRef.current) {
+          onCompleteCallbackRef.current();
+          onCompleteCallbackRef.current = null;
+        }
+        break;
+    }
+  }, [cleanup, handleWebRTCOffer, handleWebRTCAnswer]);
+
+  useEffect(() => {
+    if (!client || !connected || !client.connected || !client.active) {
+      if (signalSubscriptionRef.current) {
+        safeUnsubscribe(signalSubscriptionRef.current);
+        signalSubscriptionRef.current = null;
+      }
+      return;
+    }
+
+    if (signalSubscriptionRef.current) {
+      safeUnsubscribe(signalSubscriptionRef.current);
+      signalSubscriptionRef.current = null;
+    }
+
+    try {
+      const subscription = client.subscribe('/user/queue/voice-signal', (message) => {
+        const response = safeJsonParse(message.body);
+        if (!response) return;
+        handleSignalResponse(response);
+      });
+      signalSubscriptionRef.current = subscription;
+    } catch (e) {}
+
+    return () => {
+      if (signalSubscriptionRef.current) {
+        safeUnsubscribe(signalSubscriptionRef.current);
+        signalSubscriptionRef.current = null;
+      }
+    };
+  }, [client, connected, handleSignalResponse]);
+
   const initiate = useCallback(async (codecParams = DEFAULT_CODEC) => {
     if (!client || !connected || !client.connected || !client.active) {
       throw new Error('WebSocket not connected');
@@ -148,36 +171,39 @@ export const useVoiceProtocol = (chatId) => {
     setRelaySessionId(null);
     setRemoteEndpoint(null);
 
-    try {
-      const webrtc = new WebRTCPeer(chatId, (dataChannel) => {
-        dataChannelRef.current = dataChannel;
-      }, (error) => {
-        setSessionState('error');
-      });
+    if (typeof window !== 'undefined' && window.RTCPeerConnection) {
+      try {
+        const webrtc = new WebRTCPeer(chatId, (dataChannel) => {
+          dataChannelRef.current = dataChannel;
+        }, (error) => {
+          setSessionState('error');
+        });
 
-      webrtcPeerRef.current = webrtc;
-      const offer = await webrtc.createOffer();
+        webrtcPeerRef.current = webrtc;
+        const offer = await webrtc.createOffer();
 
-      client.publish({
-        destination: '/app/voice.signal',
-        body: JSON.stringify({
-          type: VOICE_SIGNAL_TYPES.INITIATE,
-          chatId: parseInt(chatId),
-          sdp: offer.sdp,
-          localEndpoint: offer.localEndpoint,
-          ...codecParams,
-        }),
-      });
-    } catch (error) {
-      client.publish({
-        destination: '/app/voice.signal',
-        body: JSON.stringify({
-          type: VOICE_SIGNAL_TYPES.INITIATE,
-          chatId: parseInt(chatId),
-          ...codecParams,
-        }),
-      });
+        client.publish({
+          destination: '/app/voice.signal',
+          body: JSON.stringify({
+            type: VOICE_SIGNAL_TYPES.INITIATE,
+            chatId: parseInt(chatId),
+            sdp: offer.sdp,
+            localEndpoint: offer.localEndpoint,
+            ...codecParams,
+          }),
+        });
+        return;
+      } catch (error) {}
     }
+
+    client.publish({
+      destination: '/app/voice.signal',
+      body: JSON.stringify({
+        type: VOICE_SIGNAL_TYPES.INITIATE,
+        chatId: parseInt(chatId),
+        ...codecParams,
+      }),
+    });
   }, [client, connected, chatId]);
 
   const createSignalPayload = useCallback((type, localEndpoint = null) => {
@@ -203,7 +229,7 @@ export const useVoiceProtocol = (chatId) => {
   }, [client, connected, createSignalPayload]);
 
   const sendOffer = useCallback(async (localEndpoint = null) => {
-    if (webrtcPeerRef.current && !localEndpoint) {
+    if (typeof window !== 'undefined' && window.RTCPeerConnection && webrtcPeerRef.current && !localEndpoint) {
       try {
         const offer = await webrtcPeerRef.current.createOffer();
         sendSignal(VOICE_SIGNAL_TYPES.OFFER, offer.localEndpoint, {
@@ -299,22 +325,6 @@ export const useVoiceProtocol = (chatId) => {
       }
     }, 20);
   }, [sendReady, sendAudioData, sendComplete]);
-
-  const cleanup = useCallback(() => {
-    if (sendingIntervalRef.current) {
-      clearInterval(sendingIntervalRef.current);
-      sendingIntervalRef.current = null;
-    }
-    if (webrtcPeerRef.current) {
-      webrtcPeerRef.current.close();
-      webrtcPeerRef.current = null;
-    }
-    dataChannelRef.current = null;
-    setSessionState(null);
-    setRelaySessionId(null);
-    setRemoteEndpoint(null);
-    setMessageId(null);
-  }, []);
 
   useEffect(() => {
     return () => {

@@ -1,5 +1,8 @@
 export class WebRTCPeer {
   constructor(chatId, onDataChannel, onError) {
+    if (typeof window === 'undefined' || !window.RTCPeerConnection) {
+      throw new Error('WebRTC not available');
+    }
     this.chatId = chatId;
     this.onDataChannel = onDataChannel;
     this.onError = onError;
@@ -9,6 +12,9 @@ export class WebRTCPeer {
   }
 
   async createOffer() {
+    if (typeof window === 'undefined' || !window.RTCPeerConnection) {
+      throw new Error('WebRTC not available');
+    }
     try {
       this.peerConnection = new RTCPeerConnection({
         iceServers: [
@@ -61,6 +67,9 @@ export class WebRTCPeer {
   }
 
   async createAnswer(offerSdp) {
+    if (typeof window === 'undefined' || !window.RTCPeerConnection) {
+      throw new Error('WebRTC not available');
+    }
     try {
       this.peerConnection = new RTCPeerConnection({
         iceServers: [

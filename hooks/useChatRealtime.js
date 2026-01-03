@@ -74,28 +74,32 @@ export const useChatRealtime = (chatId) => {
       topicSubRef.current = sub;
     } catch (e) {}
 
-    try {
-      const voiceSub = client.subscribe(`/topic/voice/${chatId}`, (message) => {
-        const data = safeJsonParse(message.body);
-        if (!data) return;
-        if (Number(data.chatId) !== Number(chatId)) return;
+    if (typeof window !== 'undefined') {
+      try {
+        const voiceSub = client.subscribe(`/topic/voice/${chatId}`, (message) => {
+          const data = safeJsonParse(message.body);
+          if (!data) return;
+          if (Number(data.chatId) !== Number(chatId)) return;
 
-        if (data.audioData && typeof window !== 'undefined') {
-          const audioBlob = new Blob([
-            Uint8Array.from(atob(data.audioData), c => c.charCodeAt(0))
-          ], { type: 'audio/webm' });
-          
-          const audioUrl = URL.createObjectURL(audioBlob);
-          const audio = new Audio(audioUrl);
-          audio.play().catch(() => {});
-          
-          audio.onended = () => {
-            URL.revokeObjectURL(audioUrl);
-          };
-        }
-      });
-      voiceTopicSubRef.current = voiceSub;
-    } catch (e) {}
+          if (data.audioData) {
+            try {
+              const audioBlob = new Blob([
+                Uint8Array.from(atob(data.audioData), c => c.charCodeAt(0))
+              ], { type: 'audio/webm' });
+              
+              const audioUrl = URL.createObjectURL(audioBlob);
+              const audio = new Audio(audioUrl);
+              audio.play().catch(() => {});
+              
+              audio.onended = () => {
+                URL.revokeObjectURL(audioUrl);
+              };
+            } catch (e) {}
+          }
+        });
+        voiceTopicSubRef.current = voiceSub;
+      } catch (e) {}
+    }
 
     return () => {
       if (topicSubRef.current) {
