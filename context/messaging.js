@@ -44,6 +44,7 @@ const actionTypes = {
   REPLACE_OPTIMISTIC: 'REPLACE_OPTIMISTIC',
   APPLY_READ_RECEIPT: 'APPLY_READ_RECEIPT',
   MARK_CHAT_READ_LOCAL: 'MARK_CHAT_READ_LOCAL',
+  UPDATE_PRESENCE: 'UPDATE_PRESENCE',
 };
 
 const ensureArray = (v) => (Array.isArray(v) ? v : []);
@@ -245,6 +246,32 @@ const reducer = (state, action) => {
       };
     }
 
+    case actionTypes.UPDATE_PRESENCE: {
+      const { userId, online, lastSeenAt } = action.payload || {};
+      if (!userId) return state;
+      const uid = String(userId);
+      const chatsById = { ...state.chatsById };
+      let updated = false;
+
+      for (const [cid, chat] of Object.entries(chatsById)) {
+        if (!chat?.participants) continue;
+        const participants = chat.participants.map(p => {
+          if (String(p.id) !== uid) return p;
+          return {
+            ...p,
+            online: online ?? p.online,
+            lastSeenAt: lastSeenAt ?? p.lastSeenAt,
+          };
+        });
+        if (participants.some((p, i) => p.online !== chat.participants[i]?.online || p.lastSeenAt !== chat.participants[i]?.lastSeenAt)) {
+          chatsById[cid] = { ...chat, participants };
+          updated = true;
+        }
+      }
+
+      return updated ? { ...state, chatsById } : state;
+    }
+
     default:
       return state;
   }
@@ -285,7 +312,7 @@ export const MessagingProvider = ({ children }) => {
   const { client, connected } = useStomp();
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  const wsSubsRef = useRef({ messages: null, notifications: null });
+  const wsSubsRef = useRef({ messages: null, notifications: null, presence: null });
   const readSubsRef = useRef(new Map());
   const refreshInFlightRef = useRef(false);
   const lastSoundAtRef = useRef(0);
@@ -431,8 +458,10 @@ export const MessagingProvider = ({ children }) => {
     const cleanup = () => {
       safeUnsubscribe(wsSubsRef.current.messages);
       safeUnsubscribe(wsSubsRef.current.notifications);
+      safeUnsubscribe(wsSubsRef.current.presence);
       wsSubsRef.current.messages = null;
       wsSubsRef.current.notifications = null;
+      wsSubsRef.current.presence = null;
     };
     cleanup();
 
@@ -453,6 +482,19 @@ export const MessagingProvider = ({ children }) => {
         const msg = getNotificationMessage(notif);
         if (msg?.id) upsertMessage(msg);
         maybeSound(notif);
+      });
+
+      wsSubsRef.current.presence = client.subscribe('/user/queue/presence', (m) => {
+        const event = safeJsonParse(m.body);
+        if (!event?.userId) return;
+        dispatch({
+          type: actionTypes.UPDATE_PRESENCE,
+          payload: {
+            userId: event.userId,
+            online: event.online,
+            lastSeenAt: event.lastSeenAt,
+          },
+        });
       });
     } catch (e) {}
 
@@ -491,6 +533,7 @@ export const MessagingProvider = ({ children }) => {
     return () => {
       safeUnsubscribe(wsSubsRef.current.messages);
       safeUnsubscribe(wsSubsRef.current.notifications);
+      safeUnsubscribe(wsSubsRef.current.presence);
       for (const sub of readSubsRef.current.values()) safeUnsubscribe(sub);
       readSubsRef.current.clear();
     };

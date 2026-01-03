@@ -241,7 +241,7 @@ export default function ChatPage() {
                   <span className={status.online ? styles.onlineText : styles.offlineText}>
                     {status.text}
                   </span>
-                </div>
+            </div>
               );
             })()}
           </div>
