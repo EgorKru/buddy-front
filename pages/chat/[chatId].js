@@ -6,6 +6,7 @@ import { getChatName } from '@/utils/chatHelpers';
 import { formatChatDate, formatChatTime, getOnlineStatus } from '@/utils/dateHelpers';
 import { useMessageSender } from '@/hooks/useMessageSender';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
+import { useVoiceProtocol } from '@/hooks/useVoiceProtocol';
 import { MESSAGE_STATUS } from '@/utils/messageQueue';
 import ChatSidebar from '@/component/ChatSidebar';
 import VoiceMessagePlayer from '@/component/VoiceMessagePlayer';
@@ -47,6 +48,7 @@ export default function ChatPage() {
   const messages = useChatMessages(chatId);
 
   useChatRealtime(chatId);
+  const voiceProtocol = useVoiceProtocol(chatId);
 
   const loadChat = useCallback(async () => {
     if (!chatId) return;
@@ -165,7 +167,7 @@ export default function ChatPage() {
     }
   };
 
-  const handleVoiceSend = useCallback(async () => {
+  const handleVoiceSendSimple = useCallback(async () => {
     if (!audioBlob || !user || sending) return;
 
     try {
@@ -209,6 +211,47 @@ export default function ChatPage() {
       sentAudioBlobRef.current = null;
     }
   }, [audioBlob, user, sending, convertToBase64, sendMessageHook, chatId, addOptimistic, resetVoice]);
+
+  const handleVoiceSend = useCallback(async () => {
+    if (!audioBlob || !user || sending) return;
+
+    const useNewProtocol = typeof window !== 'undefined' && localStorage.getItem('use_voice_protocol') !== 'false';
+
+    if (useNewProtocol) {
+      try {
+        voiceProtocol.initiate();
+        
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('Voice protocol timeout')), 5000);
+          const checkState = setInterval(() => {
+            const { sessionState, relaySessionId } = voiceProtocol;
+            if (sessionState === 'ready' || sessionState === 'relay' || sessionState === 'p2p') {
+              clearInterval(checkState);
+              clearTimeout(timeout);
+              
+              if (relaySessionId) {
+                voiceProtocol.sendAnswer();
+              } else {
+                voiceProtocol.sendOffer();
+              }
+              
+              setTimeout(() => {
+                voiceProtocol.startSendingAudio([audioBlob], () => {
+                  resetVoice();
+                  sentAudioBlobRef.current = null;
+                  resolve();
+                });
+              }, 500);
+            }
+          }, 100);
+        });
+      } catch (error) {
+        await handleVoiceSendSimple();
+      }
+    } else {
+      await handleVoiceSendSimple();
+    }
+  }, [audioBlob, user, sending, voiceProtocol, handleVoiceSendSimple, resetVoice]);
 
   const handleVoiceCancel = () => {
     cancelRecording();
