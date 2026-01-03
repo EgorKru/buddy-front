@@ -159,20 +159,21 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
                     <div className={styles.lastMessage}>
                       <span className={styles.lastMessageText}>
                         {Number(chat.lastMessage.senderId) === Number(user?.id) && (
-                          <span title={(() => {
+                          (() => {
                             const meta = getLastMessageReadMeta(chat);
-                            if (!meta.readCount) return 'Отправлено';
-                            return meta.totalOthers > 1 ? `Прочитали ${meta.readCount}/${meta.totalOthers}` : 'Прочитано';
-                          })()} style={{ display: 'inline-flex', alignItems: 'center', marginRight: 6 }}>
-                            {(() => {
-                              const meta = getLastMessageReadMeta(chat);
-                              return meta.isRead ? (
-                                <CheckCheck size={14} className={styles.statusIcon} />
-                              ) : (
-                                <Check size={14} className={styles.statusIcon} />
-                              );
-                            })()}
-                          </span>
+                            const title = meta.isRead 
+                              ? (meta.totalOthers > 1 ? `Прочитали ${meta.readCount}/${meta.totalOthers}` : 'Прочитано')
+                              : 'Отправлено';
+                            return (
+                              <span title={title} style={{ display: 'inline-flex', alignItems: 'center', marginRight: 6 }}>
+                                {meta.isRead ? (
+                                  <CheckCheck size={14} className={styles.statusIconRead} />
+                                ) : (
+                                  <CheckCheck size={14} className={styles.statusIcon} />
+                                )}
+                              </span>
+                            );
+                          })()
                         )}
                         {chat.lastMessage.content.substring(0, 40)}
                         {chat.lastMessage.content.length > 40 ? '...' : ''}

@@ -639,3 +639,13 @@
   }
 }
 
+.statusIcon {
+  color: rgb(150, 150, 160);
+  flex-shrink: 0;
+}
+
+.statusIconRead {
+  color: rgb(34, 197, 94);
+  flex-shrink: 0;
+}
+

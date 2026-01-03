@@ -383,6 +383,11 @@
   flex-shrink: 0;
 }
 
+.statusIconRead {
+  color: rgb(34, 197, 94);
+  flex-shrink: 0;
+}
+
 .statusIconFailed {
   color: #f44336;
   flex-shrink: 0;

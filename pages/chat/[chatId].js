@@ -179,14 +179,14 @@ export default function ChatPage() {
       case MESSAGE_STATUS.PENDING:
         return <Clock size={14} className={styles.statusIcon} />;
       case MESSAGE_STATUS.SENT:
-        if (isRead) return <CheckCheck size={14} className={styles.statusIcon} />;
-        return <Check size={14} className={styles.statusIcon} />;
+        if (isRead) return <CheckCheck size={14} className={styles.statusIconRead} />;
+        return <CheckCheck size={14} className={styles.statusIcon} />;
       case MESSAGE_STATUS.DELIVERED:
         return <CheckCheck size={14} className={styles.statusIcon} />;
       case MESSAGE_STATUS.FAILED:
         return <AlertCircle size={14} className={styles.statusIconFailed} title="Ошибка отправки" />;
       default:
-        return <Check size={14} className={styles.statusIcon} />;
+        return <CheckCheck size={14} className={styles.statusIcon} />;
     }
   };
 
@@ -224,10 +224,6 @@ export default function ChatPage() {
           </button>
           <div className={styles.chatInfo}>
             <h1>{getDisplayChatName()}</h1>
-            <div className={styles.status}>
-              <span className={`${styles.statusDot} ${connected ? styles.connected : ''}`}></span>
-              <span>{connected ? 'Подключено' : 'Подключение...'}</span>
-            </div>
           </div>
         </div>
 
@@ -318,7 +314,7 @@ export default function ChatPage() {
           name="message"
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
-          placeholder={connected ? "Введите сообщение..." : "Подключение... (отправка через REST API)"}
+          placeholder="Введите сообщение..."
           disabled={sending}
           className={styles.messageInput}
         />
@@ -326,7 +322,7 @@ export default function ChatPage() {
           type="submit"
           disabled={!newMessage.trim() || sending}
           className={styles.sendButton}
-          title={!connected ? "WebSocket не подключен, сообщение будет отправлено через REST API" : ""}
+          title="Отправить сообщение"
         >
           {sending ? (
             <Loader2 size={20} className={styles.spinner} />
