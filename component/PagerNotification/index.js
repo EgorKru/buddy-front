@@ -22,8 +22,11 @@ export default function PagerNotification({
       const latest = unreadNotifications
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
       setLatestNotification(latest);
+    } else {
+      // Если все уведомления прочитаны, скрываем плашку
+      setLatestNotification(null);
     }
-  }, [unreadNotifications]);
+  }, [unreadNotifications, notifications]);
 
   const handlePagerClick = () => {
     unlockPagerAudio();
@@ -35,6 +38,8 @@ export default function PagerNotification({
       onNotificationClick(notification);
     }
     setIsExpanded(false);
+    // После клика уведомление будет помечено как прочитанное,
+    // и плашка автоматически скроется благодаря useEffect
   };
 
   const handleDismiss = (e, notificationId) => {

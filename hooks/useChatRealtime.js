@@ -65,9 +65,14 @@ export const useChatRealtime = (chatId) => {
         if (!dto) return;
         if (Number(dto.chatId) !== Number(chatId)) return;
 
-        upsertMessage({ ...dto, status: MESSAGE_STATUS.SENT, isOptimistic: false });
+        // Передаем unreadDelta: 0, так как мы в активном чате
+        const isVisible = typeof document !== 'undefined' && document.visibilityState === 'visible';
+        upsertMessage(
+          { ...dto, status: MESSAGE_STATUS.SENT, isOptimistic: false },
+          { unreadDelta: isVisible ? 0 : undefined }
+        );
 
-        if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        if (isVisible) {
           markChatAsRead(chatId);
         }
       });

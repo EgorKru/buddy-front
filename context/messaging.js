@@ -142,7 +142,22 @@ const reducer = (state, action) => {
     }
 
     case actionTypes.SET_ACTIVE_CHAT: {
-      return { ...state, activeChatId: action.payload?.chatId ? String(action.payload.chatId) : null };
+      const newActiveChatId = action.payload?.chatId ? String(action.payload.chatId) : null;
+      const chatsById = { ...state.chatsById };
+      
+      // Сбрасываем счетчик непрочитанных для нового активного чата
+      if (newActiveChatId && chatsById[newActiveChatId]) {
+        chatsById[newActiveChatId] = {
+          ...chatsById[newActiveChatId],
+          unreadCount: 0,
+        };
+      }
+      
+      return { 
+        ...state, 
+        activeChatId: newActiveChatId,
+        chatsById,
+      };
     }
 
     case actionTypes.UPSERT_MESSAGE: {
@@ -164,21 +179,41 @@ const reducer = (state, action) => {
 
       const chatsById = { ...state.chatsById };
       const chat = chatsById[cid];
+      const isActiveChat = state.activeChatId && String(state.activeChatId) === cid;
+      const isVisible = typeof window !== 'undefined' && document.visibilityState === 'visible';
+      const shouldResetUnread = isActiveChat && isVisible;
+      
       if (chat) {
         const last = chat?.lastMessage;
         if (!last?.createdAt || isNewer(message.createdAt, last.createdAt)) {
+          // Если чат активен и окно видимо, сбрасываем счетчик непрочитанных
+          const newUnreadCount = shouldResetUnread 
+            ? 0 
+            : (action.payload?.unreadDelta != null
+              ? Math.max(0, Number(chat.unreadCount || 0) + Number(action.payload.unreadDelta))
+              : chat.unreadCount);
+          
           chatsById[cid] = {
             ...chat,
             lastMessage: message,
             updatedAt: toIso(message.createdAt) ?? chat.updatedAt ?? new Date().toISOString(),
-            unreadCount: action.payload?.unreadDelta != null
-              ? Math.max(0, Number(chat.unreadCount || 0) + Number(action.payload.unreadDelta))
-              : chat.unreadCount,
+            unreadCount: newUnreadCount,
           };
         } else if (action.payload?.unreadDelta != null) {
+          // Если чат активен и окно видимо, сбрасываем счетчик непрочитанных
+          const newUnreadCount = shouldResetUnread 
+            ? 0 
+            : Math.max(0, Number(chat.unreadCount || 0) + Number(action.payload.unreadDelta));
+          
           chatsById[cid] = {
             ...chat,
-            unreadCount: Math.max(0, Number(chat.unreadCount || 0) + Number(action.payload.unreadDelta)),
+            unreadCount: newUnreadCount,
+          };
+        } else if (shouldResetUnread && chat.unreadCount > 0) {
+          // Сбрасываем счетчик, если чат активен и окно видимо
+          chatsById[cid] = {
+            ...chat,
+            unreadCount: 0,
           };
         }
       }
@@ -515,6 +550,41 @@ export const MessagingProvider = ({ children }) => {
     } catch (e) {}
   }, [state.activeChatId]);
 
+  // Эффект для автоматического сброса счетчика непрочитанных в активном чате
+  useEffect(() => {
+    if (!state.activeChatId) return;
+    const isVisible = typeof document !== 'undefined' && document.visibilityState === 'visible';
+    if (!isVisible) return;
+
+    const activeChat = state.chatsById[String(state.activeChatId)];
+    if (activeChat && activeChat.unreadCount > 0) {
+      dispatch({ type: actionTypes.MARK_CHAT_READ_LOCAL, payload: { chatId: state.activeChatId } });
+      markChatAsRead(state.activeChatId);
+    }
+  }, [state.activeChatId, state.chatsById, markChatAsRead]);
+
+  // Эффект для сброса счетчика при изменении видимости окна
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const handleVisibilityChange = () => {
+      if (!state.activeChatId) return;
+      const isVisible = document.visibilityState === 'visible';
+      if (isVisible) {
+        const activeChat = state.chatsById[String(state.activeChatId)];
+        if (activeChat && activeChat.unreadCount > 0) {
+          dispatch({ type: actionTypes.MARK_CHAT_READ_LOCAL, payload: { chatId: state.activeChatId } });
+          markChatAsRead(state.activeChatId);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [state.activeChatId, state.chatsById, markChatAsRead]);
+
   useEffect(() => {
     if (!isAuthenticated()) return;
     if (!client || !connected || !client.connected || !client.active) return;
@@ -534,7 +604,9 @@ export const MessagingProvider = ({ children }) => {
         const notif = safeJsonParse(m.body);
         if (!notif) return;
         const msg = getNotificationMessage(notif);
-        if (msg?.id) upsertMessage(msg);
+        if (msg?.id) {
+          upsertMessage(msg);
+        }
         maybeSound(notif);
       });
     } catch (e) {}
@@ -544,7 +616,9 @@ export const MessagingProvider = ({ children }) => {
         const notif = safeJsonParse(m.body);
         if (!notif) return;
         const msg = getNotificationMessage(notif);
-        if (msg?.id) upsertMessage(msg);
+        if (msg?.id) {
+          upsertMessage(msg);
+        }
         maybeSound(notif);
       });
 

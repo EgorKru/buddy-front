@@ -52,6 +52,12 @@ export default function ChatPage() {
   const scrollPositionSavedRef = useRef(false);
   const isUserScrollingRef = useRef(false);
   const scrollTimeoutRef = useRef(null);
+  const userScrolledToBottomRef = useRef(false); // Флаг, что пользователь намеренно прокрутил вниз
+  const shouldRestorePositionRef = useRef(true); // Флаг, нужно ли восстанавливать позицию
+  const restoreAttemptsRef = useRef(0); // Счетчик попыток восстановления
+  const wasAtBottomBeforeMessageRef = useRef(false); // Флаг, был ли пользователь внизу до добавления сообщения
+  const shouldAutoScrollRef = useRef(false); // Флаг, нужно ли автоматически прокручивать
+  const scrollHeightBeforeMessageRef = useRef(0); // Высота скролла до добавления сообщения
 
   useChatRealtime(chatId);
   const voiceProtocol = useVoiceProtocol(chatId);
@@ -94,8 +100,11 @@ export default function ChatPage() {
       return;
     }
     if (chatId) {
-      // Сбрасываем флаг сохранения позиции при смене чата
+      // Сбрасываем флаги при смене чата
       scrollPositionSavedRef.current = false;
+      shouldRestorePositionRef.current = true;
+      userScrolledToBottomRef.current = false;
+      restoreAttemptsRef.current = 0;
       if (!chat) {
         setLoading(true);
         loadChat();
@@ -120,25 +129,43 @@ export default function ChatPage() {
     }
   }, [chatId, router, loadChat, loadMessages, chat]);
 
+  // Проверка, находится ли пользователь внизу чата
+  const isAtBottom = useCallback((threshold = 100) => {
+    if (!messagesContainerRef.current) return false;
+    const container = messagesContainerRef.current;
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    return distanceFromBottom <= threshold;
+  }, []);
+
   // Сохранение позиции скролла
-  const saveScrollPosition = useCallback(() => {
+  const saveScrollPosition = useCallback((force = false) => {
     if (!messagesContainerRef.current || !chatId) return;
     const container = messagesContainerRef.current;
     const scrollTop = container.scrollTop;
     const scrollHeight = container.scrollHeight;
+    const isBottom = isAtBottom(50); // Более строгая проверка для "внизу"
     
     if (typeof window !== 'undefined') {
-      localStorage.setItem(`chat_scroll_${chatId}`, JSON.stringify({
+      const scrollData = {
         scrollTop,
         scrollHeight,
+        isBottom, // Сохраняем, был ли пользователь внизу
         timestamp: Date.now()
-      }));
+      };
+      
+      localStorage.setItem(`chat_scroll_${chatId}`, JSON.stringify(scrollData));
+      
+      // Если пользователь внизу, помечаем это
+      if (isBottom) {
+        userScrolledToBottomRef.current = true;
+      }
     }
-  }, [chatId]);
+  }, [chatId, isAtBottom]);
 
   // Восстановление позиции скролла
   const restoreScrollPosition = useCallback(() => {
     if (!messagesContainerRef.current || !chatId || messages.length === 0) return;
+    if (!shouldRestorePositionRef.current) return;
     
     const saved = typeof window !== 'undefined' 
       ? localStorage.getItem(`chat_scroll_${chatId}`)
@@ -146,27 +173,68 @@ export default function ChatPage() {
     
     if (saved) {
       try {
-        const { scrollTop, scrollHeight, timestamp } = JSON.parse(saved);
+        const { scrollTop, scrollHeight, isBottom, timestamp } = JSON.parse(saved);
         const container = messagesContainerRef.current;
         
-        // Восстанавливаем только если сохранение было недавно (в течение 5 минут)
-        if (Date.now() - timestamp < 5 * 60 * 1000) {
-          // Ждем, пока DOM обновится
-          setTimeout(() => {
+        // Восстанавливаем только если сохранение было недавно (в течение 10 минут)
+        const isRecent = Date.now() - timestamp < 10 * 60 * 1000;
+        
+        if (isRecent) {
+          // Если пользователь был внизу, всегда прокручиваем вниз
+          if (isBottom) {
+            userScrolledToBottomRef.current = true;
+            setTimeout(() => {
+              scrollToBottom();
+              scrollPositionSavedRef.current = true;
+              shouldRestorePositionRef.current = false;
+            }, 100);
+            return;
+          }
+          
+          // Иначе восстанавливаем сохраненную позицию
+          const attemptRestore = () => {
             if (container.scrollHeight >= scrollHeight) {
               container.scrollTop = scrollTop;
               scrollPositionSavedRef.current = true;
+              shouldRestorePositionRef.current = false;
+              restoreAttemptsRef.current = 0;
+            } else {
+              // Если контент еще не загружен, пробуем еще раз
+              restoreAttemptsRef.current++;
+              if (restoreAttemptsRef.current < 5) {
+                setTimeout(attemptRestore, 200);
+              } else {
+                // Если не удалось восстановить за 5 попыток, прокручиваем вниз
+                scrollToBottom();
+                scrollPositionSavedRef.current = true;
+                shouldRestorePositionRef.current = false;
+              }
             }
-          }, 100);
+          };
+          
+          setTimeout(attemptRestore, 100);
+        } else {
+          // Если сохранение старое, прокручиваем вниз
+          scrollToBottom();
+          scrollPositionSavedRef.current = true;
+          shouldRestorePositionRef.current = false;
         }
       } catch (e) {
-        // Игнорируем ошибки парсинга
+        // Игнорируем ошибки парсинга, прокручиваем вниз
+        scrollToBottom();
+        scrollPositionSavedRef.current = true;
+        shouldRestorePositionRef.current = false;
       }
+    } else {
+      // Если нет сохраненной позиции, прокручиваем вниз
+      scrollToBottom();
+      scrollPositionSavedRef.current = true;
+      shouldRestorePositionRef.current = false;
     }
   }, [chatId, messages.length]);
 
   useEffect(() => {
-    if (messages.length > 0 && !scrollPositionSavedRef.current) {
+    if (messages.length > 0 && !scrollPositionSavedRef.current && shouldRestorePositionRef.current) {
       restoreScrollPosition();
     }
   }, [messages, restoreScrollPosition]);
@@ -174,17 +242,54 @@ export default function ChatPage() {
   // Автоскролл только для новых сообщений, если пользователь внизу
   useEffect(() => {
     if (!messagesContainerRef.current || messages.length === 0) return;
+    if (!scrollPositionSavedRef.current) return; // Не автоскроллим, пока не восстановили позицию
     
     const container = messagesContainerRef.current;
-    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+    const currentScrollHeight = container.scrollHeight;
     
-    // Автоскролл только если пользователь уже был внизу или это первая загрузка
-    if (isNearBottom || !scrollPositionSavedRef.current) {
-      setTimeout(() => {
-        scrollToBottom();
-      }, 50);
+    // Если высота изменилась (добавилось новое сообщение), проверяем, нужно ли прокручивать
+    if (scrollHeightBeforeMessageRef.current > 0 && currentScrollHeight > scrollHeightBeforeMessageRef.current) {
+      // Высота увеличилась - добавлено новое сообщение
+      // Прокручиваем только если пользователь был внизу до добавления сообщения
+      if (wasAtBottomBeforeMessageRef.current || shouldAutoScrollRef.current) {
+        setTimeout(() => {
+          // Двойная проверка перед прокруткой
+          if (isAtBottom(150)) {
+            scrollToBottom();
+            userScrolledToBottomRef.current = true;
+          } else {
+            userScrolledToBottomRef.current = false;
+          }
+          // Сбрасываем флаги после проверки
+          wasAtBottomBeforeMessageRef.current = false;
+          shouldAutoScrollRef.current = false;
+        }, 50);
+      } else {
+        // Если пользователь не был внизу, не прокручиваем
+        userScrolledToBottomRef.current = false;
+      }
+    } else {
+      // Если высота не изменилась или это первая загрузка, проверяем текущую позицию
+      const isNearBottom = isAtBottom(100);
+      if (isNearBottom && (wasAtBottomBeforeMessageRef.current || shouldAutoScrollRef.current)) {
+        setTimeout(() => {
+          if (isAtBottom(150)) {
+            scrollToBottom();
+            userScrolledToBottomRef.current = true;
+          }
+          wasAtBottomBeforeMessageRef.current = false;
+          shouldAutoScrollRef.current = false;
+        }, 50);
+      } else {
+        userScrolledToBottomRef.current = false;
+        wasAtBottomBeforeMessageRef.current = false;
+        shouldAutoScrollRef.current = false;
+      }
     }
-  }, [messages.length]);
+    
+    // Сохраняем текущую высоту для следующей проверки
+    scrollHeightBeforeMessageRef.current = currentScrollHeight;
+  }, [messages.length, isAtBottom]);
 
   useEffect(() => {
     const textarea = messageInputRef.current;
@@ -225,6 +330,7 @@ export default function ChatPage() {
     recordingTime,
     audioBlob,
     error: voiceError,
+    audioLevel,
     startRecording,
     stopRecording,
     cancelRecording,
@@ -246,6 +352,14 @@ export default function ChatPage() {
     if (!newMessage.trim() || !user || sending) return;
 
     const messageContent = newMessage.trimEnd();
+    
+    // Сохраняем текущую высоту скролла и позицию перед отправкой
+    if (messagesContainerRef.current) {
+      scrollHeightBeforeMessageRef.current = messagesContainerRef.current.scrollHeight;
+      const wasAtBottom = isAtBottom(100);
+      wasAtBottomBeforeMessageRef.current = wasAtBottom;
+      shouldAutoScrollRef.current = wasAtBottom; // Устанавливаем флаг только если был внизу
+    }
     
     // Сохраняем позицию перед отправкой
     saveScrollPosition();
@@ -284,6 +398,14 @@ export default function ChatPage() {
 
   const handleVoiceSendSimple = useCallback(async () => {
     if (!audioBlob || !user || sending) return;
+
+    // Сохраняем текущую высоту скролла и позицию перед отправкой
+    if (messagesContainerRef.current) {
+      scrollHeightBeforeMessageRef.current = messagesContainerRef.current.scrollHeight;
+      const wasAtBottom = isAtBottom(100);
+      wasAtBottomBeforeMessageRef.current = wasAtBottom;
+      shouldAutoScrollRef.current = wasAtBottom; // Устанавливаем флаг только если был внизу
+    }
 
     try {
       let fileUrl = null;
@@ -433,8 +555,16 @@ export default function ChatPage() {
     }
     
     // Показываем кнопку "вниз" если пользователь не внизу
-    const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+    const isNearBottom = isAtBottom(100);
     setShowScrollToBottom(!isNearBottom);
+    
+    // Если пользователь прокрутил вниз, помечаем это
+    if (isNearBottom) {
+      userScrolledToBottomRef.current = true;
+    } else {
+      // Если прокрутил вверх, сбрасываем флаг
+      userScrolledToBottomRef.current = false;
+    }
     
     // Сохраняем позицию с задержкой
     isUserScrollingRef.current = true;
@@ -446,19 +576,25 @@ export default function ChatPage() {
       saveScrollPosition();
       isUserScrollingRef.current = false;
     }, 500);
-  }, [hasMore, loadingMore, page, loadMessages, saveScrollPosition]);
+  }, [hasMore, loadingMore, page, loadMessages, saveScrollPosition, isAtBottom]);
 
-  const scrollToBottom = useCallback(() => {
+  const scrollToBottom = useCallback((immediate = false) => {
     if (messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTo({
-        top: messagesContainerRef.current.scrollHeight,
-        behavior: 'smooth'
+      const container = messagesContainerRef.current;
+      const targetScroll = container.scrollHeight;
+      
+      container.scrollTo({
+        top: targetScroll,
+        behavior: immediate ? 'auto' : 'smooth'
       });
+      
       setShowScrollToBottom(false);
+      userScrolledToBottomRef.current = true; // Помечаем, что пользователь намеренно прокрутил вниз
+      
       // Сохраняем позицию после скролла
       setTimeout(() => {
-        saveScrollPosition();
-      }, 300);
+        saveScrollPosition(true);
+      }, immediate ? 50 : 300);
     }
   }, [saveScrollPosition]);
 
@@ -646,10 +782,10 @@ export default function ChatPage() {
         <div ref={messagesEndRef} />
       </div>
       
-      {showScrollToBottom && scrollButtonReady && (
+      {scrollButtonReady && (
         <button
           onClick={scrollToBottom}
-          className={styles.scrollToBottomButton}
+          className={`${styles.scrollToBottomButton} ${!showScrollToBottom ? styles.hidden : ''}`}
           title="Прокрутить к новым сообщениям"
         >
           <ChevronDown size={20} />
@@ -659,7 +795,35 @@ export default function ChatPage() {
       {isRecording && (
         <div className={styles.voiceRecordingBar}>
           <div className={styles.voiceRecordingInfo}>
-            <div className={styles.voiceRecordingIndicator} />
+            <div className={styles.voiceRecordingCircle}>
+              <Mic size={24} style={{ color: 'white', zIndex: 1, position: 'relative' }} />
+              <div className={styles.voiceRecordingWaves}>
+                <div 
+                  className={styles.voiceRecordingWave}
+                  style={{
+                    width: `${20 + audioLevel * 0.3}px`,
+                    height: `${20 + audioLevel * 0.3}px`,
+                    opacity: audioLevel > 10 ? 0.6 : 0.3
+                  }}
+                />
+                <div 
+                  className={styles.voiceRecordingWave}
+                  style={{
+                    width: `${30 + audioLevel * 0.4}px`,
+                    height: `${30 + audioLevel * 0.4}px`,
+                    opacity: audioLevel > 20 ? 0.5 : 0.2
+                  }}
+                />
+                <div 
+                  className={styles.voiceRecordingWave}
+                  style={{
+                    width: `${40 + audioLevel * 0.5}px`,
+                    height: `${40 + audioLevel * 0.5}px`,
+                    opacity: audioLevel > 30 ? 0.4 : 0.1
+                  }}
+                />
+              </div>
+            </div>
             <span className={styles.voiceRecordingTime}>
               {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}
             </span>
@@ -670,7 +834,7 @@ export default function ChatPage() {
             className={styles.voiceCancelButton}
             title="Отменить запись"
           >
-            <X size={20} />
+            <X size={16} />
           </button>
         </div>
       )}
