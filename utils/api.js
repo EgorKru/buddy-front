@@ -124,7 +124,13 @@ export const chatAPI = {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(getApiUrl(`/chats/${chatId}/files/voice`), {
+    const uploadUrl = getApiUrl(`/chats/${chatId}/files/voice`);
+    
+    if (typeof window !== 'undefined') {
+      console.log('[API] Uploading voice file:', { chatId, url: uploadUrl, blobSize: audioBlob.size, blobType: audioBlob.type });
+    }
+
+    const response = await fetch(uploadUrl, {
       method: 'POST',
       headers,
       body: formData,
@@ -141,10 +147,19 @@ export const chatAPI = {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: 'Upload failed' }));
+      if (typeof window !== 'undefined') {
+        console.error('[API] Voice upload failed:', { status: response.status, error });
+      }
       throw new Error(error.message || `Upload failed with status ${response.status}`);
     }
 
-    return await response.json();
+    const result = await response.json();
+    
+    if (typeof window !== 'undefined') {
+      console.log('[API] Voice upload successful:', result);
+    }
+    
+    return result;
   },
 
   sendVoiceMessage: async (chatId, voiceData, voiceMimeType = 'audio/webm') => {
@@ -156,7 +171,11 @@ export const chatAPI = {
 
   getVoiceFileUrl: (filePath) => {
     if (!filePath) return null;
+    // Убираем начальный "/" если есть
     const cleanPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
+    // fileUrl из БД: "voices/14/11/uuid.webm"
+    // Endpoint: /api/chats/files/voice/{*filePath}
+    // Итоговый URL: /api/chats/files/voice/voices/14/11/uuid.webm
     return getApiUrl(`/chats/files/voice/${cleanPath}`);
   },
 

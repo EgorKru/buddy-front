@@ -322,8 +322,8 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
                             );
                           })()
                         )}
-                        {chat.lastMessage.content.substring(0, 40)}
-                        {chat.lastMessage.content.length > 40 ? '...' : ''}
+                        {(chat.lastMessage.content || '').substring(0, 40)}
+                        {(chat.lastMessage.content || '').length > 40 ? '...' : ''}
                       </span>
                     </div>
                   )}
@@ -496,4 +496,3 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
     </>
   );
 }
-

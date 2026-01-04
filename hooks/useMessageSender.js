@@ -131,15 +131,27 @@ export const useMessageSender = (chatId, onMessageSent) => {
 
           if (type === 'VOICE') {
             if (fileUrl) {
+              // Способ 2: отправка с fileUrl (рекомендуемый)
               payload.fileUrl = fileUrl;
+              if (typeof window !== 'undefined') {
+                console.log('[MessageSender] Sending VOICE message with fileUrl:', { chatId, fileUrl });
+              }
             } else if (voiceData) {
+              // Способ 3: отправка с Base64 (fallback)
               payload.voiceData = voiceData;
               payload.voiceMimeType = voiceMimeType || 'audio/webm';
+              if (typeof window !== 'undefined') {
+                console.log('[MessageSender] Sending VOICE message with Base64 (fallback):', { chatId, mimeType: payload.voiceMimeType });
+              }
             } else {
               throw new Error('Neither fileUrl nor voiceData provided for VOICE message');
             }
           } else {
             payload.content = messageContent;
+          }
+
+          if (typeof window !== 'undefined') {
+            console.log('[MessageSender] Publishing to /app/chat.sendMessage:', payload);
           }
 
           client.publish({
@@ -149,6 +161,9 @@ export const useMessageSender = (chatId, onMessageSent) => {
           setSending(false);
           return { success: true, tempId: optimisticMessage.tempId, optimisticMessage, serverMessage: null };
         } catch (wsError) {
+          if (typeof window !== 'undefined') {
+            console.error('[MessageSender] WebSocket publish error:', wsError);
+          }
           if (type === 'VOICE') {
             setSending(false);
             throw new Error('Failed to send voice message via WebSocket. Please ensure WebSocket is connected.');

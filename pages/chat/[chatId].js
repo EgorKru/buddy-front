@@ -6,7 +6,6 @@ import { getChatName } from '@/utils/chatHelpers';
 import { formatChatDate, formatChatTime, getOnlineStatus } from '@/utils/dateHelpers';
 import { useMessageSender } from '@/hooks/useMessageSender';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
-import { useVoiceProtocol } from '@/hooks/useVoiceProtocol';
 import { MESSAGE_STATUS } from '@/utils/messageQueue';
 import ChatSidebar from '@/component/ChatSidebar';
 import VoiceMessagePlayer from '@/component/VoiceMessagePlayer';
@@ -60,7 +59,6 @@ export default function ChatPage() {
   const scrollHeightBeforeMessageRef = useRef(0); // Высота скролла до добавления сообщения
 
   useChatRealtime(chatId);
-  const voiceProtocol = useVoiceProtocol(chatId);
 
   const loadChat = useCallback(async () => {
     if (!chatId) return;
@@ -586,6 +584,7 @@ export default function ChatPage() {
   }, [isHolding, handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
 
 
+  // Способ 2 (рекомендуемый): загрузка файла через REST API + отправка через WebSocket
   const handleVoiceSendSimple = useCallback(async () => {
     if (!audioBlob || !user || sending) return;
 
@@ -594,18 +593,39 @@ export default function ChatPage() {
       scrollHeightBeforeMessageRef.current = messagesContainerRef.current.scrollHeight;
       const wasAtBottom = isAtBottom(100);
       wasAtBottomBeforeMessageRef.current = wasAtBottom;
-      shouldAutoScrollRef.current = wasAtBottom; // Устанавливаем флаг только если был внизу
+      shouldAutoScrollRef.current = wasAtBottom;
     }
 
     try {
       let fileUrl = null;
 
+      // Шаг 1: Загрузка файла через REST API
+      // POST /api/chats/{chatId}/files/voice
+      // Возвращает fileUrl: "voices/14/11/uuid.webm"
+      if (typeof window !== 'undefined') {
+        console.log('[Voice] Step 1: Uploading voice file via REST API...');
+      }
+      
       try {
         const uploadResponse = await chatAPI.uploadVoiceFile(chatId, audioBlob);
         fileUrl = uploadResponse?.fileUrl;
+        
+        if (typeof window !== 'undefined') {
+          console.log('[Voice] Step 1 complete: fileUrl =', fileUrl);
+        }
       } catch (uploadError) {
+        // Способ 3 (fallback): Base64 через WebSocket
+        if (typeof window !== 'undefined') {
+          console.warn('[Voice] REST upload failed, falling back to Base64 method:', uploadError.message);
+        }
+        
         const base64 = await convertToBase64(audioBlob);
         const mimeType = audioBlob.type || 'audio/webm';
+        
+        if (typeof window !== 'undefined') {
+          console.log('[Voice] Sending via WebSocket with Base64 (fallback)...');
+        }
+        
         const result = await sendMessageHook(null, 'VOICE', null, base64, mimeType);
 
         if (result?.serverMessage) {
@@ -620,10 +640,20 @@ export default function ChatPage() {
       }
 
       if (!fileUrl) {
-        throw new Error('Failed to upload voice file: no fileUrl returned');
+        throw new Error('Failed to upload voice file: no fileUrl returned from server');
       }
 
+      // Шаг 2: Отправка сообщения через WebSocket с fileUrl
+      // Payload: { chatId, type: "VOICE", fileUrl: "voices/..." }
+      if (typeof window !== 'undefined') {
+        console.log('[Voice] Step 2: Sending VOICE message via WebSocket with fileUrl...');
+      }
+      
       const result = await sendMessageHook(null, 'VOICE', fileUrl);
+
+      if (typeof window !== 'undefined') {
+        console.log('[Voice] Step 2 complete: result =', result);
+      }
 
       if (result?.serverMessage) {
         addOptimistic(chatId, { ...result.serverMessage, status: MESSAGE_STATUS.SENT, isOptimistic: false });
@@ -634,11 +664,15 @@ export default function ChatPage() {
       resetVoice();
       sentAudioBlobRef.current = null;
     } catch (error) {
+      if (typeof window !== 'undefined') {
+        console.error('[Voice] Error sending voice message:', error);
+      }
       resetVoice();
       sentAudioBlobRef.current = null;
     }
   }, [audioBlob, user, sending, convertToBase64, sendMessageHook, chatId, addOptimistic, resetVoice, isAtBottom]);
 
+  // Используем рекомендуемый способ 2: загрузка файла через REST + отправка через WebSocket
   const handleVoiceSend = useCallback(async () => {
     // Проверяем условия перед отправкой
     if (!audioBlob || !user) {
@@ -650,70 +684,16 @@ export default function ChatPage() {
       return;
     }
 
-    const useNewProtocol = typeof window !== 'undefined' && localStorage.getItem('use_voice_protocol') !== 'false';
-
-    if (useNewProtocol) {
-      try {
-        voiceProtocol.initiate();
-        
-        await new Promise((resolve, reject) => {
-          const timeout = setTimeout(() => {
-            reject(new Error('Voice protocol timeout'));
-          }, 10000);
-          
-          const checkState = setInterval(() => {
-            const { sessionState, relaySessionId } = voiceProtocol;
-            
-            if (sessionState === 'ready' || sessionState === 'relay' || sessionState === 'p2p') {
-              clearInterval(checkState);
-              clearTimeout(timeout);
-              
-              if (relaySessionId) {
-                voiceProtocol.sendAnswer();
-              } else {
-                voiceProtocol.sendOffer();
-              }
-              
-              setTimeout(() => {
-                voiceProtocol.startSendingAudio([audioBlob], () => {
-                  resetVoice();
-                  sentAudioBlobRef.current = null;
-                  resolve();
-                });
-              }, 500);
-            } else if (sessionState === 'error') {
-              clearInterval(checkState);
-              clearTimeout(timeout);
-              reject(new Error('Voice protocol error'));
-            }
-          }, 100);
-        });
-      } catch (error) {
-        if (typeof window !== 'undefined') {
-          console.warn('[Voice] New protocol failed, falling back to simple method:', error);
-        }
-        try {
-          await handleVoiceSendSimple();
-        } catch (fallbackError) {
-          if (typeof window !== 'undefined') {
-            console.error('[Voice] Fallback method also failed:', fallbackError);
-          }
-          resetVoice();
-          sentAudioBlobRef.current = null;
-        }
+    try {
+      await handleVoiceSendSimple();
+    } catch (error) {
+      if (typeof window !== 'undefined') {
+        console.error('[Voice] Failed to send voice message:', error);
       }
-    } else {
-      try {
-        await handleVoiceSendSimple();
-      } catch (error) {
-        if (typeof window !== 'undefined') {
-          console.error('[Voice] Simple method failed:', error);
-        }
-        resetVoice();
-        sentAudioBlobRef.current = null;
-      }
+      resetVoice();
+      sentAudioBlobRef.current = null;
     }
-  }, [audioBlob, user, sending, voiceProtocol, handleVoiceSendSimple, resetVoice]);
+  }, [audioBlob, user, sending, handleVoiceSendSimple, resetVoice]);
 
   const handleVoiceCancel = () => {
     cancelRecording();
