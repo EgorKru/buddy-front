@@ -349,8 +349,11 @@ export default function ChatPage() {
   const [reachedLockThreshold, setReachedLockThreshold] = useState(false);
   const buttonRef = useRef(null);
   const startYRef = useRef(0);
+  const startTimeRef = useRef(0);
+  const startDelayTimeoutRef = useRef(null);
   const audioPreviewRef = useRef(null);
   const lockThreshold = 80; // Пикселей вверх для блокировки
+  const minHoldTime = 500; // Минимальное время удержания в мс (0.5 секунды)
 
 
   useEffect(() => {
@@ -402,22 +405,56 @@ export default function ChatPage() {
     }
   };
 
-  const handleVoiceStart = useCallback(async (clientY) => {
-    try {
-      if (!isRecording) {
-        await startRecording();
-        setIsHolding(true);
-        startYRef.current = clientY;
-      }
-    } catch (error) {
-      if (typeof window !== 'undefined') {
-        console.error('[Voice] Error starting recording:', error);
-      }
+  const handleVoiceStart = useCallback((clientY) => {
+    if (!isRecording) {
+      startTimeRef.current = Date.now();
+      startYRef.current = clientY;
+      setIsHolding(true);
+      
+      // Задержка перед началом записи - запись начнется только после удержания минимум 0.5 секунды
+      startDelayTimeoutRef.current = setTimeout(async () => {
+        // Проверяем, что кнопка все еще удерживается
+        if (startTimeRef.current > 0 && !isRecording) {
+          try {
+            await startRecording();
+          } catch (error) {
+            if (typeof window !== 'undefined') {
+              console.error('[Voice] Error starting recording:', error);
+            }
+            setIsHolding(false);
+            startTimeRef.current = 0;
+          }
+        }
+      }, minHoldTime);
     }
-  }, [isRecording, startRecording]);
+  }, [isRecording, startRecording, minHoldTime]);
 
   const handleVoiceEnd = useCallback(() => {
+    const holdDuration = Date.now() - startTimeRef.current;
+    
+    // Отменяем задержку, если кнопка была отпущена до начала записи
+    if (startDelayTimeoutRef.current) {
+      clearTimeout(startDelayTimeoutRef.current);
+      startDelayTimeoutRef.current = null;
+    }
+    
     setIsHolding(false);
+    
+    // Если запись еще не началась (кнопка отпущена до истечения задержки) - просто отменяем
+    if (!isRecording) {
+      setDragDistance(0);
+      startTimeRef.current = 0;
+      return;
+    }
+    
+    // Если запись началась, но кнопка была отпущена слишком быстро - отменяем
+    if (isRecording && !isLocked && holdDuration < minHoldTime) {
+      cancelRecording();
+      setDragDistance(0);
+      startTimeRef.current = 0;
+      return;
+    }
+    
     if (isRecording && !isLocked) {
       // Если достигли порога блокировки при отпускании - блокируем
       if (reachedLockThreshold) {
@@ -429,7 +466,8 @@ export default function ChatPage() {
       }
     }
     setDragDistance(0);
-  }, [isRecording, isLocked, reachedLockThreshold, stopRecording]);
+    startTimeRef.current = 0;
+  }, [isRecording, isLocked, reachedLockThreshold, stopRecording, cancelRecording, minHoldTime]);
 
   const handleVoiceMove = useCallback((clientY) => {
     if (isHolding && startYRef.current > 0) {
@@ -452,7 +490,10 @@ export default function ChatPage() {
   const handleMouseUp = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
-    handleVoiceEnd();
+    // Обрабатываем только левую кнопку мыши
+    if (e.button === 0 || e.button === undefined) {
+      handleVoiceEnd();
+    }
   }, [handleVoiceEnd]);
 
   const handleMouseMove = useCallback((e) => {
@@ -489,6 +530,11 @@ export default function ChatPage() {
       setDragDistance(0);
       setIsPlayingPreview(false);
       startYRef.current = 0;
+      startTimeRef.current = 0;
+      if (startDelayTimeoutRef.current) {
+        clearTimeout(startDelayTimeoutRef.current);
+        startDelayTimeoutRef.current = null;
+      }
       if (audioPreviewRef.current) {
         audioPreviewRef.current.pause();
         if (audioPreviewRef.current.src) {
