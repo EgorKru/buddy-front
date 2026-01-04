@@ -115,14 +115,20 @@ export const useVoiceProtocol = (chatId) => {
   }, [isBrowser, client, connected, chatId]);
 
   const handleSignalResponse = useCallback((response) => {
-    if (!response?.type) return;
+    if (!response?.type) {
+      if (typeof window !== 'undefined') {
+        console.warn('[Voice Protocol] Response missing type:', response);
+      }
+      return;
+    }
     if (typeof window !== 'undefined') {
-      console.log('[Voice Protocol] Received signal:', response.type, { 
+      console.log('[Voice Protocol] Processing signal response:', response.type, { 
         relaySessionId: response.relaySessionId, 
         remoteEndpoint: response.remoteEndpoint, 
         hasSdp: !!response.sdp,
         fileUrl: response.fileUrl,
-        messageId: response.messageId 
+        messageId: response.messageId,
+        currentState: sessionState
       });
     }
     switch (response.type) {
@@ -196,20 +202,27 @@ export const useVoiceProtocol = (chatId) => {
     try {
       const subscription = client.subscribe('/user/queue/voice-signal', (message) => {
         if (typeof window !== 'undefined') {
-          console.log('[Voice Protocol] Raw message received:', message.body);
+          console.log('[Voice Protocol] Raw message received from /user/queue/voice-signal:', {
+            body: message.body,
+            headers: message.headers,
+            command: message.command
+          });
         }
         const response = safeJsonParse(message.body);
         if (!response) {
           if (typeof window !== 'undefined') {
-            console.warn('[Voice Protocol] Failed to parse response');
+            console.warn('[Voice Protocol] Failed to parse response:', message.body);
           }
           return;
+        }
+        if (typeof window !== 'undefined') {
+          console.log('[Voice Protocol] Parsed response:', response);
         }
         handleSignalResponse(response);
       });
       signalSubscriptionRef.current = subscription;
       if (typeof window !== 'undefined') {
-        console.log('[Voice Protocol] Subscribed to /user/queue/voice-signal');
+        console.log('[Voice Protocol] Subscribed to /user/queue/voice-signal, subscription ID:', subscription.id);
       }
     } catch (e) {
       if (typeof window !== 'undefined') {
@@ -254,12 +267,21 @@ export const useVoiceProtocol = (chatId) => {
           ...codecParams,
         };
         if (typeof window !== 'undefined') {
-          console.log('[Voice Protocol] Sending INITIATE with WebRTC SDP:', { type: payload.type, chatId: payload.chatId, hasSdp: !!payload.sdp });
+          console.log('[Voice Protocol] Sending INITIATE with WebRTC SDP:', { 
+            type: payload.type, 
+            chatId: payload.chatId, 
+            hasSdp: !!payload.sdp,
+            localEndpoint: payload.localEndpoint,
+            destination: '/app/voice.signal'
+          });
         }
         client.publish({
           destination: '/app/voice.signal',
           body: JSON.stringify(payload),
         });
+        if (typeof window !== 'undefined') {
+          console.log('[Voice Protocol] INITIATE published, waiting for response...');
+        }
         return;
       } catch (error) {}
     }

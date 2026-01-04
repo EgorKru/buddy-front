@@ -2,6 +2,7 @@ import "@/styles/globals.css";
 
 import { useMemo } from "react";
 import { useRouter } from "next/router";
+import Head from "next/head";
 import { StompProvider } from "@/context/socket";
 import { MessagingProvider } from "@/context/messaging";
 import GlobalNotifications from "@/component/GlobalNotifications";
@@ -16,16 +17,21 @@ export default function App({ Component, pageProps }) {
 
   const authed = isAuthenticated();
 
-  if (isPublicRoute || !authed) {
-    return <Component {...pageProps} />;
-  }
-
   return (
-    <StompProvider>
-      <MessagingProvider>
+    <>
+      <Head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
+      </Head>
+      {isPublicRoute || !authed ? (
         <Component {...pageProps} />
-        <GlobalNotifications />
-      </MessagingProvider>
-    </StompProvider>
+      ) : (
+        <StompProvider>
+          <MessagingProvider>
+            <Component {...pageProps} />
+            <GlobalNotifications />
+          </MessagingProvider>
+        </StompProvider>
+      )}
+    </>
   );
 }

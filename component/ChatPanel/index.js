@@ -7,6 +7,7 @@ const ChatPanel = ({ roomId, isOpen, onClose }) => {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef(null);
+  const messageInputRef = useRef(null);
   const user = getCurrentUser();
 
   useEffect(() => {
@@ -19,6 +20,24 @@ const ChatPanel = ({ roomId, isOpen, onClose }) => {
     scrollToBottom();
   }, [messages]);
 
+  useEffect(() => {
+    const textarea = messageInputRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      const newHeight = Math.min(textarea.scrollHeight, 120);
+      textarea.style.height = `${newHeight}px`;
+      
+      // Показываем скроллбар только если контент переполняется
+      if (textarea.scrollHeight > 120) {
+        textarea.style.overflowY = 'auto';
+        textarea.style.paddingRight = '20px';
+      } else {
+        textarea.style.overflowY = 'hidden';
+        textarea.style.paddingRight = '16px';
+      }
+    }
+  }, [newMessage]);
+
   const loadMessages = async () => {
     return;
   };
@@ -28,7 +47,7 @@ const ChatPanel = ({ roomId, isOpen, onClose }) => {
     if (!newMessage.trim() || !user) return;
 
     const message = {
-      content: newMessage.trim(),
+      content: newMessage.trimEnd(),
       senderId: user.id,
       senderUsername: user.username,
       senderDisplayName: user.displayName || user.username,
@@ -38,6 +57,15 @@ const ChatPanel = ({ roomId, isOpen, onClose }) => {
 
     setMessages([...messages, message]);
     setNewMessage('');
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      if (newMessage.trim()) {
+        sendMessage(e);
+      }
+    }
   };
 
   const scrollToBottom = () => {
@@ -89,14 +117,20 @@ const ChatPanel = ({ roomId, isOpen, onClose }) => {
       </div>
 
       <form onSubmit={sendMessage} className={styles.messageForm}>
-        <input
-          type="text"
+        <textarea
+          ref={messageInputRef}
           id="room-chat-message-input"
           name="message"
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
+          onKeyDown={handleKeyDown}
           placeholder="Написать сообщение..."
           className={styles.messageInput}
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck="false"
+          rows={1}
         />
         <button type="submit" className={styles.sendButton}>
           <Send size={20} />

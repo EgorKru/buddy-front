@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
 import { MessageCircle, Search, Plus, X, Loader2, Check, CheckCheck, UserPlus } from 'lucide-react';
@@ -7,7 +7,13 @@ import { useCreateChat } from '@/hooks/useCreateChat';
 import { getChatName, getChatAvatar } from '@/utils/chatHelpers';
 import { formatChatListTime, getOnlineStatus } from '@/utils/dateHelpers';
 import styles from '@/component/ChatSidebar/index.module.css';
-import { useChats } from '@/context/messaging';
+import { useChats, getChatTime } from '@/context/messaging';
+
+const SIDEBAR_POSITION_KEY = 'chatSidebarPosition';
+const SIDEBAR_WIDTH_KEY = 'chatSidebarWidth';
+const MIN_SIDEBAR_WIDTH = 250;
+const MAX_SIDEBAR_WIDTH = 600;
+const DEFAULT_SIDEBAR_WIDTH = 320;
 
 export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
   const router = useRouter();
@@ -15,8 +21,90 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
   const { chats, loading, refreshChats, readReceiptsByChatId } = useChats();
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [sidebarPosition, setSidebarPosition] = useState('left');
+  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
+  const [isResizing, setIsResizing] = useState(false);
+  const sidebarRef = useRef(null);
+  const resizeHandleRef = useRef(null);
   
   const createChat = useCreateChat();
+
+  useEffect(() => {
+    // Загружаем сохраненную позицию из localStorage
+    const savedPosition = typeof window !== 'undefined' 
+      ? localStorage.getItem(SIDEBAR_POSITION_KEY) || 'left'
+      : 'left';
+    setSidebarPosition(savedPosition);
+    
+    // Загружаем сохраненную ширину из localStorage
+    const savedWidth = typeof window !== 'undefined'
+      ? parseInt(localStorage.getItem(SIDEBAR_WIDTH_KEY) || DEFAULT_SIDEBAR_WIDTH, 10)
+      : DEFAULT_SIDEBAR_WIDTH;
+    setSidebarWidth(savedWidth);
+    
+    // Применяем класс к body для обновления стилей контейнеров
+    if (typeof window !== 'undefined') {
+      document.body.setAttribute('data-sidebar-position', savedPosition);
+      document.body.setAttribute('data-sidebar-width', savedWidth);
+      document.documentElement.style.setProperty('--sidebar-width', `${savedWidth}px`);
+    }
+  }, []);
+
+  const toggleSidebarPosition = () => {
+    const newPosition = sidebarPosition === 'left' ? 'right' : 'left';
+    setSidebarPosition(newPosition);
+    
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(SIDEBAR_POSITION_KEY, newPosition);
+      document.body.setAttribute('data-sidebar-position', newPosition);
+    }
+  };
+
+  const handleResizeStart = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizing(true);
+    
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+    let currentWidth = startWidth;
+    
+    const handleMouseMove = (e) => {
+      const diff = sidebarPosition === 'left' 
+        ? e.clientX - startX 
+        : startX - e.clientX;
+      const newWidth = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, startWidth + diff));
+      currentWidth = newWidth;
+      
+      setSidebarWidth(newWidth);
+      if (typeof window !== 'undefined') {
+        document.body.setAttribute('data-sidebar-width', newWidth);
+        document.documentElement.style.setProperty('--sidebar-width', `${newWidth}px`);
+      }
+    };
+    
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(SIDEBAR_WIDTH_KEY, currentWidth.toString());
+      }
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [sidebarWidth, sidebarPosition]);
+
+  useEffect(() => {
+    if (sidebarRef.current) {
+      sidebarRef.current.style.width = `${sidebarWidth}px`;
+    }
+  }, [sidebarWidth]);
 
   useEffect(() => {
     refreshChats();
@@ -39,7 +127,20 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
     createChat.resetForm();
   };
 
-  const filteredChats = chats.filter(chat => {
+  // Чаты уже отсортированы в контексте, но делаем дополнительную сортировку для надежности
+  const sortedChats = useMemo(() => {
+    if (!chats || chats.length === 0) return [];
+    
+    return [...chats].sort((a, b) => {
+      const timeA = getChatTime(a);
+      const timeB = getChatTime(b);
+      
+      // Более новые (большее время) идут первыми (сверху)
+      return timeB - timeA;
+    });
+  }, [chats]);
+
+  const filteredChats = sortedChats.filter(chat => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
@@ -90,10 +191,44 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
 
   return (
     <>
-      <div className={`${styles.sidebar} ${shouldShow ? styles.open : ''}`}>
+      <div 
+        ref={sidebarRef}
+        className={`${styles.sidebar} ${shouldShow ? styles.open : ''} ${styles[sidebarPosition]}`}
+        style={{ width: `${sidebarWidth}px` }}
+      >
+        {isDesktop && (
+          <div
+            ref={resizeHandleRef}
+            className={`${styles.resizeHandle} ${styles[sidebarPosition === 'left' ? 'resizeHandleRight' : 'resizeHandleLeft']}`}
+            onMouseDown={handleResizeStart}
+            title="Растянуть сайдбар"
+          />
+        )}
         <div className={styles.sidebarHeader}>
           <h2>Чаты</h2>
           <div className={styles.sidebarActions}>
+            {isDesktop && (
+              <button
+                onClick={toggleSidebarPosition}
+                className={styles.positionToggle}
+                title={sidebarPosition === 'left' ? 'Переместить вправо' : 'Переместить влево'}
+              >
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="1" y="1" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                  {sidebarPosition === 'left' ? (
+                    <>
+                      <rect x="2" y="2" width="5" height="16" rx="1" fill="currentColor" opacity="0.4"/>
+                      <rect x="8" y="2" width="10" height="16" rx="1" fill="currentColor" opacity="0.1"/>
+                    </>
+                  ) : (
+                    <>
+                      <rect x="2" y="2" width="10" height="16" rx="1" fill="currentColor" opacity="0.1"/>
+                      <rect x="13" y="2" width="5" height="16" rx="1" fill="currentColor" opacity="0.4"/>
+                    </>
+                  )}
+                </svg>
+              </button>
+            )}
             <button
               onClick={() => setShowCreateModal(true)}
               className={styles.createButton}

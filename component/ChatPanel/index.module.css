@@ -122,14 +122,14 @@
 
 .ownMessage {
   align-self: flex-end;
-  background: rgb(102, 126, 234);
-  border-color: rgb(120, 140, 250);
-  color: white;
+  background: rgb(224, 230, 240);
+  border-color: rgb(200, 210, 225);
+  color: rgb(31, 41, 55);
 }
 
 .ownMessage:hover {
-  border-color: rgb(140, 160, 255);
-  box-shadow: 0 2px 12px rgba(102, 126, 234, 0.4);
+  border-color: rgb(190, 200, 220);
+  box-shadow: 0 2px 12px rgba(224, 230, 240, 0.4);
 }
 
 .messageHeader {
@@ -153,6 +153,7 @@
   word-wrap: break-word;
   line-height: 1.5;
   font-size: 14px;
+  white-space: pre-wrap;
 }
 
 .messageForm {
@@ -161,6 +162,20 @@
   border-top: 1px solid rgb(50, 50, 60);
   gap: 12px;
   background: rgb(30, 30, 35);
+}
+
+@media (max-width: 768px) {
+  .messageForm {
+    padding: 12px 16px;
+    gap: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .messageForm {
+    padding: 10px 12px;
+    gap: 8px;
+  }
 }
 
 .messageInput {
@@ -173,6 +188,41 @@
   background: rgb(25, 25, 30);
   color: rgb(255, 255, 255);
   transition: all 0.2s ease;
+  resize: none;
+  overflow-y: hidden;
+  max-height: 120px;
+  line-height: 1.5;
+  font-family: inherit;
+  scrollbar-gutter: stable;
+}
+
+@media (max-width: 480px) {
+  .messageInput {
+    font-size: 16px; /* Предотвращает зум на iOS */
+    padding: 10px 14px;
+    min-height: 44px;
+  }
+}
+
+.messageInput::-webkit-scrollbar {
+  width: 8px;
+}
+
+.messageInput::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 4px 0;
+}
+
+.messageInput::-webkit-scrollbar-thumb {
+  background: rgb(100, 100, 110);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.messageInput::-webkit-scrollbar-thumb:hover {
+  background: rgb(120, 120, 130);
+  background-clip: padding-box;
 }
 
 .messageInput::placeholder {
@@ -180,13 +230,13 @@
 }
 
 .messageInput:focus {
-  border-color: rgb(102, 126, 234);
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: rgb(122, 122, 122);
+  box-shadow: 0 0 0 3px rgba(107, 107, 107, 0.1);
 }
 
 .sendButton {
   padding: 12px;
-  background: rgb(102, 126, 234);
+  background: rgb(74, 158, 255);
   color: white;
   border: none;
   border-radius: 50%;
@@ -197,12 +247,16 @@
   transition: all 0.2s ease;
   width: 44px;
   height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .sendButton:hover {
-  background: rgb(88, 110, 220);
+  background: rgb(58, 142, 239);
   transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 12px rgba(74, 158, 255, 0.4);
 }
 
 .sendButton:active {

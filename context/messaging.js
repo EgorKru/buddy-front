@@ -55,26 +55,70 @@ const upsertOrder = (order, chatId) => {
   return [id, ...filtered];
 };
 
+// Функция для получения времени последнего сообщения чата
+// Экспортируем для использования в компонентах
+export const getChatTime = (chat) => {
+  // Используем максимальное время из updatedAt и lastMessage.createdAt
+  // Это нужно, потому что бэкенд может не обновлять updatedAt при новых сообщениях
+  const updatedAt = chat?.updatedAt;
+  const lastMessageTime = chat?.lastMessage?.createdAt;
+  const createdAt = chat?.createdAt;
+  
+  let time = null;
+  
+  if (updatedAt && lastMessageTime) {
+    // Если есть оба, берем более новое
+    const updatedDate = new Date(updatedAt);
+    const lastMsgDate = new Date(lastMessageTime);
+    time = updatedDate.getTime() > lastMsgDate.getTime() ? updatedAt : lastMessageTime;
+  } else if (lastMessageTime) {
+    time = lastMessageTime;
+  } else if (updatedAt) {
+    time = updatedAt;
+  } else if (createdAt) {
+    time = createdAt;
+  }
+  
+  if (!time) return 0;
+  try {
+    const date = new Date(time);
+    const timestamp = date.getTime();
+    if (isNaN(timestamp)) return 0;
+    return timestamp;
+  } catch {
+    return 0;
+  }
+};
+
+// Функция для сортировки чатов по времени последнего сообщения (более новые выше)
+const sortChatsByTime = (chatsById) => {
+  return Object.keys(chatsById).sort((a, b) => {
+    const timeA = getChatTime(chatsById[a]);
+    const timeB = getChatTime(chatsById[b]);
+    return timeB - timeA; // Более новые (большее время) идут первыми
+  });
+};
+
 const reducer = (state, action) => {
   switch (action.type) {
     case actionTypes.SET_CHATS: {
       const list = ensureArray(action.payload?.chats);
       const chatsById = {};
-      let chatOrder = [];
 
       for (const c of list) {
         if (!c?.id) continue;
         const id = String(c.id);
-        chatsById[id] = c;
+        // Нормализуем данные чата, убеждаясь что есть поля для сортировки
+        const normalizedChat = {
+          ...c,
+          // Если есть lastMessage, но нет updatedAt, используем время последнего сообщения
+          updatedAt: c.updatedAt ?? c.lastMessage?.createdAt ?? c.createdAt,
+        };
+        chatsById[id] = normalizedChat;
       }
 
-      chatOrder = Object.keys(chatsById).sort((a, b) => {
-        const ca = chatsById[a];
-        const cb = chatsById[b];
-        const ta = toIso(ca?.updatedAt ?? ca?.lastMessage?.createdAt ?? ca?.createdAt);
-        const tb = toIso(cb?.updatedAt ?? cb?.lastMessage?.createdAt ?? cb?.createdAt);
-        return (tb ? new Date(tb).getTime() : 0) - (ta ? new Date(ta).getTime() : 0);
-      });
+      // Всегда сортируем чаты по времени последнего сообщения при загрузке
+      const chatOrder = sortChatsByTime(chatsById);
 
       return { ...state, chatsById, chatOrder };
     }
@@ -85,10 +129,15 @@ const reducer = (state, action) => {
       const id = String(chat.id);
       const existing = state.chatsById[id] || {};
       const merged = { ...existing, ...chat };
+      const updatedChatsById = { ...state.chatsById, [id]: merged };
+      
+      // Пересортировываем весь список чатов по времени последнего сообщения
+      const chatOrder = sortChatsByTime(updatedChatsById);
+      
       return {
         ...state,
-        chatsById: { ...state.chatsById, [id]: merged },
-        chatOrder: upsertOrder(state.chatOrder, id),
+        chatsById: updatedChatsById,
+        chatOrder,
       };
     }
 
@@ -121,7 +170,7 @@ const reducer = (state, action) => {
           chatsById[cid] = {
             ...chat,
             lastMessage: message,
-            updatedAt: toIso(message.createdAt) || chat.updatedAt,
+            updatedAt: toIso(message.createdAt) ?? chat.updatedAt ?? new Date().toISOString(),
             unreadCount: action.payload?.unreadDelta != null
               ? Math.max(0, Number(chat.unreadCount || 0) + Number(action.payload.unreadDelta))
               : chat.unreadCount,
@@ -134,12 +183,16 @@ const reducer = (state, action) => {
         }
       }
 
+      // Пересортировываем весь список чатов по времени последнего сообщения
+      // Пересортировываем весь список чатов по времени последнего сообщения
+      const chatOrder = sortChatsByTime(chatsById);
+
       return {
         ...state,
         messagesById,
         messageIdsByChatId: { ...state.messageIdsByChatId, [cid]: nextIds },
         chatsById,
-        chatOrder: upsertOrder(state.chatOrder, cid),
+        chatOrder,
       };
     }
 
@@ -158,16 +211,19 @@ const reducer = (state, action) => {
         chatsById[cid] = {
           ...chat,
           lastMessage: message,
-          updatedAt: toIso(message.createdAt) || chat.updatedAt,
+          updatedAt: toIso(message.createdAt) ?? chat.updatedAt ?? new Date().toISOString(),
         };
       }
+
+      // Пересортировываем весь список чатов по времени последнего сообщения
+      const chatOrder = sortChatsByTime(chatsById);
 
       return {
         ...state,
         messagesById,
         messageIdsByChatId: { ...state.messageIdsByChatId, [cid]: nextIds },
         chatsById,
-        chatOrder: upsertOrder(state.chatOrder, cid),
+        chatOrder,
       };
     }
 
@@ -200,14 +256,22 @@ const reducer = (state, action) => {
       const chatsById = { ...state.chatsById };
       const chat = chatsById[cid];
       if (chat?.lastMessage?.id && String(chat.lastMessage.id) === tid) {
-        chatsById[cid] = { ...chat, lastMessage: messagesById[mid] };
+        chatsById[cid] = { 
+          ...chat, 
+          lastMessage: messagesById[mid],
+          updatedAt: toIso(messagesById[mid]?.createdAt) ?? chat.updatedAt ?? new Date().toISOString(),
+        };
       }
+
+      // Пересортировываем весь список чатов по времени последнего сообщения
+      const chatOrder = sortChatsByTime(chatsById);
 
       return {
         ...state,
         messagesById,
         messageIdsByChatId: { ...state.messageIdsByChatId, [cid]: withReal },
         chatsById,
+        chatOrder,
       };
     }
 
@@ -539,7 +603,16 @@ export const MessagingProvider = ({ children }) => {
     };
   }, []);
 
-  const chats = useMemo(() => state.chatOrder.map(id => state.chatsById[id]).filter(Boolean), [state.chatOrder, state.chatsById]);
+  // Возвращаем чаты в порядке chatOrder, который уже отсортирован по времени последнего сообщения
+  const chats = useMemo(() => {
+    const ordered = state.chatOrder.map(id => state.chatsById[id]).filter(Boolean);
+    // Дополнительная сортировка на случай, если chatOrder не обновился
+    return ordered.sort((a, b) => {
+      const timeA = getChatTime(a);
+      const timeB = getChatTime(b);
+      return timeB - timeA; // Более новые выше
+    });
+  }, [state.chatOrder, state.chatsById]);
 
   const updateFaviconBadge = useCallback((count) => {
     if (typeof window === 'undefined') return;

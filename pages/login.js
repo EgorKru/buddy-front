@@ -49,11 +49,9 @@ export default function Login() {
                 <div className={styles.signalWave}></div>
               </div>
             </div>
-            <span className={styles.logoText}>Pager</span>
           </div>
         </div>
-        <h1>Вход в Pager</h1>
-        <p className={styles.subtitle}>Добро пожаловать обратно</p>
+        <h1>Вход</h1>
         <form onSubmit={handleLogin}>
           <div className={styles.formGroup}>
             <label>Имя пользователя</label>

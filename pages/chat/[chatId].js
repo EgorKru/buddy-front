@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
-import { Send, Loader2, Menu, Check, CheckCheck, AlertCircle, Clock, ArrowLeft, Mic, X } from 'lucide-react';
+import { Send, Loader2, Menu, Check, CheckCheck, AlertCircle, Clock, ArrowLeft, Mic, X, ChevronDown } from 'lucide-react';
 import { chatAPI, getCurrentUser, isAuthenticated } from '@/utils/api';
 import { getChatName } from '@/utils/chatHelpers';
 import { formatChatDate, formatChatTime, getOnlineStatus } from '@/utils/dateHelpers';
@@ -45,7 +45,13 @@ export default function ChatPage() {
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const sentAudioBlobRef = useRef(null);
+  const messageInputRef = useRef(null);
   const messages = useChatMessages(chatId);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [scrollButtonReady, setScrollButtonReady] = useState(false);
+  const scrollPositionSavedRef = useRef(false);
+  const isUserScrollingRef = useRef(false);
+  const scrollTimeoutRef = useRef(null);
 
   useChatRealtime(chatId);
   const voiceProtocol = useVoiceProtocol(chatId);
@@ -88,6 +94,8 @@ export default function ChatPage() {
       return;
     }
     if (chatId) {
+      // Сбрасываем флаг сохранения позиции при смене чата
+      scrollPositionSavedRef.current = false;
       if (!chat) {
         setLoading(true);
         loadChat();
@@ -96,11 +104,105 @@ export default function ChatPage() {
       }
       loadMessages(0);
     }
+    
+    // Устанавливаем готовность кнопки после загрузки страницы и применения стилей
+    if (typeof window !== 'undefined') {
+      // Ждем, пока CSS переменные и стили применятся
+      const checkReady = () => {
+        const sidebarWidth = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width');
+        if (sidebarWidth || document.body.hasAttribute('data-sidebar-position')) {
+          setScrollButtonReady(true);
+        } else {
+          setTimeout(checkReady, 50);
+        }
+      };
+      setTimeout(checkReady, 100);
+    }
   }, [chatId, router, loadChat, loadMessages, chat]);
 
+  // Сохранение позиции скролла
+  const saveScrollPosition = useCallback(() => {
+    if (!messagesContainerRef.current || !chatId) return;
+    const container = messagesContainerRef.current;
+    const scrollTop = container.scrollTop;
+    const scrollHeight = container.scrollHeight;
+    
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`chat_scroll_${chatId}`, JSON.stringify({
+        scrollTop,
+        scrollHeight,
+        timestamp: Date.now()
+      }));
+    }
+  }, [chatId]);
+
+  // Восстановление позиции скролла
+  const restoreScrollPosition = useCallback(() => {
+    if (!messagesContainerRef.current || !chatId || messages.length === 0) return;
+    
+    const saved = typeof window !== 'undefined' 
+      ? localStorage.getItem(`chat_scroll_${chatId}`)
+      : null;
+    
+    if (saved) {
+      try {
+        const { scrollTop, scrollHeight, timestamp } = JSON.parse(saved);
+        const container = messagesContainerRef.current;
+        
+        // Восстанавливаем только если сохранение было недавно (в течение 5 минут)
+        if (Date.now() - timestamp < 5 * 60 * 1000) {
+          // Ждем, пока DOM обновится
+          setTimeout(() => {
+            if (container.scrollHeight >= scrollHeight) {
+              container.scrollTop = scrollTop;
+              scrollPositionSavedRef.current = true;
+            }
+          }, 100);
+        }
+      } catch (e) {
+        // Игнорируем ошибки парсинга
+      }
+    }
+  }, [chatId, messages.length]);
+
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (messages.length > 0 && !scrollPositionSavedRef.current) {
+      restoreScrollPosition();
+    }
+  }, [messages, restoreScrollPosition]);
+
+  // Автоскролл только для новых сообщений, если пользователь внизу
+  useEffect(() => {
+    if (!messagesContainerRef.current || messages.length === 0) return;
+    
+    const container = messagesContainerRef.current;
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+    
+    // Автоскролл только если пользователь уже был внизу или это первая загрузка
+    if (isNearBottom || !scrollPositionSavedRef.current) {
+      setTimeout(() => {
+        scrollToBottom();
+      }, 50);
+    }
+  }, [messages.length]);
+
+  useEffect(() => {
+    const textarea = messageInputRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      const newHeight = Math.min(textarea.scrollHeight, 120);
+      textarea.style.height = `${newHeight}px`;
+      
+      // Показываем скроллбар только если контент переполняется
+      if (textarea.scrollHeight > 120) {
+        textarea.style.overflowY = 'auto';
+        textarea.style.paddingRight = '1.25rem';
+      } else {
+        textarea.style.overflowY = 'hidden';
+        textarea.style.paddingRight = '1rem';
+      }
+    }
+  }, [newMessage]);
 
   const handleMessageSent = useCallback((confirmation, tempId) => {
     if (!confirmation || !confirmation.message) return;
@@ -143,7 +245,11 @@ export default function ChatPage() {
     
     if (!newMessage.trim() || !user || sending) return;
 
-    const messageContent = newMessage.trim();
+    const messageContent = newMessage.trimEnd();
+    
+    // Сохраняем позицию перед отправкой
+    saveScrollPosition();
+    
     setNewMessage('');
 
     const result = await sendMessageHook(messageContent, 'TEXT');
@@ -156,6 +262,15 @@ export default function ChatPage() {
     
     if (!result) {
       setNewMessage(messageContent);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      if (!sending && !isRecording && newMessage.trim()) {
+        sendMessage(e);
+      }
     }
   };
 
@@ -304,18 +419,48 @@ export default function ChatPage() {
     }
   }, [audioBlob, isRecording, sending, handleVoiceSend]);
 
-  const handleScroll = () => {
+  const handleScroll = useCallback(() => {
     if (!messagesContainerRef.current) return;
     
     const container = messagesContainerRef.current;
-    if (container.scrollTop < 100 && hasMore && !loadingMore) {
+    const scrollTop = container.scrollTop;
+    const scrollHeight = container.scrollHeight;
+    const clientHeight = container.clientHeight;
+    
+    // Проверка на загрузку старых сообщений
+    if (scrollTop < 100 && hasMore && !loadingMore) {
       loadMessages(page + 1, true);
     }
-  };
+    
+    // Показываем кнопку "вниз" если пользователь не внизу
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+    setShowScrollToBottom(!isNearBottom);
+    
+    // Сохраняем позицию с задержкой
+    isUserScrollingRef.current = true;
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+    
+    scrollTimeoutRef.current = setTimeout(() => {
+      saveScrollPosition();
+      isUserScrollingRef.current = false;
+    }, 500);
+  }, [hasMore, loadingMore, page, loadMessages, saveScrollPosition]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const scrollToBottom = useCallback(() => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+      setShowScrollToBottom(false);
+      // Сохраняем позицию после скролла
+      setTimeout(() => {
+        saveScrollPosition();
+      }, 300);
+    }
+  }, [saveScrollPosition]);
 
   const getReadMetaForMessage = useCallback((msg) => {
     if (!chatId || !msg?.createdAt || !user?.id) return { isRead: false, readCount: 0, totalOthers: 0 };
@@ -394,18 +539,11 @@ export default function ChatPage() {
       <div className={styles.mainContent}>
         <div className={styles.header}>
           <button 
-            onClick={() => router.push('/chats')} 
+            onClick={() => router.back()} 
             className={styles.backButton}
-            title="Вернуться к списку чатов"
+            title="Назад"
           >
             <ArrowLeft size={20} />
-          </button>
-          <button 
-            onClick={() => setSidebarOpen(!sidebarOpen)} 
-            className={styles.menuButton}
-            title="Открыть список чатов"
-          >
-            <Menu size={20} />
           </button>
           <div className={styles.chatInfo}>
             <h1>{getDisplayChatName()}</h1>
@@ -507,6 +645,16 @@ export default function ChatPage() {
         )}
         <div ref={messagesEndRef} />
       </div>
+      
+      {showScrollToBottom && scrollButtonReady && (
+        <button
+          onClick={scrollToBottom}
+          className={styles.scrollToBottomButton}
+          title="Прокрутить к новым сообщениям"
+        >
+          <ChevronDown size={20} />
+        </button>
+      )}
 
       {isRecording && (
         <div className={styles.voiceRecordingBar}>
@@ -527,15 +675,21 @@ export default function ChatPage() {
         </div>
       )}
       <form onSubmit={sendMessage} className={styles.messageForm}>
-        <input
-          type="text"
+        <textarea
+          ref={messageInputRef}
           id="chat-message-input"
           name="message"
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
+          onKeyDown={handleKeyDown}
           placeholder={isRecording ? "Идет запись..." : "Введите сообщение..."}
           disabled={sending || isRecording}
           className={styles.messageInput}
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck="false"
+          rows={1}
         />
         <button
           type="button"

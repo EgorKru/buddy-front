@@ -60,11 +60,9 @@ export default function Register() {
                 <div className={styles.signalWave}></div>
               </div>
             </div>
-            <span className={styles.logoText}>Pager</span>
           </div>
         </div>
-        <h1>Регистрация в Pager</h1>
-        <p className={styles.subtitle}>Начните свой путь</p>
+        <h1>Регистрация</h1>
         <form onSubmit={handleRegister}>
           <div className={styles.formGroup}>
             <label>Имя пользователя</label>

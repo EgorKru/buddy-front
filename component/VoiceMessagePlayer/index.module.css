@@ -3,7 +3,7 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem 1rem;
-  background: rgba(102, 126, 234, 0.1);
+  background: #e0e6f0;
   border-radius: 1rem;
   min-width: 200px;
   max-width: 300px;
@@ -16,7 +16,7 @@
   width: 36px;
   height: 36px;
   border: none;
-  background: #667eea;
+  background: #4a9eff;
   color: white;
   border-radius: 50%;
   cursor: pointer;
@@ -25,7 +25,7 @@
 }
 
 .playButton:hover:not(:disabled) {
-  background: #5568d3;
+  background: #3a8eef;
   transform: scale(1.05);
 }
 
@@ -42,7 +42,7 @@
 .progressBar {
   width: 100%;
   height: 4px;
-  background: rgba(102, 126, 234, 0.2);
+  background: rgba(74, 158, 255, 0.2);
   border-radius: 2px;
   overflow: hidden;
   margin-bottom: 0.25rem;
@@ -50,14 +50,14 @@
 
 .progressFill {
   height: 100%;
-  background: #667eea;
+  background: #4a9eff;
   border-radius: 2px;
   transition: width 0.1s linear;
 }
 
 .duration {
   font-size: 0.75rem;
-  color: #666;
+  color: #1f2937;
   font-family: 'Courier New', monospace;
 }
 

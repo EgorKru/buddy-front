@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
 import { MessageCircle, Search, ArrowLeft, Plus, X, Loader2, Check, CheckCheck, UserPlus } from 'lucide-react';
@@ -7,7 +7,7 @@ import { useCreateChat } from '@/hooks/useCreateChat';
 import { getChatName, getChatAvatar } from '@/utils/chatHelpers';
 import { formatChatListTime } from '@/utils/dateHelpers';
 import styles from '@/styles/chats.module.css';
-import { useChats } from '@/context/messaging';
+import { useChats, getChatTime } from '@/context/messaging';
 
 export default function Chats() {
   const router = useRouter();
@@ -58,7 +58,20 @@ export default function Chats() {
     createChat.resetForm();
   };
 
-  const filteredChats = chats.filter(chat => {
+  // Чаты уже отсортированы в контексте, но делаем дополнительную сортировку для надежности
+  const sortedChats = useMemo(() => {
+    if (!chats || chats.length === 0) return [];
+    
+    return [...chats].sort((a, b) => {
+      const timeA = getChatTime(a);
+      const timeB = getChatTime(b);
+      
+      // Более новые (большее время) идут первыми (сверху)
+      return timeB - timeA;
+    });
+  }, [chats]);
+
+  const filteredChats = sortedChats.filter(chat => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
