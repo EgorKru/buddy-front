@@ -114,10 +114,15 @@ export const chatAPI = {
     });
   },
 
-  uploadVoiceFile: async (chatId, audioBlob) => {
+  uploadVoiceFile: async (chatId, audioBlob, duration = null) => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     const formData = new FormData();
     formData.append('file', audioBlob, 'voice.webm');
+    
+    // Передаём duration если указан
+    if (duration !== null && duration !== undefined) {
+      formData.append('duration', duration.toString());
+    }
 
     const headers = {};
     if (token) {
@@ -127,7 +132,7 @@ export const chatAPI = {
     const uploadUrl = getApiUrl(`/chats/${chatId}/files/voice`);
     
     if (typeof window !== 'undefined') {
-      console.log('[API] Uploading voice file:', { chatId, url: uploadUrl, blobSize: audioBlob.size, blobType: audioBlob.type });
+      console.log('[API] Uploading voice file:', { chatId, url: uploadUrl, blobSize: audioBlob.size, blobType: audioBlob.type, duration });
     }
 
     const response = await fetch(uploadUrl, {

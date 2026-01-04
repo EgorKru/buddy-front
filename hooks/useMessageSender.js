@@ -102,7 +102,7 @@ export const useMessageSender = (chatId, onMessageSent) => {
     }, delay);
   }, [chatId]);
 
-  const sendMessage = useCallback(async (content, type = 'TEXT', fileUrl = null, voiceData = null, voiceMimeType = null) => {
+  const sendMessage = useCallback(async (content, type = 'TEXT', fileUrl = null, voiceData = null, voiceMimeType = null, duration = null) => {
     if (type === 'VOICE' && !fileUrl && !voiceData) return null;
     if (type !== 'VOICE' && !content.trim()) return null;
     if (sending) return null;
@@ -133,15 +133,23 @@ export const useMessageSender = (chatId, onMessageSent) => {
             if (fileUrl) {
               // Способ 2: отправка с fileUrl (рекомендуемый)
               payload.fileUrl = fileUrl;
+              // Передаём duration если указан
+              if (duration !== null && duration !== undefined) {
+                payload.duration = duration;
+              }
               if (typeof window !== 'undefined') {
-                console.log('[MessageSender] Sending VOICE message with fileUrl:', { chatId, fileUrl });
+                console.log('[MessageSender] Sending VOICE message with fileUrl:', { chatId, fileUrl, duration });
               }
             } else if (voiceData) {
               // Способ 3: отправка с Base64 (fallback)
               payload.voiceData = voiceData;
               payload.voiceMimeType = voiceMimeType || 'audio/webm';
+              // Передаём duration если указан
+              if (duration !== null && duration !== undefined) {
+                payload.duration = duration;
+              }
               if (typeof window !== 'undefined') {
-                console.log('[MessageSender] Sending VOICE message with Base64 (fallback):', { chatId, mimeType: payload.voiceMimeType });
+                console.log('[MessageSender] Sending VOICE message with Base64 (fallback):', { chatId, mimeType: payload.voiceMimeType, duration });
               }
             } else {
               throw new Error('Neither fileUrl nor voiceData provided for VOICE message');

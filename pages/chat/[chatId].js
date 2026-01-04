@@ -598,6 +598,7 @@ export default function ChatPage() {
 
     try {
       let fileUrl = null;
+      let finalDuration = recordingTime > 0 ? recordingTime : null;
 
       // Шаг 1: Загрузка файла через REST API
       // POST /api/chats/{chatId}/files/voice
@@ -607,11 +608,15 @@ export default function ChatPage() {
       }
       
       try {
-        const uploadResponse = await chatAPI.uploadVoiceFile(chatId, audioBlob);
+        // Передаём recordingTime как duration (в секундах)
+        const duration = recordingTime > 0 ? recordingTime : null;
+        const uploadResponse = await chatAPI.uploadVoiceFile(chatId, audioBlob, duration);
         fileUrl = uploadResponse?.fileUrl;
+        // Используем duration из ответа сервера (если есть) или наш
+        finalDuration = uploadResponse?.duration || duration;
         
         if (typeof window !== 'undefined') {
-          console.log('[Voice] Step 1 complete: fileUrl =', fileUrl);
+          console.log('[Voice] Step 1 complete: fileUrl =', fileUrl, 'duration =', finalDuration);
         }
       } catch (uploadError) {
         // Способ 3 (fallback): Base64 через WebSocket
@@ -621,12 +626,13 @@ export default function ChatPage() {
         
         const base64 = await convertToBase64(audioBlob);
         const mimeType = audioBlob.type || 'audio/webm';
+        const duration = recordingTime > 0 ? recordingTime : null;
         
         if (typeof window !== 'undefined') {
           console.log('[Voice] Sending via WebSocket with Base64 (fallback)...');
         }
         
-        const result = await sendMessageHook(null, 'VOICE', null, base64, mimeType);
+        const result = await sendMessageHook(null, 'VOICE', null, base64, mimeType, duration);
 
         if (result?.serverMessage) {
           addOptimistic(chatId, { ...result.serverMessage, status: MESSAGE_STATUS.SENT, isOptimistic: false });
@@ -644,12 +650,12 @@ export default function ChatPage() {
       }
 
       // Шаг 2: Отправка сообщения через WebSocket с fileUrl
-      // Payload: { chatId, type: "VOICE", fileUrl: "voices/..." }
+      // Payload: { chatId, type: "VOICE", fileUrl: "voices/...", duration: ... }
       if (typeof window !== 'undefined') {
         console.log('[Voice] Step 2: Sending VOICE message via WebSocket with fileUrl...');
       }
       
-      const result = await sendMessageHook(null, 'VOICE', fileUrl);
+      const result = await sendMessageHook(null, 'VOICE', fileUrl, null, null, finalDuration);
 
       if (typeof window !== 'undefined') {
         console.log('[Voice] Step 2 complete: result =', result);
@@ -670,7 +676,7 @@ export default function ChatPage() {
       resetVoice();
       sentAudioBlobRef.current = null;
     }
-  }, [audioBlob, user, sending, convertToBase64, sendMessageHook, chatId, addOptimistic, resetVoice, isAtBottom]);
+  }, [audioBlob, user, sending, recordingTime, convertToBase64, sendMessageHook, chatId, addOptimistic, resetVoice, isAtBottom]);
 
   // Используем рекомендуемый способ 2: загрузка файла через REST + отправка через WebSocket
   const handleVoiceSend = useCallback(async () => {
@@ -920,35 +926,44 @@ export default function ChatPage() {
                         <span className={styles.senderName}>
                           {msg.senderDisplayName || msg.senderUsername}
                         </span>
-                        <span className={styles.messageTime}>
-                          {formatChatTime(msg.createdAt)}
-                        </span>
                       </div>
                     )}
                     {msg.type === 'VOICE' && msg.fileUrl ? (
-                      <VoiceMessagePlayer fileUrl={msg.fileUrl} duration={msg.duration} />
+                      (() => {
+                        const status = msg.status || (msg.isOptimistic ? MESSAGE_STATUS.SENDING : MESSAGE_STATUS.SENT);
+                        const readMeta = status === MESSAGE_STATUS.SENT ? getReadMetaForMessage(msg) : null;
+                        return (
+                          <VoiceMessagePlayer 
+                            fileUrl={msg.fileUrl} 
+                            duration={msg.duration}
+                            messageTime={formatChatTime(msg.createdAt)}
+                            isOwn={isOwn}
+                            statusIcon={isOwn ? getMessageStatusIcon(status, readMeta) : null}
+                          />
+                        );
+                      })()
                     ) : (
                       <div className={`${styles.messageText} ${msg.isOptimistic ? styles.messagePending : ''} ${msg.status === MESSAGE_STATUS.FAILED ? styles.messageFailed : ''}`}>
-                        {msg.content}
-                      </div>
-                    )}
-                    {isOwn && (
-                      <div className={styles.messageFooter}>
-                        <span className={styles.messageTime}>
-                          {formatChatTime(msg.createdAt)}
-                        </span>
-                        {(() => {
-                          const status = msg.status || (msg.isOptimistic ? MESSAGE_STATUS.SENDING : MESSAGE_STATUS.SENT);
-                          const readMeta = status === MESSAGE_STATUS.SENT ? getReadMetaForMessage(msg) : null;
-                          const title = readMeta?.readCount
-                            ? (readMeta.totalOthers > 1 ? `Прочитали ${readMeta.readCount}/${readMeta.totalOthers}` : 'Прочитано')
-                            : 'Отправлено';
-                          return (
-                            <span title={title}>
-                              {getMessageStatusIcon(status, readMeta)}
-                            </span>
-                          );
-                        })()}
+                        <div className={styles.messageTextContent}>
+                          {msg.content}
+                        </div>
+                        <div className={styles.messageTextFooter}>
+                          <span className={styles.messageTime}>
+                            {formatChatTime(msg.createdAt)}
+                          </span>
+                          {isOwn && (() => {
+                            const status = msg.status || (msg.isOptimistic ? MESSAGE_STATUS.SENDING : MESSAGE_STATUS.SENT);
+                            const readMeta = status === MESSAGE_STATUS.SENT ? getReadMetaForMessage(msg) : null;
+                            const title = readMeta?.readCount
+                              ? (readMeta.totalOthers > 1 ? `Прочитали ${readMeta.readCount}/${readMeta.totalOthers}` : 'Прочитано')
+                              : 'Отправлено';
+                            return (
+                              <span title={title}>
+                                {getMessageStatusIcon(status, readMeta)}
+                              </span>
+                            );
+                          })()}
+                        </div>
                       </div>
                     )}
                   </div>

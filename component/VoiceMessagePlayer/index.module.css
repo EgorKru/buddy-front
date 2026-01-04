@@ -1,31 +1,33 @@
 .voiceMessage {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  background: #e0e6f0;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  min-width: 240px;
+  max-width: 320px;
+  background: #f5f7fa;
   border-radius: 1rem;
-  min-width: 200px;
-  max-width: 300px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .playButton {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 42px;
+  height: 42px;
   border: none;
-  background: #4a9eff;
+  background: #5c6bc0;
   color: white;
   border-radius: 50%;
   cursor: pointer;
   transition: all 0.2s;
   flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(92, 107, 192, 0.25);
 }
 
 .playButton:hover:not(:disabled) {
-  background: #3a8eef;
+  background: #4a5ab8;
   transform: scale(1.05);
 }
 
@@ -34,36 +36,73 @@
   cursor: wait;
 }
 
-.voiceInfo {
+.playButton svg {
+  margin-left: 2px; /* Визуальная центровка треугольника play */
+}
+
+.voiceContent {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
-.progressBar {
-  width: 100%;
-  height: 4px;
-  background: rgba(74, 158, 255, 0.2);
+/* Waveform контейнер */
+.waveformContainer {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  gap: 2px;
+  cursor: pointer;
+  position: relative;
+}
+
+.waveformBar {
+  flex: 1;
+  min-width: 3px;
+  max-width: 4px;
+  background: rgba(92, 107, 192, 0.3);
   border-radius: 2px;
-  overflow: hidden;
-  margin-bottom: 0.25rem;
+  transition: background-color 0.1s;
 }
 
-.progressFill {
-  height: 100%;
-  background: #4a9eff;
-  border-radius: 2px;
-  transition: width 0.1s linear;
+.waveformBar.played {
+  background: #5c6bc0;
 }
 
-.duration {
-  font-size: 0.75rem;
-  color: #1f2937;
-  font-family: 'Courier New', monospace;
+/* Нижняя строка с временем */
+.timeRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  margin-top: 0.15rem;
+  position: relative;
+  min-height: 1.2rem;
 }
 
+.currentTime {
+  font-size: 0.7rem;
+  color: #6b7280;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-variant-numeric: tabular-nums;
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.messageTime {
+  font-size: 0.7rem;
+  color: #9ca3af;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Spinner */
 .spinner {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border: 2px solid rgba(255, 255, 255, 0.3);
   border-top-color: white;
   border-radius: 50%;
@@ -76,3 +115,33 @@
   }
 }
 
+/* Ошибка */
+.error {
+  font-size: 0.75rem;
+  color: #ef4444;
+  padding: 0.25rem 0;
+}
+
+/* Скорость воспроизведения */
+.speedButton {
+  font-size: 0.65rem;
+  color: #5c6bc0;
+  background: rgba(92, 107, 192, 0.1);
+  border: none;
+  border-radius: 4px;
+  padding: 2px 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background-color 0.2s;
+}
+
+.speedButton:hover {
+  background: rgba(92, 107, 192, 0.2);
+}
+
+/* Статус сообщения (время + галочки) */
+.messageStatus {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}

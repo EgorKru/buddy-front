@@ -5,6 +5,7 @@ import { useRouter } from "next/router";
 import Head from "next/head";
 import { StompProvider } from "@/context/socket";
 import { MessagingProvider } from "@/context/messaging";
+import { VoicePlayerProvider } from "@/context/voicePlayer";
 import GlobalNotifications from "@/component/GlobalNotifications";
 import { isAuthenticated } from "@/utils/api";
 
@@ -27,8 +28,10 @@ export default function App({ Component, pageProps }) {
       ) : (
         <StompProvider>
           <MessagingProvider>
-            <Component {...pageProps} />
-            <GlobalNotifications />
+            <VoicePlayerProvider>
+              <Component {...pageProps} />
+              <GlobalNotifications />
+            </VoicePlayerProvider>
           </MessagingProvider>
         </StompProvider>
       )}
