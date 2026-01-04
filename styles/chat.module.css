@@ -746,6 +746,273 @@
   cursor: not-allowed;
 }
 
+.voiceButtonLocked {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.pauseButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: white;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-left: 8px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 768px) {
+  .pauseButton {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+.pauseButton:hover:not(:disabled) {
+  background: #f5f5f5;
+  transform: scale(1.05);
+}
+
+.pauseButton:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.pauseButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.voiceButtonWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.voiceWaves {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.voiceWave {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid rgba(129, 140, 248, 0.5);
+  animation: waveExpand 1.5s ease-out infinite;
+}
+
+@keyframes waveExpand {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.2);
+    opacity: 0;
+  }
+}
+
+.lockIndicator {
+  position: absolute;
+  top: -60px;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: white;
+  padding: 8px 12px;
+  border-radius: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  color: #666;
+  transition: transform 0.2s ease, opacity 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+  pointer-events: none;
+  z-index: 1000;
+  white-space: nowrap;
+}
+
+.lockIndicatorActive {
+  background: #e3f2fd;
+  box-shadow: 0 4px 12px rgba(74, 158, 255, 0.3);
+  border: 2px solid #4a9eff;
+}
+
+.lockIndicatorCollapse {
+  animation: lockCollapse 0.3s ease-out;
+}
+
+@keyframes lockCollapse {
+  0% {
+    transform: translateX(-50%) translateY(-80px) scale(1);
+  }
+  50% {
+    transform: translateX(-50%) translateY(-80px) scale(0.7);
+  }
+  100% {
+    transform: translateX(-50%) translateY(-80px) scale(0.85);
+  }
+}
+
+.lockIndicatorLocked {
+  background: #e3f2fd;
+  box-shadow: 0 4px 12px rgba(74, 158, 255, 0.4);
+  border: 2px solid #4a9eff;
+  animation: lockPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes lockPulse {
+  0%, 100% {
+    box-shadow: 0 4px 12px rgba(74, 158, 255, 0.4);
+  }
+  50% {
+    box-shadow: 0 4px 16px rgba(74, 158, 255, 0.6);
+  }
+}
+
+.voicePreviewBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #4a9eff;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 400px;
+}
+
+.voiceDeleteButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: white;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.voiceDeleteButton:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.voicePlayButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: white;
+  color: #4a9eff;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.voicePlayButton:hover {
+  transform: scale(1.1);
+}
+
+.voiceResumeButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: rgba(255, 255, 255, 0.3);
+  color: white;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+
+.voiceResumeButton:hover {
+  background: rgba(255, 255, 255, 0.4);
+  transform: scale(1.1);
+}
+
+.voiceWaveform {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  height: 32px;
+  padding: 0 8px;
+}
+
+.waveformBar {
+  flex: 1;
+  background: white;
+  border-radius: 2px;
+  min-width: 2px;
+  animation: waveformPulse 1s ease-in-out infinite;
+}
+
+@keyframes waveformPulse {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.voiceDuration {
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 40px;
+  text-align: right;
+}
+
+.voiceSendButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: white;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.voiceSendButton:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.1);
+}
+
 .voiceButtonRecording {
   background: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
   color: white;

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
-import { Send, Loader2, Menu, Check, CheckCheck, AlertCircle, Clock, ArrowLeft, Mic, X, ChevronDown } from 'lucide-react';
+import { Send, Loader2, Menu, Check, CheckCheck, AlertCircle, Clock, ArrowLeft, Mic, X, ChevronDown, Pause, Play, Lock, Unlock, Trash2 } from 'lucide-react';
 import { chatAPI, getCurrentUser, isAuthenticated } from '@/utils/api';
 import { getChatName } from '@/utils/chatHelpers';
 import { formatChatDate, formatChatTime, getOnlineStatus } from '@/utils/dateHelpers';
@@ -327,16 +327,30 @@ export default function ChatPage() {
 
   const {
     isRecording,
+    isPaused,
     recordingTime,
     audioBlob,
+    previewBlob,
     error: voiceError,
     audioLevel,
     startRecording,
+    pauseRecording,
+    resumeRecording,
     stopRecording,
     cancelRecording,
     reset: resetVoice,
     convertToBase64,
   } = useVoiceRecorder();
+
+  const [isLocked, setIsLocked] = useState(false);
+  const [isHolding, setIsHolding] = useState(false);
+  const [dragDistance, setDragDistance] = useState(0);
+  const [isPlayingPreview, setIsPlayingPreview] = useState(false);
+  const [reachedLockThreshold, setReachedLockThreshold] = useState(false);
+  const buttonRef = useRef(null);
+  const startYRef = useRef(0);
+  const audioPreviewRef = useRef(null);
+  const lockThreshold = 80; // Пикселей вверх для блокировки
 
 
   useEffect(() => {
@@ -388,13 +402,143 @@ export default function ChatPage() {
     }
   };
 
-  const handleVoiceRecord = async () => {
-    if (isRecording) {
-      stopRecording();
-    } else {
-      startRecording();
+  const handleVoiceStart = useCallback(async (clientY) => {
+    try {
+      if (!isRecording) {
+        await startRecording();
+        setIsHolding(true);
+        startYRef.current = clientY;
+      }
+    } catch (error) {
+      if (typeof window !== 'undefined') {
+        console.error('[Voice] Error starting recording:', error);
+      }
     }
-  };
+  }, [isRecording, startRecording]);
+
+  const handleVoiceEnd = useCallback(() => {
+    setIsHolding(false);
+    if (isRecording && !isLocked) {
+      // Если достигли порога блокировки при отпускании - блокируем
+      if (reachedLockThreshold) {
+        setIsLocked(true);
+        setReachedLockThreshold(false);
+      } else {
+        // Иначе отправляем сообщение
+        stopRecording();
+      }
+    }
+    setDragDistance(0);
+  }, [isRecording, isLocked, reachedLockThreshold, stopRecording]);
+
+  const handleVoiceMove = useCallback((clientY) => {
+    if (isHolding && startYRef.current > 0) {
+      const deltaY = startYRef.current - clientY;
+      setDragDistance(Math.max(0, deltaY));
+      if (deltaY > lockThreshold) {
+        setReachedLockThreshold(true);
+      } else {
+        setReachedLockThreshold(false);
+      }
+    }
+  }, [isHolding]);
+
+  const handleMouseDown = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    handleVoiceStart(e.clientY);
+  }, [handleVoiceStart]);
+
+  const handleMouseUp = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    handleVoiceEnd();
+  }, [handleVoiceEnd]);
+
+  const handleMouseMove = useCallback((e) => {
+    if (isHolding) {
+      handleVoiceMove(e.clientY);
+    }
+  }, [isHolding, handleVoiceMove]);
+
+  const handleTouchStart = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const touch = e.touches[0];
+    handleVoiceStart(touch.clientY);
+  }, [handleVoiceStart]);
+
+  const handleTouchEnd = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    handleVoiceEnd();
+  }, [handleVoiceEnd]);
+
+  const handleTouchMove = useCallback((e) => {
+    if (isHolding) {
+      const touch = e.touches[0];
+      handleVoiceMove(touch.clientY);
+    }
+  }, [isHolding, handleVoiceMove]);
+
+  // Очистка при размонтировании или остановке записи
+  useEffect(() => {
+    if (!isRecording) {
+      setIsLocked(false);
+      setIsHolding(false);
+      setDragDistance(0);
+      setIsPlayingPreview(false);
+      startYRef.current = 0;
+      if (audioPreviewRef.current) {
+        audioPreviewRef.current.pause();
+        if (audioPreviewRef.current.src) {
+          URL.revokeObjectURL(audioPreviewRef.current.src);
+        }
+        audioPreviewRef.current.src = '';
+      }
+    }
+  }, [isRecording]);
+
+  // Обновление src для audio элемента при изменении previewBlob или audioBlob
+  useEffect(() => {
+    if (audioPreviewRef.current && (previewBlob || audioBlob) && isRecording && isLocked && isPaused) {
+      // Освобождаем предыдущий URL
+      if (audioPreviewRef.current.src && audioPreviewRef.current.src.startsWith('blob:')) {
+        URL.revokeObjectURL(audioPreviewRef.current.src);
+      }
+      // Создаем новый URL
+      const blob = previewBlob || audioBlob;
+      if (blob && blob.size > 0) {
+        const url = URL.createObjectURL(blob);
+        audioPreviewRef.current.src = url;
+        // Загружаем метаданные
+        audioPreviewRef.current.load();
+      }
+    }
+    return () => {
+      if (audioPreviewRef.current && audioPreviewRef.current.src && audioPreviewRef.current.src.startsWith('blob:')) {
+        URL.revokeObjectURL(audioPreviewRef.current.src);
+      }
+    };
+  }, [previewBlob, audioBlob, isRecording, isLocked, isPaused]);
+
+  // Глобальные обработчики для мыши и тача
+  useEffect(() => {
+    if (isHolding) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.addEventListener('touchmove', handleTouchMove);
+      document.addEventListener('touchend', handleTouchEnd);
+      
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+        document.removeEventListener('touchmove', handleTouchMove);
+        document.removeEventListener('touchend', handleTouchEnd);
+      };
+    }
+  }, [isHolding, handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
+
 
   const handleVoiceSendSimple = useCallback(async () => {
     if (!audioBlob || !user || sending) return;
@@ -447,62 +591,45 @@ export default function ChatPage() {
       resetVoice();
       sentAudioBlobRef.current = null;
     }
-  }, [audioBlob, user, sending, convertToBase64, sendMessageHook, chatId, addOptimistic, resetVoice]);
+  }, [audioBlob, user, sending, convertToBase64, sendMessageHook, chatId, addOptimistic, resetVoice, isAtBottom]);
 
   const handleVoiceSend = useCallback(async () => {
-    if (!audioBlob || !user || sending) return;
+    // Проверяем условия перед отправкой
+    if (!audioBlob || !user) {
+      return;
+    }
+    
+    // Проверяем, не отправляется ли уже сообщение
+    if (sending) {
+      return;
+    }
 
     const useNewProtocol = typeof window !== 'undefined' && localStorage.getItem('use_voice_protocol') !== 'false';
 
-    if (typeof window !== 'undefined') {
-      console.log('[Voice] Protocol:', useNewProtocol ? 'NEW (Pager Voice Protocol)' : 'SIMPLE (REST + WebSocket)');
-    }
-
     if (useNewProtocol) {
       try {
-        if (typeof window !== 'undefined') {
-          console.log('[Voice] Initiating new protocol...');
-        }
         voiceProtocol.initiate();
         
         await new Promise((resolve, reject) => {
           const timeout = setTimeout(() => {
-            if (typeof window !== 'undefined') {
-              console.warn('[Voice] Protocol timeout - no response from server');
-            }
             reject(new Error('Voice protocol timeout'));
           }, 10000);
           
           const checkState = setInterval(() => {
             const { sessionState, relaySessionId } = voiceProtocol;
-            if (typeof window !== 'undefined') {
-              console.log('[Voice] Checking state:', sessionState, 'relaySessionId:', relaySessionId);
-            }
             
             if (sessionState === 'ready' || sessionState === 'relay' || sessionState === 'p2p') {
               clearInterval(checkState);
               clearTimeout(timeout);
               
               if (relaySessionId) {
-                if (typeof window !== 'undefined') {
-                  console.log('[Voice] Sending ANSWER (relay mode)');
-                }
                 voiceProtocol.sendAnswer();
               } else {
-                if (typeof window !== 'undefined') {
-                  console.log('[Voice] Sending OFFER (P2P mode)');
-                }
                 voiceProtocol.sendOffer();
               }
               
               setTimeout(() => {
-                if (typeof window !== 'undefined') {
-                  console.log('[Voice] Starting audio transmission');
-                }
                 voiceProtocol.startSendingAudio([audioBlob], () => {
-                  if (typeof window !== 'undefined') {
-                    console.log('[Voice] Audio transmission completed');
-                  }
                   resetVoice();
                   sentAudioBlobRef.current = null;
                   resolve();
@@ -519,13 +646,26 @@ export default function ChatPage() {
         if (typeof window !== 'undefined') {
           console.warn('[Voice] New protocol failed, falling back to simple method:', error);
         }
-        await handleVoiceSendSimple();
+        try {
+          await handleVoiceSendSimple();
+        } catch (fallbackError) {
+          if (typeof window !== 'undefined') {
+            console.error('[Voice] Fallback method also failed:', fallbackError);
+          }
+          resetVoice();
+          sentAudioBlobRef.current = null;
+        }
       }
     } else {
-      if (typeof window !== 'undefined') {
-        console.log('[Voice] Using simple method (protocol disabled)');
+      try {
+        await handleVoiceSendSimple();
+      } catch (error) {
+        if (typeof window !== 'undefined') {
+          console.error('[Voice] Simple method failed:', error);
+        }
+        resetVoice();
+        sentAudioBlobRef.current = null;
       }
-      await handleVoiceSendSimple();
     }
   }, [audioBlob, user, sending, voiceProtocol, handleVoiceSendSimple, resetVoice]);
 
@@ -535,11 +675,23 @@ export default function ChatPage() {
   };
 
   useEffect(() => {
-    if (audioBlob && !isRecording && !sending && sentAudioBlobRef.current !== audioBlob) {
-      sentAudioBlobRef.current = audioBlob;
-      handleVoiceSend();
+    // Отправляем голосовое сообщение, когда запись завершена
+    // НЕ отправляем, если запись была отменена (isLocked сброшен, но audioBlob есть)
+    if (audioBlob && !isRecording && sentAudioBlobRef.current !== audioBlob && !isLocked) {
+      // Проверяем, что мы не в процессе отправки другого сообщения
+      if (!sending) {
+        sentAudioBlobRef.current = audioBlob;
+        // Небольшая задержка, чтобы убедиться, что audioBlob полностью установлен
+        const timeoutId = setTimeout(() => {
+          if (audioBlob && !sending && !isLocked) {
+            handleVoiceSend();
+          }
+        }, 100);
+        
+        return () => clearTimeout(timeoutId);
+      }
     }
-  }, [audioBlob, isRecording, sending, handleVoiceSend]);
+  }, [audioBlob, isRecording, sending, isLocked, handleVoiceSend]);
 
   const handleScroll = useCallback(() => {
     if (!messagesContainerRef.current) return;
@@ -792,52 +944,12 @@ export default function ChatPage() {
         </button>
       )}
 
-      {isRecording && (
-        <div className={styles.voiceRecordingBar}>
-          <div className={styles.voiceRecordingInfo}>
-            <div className={styles.voiceRecordingCircle}>
-              <Mic size={24} style={{ color: 'white', zIndex: 1, position: 'relative' }} />
-              <div className={styles.voiceRecordingWaves}>
-                <div 
-                  className={styles.voiceRecordingWave}
-                  style={{
-                    width: `${20 + audioLevel * 0.3}px`,
-                    height: `${20 + audioLevel * 0.3}px`,
-                    opacity: audioLevel > 10 ? 0.6 : 0.3
-                  }}
-                />
-                <div 
-                  className={styles.voiceRecordingWave}
-                  style={{
-                    width: `${30 + audioLevel * 0.4}px`,
-                    height: `${30 + audioLevel * 0.4}px`,
-                    opacity: audioLevel > 20 ? 0.5 : 0.2
-                  }}
-                />
-                <div 
-                  className={styles.voiceRecordingWave}
-                  style={{
-                    width: `${40 + audioLevel * 0.5}px`,
-                    height: `${40 + audioLevel * 0.5}px`,
-                    opacity: audioLevel > 30 ? 0.4 : 0.1
-                  }}
-                />
-              </div>
-            </div>
-            <span className={styles.voiceRecordingTime}>
-              {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={handleVoiceCancel}
-            className={styles.voiceCancelButton}
-            title="Отменить запись"
-          >
-            <X size={16} />
-          </button>
+      {voiceError && (
+        <div style={{ padding: '10px', background: '#fee', color: '#c33', borderRadius: '4px', margin: '10px' }}>
+          {voiceError}
         </div>
       )}
+
       <form onSubmit={sendMessage} className={styles.messageForm}>
         <textarea
           ref={messageInputRef}
@@ -855,27 +967,279 @@ export default function ChatPage() {
           spellCheck="false"
           rows={1}
         />
-        <button
-          type="button"
-          onClick={handleVoiceRecord}
-          className={`${styles.voiceButton} ${isRecording ? styles.voiceButtonRecording : ''}`}
-          title={isRecording ? "Остановить запись" : "Записать голосовое сообщение"}
-          disabled={sending}
-        >
-          <Mic size={20} />
-        </button>
-        <button
-          type="submit"
-          disabled={!newMessage.trim() || sending || isRecording}
-          className={styles.sendButton}
-          title="Отправить сообщение"
-        >
-          {sending ? (
-            <Loader2 size={20} className={styles.spinner} />
-          ) : (
-            <Send size={20} />
-          )}
-        </button>
+        {!newMessage.trim() && (
+          <>
+            {!isRecording && (
+              <button
+                ref={buttonRef}
+                type="button"
+                onMouseDown={handleMouseDown}
+                onTouchStart={handleTouchStart}
+                className={styles.voiceButton}
+                title="Зажмите для записи, потяните вверх для блокировки"
+                disabled={sending}
+              >
+                <Mic size={20} />
+              </button>
+            )}
+            {isRecording && !isLocked && (
+              <div className={styles.voiceButtonWrapper}>
+                <div 
+                  className={`${styles.lockIndicator} ${reachedLockThreshold ? styles.lockIndicatorActive : ''} ${reachedLockThreshold ? styles.lockIndicatorCollapse : ''}`}
+                  style={{ 
+                    opacity: isHolding && dragDistance > 20 ? Math.min(1, 0.4 + (dragDistance / lockThreshold) * 0.6) : 0.4,
+                    transform: isHolding && dragDistance > 20 
+                      ? `translateX(-50%) translateY(-${Math.min(dragDistance, lockThreshold)}px) ${reachedLockThreshold ? 'scale(0.85)' : 'scale(1)'}` 
+                      : 'translateX(-50%) translateY(-20px)'
+                  }}
+                >
+                  {reachedLockThreshold ? (
+                    <Lock size={16} style={{ 
+                      stroke: '#4a9eff',
+                      fill: 'none',
+                      strokeWidth: 2.5
+                    }} />
+                  ) : (
+                    <Unlock size={16} style={{ 
+                      color: '#666'
+                    }} />
+                  )}
+                  <ChevronDown size={12} style={{
+                    opacity: reachedLockThreshold ? 0 : 1,
+                    transform: reachedLockThreshold ? 'scale(0)' : 'scale(1)',
+                    transition: 'all 0.2s ease'
+                  }} />
+                </div>
+                <div className={styles.voiceWaves}>
+                  <div 
+                    className={styles.voiceWave}
+                    style={{
+                      width: `${48 + audioLevel * 0.5}px`,
+                      height: `${48 + audioLevel * 0.5}px`,
+                      opacity: 0.3 + audioLevel / 300
+                    }}
+                  />
+                  <div 
+                    className={styles.voiceWave}
+                    style={{
+                      width: `${56 + audioLevel * 0.6}px`,
+                      height: `${56 + audioLevel * 0.6}px`,
+                      opacity: 0.2 + audioLevel / 400
+                    }}
+                  />
+                  <div 
+                    className={styles.voiceWave}
+                    style={{
+                      width: `${64 + audioLevel * 0.7}px`,
+                      height: `${64 + audioLevel * 0.7}px`,
+                      opacity: 0.1 + audioLevel / 500
+                    }}
+                  />
+                </div>
+                <button
+                  ref={buttonRef}
+                  type="button"
+                  className={`${styles.voiceButton} ${styles.voiceButtonRecording} ${reachedLockThreshold ? styles.voiceButtonActive : ''}`}
+                  style={reachedLockThreshold ? {
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    boxShadow: '0 4px 16px rgba(102, 126, 234, 0.5)',
+                    transform: 'scale(1.05)'
+                  } : {}}
+                  title="Отпустите для отправки, потяните вверх для блокировки"
+                  disabled={sending}
+                >
+                  <Mic size={20} />
+                </button>
+              </div>
+            )}
+            {isRecording && isLocked && !isPaused && (
+              <>
+                <div className={styles.voiceButtonWrapper}>
+                  <div 
+                    className={`${styles.lockIndicator} ${styles.lockIndicatorLocked}`}
+                    style={{ 
+                      opacity: 1,
+                      transform: 'translateX(-50%) translateY(-80px)'
+                    }}
+                  >
+                    <Lock size={16} style={{ 
+                      stroke: '#4a9eff',
+                      fill: 'none',
+                      strokeWidth: 2.5
+                    }} />
+                  </div>
+                  <div className={styles.voiceWaves}>
+                    <div 
+                      className={styles.voiceWave}
+                      style={{
+                        width: `${48 + audioLevel * 0.5}px`,
+                        height: `${48 + audioLevel * 0.5}px`,
+                        opacity: 0.3 + audioLevel / 300
+                      }}
+                    />
+                    <div 
+                      className={styles.voiceWave}
+                      style={{
+                        width: `${56 + audioLevel * 0.6}px`,
+                        height: `${56 + audioLevel * 0.6}px`,
+                        opacity: 0.2 + audioLevel / 400
+                      }}
+                    />
+                    <div 
+                      className={styles.voiceWave}
+                      style={{
+                        width: `${64 + audioLevel * 0.7}px`,
+                        height: `${64 + audioLevel * 0.7}px`,
+                        opacity: 0.1 + audioLevel / 500
+                      }}
+                    />
+                  </div>
+                  <button
+                    ref={buttonRef}
+                    type="button"
+                    className={`${styles.voiceButton} ${styles.voiceButtonRecording} ${styles.voiceButtonLocked}`}
+                    title="Запись заблокирована"
+                    disabled={sending}
+                  >
+                    <Mic size={20} />
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    pauseRecording();
+                  }}
+                  className={styles.pauseButton}
+                  title="Приостановить запись"
+                  disabled={sending}
+                >
+                  <Pause size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    stopRecording();
+                  }}
+                  className={styles.sendButton}
+                  title="Отправить запись"
+                  disabled={sending}
+                >
+                  <Send size={20} />
+                </button>
+              </>
+            )}
+            {isRecording && isLocked && isPaused && (
+              <>
+                <audio
+                  ref={audioPreviewRef}
+                  onEnded={() => setIsPlayingPreview(false)}
+                  onPause={() => setIsPlayingPreview(false)}
+                  onPlay={() => setIsPlayingPreview(true)}
+                />
+                <div className={styles.voicePreviewBar}>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    cancelRecording();
+                  }}
+                  className={styles.voiceDeleteButton}
+                  title="Удалить запись"
+                >
+                  <Trash2 size={18} />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (audioPreviewRef.current) {
+                      if (isPlayingPreview) {
+                        audioPreviewRef.current.pause();
+                        setIsPlayingPreview(false);
+                      } else {
+                        audioPreviewRef.current.play();
+                        setIsPlayingPreview(true);
+                      }
+                    }
+                  }}
+                  className={styles.voicePlayButton}
+                  title={isPlayingPreview ? "Пауза" : "Прослушать запись"}
+                >
+                  {isPlayingPreview ? <Pause size={16} /> : <Play size={16} />}
+                </button>
+                <div className={styles.voiceWaveform}>
+                  {/* Простая визуализация волны */}
+                  {Array.from({ length: 40 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={styles.waveformBar}
+                      style={{
+                        height: `${20 + Math.sin(i * 0.3) * 15}px`,
+                        animationDelay: `${i * 0.05}s`
+                      }}
+                    />
+                  ))}
+                </div>
+                <span className={styles.voiceDuration}>
+                  {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (audioPreviewRef.current) {
+                      audioPreviewRef.current.pause();
+                      setIsPlayingPreview(false);
+                    }
+                    resumeRecording();
+                  }}
+                  className={styles.voiceResumeButton}
+                  title="Продолжить запись"
+                >
+                  <Mic size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (audioPreviewRef.current) {
+                      audioPreviewRef.current.pause();
+                      setIsPlayingPreview(false);
+                    }
+                    stopRecording();
+                  }}
+                  className={styles.voiceSendButton}
+                  title="Отправить запись"
+                >
+                  <Send size={18} />
+                </button>
+                </div>
+              </>
+            )}
+          </>
+        )}
+        {newMessage.trim() && !isRecording && (
+          <button
+            type="submit"
+            disabled={!newMessage.trim() || sending || isRecording}
+            className={styles.sendButton}
+            title="Отправить сообщение"
+          >
+            {sending ? (
+              <Loader2 size={20} className={styles.spinner} />
+            ) : (
+              <Send size={20} />
+            )}
+          </button>
+        )}
       </form>
       </div>
     </div>
