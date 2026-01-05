@@ -185,7 +185,8 @@ const reducer = (state, action) => {
       
       if (chat) {
         const last = chat?.lastMessage;
-        if (!last?.createdAt || isNewer(message.createdAt, last.createdAt)) {
+        const isLastMessage = last?.id && String(last.id) === mid;
+        if (!last?.createdAt || isNewer(message.createdAt, last.createdAt) || isLastMessage) {
           // Если чат активен и окно видимо, сбрасываем счетчик непрочитанных
           const newUnreadCount = shouldResetUnread 
             ? 0 
@@ -393,6 +394,7 @@ export const useChats = () => {
       readAtByChatIdByUserId: {},
       upsertReadReceipt: () => {},
       upsertMessage: () => {},
+      updateMessage: () => {},
       addOptimistic: () => {},
       replaceOptimistic: () => {},
     };
@@ -506,6 +508,24 @@ export const MessagingProvider = ({ children }) => {
     const mid = String(message.id);
     if (processedMessageIdsRef.current.has(mid)) return;
     processedMessageIdsRef.current.add(mid);
+
+    const currentUser = getCurrentUser();
+    const isVisible = typeof document !== 'undefined' && document.visibilityState === 'visible';
+    const active = state.activeChatId && String(state.activeChatId) === String(message.chatId);
+    const isOwn = currentUser?.id && message?.senderId && Number(currentUser.id) === Number(message.senderId);
+    const unreadDelta = isOwn ? 0 : (active && isVisible ? 0 : 1);
+
+    dispatch({
+      type: actionTypes.UPSERT_MESSAGE,
+      payload: { message, chatId: message.chatId, unreadDelta: meta.unreadDelta ?? unreadDelta },
+    });
+  }, [state.activeChatId]);
+
+  const updateMessage = useCallback((message, meta = {}) => {
+    if (!message?.id || !message?.chatId) return;
+    const mid = String(message.id);
+    // Для обновления существующих сообщений очищаем из processedMessageIdsRef
+    processedMessageIdsRef.current.delete(mid);
 
     const currentUser = getCurrentUser();
     const isVisible = typeof document !== 'undefined' && document.visibilityState === 'visible';
@@ -764,6 +784,7 @@ export const MessagingProvider = ({ children }) => {
       messagesById: state.messagesById,
       upsertReadReceipt,
       upsertMessage,
+      updateMessage,
       addOptimistic,
       replaceOptimistic,
     };
@@ -778,6 +799,7 @@ export const MessagingProvider = ({ children }) => {
     state.messagesById,
     upsertReadReceipt,
     upsertMessage,
+    updateMessage,
     addOptimistic,
     replaceOptimistic,
   ]);

@@ -61,8 +61,25 @@ export const useChatRealtime = (chatId) => {
 
     try {
       const sub = client.subscribe(`/topic/chat/${chatId}`, (message) => {
-        const dto = safeJsonParse(message.body);
-        if (!dto) return;
+        const data = safeJsonParse(message.body);
+        if (!data) return;
+
+        // Проверяем, является ли это событием редактирования
+        if (data.eventType === 'MESSAGE_EDITED') {
+          const editedMessage = data.message;
+          if (!editedMessage) return;
+          if (Number(editedMessage.chatId) !== Number(chatId)) return;
+
+          // Обновляем существующее сообщение
+          upsertMessage(
+            { ...editedMessage, status: MESSAGE_STATUS.SENT, isOptimistic: false },
+            { unreadDelta: 0 }
+          );
+          return;
+        }
+
+        // Обычное новое сообщение
+        const dto = data;
         if (Number(dto.chatId) !== Number(chatId)) return;
 
         // Передаем unreadDelta: 0, так как мы в активном чате

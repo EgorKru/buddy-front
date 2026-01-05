@@ -100,7 +100,7 @@ export const chatAPI = {
     return apiRequest(`/chats/${chatId}/messages${queryString ? `?${queryString}` : ''}`);
   },
 
-  sendMessage: async (chatId, content, type = 'TEXT', fileUrl = null) => {
+  sendMessage: async (chatId, content, type = 'TEXT', fileUrl = null, replyToMessageId = null) => {
     const body = { 
       content: type === 'VOICE' ? '' : content, 
       type 
@@ -108,10 +108,17 @@ export const chatAPI = {
     if (type === 'VOICE' && fileUrl) {
       body.fileUrl = fileUrl;
     }
+    if (replyToMessageId) {
+      body.replyToMessageId = replyToMessageId;
+    }
     return apiRequest(`/chats/${chatId}/messages`, {
       method: 'POST',
       body,
     });
+  },
+
+  getMessage: async (chatId, messageId) => {
+    return apiRequest(`/chats/${chatId}/messages/${messageId}`);
   },
 
   uploadVoiceFile: async (chatId, audioBlob, duration = null) => {
@@ -187,6 +194,19 @@ export const chatAPI = {
   markChatAsRead: async (chatId) => {
     return apiRequest(`/chats/${chatId}/read`, {
       method: 'PUT',
+    });
+  },
+
+  editMessage: async (chatId, messageId, content) => {
+    return apiRequest(`/chats/${chatId}/messages/${messageId}`, {
+      method: 'PUT',
+      body: { content },
+    });
+  },
+
+  deleteMessage: async (chatId, messageId) => {
+    return apiRequest(`/chats/${chatId}/messages/${messageId}`, {
+      method: 'DELETE',
     });
   },
 };
