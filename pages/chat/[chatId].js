@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
-import { Send, Loader2, Menu, Check, CheckCheck, AlertCircle, Clock, ArrowLeft, Mic, X, ChevronDown, Pause, Play, Lock, Unlock, Trash2, Edit, Reply } from 'lucide-react';
+import { Send, Loader2, Menu, Check, CheckCheck, AlertCircle, Clock, ArrowLeft, Mic, X, ChevronDown, Pause, Play, Lock, Unlock, Trash2, Edit, Reply, Pin } from 'lucide-react';
 import { chatAPI, getCurrentUser, isAuthenticated } from '@/utils/api';
 import { getChatName } from '@/utils/chatHelpers';
 import { formatChatDate, formatChatTime, getOnlineStatus } from '@/utils/dateHelpers';
@@ -13,6 +13,8 @@ import MessageContextMenu from '@/component/MessageContextMenu';
 import styles from '@/styles/chat.module.css';
 import { useChats, useChatMessages } from '@/context/messaging';
 import { useChatRealtime } from '@/hooks/useChatRealtime';
+import { useStomp } from '@/context/socket';
+import { safeJsonParse, safeUnsubscribe } from '@/utils/safe';
 
 const DUPLICATE_WINDOW_MS = 5000;
 
@@ -30,6 +32,7 @@ export default function ChatPage() {
   const { chatId } = router.query;
   const user = getCurrentUser();
   const { connected, readAtByChatIdByUserId, replaceOptimistic, addOptimistic, chats, refreshChats, upsertMessage, updateMessage } = useChats();
+  const { client } = useStomp();
 
   const chat = useMemo(() => {
     if (!chatId) return null;
@@ -46,6 +49,8 @@ export default function ChatPage() {
   const [editingContent, setEditingContent] = useState('');
   const [replyingToMessageId, setReplyingToMessageId] = useState(null);
   const [replyingToMessage, setReplyingToMessage] = useState(null);
+  const [pinnedMessages, setPinnedMessages] = useState([]);
+  const [viewedPinnedMessageId, setViewedPinnedMessageId] = useState(null);
 
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
@@ -116,6 +121,7 @@ export default function ChatPage() {
         setLoading(false);
       }
       loadMessages(0);
+      loadPinnedMessages();
     }
     
     // Устанавливаем готовность кнопки после загрузки страницы и применения стилей
@@ -366,6 +372,142 @@ export default function ChatPage() {
     }
   }, [connected, chatId, syncQueue]);
 
+  // Подписка на WebSocket события закрепления/открепления
+  const pinnedSubRef = useRef(null);
+  const unpinnedSubRef = useRef(null);
+
+  useEffect(() => {
+    if (!chatId || !client || !connected || !client.connected || !client.active) {
+      if (pinnedSubRef.current) {
+        safeUnsubscribe(pinnedSubRef.current);
+        pinnedSubRef.current = null;
+      }
+      if (unpinnedSubRef.current) {
+        safeUnsubscribe(unpinnedSubRef.current);
+        unpinnedSubRef.current = null;
+      }
+      return;
+    }
+
+    if (pinnedSubRef.current) {
+      safeUnsubscribe(pinnedSubRef.current);
+      pinnedSubRef.current = null;
+    }
+    if (unpinnedSubRef.current) {
+      safeUnsubscribe(unpinnedSubRef.current);
+      unpinnedSubRef.current = null;
+    }
+
+    try {
+      console.log('Subscribing to pinned messages for chat:', chatId);
+      const pinnedSub = client.subscribe(`/topic/chat/${chatId}/pinned`, (message) => {
+        const event = safeJsonParse(message.body);
+        console.log('MESSAGE_PINNED event received:', event); // Для отладки
+        if (!event || event.eventType !== 'MESSAGE_PINNED') {
+          console.log('Event is not MESSAGE_PINNED or missing eventType');
+          return;
+        }
+        if (!event.pinnedMessage) {
+          console.log('Event missing pinnedMessage');
+          return;
+        }
+        
+        // Проверяем chatId из pinnedMessage (согласно инструкции)
+        const eventChatId = event.pinnedMessage.chatId;
+        if (Number(eventChatId) !== Number(chatId)) {
+          console.log('ChatId mismatch:', eventChatId, 'vs', chatId);
+          return;
+        }
+
+        // Согласно инструкции: pinnedMessage содержит message (полная информация о сообщении)
+        const pinnedMsg = event.pinnedMessage.message;
+        if (pinnedMsg?.id) {
+          // Обновляем сообщение в списке сообщений, чтобы показать индикатор закрепления
+          updateMessage({ ...pinnedMsg, isPinned: true }, { unreadDelta: 0 });
+        }
+
+        setPinnedMessages(prev => {
+          // Проверяем, нет ли уже такого сообщения (по message.id)
+          const pinnedMsgId = pinnedMsg?.id;
+          if (!pinnedMsgId) return prev;
+          
+          const exists = prev.some(p => {
+            const pMsgId = p.message?.id;
+            return pMsgId && Number(pMsgId) === Number(pinnedMsgId);
+          });
+          
+          if (exists) {
+            // Обновляем существующее закрепленное сообщение
+            return prev.map(p => {
+              const pMsgId = p.message?.id;
+              if (pMsgId && Number(pMsgId) === Number(pinnedMsgId)) {
+                return event.pinnedMessage;
+              }
+              return p;
+            }).sort((a, b) => (b.orderIndex || 0) - (a.orderIndex || 0));
+          }
+          
+          // Добавляем новое закрепленное сообщение и сортируем по orderIndex DESC
+          const updated = [...prev, event.pinnedMessage];
+          return updated.sort((a, b) => (b.orderIndex || 0) - (a.orderIndex || 0));
+        });
+      });
+      pinnedSubRef.current = pinnedSub;
+      console.log('Successfully subscribed to pinned messages');
+
+      const unpinnedSub = client.subscribe(`/topic/chat/${chatId}/unpinned`, (message) => {
+        const event = safeJsonParse(message.body);
+        console.log('MESSAGE_UNPINNED event received:', event); // Для отладки
+        if (!event || event.eventType !== 'MESSAGE_UNPINNED') {
+          console.log('Event is not MESSAGE_UNPINNED or missing eventType');
+          return;
+        }
+        if (Number(event.chatId) !== Number(chatId)) {
+          console.log('ChatId mismatch:', event.chatId, 'vs', chatId);
+          return;
+        }
+
+        // Обновляем сообщение в списке сообщений, чтобы убрать индикатор закрепления
+        if (event.messageId) {
+          // Находим сообщение в списке и обновляем его
+          const messageToUpdate = messages.find(m => Number(m.id) === Number(event.messageId));
+          if (messageToUpdate) {
+            updateMessage({ ...messageToUpdate, isPinned: false }, { unreadDelta: 0 });
+          }
+        }
+
+        // Согласно инструкции: event содержит messageId
+        setPinnedMessages(prev => prev.filter(p => {
+          const pMsgId = p.message?.id;
+          return !pMsgId || Number(pMsgId) !== Number(event.messageId);
+        }));
+
+        // Сбрасываем просмотренное сообщение, если оно было откреплено
+        setViewedPinnedMessageId(prev => {
+          if (prev && Number(prev) === Number(event.messageId)) {
+            return null;
+          }
+          return prev;
+        });
+      });
+      unpinnedSubRef.current = unpinnedSub;
+      console.log('Successfully subscribed to unpinned messages');
+    } catch (e) {
+      console.error('Error subscribing to pinned messages:', e);
+    }
+
+    return () => {
+      if (pinnedSubRef.current) {
+        safeUnsubscribe(pinnedSubRef.current);
+        pinnedSubRef.current = null;
+      }
+      if (unpinnedSubRef.current) {
+        safeUnsubscribe(unpinnedSubRef.current);
+        unpinnedSubRef.current = null;
+      }
+    };
+  }, [chatId, client, connected, updateMessage, messages]);
+
   const handleContextMenu = useCallback((e, message) => {
     e.preventDefault();
     e.stopPropagation();
@@ -512,10 +654,95 @@ export default function ChatPage() {
     setReplyingToMessage(null);
   }, []);
 
-  const handlePinMessage = useCallback((message) => {
-    // TODO: Реализовать закрепление сообщения
+  const loadPinnedMessages = useCallback(async () => {
+    if (!chatId) return;
+    try {
+      const pinned = await chatAPI.getPinnedMessages(chatId);
+      // Сортируем по orderIndex DESC (последние закрепленные первыми)
+      const sorted = Array.isArray(pinned) 
+        ? [...pinned].sort((a, b) => (b.orderIndex || 0) - (a.orderIndex || 0))
+        : [];
+      setPinnedMessages(sorted);
+      // Сбрасываем просмотренное сообщение при загрузке новых закрепленных
+      setViewedPinnedMessageId(null);
+    } catch (error) {
+      console.error('Error loading pinned messages:', error);
+    }
+  }, [chatId]);
+
+  const handlePinMessage = useCallback(async (message) => {
+    if (!message?.id || !chatId) return;
     setContextMenu(null);
-  }, []);
+    
+    const isCurrentlyPinned = pinnedMessages.some(p => {
+      const pinnedMsgId = p.message?.id || p.id;
+      return Number(pinnedMsgId) === Number(message.id);
+    });
+    
+    try {
+      if (isCurrentlyPinned) {
+        // Оптимистичное обновление: сразу убираем из списка закрепленных
+        setPinnedMessages(prev => prev.filter(p => {
+          const pMsgId = p.message?.id || p.id;
+          return Number(pMsgId) !== Number(message.id);
+        }));
+        // Обновляем сообщение в списке
+        updateMessage({ ...message, isPinned: false }, { unreadDelta: 0 });
+        
+        await chatAPI.unpinMessage(chatId, message.id);
+      } else {
+        // Оптимистичное обновление: сразу добавляем в список закрепленных
+        const optimisticPinned = {
+          id: `temp-${Date.now()}`,
+          message: message,
+          orderIndex: pinnedMessages.length > 0 ? (pinnedMessages[0].orderIndex || 0) + 1 : 1,
+        };
+        setPinnedMessages(prev => [optimisticPinned, ...prev].sort((a, b) => (b.orderIndex || 0) - (a.orderIndex || 0)));
+        // Обновляем сообщение в списке
+        updateMessage({ ...message, isPinned: true }, { unreadDelta: 0 });
+        
+        await chatAPI.pinMessage(chatId, message.id);
+      }
+      // WebSocket событие подтвердит и обновит данные
+    } catch (error) {
+      console.error('Error pinning/unpinning message:', error);
+      // Откатываем оптимистичное обновление при ошибке
+      loadPinnedMessages();
+      alert(`Не удалось ${isCurrentlyPinned ? 'открепить' : 'закрепить'} сообщение`);
+    }
+  }, [chatId, pinnedMessages, updateMessage, loadPinnedMessages]);
+
+  const handleUnpinMessage = useCallback(async (pinnedMessage) => {
+    if (!pinnedMessage?.message?.id || !chatId) return;
+    const messageId = pinnedMessage.message.id;
+    
+    try {
+      // Оптимистичное обновление: сразу убираем из списка закрепленных
+      setPinnedMessages(prev => prev.filter(p => {
+        const pMsgId = p.message?.id || p.id;
+        return Number(pMsgId) !== Number(messageId);
+      }));
+      
+      // Сбрасываем просмотренное сообщение, если оно было откреплено
+      if (viewedPinnedMessageId && Number(viewedPinnedMessageId) === Number(messageId)) {
+        setViewedPinnedMessageId(null);
+      }
+      
+      // Обновляем сообщение в списке сообщений
+      const messageToUpdate = messages.find(m => Number(m.id) === Number(messageId));
+      if (messageToUpdate) {
+        updateMessage({ ...messageToUpdate, isPinned: false }, { unreadDelta: 0 });
+      }
+      
+      await chatAPI.unpinMessage(chatId, messageId);
+      // WebSocket событие подтвердит и обновит данные
+    } catch (error) {
+      console.error('Error unpinning message:', error);
+      // Откатываем оптимистичное обновление при ошибке
+      loadPinnedMessages();
+      alert('Не удалось открепить сообщение');
+    }
+  }, [chatId, messages, updateMessage, loadPinnedMessages, viewedPinnedMessageId]);
 
   const handleForwardMessage = useCallback((message) => {
     // TODO: Реализовать пересылку сообщения
@@ -1066,6 +1293,87 @@ export default function ChatPage() {
           </div>
         </div>
 
+        {pinnedMessages.length > 0 && (() => {
+          // Определяем, какое закрепленное сообщение показывать
+          // Если есть просмотренное сообщение, показываем следующее после него
+          // Иначе показываем первое (последнее закрепленное)
+          let messageToShow = null;
+          if (viewedPinnedMessageId) {
+            // Находим индекс просмотренного сообщения
+            const viewedIndex = pinnedMessages.findIndex(p => {
+              const msgId = p.message?.id || p.id;
+              return Number(msgId) === Number(viewedPinnedMessageId);
+            });
+            // Показываем следующее сообщение после просмотренного
+            if (viewedIndex >= 0 && viewedIndex < pinnedMessages.length - 1) {
+              messageToShow = pinnedMessages[viewedIndex + 1];
+            } else {
+              // Если это было последнее сообщение, показываем первое
+              messageToShow = pinnedMessages[0];
+            }
+          } else {
+            // Показываем первое (последнее закрепленное)
+            messageToShow = pinnedMessages[0];
+          }
+
+          if (!messageToShow) return null;
+
+          const msg = messageToShow.message || messageToShow;
+          return (
+            <div className={styles.pinnedMessagesContainer}>
+              <div
+                key={messageToShow.id || msg.id}
+                className={styles.pinnedMessage}
+                onClick={async () => {
+                  // Прокручиваем к сообщению
+                  const targetMessage = document.querySelector(`[data-message-id="${msg.id}"]`);
+                  if (targetMessage) {
+                    targetMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    // Подсвечиваем сообщение
+                    targetMessage.classList.add(styles.messageHighlight);
+                    setTimeout(() => {
+                      targetMessage.classList.remove(styles.messageHighlight);
+                    }, 2000);
+                    // Устанавливаем это сообщение как просмотренное
+                    setViewedPinnedMessageId(msg.id);
+                  } else {
+                    // Если сообщение не найдено, загружаем его
+                    try {
+                      const fullMessage = await chatAPI.getMessage(chatId, msg.id);
+                      // Прокручиваем к началу чата и загружаем сообщения
+                      messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+                      // Сообщение будет загружено через loadMessages
+                      setViewedPinnedMessageId(msg.id);
+                    } catch (error) {
+                      console.error('Failed to load message:', error);
+                    }
+                  }
+                }}
+              >
+                <div className={styles.pinnedMessageLine} />
+                <div className={styles.pinnedMessageContent}>
+                  <div className={styles.pinnedMessageHeader}>
+                    <span className={styles.pinnedMessageLabel}>Закреплённое сообщение</span>
+                    <button
+                      className={styles.pinnedMessageUnpin}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUnpinMessage(messageToShow);
+                      }}
+                      title="Открепить"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <div className={styles.pinnedMessageText}>
+                    {msg.content || (msg.type === 'VOICE' ? '🎤 Голосовое сообщение' : '')}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
       <div
         ref={messagesContainerRef}
         className={styles.messagesContainer}
@@ -1097,7 +1405,7 @@ export default function ChatPage() {
                   </div>
                 )}
                 <div
-                  className={`${styles.message} ${isOwn ? styles.ownMessage : ''}`}
+                  className={`${styles.message} ${isOwn ? styles.ownMessage : ''} ${msg.pinned ? styles.messagePinned : ''}`}
                   onContextMenu={(e) => handleContextMenu(e, msg)}
                   data-message-id={msg.id}
                 >
@@ -1172,6 +1480,15 @@ export default function ChatPage() {
                             {msg.content}
                           </div>
                           <div className={styles.messageTextMeta}>
+                            {(() => {
+                              const isPinned = pinnedMessages.some(p => {
+                                const pinnedMsgId = p.message?.id || p.id;
+                                return Number(pinnedMsgId) === Number(msg.id);
+                              });
+                              return isPinned ? (
+                                <Pin size={12} className={styles.messagePinnedIcon} title="Закреплено" />
+                              ) : null;
+                            })()}
                             <span className={styles.messageTime}>
                               {formatChatTime(msg.createdAt)}
                             </span>
@@ -1568,6 +1885,10 @@ export default function ChatPage() {
           message={contextMenu.message}
           position={contextMenu.position}
           isOwn={contextMenu.message.senderId === user?.id}
+          isPinned={pinnedMessages.some(p => {
+            const pinnedMsgId = p.message?.id || p.id;
+            return Number(pinnedMsgId) === Number(contextMenu.message.id);
+          })}
           onClose={handleCloseContextMenu}
           onReply={() => handleReplyMessage(contextMenu.message)}
           onPin={() => handlePinMessage(contextMenu.message)}

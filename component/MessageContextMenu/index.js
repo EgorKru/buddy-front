@@ -1,11 +1,12 @@
 import { useEffect, useRef } from 'react';
-import { Reply, Pin, Copy, Forward, Trash2, CheckCircle2, Edit } from 'lucide-react';
+import { Reply, Pin, PinOff, Copy, Forward, Trash2, CheckCircle2, Edit } from 'lucide-react';
 import styles from './index.module.css';
 
 export default function MessageContextMenu({ 
   message, 
   position, 
   isOwn, 
+  isPinned = false,
   onClose, 
   onReply, 
   onPin, 
@@ -79,7 +80,7 @@ export default function MessageContextMenu({
 
   const menuItems = [
     { icon: Reply, label: 'Ответить', onClick: onReply, show: true },
-    { icon: Pin, label: 'Закрепить', onClick: onPin, show: true },
+    { icon: isPinned ? PinOff : Pin, label: isPinned ? 'Открепить' : 'Закрепить', onClick: onPin, show: true },
     { icon: Copy, label: 'Копировать текст', onClick: onCopy, show: message.type === 'TEXT' },
     { icon: Forward, label: 'Переслать', onClick: onForward, show: true },
     { icon: Edit, label: 'Редактировать', onClick: onEdit, show: isOwn && message.type === 'TEXT' && !message.isOptimistic },

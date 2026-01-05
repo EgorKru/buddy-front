@@ -209,6 +209,22 @@ export const chatAPI = {
       method: 'DELETE',
     });
   },
+
+  getPinnedMessages: async (chatId) => {
+    return apiRequest(`/chats/${chatId}/pinned-messages`);
+  },
+
+  pinMessage: async (chatId, messageId) => {
+    return apiRequest(`/chats/${chatId}/messages/${messageId}/pin`, {
+      method: 'POST',
+    });
+  },
+
+  unpinMessage: async (chatId, messageId) => {
+    return apiRequest(`/chats/${chatId}/messages/${messageId}/pin`, {
+      method: 'DELETE',
+    });
+  },
 };
 
 export const userAPI = {
