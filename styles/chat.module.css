@@ -602,8 +602,8 @@
 .messageForm {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  padding: 1rem;
+  gap: 0;
+  padding: 0;
   background: white;
   border-top: 1px solid #e0e0e0;
   flex-shrink: 0;
@@ -614,6 +614,7 @@
   display: flex;
   gap: 0.5rem;
   align-items: flex-end;
+  padding: 1rem;
 }
 
 .editIndicator {
@@ -693,37 +694,29 @@
 }
 
 .replyIndicator {
-  position: absolute;
-  top: -32px;
-  left: 0;
-  right: 0;
   display: flex;
   align-items: flex-start;
-  gap: 6px;
-  padding: 6px 10px;
+  gap: 8px;
+  padding: 8px 12px;
   background: white;
   color: #60a5fa;
-  border-radius: 6px;
   font-size: 0.75rem;
   font-weight: 400;
-  z-index: 10;
-  animation: slideDown 0.2s ease-out;
-  border: 1px solid #bfdbfe;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  border-bottom: 1px solid #e0e0e0;
 }
 
 .replyIndicator svg:first-child {
   flex-shrink: 0;
   color: #60a5fa;
-  width: 14px;
-  height: 14px;
-  margin-top: 1px;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
 }
 
 .replyIndicatorContent {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -732,13 +725,13 @@
 .replyIndicatorAuthor {
   font-weight: 500;
   color: #60a5fa;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   line-height: 1.2;
 }
 
 .replyIndicatorText {
   color: #000000;
-  font-size: 0.7rem;
+  font-size: 0.875rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -774,8 +767,6 @@
 }
 
 .messageReply {
-  display: flex;
-  gap: 6px;
   padding: 6px 8px;
   margin-bottom: 6px;
   background: rgba(0, 0, 0, 0.03);
@@ -789,15 +780,7 @@
   background: rgba(0, 0, 0, 0.05);
 }
 
-.messageReplyLine {
-  width: 3px;
-  background: #60a5fa;
-  border-radius: 2px;
-  flex-shrink: 0;
-}
-
 .messageReplyContent {
-  flex: 1;
   min-width: 0;
   overflow: hidden;
 }

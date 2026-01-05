@@ -1157,7 +1157,6 @@ export default function ChatPage() {
                               }
                             }}
                           >
-                            <div className={styles.messageReplyLine} />
                             <div className={styles.messageReplyContent}>
                               <div className={styles.messageReplyAuthor}>
                                 {msg.replyTo.senderDisplayName || msg.replyTo.senderUsername}
