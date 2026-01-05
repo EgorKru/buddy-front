@@ -452,7 +452,8 @@
 }
 
 .messageContent {
-  max-width: 70%;
+  max-width: 65%;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
@@ -492,10 +493,18 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
+.messageEdited {
+  font-size: 0.7rem;
+  color: #9ca3af;
+  font-style: italic;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  opacity: 0.8;
+}
+
 .messageText {
   background: #f5f7fa;
-  padding: 0.75rem 1rem;
-  border-radius: 1rem;
+  padding: 0.625rem 0.875rem;
+  border-radius: 0.75rem;
   word-wrap: break-word;
   word-break: break-word;
   overflow-wrap: break-word;
@@ -506,6 +515,15 @@
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.messageTextContentWrapper {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .messageTextContent {
@@ -513,15 +531,17 @@
   word-wrap: break-word;
   word-break: break-word;
   overflow-wrap: break-word;
+  flex: 1;
+  min-width: 0;
 }
 
-.messageTextFooter {
+.messageTextMeta {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 0.35rem;
-  margin-top: 0.15rem;
+  gap: 0.25rem;
+  flex-shrink: 0;
   align-self: flex-end;
+  margin-bottom: -2px;
 }
 
 @media (max-width: 768px) {
@@ -581,11 +601,239 @@
 
 .messageForm {
   display: flex;
+  flex-direction: column;
   gap: 0.5rem;
   padding: 1rem;
   background: white;
   border-top: 1px solid #e0e0e0;
   flex-shrink: 0;
+  position: relative;
+}
+
+.messageFormRow {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+
+.editIndicator {
+  position: absolute;
+  top: -32px;
+  left: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: white;
+  color: #60a5fa;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 400;
+  z-index: 10;
+  animation: slideDown 0.2s ease-out;
+  white-space: nowrap;
+  border: 1px solid #bfdbfe;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.editIndicator svg:first-child {
+  flex-shrink: 0;
+  color: #60a5fa;
+  width: 14px;
+  height: 14px;
+}
+
+.editIndicator span {
+  margin-right: 0;
+  color: #60a5fa;
+}
+
+.cancelEditButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
+  border-radius: 50%;
+  padding: 0;
+  margin-left: auto;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.cancelEditButton svg {
+  width: 14px;
+  height: 14px;
+}
+
+.cancelEditButton:hover {
+  opacity: 1;
+  background: rgba(156, 163, 175, 0.1);
+  transform: scale(1.05);
+}
+
+.cancelEditButton:active {
+  transform: scale(0.95);
+}
+
+.replyIndicator {
+  position: absolute;
+  top: -32px;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 6px 10px;
+  background: white;
+  color: #60a5fa;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 400;
+  z-index: 10;
+  animation: slideDown 0.2s ease-out;
+  border: 1px solid #bfdbfe;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.replyIndicator svg:first-child {
+  flex-shrink: 0;
+  color: #60a5fa;
+  width: 14px;
+  height: 14px;
+  margin-top: 1px;
+}
+
+.replyIndicatorContent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.replyIndicatorAuthor {
+  font-weight: 500;
+  color: #60a5fa;
+  font-size: 0.7rem;
+  line-height: 1.2;
+}
+
+.replyIndicatorText {
+  color: #000000;
+  font-size: 0.7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+.cancelReplyButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
+  border-radius: 50%;
+  padding: 0;
+  margin-left: 4px;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.cancelReplyButton:hover {
+  opacity: 1;
+  background: rgba(156, 163, 175, 0.1);
+  transform: scale(1.05);
+}
+
+.cancelReplyButton:active {
+  transform: scale(0.95);
+}
+
+.messageReply {
+  display: flex;
+  gap: 6px;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  background: rgba(0, 0, 0, 0.03);
+  border-left: 3px solid #60a5fa;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.messageReply:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.messageReplyLine {
+  width: 3px;
+  background: #60a5fa;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.messageReplyContent {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.messageReplyAuthor {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #60a5fa;
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.messageReplyText {
+  font-size: 0.7rem;
+  color: #6b7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  line-height: 1.3;
+}
+
+.messageHighlight {
+  animation: highlightMessage 2s ease-out;
+}
+
+@keyframes highlightMessage {
+  0% {
+    background-color: rgba(96, 165, 250, 0.3);
+  }
+  100% {
+    background-color: transparent;
+  }
 }
 
 @media (max-width: 768px) {

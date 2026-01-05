@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
-import { Send, Loader2, Menu, Check, CheckCheck, AlertCircle, Clock, ArrowLeft, Mic, X, ChevronDown, Pause, Play, Lock, Unlock, Trash2 } from 'lucide-react';
+import { Send, Loader2, Menu, Check, CheckCheck, AlertCircle, Clock, ArrowLeft, Mic, X, ChevronDown, Pause, Play, Lock, Unlock, Trash2, Edit, Reply } from 'lucide-react';
 import { chatAPI, getCurrentUser, isAuthenticated } from '@/utils/api';
 import { getChatName } from '@/utils/chatHelpers';
 import { formatChatDate, formatChatTime, getOnlineStatus } from '@/utils/dateHelpers';
@@ -9,6 +9,7 @@ import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import { MESSAGE_STATUS } from '@/utils/messageQueue';
 import ChatSidebar from '@/component/ChatSidebar';
 import VoiceMessagePlayer from '@/component/VoiceMessagePlayer';
+import MessageContextMenu from '@/component/MessageContextMenu';
 import styles from '@/styles/chat.module.css';
 import { useChats, useChatMessages } from '@/context/messaging';
 import { useChatRealtime } from '@/hooks/useChatRealtime';
@@ -28,7 +29,7 @@ export default function ChatPage() {
   const router = useRouter();
   const { chatId } = router.query;
   const user = getCurrentUser();
-  const { connected, readAtByChatIdByUserId, replaceOptimistic, addOptimistic, chats, refreshChats } = useChats();
+  const { connected, readAtByChatIdByUserId, replaceOptimistic, addOptimistic, chats, refreshChats, upsertMessage, updateMessage } = useChats();
 
   const chat = useMemo(() => {
     if (!chatId) return null;
@@ -40,6 +41,11 @@ export default function ChatPage() {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [contextMenu, setContextMenu] = useState(null);
+  const [editingMessageId, setEditingMessageId] = useState(null);
+  const [editingContent, setEditingContent] = useState('');
+  const [replyingToMessageId, setReplyingToMessageId] = useState(null);
+  const [replyingToMessage, setReplyingToMessage] = useState(null);
 
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
@@ -360,9 +366,176 @@ export default function ChatPage() {
     }
   }, [connected, chatId, syncQueue]);
 
+  const handleContextMenu = useCallback((e, message) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({
+      message,
+      position: { x: e.clientX, y: e.clientY }
+    });
+  }, []);
+
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
+  const handleCopyMessage = useCallback(async (message) => {
+    if (!message?.content) return;
+    
+    const textToCopy = message.content;
+    
+    try {
+      // Пробуем использовать современный Clipboard API
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(textToCopy);
+        // Можно добавить уведомление об успешном копировании
+        if (typeof window !== 'undefined') {
+          // Визуальная обратная связь (опционально)
+          const notification = document.createElement('div');
+          notification.textContent = 'Текст скопирован';
+          notification.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #10b981; color: white; padding: 12px 20px; border-radius: 8px; z-index: 10000; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
+          document.body.appendChild(notification);
+          setTimeout(() => {
+            notification.style.opacity = '0';
+            notification.style.transition = 'opacity 0.3s';
+            setTimeout(() => document.body.removeChild(notification), 300);
+          }, 2000);
+        }
+      } else {
+        // Fallback для старых браузеров
+        const textArea = document.createElement('textarea');
+        textArea.value = textToCopy;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.select();
+        textArea.setSelectionRange(0, 99999); // Для мобильных устройств
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+    } catch (err) {
+      console.error('Failed to copy text:', err);
+      // В случае ошибки можно показать сообщение пользователю
+      alert('Не удалось скопировать текст');
+    }
+  }, []);
+
+  const handleDeleteMessage = useCallback(async (message) => {
+    if (!message?.id || !chatId) return;
+    if (!confirm('Вы уверены, что хотите удалить это сообщение?')) return;
+    
+    try {
+      await chatAPI.deleteMessage(chatId, message.id);
+      // Сообщение будет удалено через WebSocket событие от бэка
+    } catch (error) {
+      console.error('Error deleting message:', error);
+      alert('Не удалось удалить сообщение');
+    }
+  }, [chatId]);
+
+  const handleEditMessage = useCallback((message) => {
+    setEditingMessageId(message.id);
+    setEditingContent(message.content || '');
+    setContextMenu(null);
+    // Фокусируемся на поле ввода
+    setTimeout(() => {
+      messageInputRef.current?.focus();
+    }, 100);
+  }, []);
+
+  const handleSaveEdit = useCallback(async () => {
+    if (!editingMessageId || !chatId || !editingContent.trim()) {
+      setEditingMessageId(null);
+      setEditingContent('');
+      return;
+    }
+
+    // Находим текущее сообщение в списке
+    const currentMessage = messages.find(m => String(m.id) === String(editingMessageId));
+    
+    // Проверяем, изменился ли текст
+    const originalContent = currentMessage?.content?.trim() || '';
+    const newContent = editingContent.trim();
+    
+    if (originalContent === newContent) {
+      // Текст не изменился, просто закрываем режим редактирования
+      setEditingMessageId(null);
+      setEditingContent('');
+      setNewMessage('');
+      return;
+    }
+
+    try {
+      const editedMessage = await chatAPI.editMessage(chatId, editingMessageId, newContent);
+      
+      if (currentMessage) {
+        // Обновляем сообщение локально с новым содержимым и флагом edited
+        const updatedMessage = {
+          ...currentMessage,
+          content: newContent,
+          edited: true,
+          editedAt: editedMessage?.editedAt || new Date().toISOString(),
+        };
+        
+        // Обновляем сообщение через updateMessage (для существующих сообщений)
+        updateMessage(updatedMessage, { unreadDelta: 0 });
+      }
+      
+      setEditingMessageId(null);
+      setEditingContent('');
+      setNewMessage('');
+    } catch (error) {
+      console.error('Error editing message:', error);
+      alert('Не удалось отредактировать сообщение');
+    }
+  }, [editingMessageId, chatId, editingContent, messages, updateMessage]);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingMessageId(null);
+    setEditingContent('');
+    setNewMessage('');
+  }, []);
+
+  const handleReplyMessage = useCallback((message) => {
+    if (!message?.id) return;
+    setReplyingToMessageId(message.id);
+    setReplyingToMessage(message);
+    setContextMenu(null);
+    // Фокусируемся на поле ввода
+    setTimeout(() => {
+      messageInputRef.current?.focus();
+    }, 100);
+  }, []);
+
+  const handleCancelReply = useCallback(() => {
+    setReplyingToMessageId(null);
+    setReplyingToMessage(null);
+  }, []);
+
+  const handlePinMessage = useCallback((message) => {
+    // TODO: Реализовать закрепление сообщения
+    setContextMenu(null);
+  }, []);
+
+  const handleForwardMessage = useCallback((message) => {
+    // TODO: Реализовать пересылку сообщения
+    setContextMenu(null);
+  }, []);
+
+  const handleSelectMessage = useCallback((message) => {
+    // TODO: Реализовать выделение сообщения
+    setContextMenu(null);
+  }, []);
+
   const sendMessage = async (e) => {
     e.preventDefault();
     e.stopPropagation();
+    
+    // Если редактируем сообщение
+    if (editingMessageId) {
+      await handleSaveEdit();
+      return;
+    }
     
     if (!newMessage.trim() || !user || sending) return;
 
@@ -379,9 +552,12 @@ export default function ChatPage() {
     // Сохраняем позицию перед отправкой
     saveScrollPosition();
     
+    const replyToId = replyingToMessageId;
     setNewMessage('');
+    setReplyingToMessageId(null);
+    setReplyingToMessage(null);
 
-    const result = await sendMessageHook(messageContent, 'TEXT');
+    const result = await sendMessageHook(messageContent, 'TEXT', null, null, null, null, replyToId);
 
     if (result?.serverMessage) {
       addOptimistic(chatId, { ...result.serverMessage, status: MESSAGE_STATUS.SENT, isOptimistic: false });
@@ -397,8 +573,16 @@ export default function ChatPage() {
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
       e.preventDefault();
-      if (!sending && !isRecording && newMessage.trim()) {
-        sendMessage(e);
+      if (editingMessageId) {
+        // Для редактирования проверяем editingContent
+        if (!sending && !isRecording && editingContent.trim()) {
+          handleSaveEdit();
+        }
+      } else {
+        // Для нового сообщения проверяем newMessage
+        if (!sending && !isRecording && newMessage.trim()) {
+          sendMessage(e);
+        }
       }
     }
   };
@@ -914,6 +1098,8 @@ export default function ChatPage() {
                 )}
                 <div
                   className={`${styles.message} ${isOwn ? styles.ownMessage : ''}`}
+                  onContextMenu={(e) => handleContextMenu(e, msg)}
+                  data-message-id={msg.id}
                 >
                   {!isOwn && (
                     <div className={styles.messageAvatar}>
@@ -944,25 +1130,70 @@ export default function ChatPage() {
                       })()
                     ) : (
                       <div className={`${styles.messageText} ${msg.isOptimistic ? styles.messagePending : ''} ${msg.status === MESSAGE_STATUS.FAILED ? styles.messageFailed : ''}`}>
-                        <div className={styles.messageTextContent}>
-                          {msg.content}
-                        </div>
-                        <div className={styles.messageTextFooter}>
-                          <span className={styles.messageTime}>
-                            {formatChatTime(msg.createdAt)}
-                          </span>
-                          {isOwn && (() => {
-                            const status = msg.status || (msg.isOptimistic ? MESSAGE_STATUS.SENDING : MESSAGE_STATUS.SENT);
-                            const readMeta = status === MESSAGE_STATUS.SENT ? getReadMetaForMessage(msg) : null;
-                            const title = readMeta?.readCount
-                              ? (readMeta.totalOthers > 1 ? `Прочитали ${readMeta.readCount}/${readMeta.totalOthers}` : 'Прочитано')
-                              : 'Отправлено';
-                            return (
-                              <span title={title}>
-                                {getMessageStatusIcon(status, readMeta)}
+                        {msg.replyTo && (
+                          <div 
+                            className={styles.messageReply}
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              // Прокручиваем к сообщению
+                              const targetMessage = document.querySelector(`[data-message-id="${msg.replyTo.id}"]`);
+                              if (targetMessage) {
+                                targetMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                // Подсвечиваем сообщение
+                                targetMessage.classList.add(styles.messageHighlight);
+                                setTimeout(() => {
+                                  targetMessage.classList.remove(styles.messageHighlight);
+                                }, 2000);
+                              } else {
+                                // Если сообщение не найдено, загружаем его
+                                try {
+                                  const fullMessage = await chatAPI.getMessage(chatId, msg.replyTo.id);
+                                  // Прокручиваем к началу чата и загружаем сообщения
+                                  messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+                                  // Сообщение будет загружено через loadMessages
+                                } catch (error) {
+                                  console.error('Failed to load message:', error);
+                                }
+                              }
+                            }}
+                          >
+                            <div className={styles.messageReplyLine} />
+                            <div className={styles.messageReplyContent}>
+                              <div className={styles.messageReplyAuthor}>
+                                {msg.replyTo.senderDisplayName || msg.replyTo.senderUsername}
+                              </div>
+                              <div className={styles.messageReplyText}>
+                                {msg.replyTo.content || (msg.replyTo.type === 'VOICE' ? '🎤 Голосовое сообщение' : '')}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        <div className={styles.messageTextContentWrapper}>
+                          <div className={styles.messageTextContent}>
+                            {msg.content}
+                          </div>
+                          <div className={styles.messageTextMeta}>
+                            <span className={styles.messageTime}>
+                              {formatChatTime(msg.createdAt)}
+                            </span>
+                            {msg.edited && (
+                              <span className={styles.messageEdited} title={msg.editedAt ? `Отредактировано ${formatChatTime(msg.editedAt)}` : 'Отредактировано'}>
+                                (ред.)
                               </span>
-                            );
-                          })()}
+                            )}
+                            {isOwn && (() => {
+                              const status = msg.status || (msg.isOptimistic ? MESSAGE_STATUS.SENDING : MESSAGE_STATUS.SENT);
+                              const readMeta = status === MESSAGE_STATUS.SENT ? getReadMetaForMessage(msg) : null;
+                              const title = readMeta?.readCount
+                                ? (readMeta.totalOthers > 1 ? `Прочитали ${readMeta.readCount}/${readMeta.totalOthers}` : 'Прочитано')
+                                : 'Отправлено';
+                              return (
+                                <span title={title}>
+                                  {getMessageStatusIcon(status, readMeta)}
+                                </span>
+                              );
+                            })()}
+                          </div>
                         </div>
                       </div>
                     )}
@@ -992,14 +1223,62 @@ export default function ChatPage() {
       )}
 
       <form onSubmit={sendMessage} className={styles.messageForm}>
+        {editingMessageId && (
+          <div className={styles.editIndicator}>
+            <Edit size={14} strokeWidth={1.5} />
+            <span>Редактирование</span>
+            <button
+              type="button"
+              onClick={handleCancelEdit}
+              className={styles.cancelEditButton}
+              title="Отменить редактирование"
+            >
+              <X size={14} strokeWidth={2} />
+            </button>
+          </div>
+        )}
+        {replyingToMessage && (
+          <div className={styles.replyIndicator}>
+            <Reply size={16} strokeWidth={1.5} />
+            <div className={styles.replyIndicatorContent}>
+              <div className={styles.replyIndicatorAuthor}>
+                В ответ {replyingToMessage.senderDisplayName || replyingToMessage.senderUsername}
+              </div>
+              <div className={styles.replyIndicatorText}>
+                {replyingToMessage.content || (replyingToMessage.type === 'VOICE' ? '🎤 Голосовое сообщение' : '')}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleCancelReply}
+              className={styles.cancelReplyButton}
+              title="Отменить ответ"
+            >
+              <X size={14} strokeWidth={2} />
+            </button>
+          </div>
+        )}
+        <div className={styles.messageFormRow}>
         <textarea
           ref={messageInputRef}
           id="chat-message-input"
           name="message"
-          value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={isRecording ? "Идет запись..." : "Введите сообщение..."}
+          value={editingMessageId ? editingContent : newMessage}
+          onChange={(e) => {
+            if (editingMessageId) {
+              setEditingContent(e.target.value);
+            } else {
+              setNewMessage(e.target.value);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (editingMessageId && e.key === 'Escape') {
+              handleCancelEdit();
+              return;
+            }
+            handleKeyDown(e);
+          }}
+          placeholder={isRecording ? "Идет запись..." : editingMessageId ? "Редактируйте сообщение..." : "Введите сообщение..."}
           disabled={sending || isRecording}
           className={styles.messageInput}
           autoComplete="off"
@@ -1008,7 +1287,7 @@ export default function ChatPage() {
           spellCheck="false"
           rows={1}
         />
-        {!newMessage.trim() && (
+        {!newMessage.trim() && !editingMessageId && (
           <>
             {!isRecording && (
               <button
@@ -1267,12 +1546,12 @@ export default function ChatPage() {
             )}
           </>
         )}
-        {newMessage.trim() && !isRecording && (
+        {(newMessage.trim() || editingMessageId) && !isRecording && (
           <button
             type="submit"
-            disabled={!newMessage.trim() || sending || isRecording}
+            disabled={(!newMessage.trim() && !editingMessageId) || (!editingContent.trim() && editingMessageId) || sending || isRecording}
             className={styles.sendButton}
-            title="Отправить сообщение"
+            title={editingMessageId ? "Сохранить изменения" : "Отправить сообщение"}
           >
             {sending ? (
               <Loader2 size={20} className={styles.spinner} />
@@ -1281,8 +1560,25 @@ export default function ChatPage() {
             )}
           </button>
         )}
+        </div>
       </form>
       </div>
+
+      {contextMenu && (
+        <MessageContextMenu
+          message={contextMenu.message}
+          position={contextMenu.position}
+          isOwn={contextMenu.message.senderId === user?.id}
+          onClose={handleCloseContextMenu}
+          onReply={() => handleReplyMessage(contextMenu.message)}
+          onPin={() => handlePinMessage(contextMenu.message)}
+          onCopy={() => handleCopyMessage(contextMenu.message)}
+          onForward={() => handleForwardMessage(contextMenu.message)}
+          onDelete={() => handleDeleteMessage(contextMenu.message)}
+          onEdit={() => handleEditMessage(contextMenu.message)}
+          onSelect={() => handleSelectMessage(contextMenu.message)}
+        />
+      )}
     </div>
   );
 }
