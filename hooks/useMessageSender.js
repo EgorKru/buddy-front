@@ -102,7 +102,7 @@ export const useMessageSender = (chatId, onMessageSent) => {
     }, delay);
   }, [chatId]);
 
-  const sendMessage = useCallback(async (content, type = 'TEXT', fileUrl = null, voiceData = null, voiceMimeType = null, duration = null) => {
+  const sendMessage = useCallback(async (content, type = 'TEXT', fileUrl = null, voiceData = null, voiceMimeType = null, duration = null, replyToMessageId = null) => {
     if (type === 'VOICE' && !fileUrl && !voiceData) return null;
     if (type !== 'VOICE' && !content.trim()) return null;
     if (sending) return null;
@@ -158,6 +158,10 @@ export const useMessageSender = (chatId, onMessageSent) => {
             payload.content = messageContent;
           }
 
+          if (replyToMessageId) {
+            payload.replyToMessageId = replyToMessageId;
+          }
+
           if (typeof window !== 'undefined') {
             console.log('[MessageSender] Publishing to /app/chat.sendMessage:', payload);
           }
@@ -184,7 +188,7 @@ export const useMessageSender = (chatId, onMessageSent) => {
         throw new Error('Voice messages can only be sent via WebSocket. WebSocket is not connected.');
       }
 
-      const serverMessage = await chatAPI.sendMessage(chatId, messageContent, type);
+      const serverMessage = await chatAPI.sendMessage(chatId, messageContent, type, null, replyToMessageId);
 
       updateMessageStatus(optimisticMessage.tempId, MESSAGE_STATUS.SENT, serverMessage);
       removeMessageFromQueue(optimisticMessage.tempId);
