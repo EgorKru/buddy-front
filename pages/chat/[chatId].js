@@ -51,6 +51,8 @@ export default function ChatPage() {
   const [replyingToMessage, setReplyingToMessage] = useState(null);
   const [pinnedMessages, setPinnedMessages] = useState([]);
   const [viewedPinnedMessageId, setViewedPinnedMessageId] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [deleteForAll, setDeleteForAll] = useState(false);
 
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
@@ -375,6 +377,9 @@ export default function ChatPage() {
   // Подписка на WebSocket события закрепления/открепления
   const pinnedSubRef = useRef(null);
   const unpinnedSubRef = useRef(null);
+  // Подписка на WebSocket события удаления сообщений
+  const deletedForMeSubRef = useRef(null);
+  const deletedForAllSubRef = useRef(null);
 
   useEffect(() => {
     if (!chatId || !client || !connected || !client.connected || !client.active) {
@@ -386,6 +391,14 @@ export default function ChatPage() {
         safeUnsubscribe(unpinnedSubRef.current);
         unpinnedSubRef.current = null;
       }
+      if (deletedForMeSubRef.current) {
+        safeUnsubscribe(deletedForMeSubRef.current);
+        deletedForMeSubRef.current = null;
+      }
+      if (deletedForAllSubRef.current) {
+        safeUnsubscribe(deletedForAllSubRef.current);
+        deletedForAllSubRef.current = null;
+      }
       return;
     }
 
@@ -396,6 +409,14 @@ export default function ChatPage() {
     if (unpinnedSubRef.current) {
       safeUnsubscribe(unpinnedSubRef.current);
       unpinnedSubRef.current = null;
+    }
+    if (deletedForMeSubRef.current) {
+      safeUnsubscribe(deletedForMeSubRef.current);
+      deletedForMeSubRef.current = null;
+    }
+    if (deletedForAllSubRef.current) {
+      safeUnsubscribe(deletedForAllSubRef.current);
+      deletedForAllSubRef.current = null;
     }
 
     try {
@@ -420,36 +441,56 @@ export default function ChatPage() {
         }
 
         // Согласно инструкции: pinnedMessage содержит message (полная информация о сообщении)
-        const pinnedMsg = event.pinnedMessage.message;
-        if (pinnedMsg?.id) {
-          // Обновляем сообщение в списке сообщений, чтобы показать индикатор закрепления
-          updateMessage({ ...pinnedMsg, isPinned: true }, { unreadDelta: 0 });
+        const pinnedMsg = event.pinnedMessage?.message;
+        const pinnedMsgId = pinnedMsg?.id;
+        
+        if (!pinnedMsgId) {
+          console.warn('MESSAGE_PINNED: missing message ID', event);
+          return;
         }
+        
+        console.log('MESSAGE_PINNED WebSocket event received:', pinnedMsgId, event);
+        
+        // Сначала обновляем сообщение в списке сообщений, чтобы показать индикатор закрепления
+        updateMessage({ ...pinnedMsg, isPinned: true }, { unreadDelta: 0 });
 
+        // Затем обновляем список закрепленных сообщений
         setPinnedMessages(prev => {
-          // Проверяем, нет ли уже такого сообщения (по message.id)
-          const pinnedMsgId = pinnedMsg?.id;
-          if (!pinnedMsgId) return prev;
-          
-          const exists = prev.some(p => {
+          console.log('Updating pinned messages list, current length:', prev.length);
+          // Проверяем, есть ли уже такое сообщение (включая временные оптимистичные)
+          // Ищем по message.id внутри pinnedMessage
+          const existingIndex = prev.findIndex(p => {
             const pMsgId = p.message?.id;
             return pMsgId && Number(pMsgId) === Number(pinnedMsgId);
           });
           
-          if (exists) {
-            // Обновляем существующее закрепленное сообщение
-            return prev.map(p => {
-              const pMsgId = p.message?.id;
-              if (pMsgId && Number(pMsgId) === Number(pinnedMsgId)) {
-                return event.pinnedMessage;
-              }
-              return p;
-            }).sort((a, b) => (b.orderIndex || 0) - (a.orderIndex || 0));
+          if (existingIndex >= 0) {
+            console.log('Replacing existing pinned message at index:', existingIndex);
+            // Заменяем существующее (включая временное оптимистичное) на реальное из сервера
+            const updated = [...prev];
+            updated[existingIndex] = event.pinnedMessage;
+            const sorted = updated.sort((a, b) => (b.orderIndex || 0) - (a.orderIndex || 0));
+            console.log('Pinned messages after replace:', sorted.length);
+            
+            // Если замененное сообщение было первым в списке, сбрасываем viewedPinnedMessageId
+            // чтобы показать обновленное сообщение
+            if (sorted[0] && sorted[0].message?.id && Number(sorted[0].message.id) === Number(pinnedMsgId)) {
+              setViewedPinnedMessageId(null);
+            }
+            
+            return sorted;
           }
           
+          console.log('Adding new pinned message to list');
           // Добавляем новое закрепленное сообщение и сортируем по orderIndex DESC
           const updated = [...prev, event.pinnedMessage];
-          return updated.sort((a, b) => (b.orderIndex || 0) - (a.orderIndex || 0));
+          const sorted = updated.sort((a, b) => (b.orderIndex || 0) - (a.orderIndex || 0));
+          console.log('Pinned messages after add:', sorted.length);
+          
+          // Сбрасываем просмотренное сообщение, чтобы показать новое закрепленное (первое в списке)
+          setViewedPinnedMessageId(null);
+          
+          return sorted;
         });
       });
       pinnedSubRef.current = pinnedSub;
@@ -492,8 +533,73 @@ export default function ChatPage() {
       });
       unpinnedSubRef.current = unpinnedSub;
       console.log('Successfully subscribed to unpinned messages');
+
+      // Подписка на удаление сообщения для себя
+      const deletedForMeSub = client.subscribe('/user/queue/message-deleted', (message) => {
+        const event = safeJsonParse(message.body);
+        console.log('MESSAGE_DELETED_FOR_ME event received:', event);
+        if (!event || event.eventType !== 'MESSAGE_DELETED_FOR_ME') return;
+        if (!event.messageId) return;
+
+        // Находим сообщение в актуальном состоянии и обновляем его
+        const messageToDelete = messages.find(m => Number(m.id) === Number(event.messageId));
+        if (messageToDelete) {
+          updateMessage({ ...messageToDelete, deletedForMe: true }, { unreadDelta: 0 });
+        }
+
+        // Убираем из списка закрепленных ТОЛЬКО удаленное сообщение
+        const deletedMessageId = Number(event.messageId);
+        setPinnedMessages(prev => prev.filter(p => {
+          const pMsgId = p.message?.id;
+          // Фильтруем только если message.id совпадает с удаленным
+          return !pMsgId || Number(pMsgId) !== deletedMessageId;
+        }));
+
+        // Сбрасываем просмотренное сообщение, если оно было удалено
+        setViewedPinnedMessageId(prev => {
+          if (prev && Number(prev) === Number(event.messageId)) {
+            return null;
+          }
+          return prev;
+        });
+      });
+      deletedForMeSubRef.current = deletedForMeSub;
+
+      // Подписка на удаление сообщения для всех
+      const deletedForAllSub = client.subscribe(`/topic/chat/${chatId}/deleted`, (message) => {
+        const event = safeJsonParse(message.body);
+        console.log('MESSAGE_DELETED_FOR_ALL event received:', event);
+        if (!event || event.eventType !== 'MESSAGE_DELETED_FOR_ALL') return;
+        if (Number(event.chatId) !== Number(chatId)) return;
+        if (!event.messageId) return;
+
+        const deletedMessageId = Number(event.messageId);
+
+        // Находим сообщение в актуальном состоянии и обновляем его
+        const messageToDelete = messages.find(m => Number(m.id) === deletedMessageId);
+        if (messageToDelete) {
+          updateMessage({ ...messageToDelete, deletedForAll: true }, { unreadDelta: 0 });
+        }
+
+        // Убираем из списка закрепленных ТОЛЬКО удаленное сообщение
+        // Важно: проверяем именно message.id внутри pinnedMessage, а не id самого pinnedMessage
+        setPinnedMessages(prev => prev.filter(p => {
+          const pMsgId = p.message?.id;
+          // Фильтруем только если message.id совпадает с удаленным
+          return !pMsgId || Number(pMsgId) !== deletedMessageId;
+        }));
+
+        // Сбрасываем просмотренное сообщение, если оно было удалено
+        setViewedPinnedMessageId(prev => {
+          if (prev && Number(prev) === deletedMessageId) {
+            return null;
+          }
+          return prev;
+        });
+      });
+      deletedForAllSubRef.current = deletedForAllSub;
     } catch (e) {
-      console.error('Error subscribing to pinned messages:', e);
+      console.error('Error subscribing to pinned/deleted messages:', e);
     }
 
     return () => {
@@ -504,6 +610,14 @@ export default function ChatPage() {
       if (unpinnedSubRef.current) {
         safeUnsubscribe(unpinnedSubRef.current);
         unpinnedSubRef.current = null;
+      }
+      if (deletedForMeSubRef.current) {
+        safeUnsubscribe(deletedForMeSubRef.current);
+        deletedForMeSubRef.current = null;
+      }
+      if (deletedForAllSubRef.current) {
+        safeUnsubscribe(deletedForAllSubRef.current);
+        deletedForAllSubRef.current = null;
       }
     };
   }, [chatId, client, connected, updateMessage, messages]);
@@ -562,18 +676,79 @@ export default function ChatPage() {
     }
   }, []);
 
-  const handleDeleteMessage = useCallback(async (message) => {
-    if (!message?.id || !chatId) return;
-    if (!confirm('Вы уверены, что хотите удалить это сообщение?')) return;
-    
+  const loadPinnedMessages = useCallback(async () => {
+    if (!chatId) return;
     try {
-      await chatAPI.deleteMessage(chatId, message.id);
-      // Сообщение будет удалено через WebSocket событие от бэка
+      const pinned = await chatAPI.getPinnedMessages(chatId);
+      // Сортируем по orderIndex DESC (последние закрепленные первыми)
+      const sorted = Array.isArray(pinned) 
+        ? [...pinned].sort((a, b) => (b.orderIndex || 0) - (a.orderIndex || 0))
+        : [];
+      setPinnedMessages(sorted);
+      // Сбрасываем просмотренное сообщение при загрузке новых закрепленных
+      setViewedPinnedMessageId(null);
     } catch (error) {
-      console.error('Error deleting message:', error);
-      alert('Не удалось удалить сообщение');
+      console.error('Error loading pinned messages:', error);
     }
   }, [chatId]);
+
+  const handleDeleteMessage = useCallback((message) => {
+    if (!message?.id || !chatId) return;
+    setContextMenu(null);
+    setDeleteConfirm({ message });
+  }, [chatId]);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!deleteConfirm?.message?.id || !chatId) return;
+    const message = deleteConfirm.message;
+    const shouldDeleteForAll = deleteForAll && message.senderId === user?.id;
+    setDeleteConfirm(null);
+    setDeleteForAll(false);
+    
+    // Оптимистичное обновление: сразу удаляем из UI
+    const messageToDelete = messages.find(m => Number(m.id) === Number(message.id));
+    if (messageToDelete) {
+      if (shouldDeleteForAll) {
+        updateMessage({ ...messageToDelete, deletedForAll: true }, { unreadDelta: 0 });
+      } else {
+        updateMessage({ ...messageToDelete, deletedForMe: true }, { unreadDelta: 0 });
+      }
+    }
+    
+    // Убираем из списка закрепленных ТОЛЬКО удаленное сообщение
+    const deletedMessageId = Number(message.id);
+    setPinnedMessages(prev => prev.filter(p => {
+      const pMsgId = p.message?.id;
+      // Фильтруем только если message.id совпадает с удаленным
+      return !pMsgId || Number(pMsgId) !== deletedMessageId;
+    }));
+    
+    // Сбрасываем просмотренное сообщение, если оно было удалено
+    if (viewedPinnedMessageId && Number(viewedPinnedMessageId) === Number(message.id)) {
+      setViewedPinnedMessageId(null);
+    }
+    
+    try {
+      if (shouldDeleteForAll) {
+        await chatAPI.deleteMessageForAll(chatId, message.id);
+      } else {
+        await chatAPI.deleteMessageForMe(chatId, message.id);
+      }
+      // WebSocket события подтвердят удаление
+    } catch (error) {
+      console.error('Error deleting message:', error);
+      // Откатываем оптимистичное обновление при ошибке
+      if (messageToDelete) {
+        if (shouldDeleteForAll) {
+          updateMessage({ ...messageToDelete, deletedForAll: false }, { unreadDelta: 0 });
+        } else {
+          updateMessage({ ...messageToDelete, deletedForMe: false }, { unreadDelta: 0 });
+        }
+      }
+      // Перезагружаем закрепленные сообщения при ошибке
+      loadPinnedMessages();
+    }
+  }, [chatId, deleteConfirm, deleteForAll, messages, updateMessage, viewedPinnedMessageId, loadPinnedMessages, user]);
 
   const handleEditMessage = useCallback((message) => {
     setEditingMessageId(message.id);
@@ -654,52 +829,65 @@ export default function ChatPage() {
     setReplyingToMessage(null);
   }, []);
 
-  const loadPinnedMessages = useCallback(async () => {
-    if (!chatId) return;
-    try {
-      const pinned = await chatAPI.getPinnedMessages(chatId);
-      // Сортируем по orderIndex DESC (последние закрепленные первыми)
-      const sorted = Array.isArray(pinned) 
-        ? [...pinned].sort((a, b) => (b.orderIndex || 0) - (a.orderIndex || 0))
-        : [];
-      setPinnedMessages(sorted);
-      // Сбрасываем просмотренное сообщение при загрузке новых закрепленных
-      setViewedPinnedMessageId(null);
-    } catch (error) {
-      console.error('Error loading pinned messages:', error);
-    }
-  }, [chatId]);
-
   const handlePinMessage = useCallback(async (message) => {
     if (!message?.id || !chatId) return;
     setContextMenu(null);
     
     const isCurrentlyPinned = pinnedMessages.some(p => {
-      const pinnedMsgId = p.message?.id || p.id;
-      return Number(pinnedMsgId) === Number(message.id);
+      const pinnedMsgId = p.message?.id;
+      return pinnedMsgId && Number(pinnedMsgId) === Number(message.id);
     });
     
     try {
       if (isCurrentlyPinned) {
         // Оптимистичное обновление: сразу убираем из списка закрепленных
+        const messageIdToUnpin = Number(message.id);
         setPinnedMessages(prev => prev.filter(p => {
-          const pMsgId = p.message?.id || p.id;
-          return Number(pMsgId) !== Number(message.id);
+          const pMsgId = p.message?.id;
+          return !pMsgId || Number(pMsgId) !== messageIdToUnpin;
         }));
         // Обновляем сообщение в списке
         updateMessage({ ...message, isPinned: false }, { unreadDelta: 0 });
         
         await chatAPI.unpinMessage(chatId, message.id);
       } else {
-        // Оптимистичное обновление: сразу добавляем в список закрепленных
-        const optimisticPinned = {
-          id: `temp-${Date.now()}`,
-          message: message,
-          orderIndex: pinnedMessages.length > 0 ? (pinnedMessages[0].orderIndex || 0) + 1 : 1,
-        };
-        setPinnedMessages(prev => [optimisticPinned, ...prev].sort((a, b) => (b.orderIndex || 0) - (a.orderIndex || 0)));
-        // Обновляем сообщение в списке
+        // Оптимистичное обновление: сначала обновляем сообщение в списке сообщений
         updateMessage({ ...message, isPinned: true }, { unreadDelta: 0 });
+        
+        // Затем добавляем в список закрепленных
+        setPinnedMessages(prev => {
+          // Проверяем, нет ли уже такого сообщения (на случай двойного клика)
+          const exists = prev.some(p => {
+            const pMsgId = p.message?.id;
+            return pMsgId && Number(pMsgId) === Number(message.id);
+          });
+          if (exists) {
+            console.warn('Message already in pinned list:', message.id);
+            return prev;
+          }
+          
+          // Используем prev для получения максимального orderIndex
+          const maxOrderIndex = prev.length > 0 
+            ? Math.max(...prev.map(p => p.orderIndex || 0))
+            : 0;
+          
+          // Используем временный ID, но с правильной структурой для замены при получении WebSocket события
+          const optimisticPinned = {
+            id: `temp-${message.id}-${Date.now()}`, // Временный ID с message.id для легкой идентификации
+            message: message,
+            orderIndex: maxOrderIndex + 1, // Новое сообщение должно быть первым (самый большой orderIndex)
+          };
+          
+          console.log('Adding optimistic pinned message:', message.id, 'orderIndex:', optimisticPinned.orderIndex, 'to list of', prev.length);
+          const updated = [optimisticPinned, ...prev];
+          const sorted = updated.sort((a, b) => (b.orderIndex || 0) - (a.orderIndex || 0));
+          console.log('Pinned messages after add:', sorted.length, 'first message ID:', sorted[0]?.message?.id);
+          
+          // Сбрасываем просмотренное сообщение, чтобы показать новое закрепленное (первое в списке)
+          setViewedPinnedMessageId(null);
+          
+          return sorted;
+        });
         
         await chatAPI.pinMessage(chatId, message.id);
       }
@@ -718,9 +906,10 @@ export default function ChatPage() {
     
     try {
       // Оптимистичное обновление: сразу убираем из списка закрепленных
+      const messageIdToUnpin = Number(messageId);
       setPinnedMessages(prev => prev.filter(p => {
-        const pMsgId = p.message?.id || p.id;
-        return Number(pMsgId) !== Number(messageId);
+        const pMsgId = p.message?.id;
+        return !pMsgId || Number(pMsgId) !== messageIdToUnpin;
       }));
       
       // Сбрасываем просмотренное сообщение, если оно было откреплено
@@ -1301,8 +1490,8 @@ export default function ChatPage() {
           if (viewedPinnedMessageId) {
             // Находим индекс просмотренного сообщения
             const viewedIndex = pinnedMessages.findIndex(p => {
-              const msgId = p.message?.id || p.id;
-              return Number(msgId) === Number(viewedPinnedMessageId);
+              const msgId = p.message?.id;
+              return msgId && Number(msgId) === Number(viewedPinnedMessageId);
             });
             // Показываем следующее сообщение после просмотренного
             if (viewedIndex >= 0 && viewedIndex < pinnedMessages.length - 1) {
@@ -1366,7 +1555,14 @@ export default function ChatPage() {
                     </button>
                   </div>
                   <div className={styles.pinnedMessageText}>
-                    {msg.content || (msg.type === 'VOICE' ? '🎤 Голосовое сообщение' : '')}
+                    {msg.type === 'VOICE' ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Mic size={14} style={{ color: '#6b7280', flexShrink: 0 }} />
+                        <span>Голосовое сообщение {msg.duration ? `(${Math.round(msg.duration)}с)` : ''}</span>
+                      </div>
+                    ) : (
+                      msg.content || ''
+                    )}
                   </div>
                 </div>
               </div>
@@ -1386,15 +1582,18 @@ export default function ChatPage() {
           </div>
         )}
         
-        {messages.length === 0 ? (
-          <div className={styles.emptyState}>
-            <p>Пока нет сообщений</p>
-            <p className={styles.emptyHint}>Начните общение!</p>
-          </div>
-        ) : (
-          messages.map((msg, index) => {
-            const showDate = index === 0 || 
-              formatChatDate(messages[index - 1].createdAt) !== formatChatDate(msg.createdAt);
+        {(() => {
+          // Фильтруем удаленные сообщения
+          const visibleMessages = messages.filter(msg => !msg.deletedForMe && !msg.deletedForAll);
+          return visibleMessages.length === 0 ? (
+            <div className={styles.emptyState}>
+              <p>Пока нет сообщений</p>
+              <p className={styles.emptyHint}>Начните общение!</p>
+            </div>
+          ) : (
+            visibleMessages.map((msg, index) => {
+              const showDate = index === 0 ||
+              formatChatDate(visibleMessages[index - 1].createdAt) !== formatChatDate(msg.createdAt);
             const isOwn = msg.senderId === user?.id;
 
             return (
@@ -1481,10 +1680,12 @@ export default function ChatPage() {
                           </div>
                           <div className={styles.messageTextMeta}>
                             {(() => {
-                              const isPinned = pinnedMessages.some(p => {
-                                const pinnedMsgId = p.message?.id || p.id;
-                                return Number(pinnedMsgId) === Number(msg.id);
+                              // Проверяем и флаг isPinned на сообщении, и наличие в pinnedMessages
+                              const isPinnedInList = pinnedMessages.some(p => {
+                                const pinnedMsgId = p.message?.id;
+                                return pinnedMsgId && Number(pinnedMsgId) === Number(msg.id);
                               });
+                              const isPinned = msg.isPinned || isPinnedInList;
                               return isPinned ? (
                                 <Pin size={12} className={styles.messagePinnedIcon} title="Закреплено" />
                               ) : null;
@@ -1518,7 +1719,8 @@ export default function ChatPage() {
               </div>
             );
           })
-        )}
+          );
+        })()}
         <div ref={messagesEndRef} />
       </div>
       
@@ -1886,8 +2088,8 @@ export default function ChatPage() {
           position={contextMenu.position}
           isOwn={contextMenu.message.senderId === user?.id}
           isPinned={pinnedMessages.some(p => {
-            const pinnedMsgId = p.message?.id || p.id;
-            return Number(pinnedMsgId) === Number(contextMenu.message.id);
+            const pinnedMsgId = p.message?.id;
+            return pinnedMsgId && Number(pinnedMsgId) === Number(contextMenu.message.id);
           })}
           onClose={handleCloseContextMenu}
           onReply={() => handleReplyMessage(contextMenu.message)}
@@ -1899,6 +2101,54 @@ export default function ChatPage() {
           onSelect={() => handleSelectMessage(contextMenu.message)}
         />
       )}
+
+      {deleteConfirm && (() => {
+        // Получаем имя другого участника для чекбокса
+        const getOtherParticipantName = () => {
+          if (!chat?.participants || !user?.id) return '';
+          if (chat.type !== 'DIRECT') {
+            // Для группового чата показываем количество участников
+            return `${chat.participants?.length || 0} участников`;
+          }
+          const other = chat.participants.find(p => Number(p.id) !== Number(user.id));
+          return other?.displayName || other?.username || '';
+        };
+
+        const otherParticipantName = getOtherParticipantName();
+        const canDeleteForAll = deleteConfirm.message?.senderId === user?.id;
+
+        return (
+          <div className={styles.deleteModalOverlay} onClick={() => { setDeleteConfirm(null); setDeleteForAll(false); }}>
+            <div className={styles.deleteModal} onClick={(e) => e.stopPropagation()}>
+              <h3 className={styles.deleteModalTitle}>Удалить это сообщение?</h3>
+              {canDeleteForAll && otherParticipantName && (
+                <label className={styles.deleteModalCheckbox}>
+                  <input
+                    type="checkbox"
+                    checked={deleteForAll}
+                    onChange={(e) => setDeleteForAll(e.target.checked)}
+                  />
+                  <span>Также удалить для {otherParticipantName}</span>
+                </label>
+              )}
+              <div className={styles.deleteModalButtons}>
+                <button
+                  className={styles.deleteModalCancel}
+                  onClick={() => { setDeleteConfirm(null); setDeleteForAll(false); }}
+                >
+                  Отмена
+                </button>
+                <button
+                  className={styles.deleteModalConfirm}
+                  onClick={handleConfirmDelete}
+                >
+                  Удалить
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

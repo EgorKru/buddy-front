@@ -57,3 +57,19 @@
   color: #333;
 }
 
+.menuItemDelete {
+  color: #ef4444 !important;
+}
+
+.menuItemDelete .menuIcon {
+  color: #ef4444 !important;
+}
+
+.menuItemDelete:hover {
+  background-color: #fef2f2 !important;
+}
+
+.menuItemDelete:hover .menuIcon {
+  color: #dc2626 !important;
+}
+

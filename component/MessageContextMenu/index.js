@@ -12,7 +12,7 @@ export default function MessageContextMenu({
   onPin, 
   onCopy, 
   onForward, 
-  onDelete, 
+  onDelete,
   onEdit,
   onSelect 
 }) {
@@ -84,7 +84,7 @@ export default function MessageContextMenu({
     { icon: Copy, label: 'Копировать текст', onClick: onCopy, show: message.type === 'TEXT' },
     { icon: Forward, label: 'Переслать', onClick: onForward, show: true },
     { icon: Edit, label: 'Редактировать', onClick: onEdit, show: isOwn && message.type === 'TEXT' && !message.isOptimistic },
-    { icon: Trash2, label: 'Удалить', onClick: onDelete, show: isOwn && !message.isOptimistic },
+    { icon: Trash2, label: 'Удалить', onClick: onDelete, show: !message.isOptimistic, isDelete: true },
     { icon: CheckCircle2, label: 'Выделить', onClick: onSelect, show: true },
   ].filter(item => item.show);
 

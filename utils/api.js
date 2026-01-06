@@ -210,6 +210,18 @@ export const chatAPI = {
     });
   },
 
+  deleteMessageForMe: async (chatId, messageId) => {
+    return apiRequest(`/chats/${chatId}/messages/${messageId}/for-me`, {
+      method: 'DELETE',
+    });
+  },
+
+  deleteMessageForAll: async (chatId, messageId) => {
+    return apiRequest(`/chats/${chatId}/messages/${messageId}/for-all`, {
+      method: 'DELETE',
+    });
+  },
+
   getPinnedMessages: async (chatId) => {
     return apiRequest(`/chats/${chatId}/pinned-messages`);
   },

@@ -11,6 +11,7 @@ export const useChatRealtime = (chatId) => {
     setActiveChatId,
     markChatAsRead,
     upsertMessage,
+    updateMessage,
   } = useChats();
 
   const topicSubRef = useRef(null);
@@ -70,8 +71,9 @@ export const useChatRealtime = (chatId) => {
           if (!editedMessage) return;
           if (Number(editedMessage.chatId) !== Number(chatId)) return;
 
-          // Обновляем существующее сообщение
-          upsertMessage(
+          // Обновляем существующее сообщение через updateMessage
+          // Это гарантирует обновление даже если сообщение уже было обработано
+          updateMessage(
             { ...editedMessage, status: MESSAGE_STATUS.SENT, isOptimistic: false },
             { unreadDelta: 0 }
           );
@@ -133,7 +135,7 @@ export const useChatRealtime = (chatId) => {
         voiceTopicSubRef.current = null;
       }
     };
-  }, [chatId, client, connected, upsertMessage, markChatAsRead]);
+  }, [chatId, client, connected, upsertMessage, updateMessage, markChatAsRead]);
 };
 
 
