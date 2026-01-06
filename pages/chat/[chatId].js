@@ -36,7 +36,7 @@ export default function ChatPage() {
   const router = useRouter();
   const { chatId } = router.query;
   const user = getCurrentUser();
-  const { connected, readAtByChatIdByUserId, replaceOptimistic, addOptimistic, chats, refreshChats, upsertMessage, updateMessage, removeMessage } = useChats();
+  const { connected, readAtByChatIdByUserId, replaceOptimistic, addOptimistic, chats, refreshChats, upsertMessage, updateMessage, removeMessage, markChatAsRead } = useChats();
   const { client } = useStomp();
 
   const chat = useMemo(() => {
@@ -142,6 +142,11 @@ export default function ChatPage() {
     if (!chatId) return;
     try {
       await refreshChats();
+      // Загружаем read receipts при загрузке чата
+      // markChatAsRead может вернуть текущие read receipts или обновить их через WebSocket
+      if (markChatAsRead) {
+        await markChatAsRead(chatId);
+      }
       setLoading(false);
     } catch (error) {
       setLoading(false);
@@ -149,7 +154,7 @@ export default function ChatPage() {
         router.push('/');
       }
     }
-  }, [chatId, router, refreshChats]);
+  }, [chatId, router, refreshChats, markChatAsRead]);
 
   const loadMessages = useCallback(async (pageNum = 0, append = false) => {
     if (!chatId) return;

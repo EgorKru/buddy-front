@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
 import { MessageCircle, Search, Plus, X, Loader2, Check, CheckCheck, UserPlus } from 'lucide-react';
-import { getCurrentUser } from '@/utils/api';
+import { getCurrentUser, chatAPI } from '@/utils/api';
 import { useCreateChat } from '@/hooks/useCreateChat';
 import { getChatName, getChatAvatar } from '@/utils/chatHelpers';
 import { formatChatListTime, getOnlineStatus } from '@/utils/dateHelpers';
@@ -18,7 +18,7 @@ const DEFAULT_SIDEBAR_WIDTH = 320;
 export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
   const router = useRouter();
   const user = getCurrentUser();
-  const { chats, loading, refreshChats, readReceiptsByChatId } = useChats();
+  const { chats, loading, refreshChats, readAtByChatIdByUserId, messageIdsByChatId, messagesById, upsertMessage, upsertChat } = useChats();
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [sidebarPosition, setSidebarPosition] = useState('left');
@@ -26,6 +26,8 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef(null);
   const resizeHandleRef = useRef(null);
+  const loadingLastMessagesRef = useRef(new Set());
+  const hasLoadedLastMessagesRef = useRef(false);
   
   const createChat = useCreateChat();
 
@@ -107,8 +109,117 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
   }, [sidebarWidth]);
 
   useEffect(() => {
+    // Сбрасываем флаг загрузки при обновлении чатов
+    hasLoadedLastMessagesRef.current = false;
+    loadingLastMessagesRef.current.clear();
     refreshChats();
   }, [refreshChats]);
+
+  // Загружаем последние сообщения для чатов, у которых их нет
+  const loadLastMessages = useCallback(async () => {
+    if (!chats || chats.length === 0 || loading) return;
+    
+    // Загружаем последние сообщения для всех чатов, у которых нет lastMessage или оно неполное
+    const chatsToLoad = chats.filter(chat => {
+      const chatId = String(chat.id);
+      // Пропускаем, если уже загружаем
+      if (loadingLastMessagesRef.current.has(chatId)) return false;
+      // Загружаем, если нет lastMessage или нет id/createdAt в lastMessage
+      // Для голосовых сообщений content может быть null, поэтому проверяем только id и createdAt
+      const needsLoad = !chat.lastMessage || 
+                       !chat.lastMessage.id || 
+                       !chat.lastMessage.createdAt;
+      return needsLoad;
+    });
+
+    if (chatsToLoad.length === 0) {
+      // Если все чаты уже имеют lastMessage, помечаем как загруженные
+      hasLoadedLastMessagesRef.current = true;
+      return;
+    }
+
+    // Загружаем последние сообщения параллельно
+    const promises = chatsToLoad.map(async (chat) => {
+      const chatId = String(chat.id);
+      if (loadingLastMessagesRef.current.has(chatId)) return;
+      
+      loadingLastMessagesRef.current.add(chatId);
+      try {
+        // Загружаем последнее сообщение (page=0, size=1)
+        const response = await chatAPI.getMessages(chatId, { page: 0, size: 1 });
+        if (response?.content && Array.isArray(response.content) && response.content.length > 0) {
+          const lastMessage = response.content[0];
+          // Фильтруем удаленные сообщения
+          if (lastMessage.deletedForMe || lastMessage.deletedForAll) {
+            return;
+          }
+          
+          // Обновляем сообщение через контекст, что автоматически обновит lastMessage в чате
+          if (upsertMessage) {
+            upsertMessage({
+              ...lastMessage,
+              status: 'SENT',
+              isOptimistic: false,
+              deletedForMe: lastMessage.deletedForMe || false,
+              deletedForAll: lastMessage.deletedForAll || false,
+            }, { unreadDelta: 0 });
+          }
+          
+          // Явно обновляем чат с lastMessage, чтобы гарантировать его сохранение
+          if (upsertChat) {
+            upsertChat({
+              id: chat.id,
+              lastMessage: lastMessage,
+              updatedAt: lastMessage.createdAt,
+            });
+          }
+        }
+      } catch (error) {
+        // Игнорируем ошибки
+      } finally {
+        loadingLastMessagesRef.current.delete(chatId);
+      }
+    });
+
+    await Promise.all(promises);
+    
+    // После загрузки проверяем еще раз, все ли чаты имеют lastMessage
+    // Это нужно, так как после обновления чатов через upsertChat список может измениться
+    // Используем небольшую задержку, чтобы дать время React обновить состояние
+    setTimeout(() => {
+      const currentChats = chats; // Используем chats из замыкания
+      if (currentChats && currentChats.length > 0) {
+        const stillMissing = currentChats.filter(chat => {
+          return !chat.lastMessage || !chat.lastMessage.id || !chat.lastMessage.createdAt;
+        });
+        if (stillMissing.length === 0) {
+          hasLoadedLastMessagesRef.current = true;
+        }
+      }
+    }, 200);
+  }, [chats, loading, upsertMessage, upsertChat]);
+
+  useEffect(() => {
+    // Загружаем последние сообщения после загрузки чатов
+    // Используем небольшую задержку, чтобы убедиться, что refreshChats завершился
+    if (!loading && chats && chats.length > 0) {
+      // Проверяем, есть ли чаты без lastMessage
+      const chatsWithoutLastMessage = chats.filter(chat => {
+        return !chat.lastMessage || !chat.lastMessage.id || !chat.lastMessage.createdAt;
+      });
+      
+      // Загружаем только если есть чаты без lastMessage и мы еще не загружали
+      if (chatsWithoutLastMessage.length > 0 && !hasLoadedLastMessagesRef.current) {
+        const timeoutId = setTimeout(() => {
+          loadLastMessages();
+        }, 600); // Увеличиваем задержку для надежности
+        return () => clearTimeout(timeoutId);
+      } else if (chatsWithoutLastMessage.length === 0) {
+        // Если все чаты имеют lastMessage, помечаем как загруженные
+        hasLoadedLastMessagesRef.current = true;
+      }
+    }
+  }, [loading, chats, loadLastMessages]);
 
   const handleCreateChat = async (e) => {
     e.preventDefault();
@@ -128,17 +239,43 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
   };
 
   // Чаты уже отсортированы в контексте, но делаем дополнительную сортировку для надежности
+  // Также добавляем lastMessage из контекста сообщений, если его нет в чате
   const sortedChats = useMemo(() => {
     if (!chats || chats.length === 0) return [];
     
-    return [...chats].sort((a, b) => {
+    const enrichedChats = chats.map(chat => {
+      // Если у чата нет lastMessage, пытаемся получить его из контекста сообщений
+      if (!chat.lastMessage && messageIdsByChatId && messagesById) {
+        const chatId = String(chat.id);
+        const messageIds = messageIdsByChatId[chatId] || [];
+        if (messageIds.length > 0) {
+          // Берем последнее сообщение (самое новое по времени)
+          // Фильтруем удаленные сообщения
+          const chatMessages = messageIds
+            .map(id => messagesById[String(id)])
+            .filter(Boolean)
+            .filter(msg => !msg.deletedForMe && !msg.deletedForAll)
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          
+          if (chatMessages.length > 0) {
+            return {
+              ...chat,
+              lastMessage: chatMessages[0],
+            };
+          }
+        }
+      }
+      return chat;
+    });
+    
+    return enrichedChats.sort((a, b) => {
       const timeA = getChatTime(a);
       const timeB = getChatTime(b);
       
       // Более новые (большее время) идут первыми (сверху)
       return timeB - timeA;
     });
-  }, [chats]);
+  }, [chats, messageIdsByChatId, messagesById]);
 
   const filteredChats = sortedChats.filter(chat => {
     if (!searchQuery) return true;
@@ -156,7 +293,7 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
     const lastMessage = chat?.lastMessage;
     if (!lastMessage?.createdAt || !user?.id) return { isRead: false, readCount: 0, totalOthers: 0 };
 
-    const chatReadMap = readReceiptsByChatId?.[String(chat.id)] || {};
+    const chatReadMap = readAtByChatIdByUserId?.[String(chat.id)] || {};
     const msgTime = new Date(lastMessage.createdAt).getTime();
     if (Number.isNaN(msgTime)) return { isRead: false, readCount: 0, totalOthers: 0 };
 
@@ -172,7 +309,8 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
       .filter(t => !Number.isNaN(t));
 
     const readCount = otherReaders.reduce((acc, readAtTime) => (readAtTime >= msgTime ? acc + 1 : acc), 0);
-    return { isRead: readCount > 0, readCount, totalOthers };
+    const isRead = readCount > 0;
+    return { isRead, readCount, totalOthers };
   };
 
   const getOtherParticipantOnline = (chat) => {

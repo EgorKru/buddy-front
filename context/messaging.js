@@ -26,12 +26,26 @@ const getNotificationMessage = (n) => {
   return n?.message ?? n?.payload?.message ?? null;
 };
 
+// Загружаем read receipts из localStorage при инициализации
+const loadReadReceiptsFromStorage = () => {
+  if (typeof window === 'undefined') return {};
+  try {
+    const stored = localStorage.getItem('readReceipts');
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) {
+    // Игнорируем ошибки
+  }
+  return {};
+};
+
 const initialState = {
   chatsById: {},
   chatOrder: [],
   messagesById: {},
   messageIdsByChatId: {},
-  readAtByChatIdByUserId: {},
+  readAtByChatIdByUserId: loadReadReceiptsFromStorage(),
   activeChatId: null,
 };
 
@@ -109,11 +123,23 @@ const reducer = (state, action) => {
       for (const c of list) {
         if (!c?.id) continue;
         const id = String(c.id);
+        // Сохраняем существующий чат из state, чтобы не потерять lastMessage
+        const existingChat = state.chatsById[id];
+        
+        // Проверяем, является ли lastMessage из нового чата валидным (имеет id и createdAt)
+        // Для голосовых сообщений content может быть null, поэтому проверяем только id и createdAt
+        const newLastMessageValid = c.lastMessage && 
+                                   c.lastMessage.id && 
+                                   c.lastMessage.createdAt;
+        
         // Нормализуем данные чата, убеждаясь что есть поля для сортировки
+        // Важно: сохраняем lastMessage из нового чата только если оно валидное, иначе из существующего
         const normalizedChat = {
           ...c,
           // Если есть lastMessage, но нет updatedAt, используем время последнего сообщения
           updatedAt: c.updatedAt ?? c.lastMessage?.createdAt ?? c.createdAt,
+          // Сохраняем lastMessage: сначала валидное из нового чата, если нет - из существующего
+          lastMessage: newLastMessageValid ? c.lastMessage : (existingChat?.lastMessage || null),
         };
         chatsById[id] = normalizedChat;
       }
@@ -129,7 +155,22 @@ const reducer = (state, action) => {
       if (!chat?.id) return state;
       const id = String(chat.id);
       const existing = state.chatsById[id] || {};
-      const merged = { ...existing, ...chat };
+      
+      // Проверяем, является ли lastMessage из нового чата валидным (имеет id и createdAt)
+      // Для голосовых сообщений content может быть null, поэтому проверяем только id и createdAt
+      const newLastMessageValid = chat.lastMessage && 
+                                  chat.lastMessage.id && 
+                                  chat.lastMessage.createdAt;
+      
+      // При мерже сохраняем lastMessage: приоритет у валидного нового, если нет - сохраняем существующее
+      const merged = { 
+        ...existing, 
+        ...chat,
+        // Сохраняем lastMessage: сначала валидное из нового чата, если нет - из существующего
+        lastMessage: newLastMessageValid ? chat.lastMessage : (existing.lastMessage || null),
+        // Обновляем updatedAt, если есть новое время
+        updatedAt: chat.updatedAt || existing.updatedAt || null,
+      };
       const updatedChatsById = { ...state.chatsById, [id]: merged };
       
       // Пересортировываем весь список чатов по времени последнего сообщения
@@ -365,15 +406,27 @@ const reducer = (state, action) => {
       if (!iso) return state;
       const current = state.readAtByChatIdByUserId[cid]?.[rid];
       if (current && !isNewer(iso, current)) return state;
+      
+      const newReadAtByChatIdByUserId = {
+        ...state.readAtByChatIdByUserId,
+        [cid]: {
+          ...(state.readAtByChatIdByUserId[cid] || {}),
+          [rid]: iso,
+        },
+      };
+      
+      // Сохраняем read receipts в localStorage для восстановления после обновления страницы
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('readReceipts', JSON.stringify(newReadAtByChatIdByUserId));
+        } catch (e) {
+          // Игнорируем ошибки localStorage
+        }
+      }
+      
       return {
         ...state,
-        readAtByChatIdByUserId: {
-          ...state.readAtByChatIdByUserId,
-          [cid]: {
-            ...(state.readAtByChatIdByUserId[cid] || {}),
-            [rid]: iso,
-          },
-        },
+        readAtByChatIdByUserId: newReadAtByChatIdByUserId,
       };
     }
 
@@ -746,6 +799,7 @@ export const MessagingProvider = ({ children }) => {
 
     const chatIds = new Set(state.chatOrder.map(String));
 
+    // Отписываемся от чатов, которых больше нет
     for (const [cid, sub] of readSubsRef.current.entries()) {
       if (!chatIds.has(cid)) {
         safeUnsubscribe(sub);
@@ -753,6 +807,7 @@ export const MessagingProvider = ({ children }) => {
       }
     }
 
+    // Подписываемся на read receipts для всех чатов
     for (const cid of chatIds) {
       if (readSubsRef.current.has(cid)) continue;
       try {
@@ -762,7 +817,9 @@ export const MessagingProvider = ({ children }) => {
           upsertReadReceipt(ev.chatId, ev.readerId, ev.readAt);
         });
         readSubsRef.current.set(cid, sub);
-      } catch (e) {}
+      } catch (e) {
+        console.error('Failed to subscribe to read receipts for chat', cid, e);
+      }
     }
 
     return () => {};
@@ -846,6 +903,14 @@ export const MessagingProvider = ({ children }) => {
     }
   }, [totalUnread, updateFaviconBadge]);
 
+  const upsertChat = useCallback((chat) => {
+    if (!chat?.id) return;
+    dispatch({
+      type: actionTypes.UPSERT_CHAT,
+      payload: { chat },
+    });
+  }, []);
+
   const value = useMemo(() => {
     return {
       chats,
@@ -863,6 +928,7 @@ export const MessagingProvider = ({ children }) => {
       removeMessage,
       addOptimistic,
       replaceOptimistic,
+      upsertChat,
     };
   }, [
     chats,
@@ -879,6 +945,7 @@ export const MessagingProvider = ({ children }) => {
     removeMessage,
     addOptimistic,
     replaceOptimistic,
+    upsertChat,
   ]);
 
   return (

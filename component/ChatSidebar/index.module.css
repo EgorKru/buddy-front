@@ -357,10 +357,10 @@
 
 .unreadBadge {
   position: absolute;
-  top: 50%;
+  top: auto;
+  bottom: 12px;
   right: 12px;
-  transform: translateY(-50%);
-  background: #6b6b6b;
+  background: #4a9eff;
   color: white;
   border-radius: 10px;
   padding: 2px 6px;
