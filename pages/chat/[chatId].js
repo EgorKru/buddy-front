@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
-import { Send, Loader2, Menu, Check, CheckCheck, AlertCircle, Clock, ArrowLeft, Mic, X, ChevronDown, Pause, Play, Lock, Unlock, Trash2, Edit, Reply, Pin, PinOff, Forward } from 'lucide-react';
+import { Send, Loader2, Menu, Check, CheckCheck, AlertCircle, Clock, ArrowLeft, Mic, X, ChevronDown, Pause, Play, Lock, Unlock, Trash2, Edit, Reply, Pin, PinOff, Forward, Search, ChevronUp } from 'lucide-react';
 import { chatAPI, getCurrentUser, isAuthenticated } from '@/utils/api';
 import { getChatName } from '@/utils/chatHelpers';
 import { formatChatDate, formatChatTime, getOnlineStatus } from '@/utils/dateHelpers';
@@ -57,6 +57,16 @@ export default function ChatPage() {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleteForAll, setDeleteForAll] = useState(false);
   const [forwardModal, setForwardModal] = useState(null);
+  const [searchText, setSearchText] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchMode, setSearchMode] = useState(false);
+  const [searchPage, setSearchPage] = useState(0);
+  const [hasMoreSearchResults, setHasMoreSearchResults] = useState(true);
+  const [currentSearchIndex, setCurrentSearchIndex] = useState(-1);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchInputRef = useRef(null);
+  const searchTimeoutRef = useRef(null);
   
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
@@ -845,6 +855,138 @@ export default function ChatPage() {
     handleSelectAllBase(messages);
   }, [handleSelectAllBase, messages]);
 
+  const handleSearch = useCallback(async (query, pageNum = 0) => {
+    if (!query.trim() || !chatId) {
+      setSearchResults([]);
+      setSearchMode(false);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const response = await chatAPI.searchMessages(chatId, query.trim(), pageNum, 50);
+      const results = Array.isArray(response?.content) ? response.content : (Array.isArray(response) ? response : []);
+      
+      if (pageNum === 0) {
+        setSearchResults(results);
+      } else {
+        setSearchResults(prev => [...prev, ...results]);
+      }
+      
+      setHasMoreSearchResults(response?.totalPages ? pageNum < response.totalPages - 1 : results.length === 50);
+      setSearchMode(true);
+      setCurrentSearchIndex(-1);
+    } catch (error) {
+      console.error('Error searching messages:', error);
+      alert('Не удалось выполнить поиск');
+    } finally {
+      setIsSearching(false);
+    }
+  }, [chatId]);
+
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    if (searchText.trim() && chatId) {
+      searchTimeoutRef.current = setTimeout(() => {
+        setSearchPage(0);
+        handleSearch(searchText, 0);
+      }, 300);
+    } else {
+      setSearchResults([]);
+      setSearchMode(false);
+    }
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchText, chatId, handleSearch]);
+
+  const handleSearchSubmit = useCallback((e) => {
+    e.preventDefault();
+    if (!searchText.trim()) return;
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    setSearchPage(0);
+    handleSearch(searchText, 0);
+  }, [searchText, handleSearch]);
+
+  const handleOpenSearch = useCallback(() => {
+    setSearchOpen(true);
+    setTimeout(() => {
+      searchInputRef.current?.focus();
+    }, 100);
+  }, []);
+
+  const handleCloseSearch = useCallback(() => {
+    setSearchOpen(false);
+    setSearchText('');
+    setSearchResults([]);
+    setSearchMode(false);
+    setCurrentSearchIndex(-1);
+  }, []);
+
+
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && searchOpen) {
+        handleCloseSearch();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [searchOpen, handleCloseSearch]);
+
+  const handleNavigateToMessage = useCallback(async (messageId) => {
+    const targetMessage = document.querySelector(`[data-message-id="${messageId}"]`);
+    if (targetMessage) {
+      targetMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      targetMessage.classList.add(styles.messageHighlight);
+      setTimeout(() => {
+        targetMessage.classList.remove(styles.messageHighlight);
+      }, 2000);
+    } else {
+      try {
+        await chatAPI.getMessage(chatId, messageId);
+        messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+        setTimeout(() => {
+          const targetMessage = document.querySelector(`[data-message-id="${messageId}"]`);
+          if (targetMessage) {
+            targetMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            targetMessage.classList.add(styles.messageHighlight);
+            setTimeout(() => {
+              targetMessage.classList.remove(styles.messageHighlight);
+            }, 2000);
+          }
+        }, 500);
+      } catch (error) {
+        console.error('Failed to load message:', error);
+      }
+    }
+  }, [chatId]);
+
+  const handleNextSearchResult = useCallback(() => {
+    if (searchResults.length === 0) return;
+    const nextIndex = currentSearchIndex < searchResults.length - 1 ? currentSearchIndex + 1 : 0;
+    setCurrentSearchIndex(nextIndex);
+    handleNavigateToMessage(searchResults[nextIndex].id);
+  }, [searchResults, currentSearchIndex, handleNavigateToMessage]);
+
+  const handlePrevSearchResult = useCallback(() => {
+    if (searchResults.length === 0) return;
+    const prevIndex = currentSearchIndex > 0 ? currentSearchIndex - 1 : searchResults.length - 1;
+    setCurrentSearchIndex(prevIndex);
+    handleNavigateToMessage(searchResults[prevIndex].id);
+  }, [searchResults, currentSearchIndex, handleNavigateToMessage]);
+
   const handleForwardSelected = useCallback(() => {
     if (selectedMessages.size === 0) return;
     setForwardModal({ 
@@ -1578,8 +1720,111 @@ export default function ChatPage() {
             </div>
               );
             })()}
+            </div>
+            <div className={styles.searchWrapper}>
+              <button
+                onClick={handleOpenSearch}
+                className={styles.searchToggleButton}
+                title="Поиск сообщений"
+              >
+                <Search size={20} />
+              </button>
+            </div>
           </div>
-        </div>
+        )}
+
+        {searchOpen && (
+          <div className={styles.searchPanel}>
+            <div className={styles.searchPanelHeader}>
+              <h2 className={styles.searchPanelTitle}>Поиск сообщений</h2>
+              <button
+                type="button"
+                onClick={handleCloseSearch}
+                className={styles.searchCloseButton}
+                title="Закрыть"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleSearchSubmit} className={styles.searchForm}>
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                placeholder="Поиск сообщений..."
+                className={styles.searchInput}
+                autoFocus
+              />
+              {searchText && (
+                <button
+                  type="button"
+                  onClick={() => setSearchText('')}
+                  className={styles.searchClearButton}
+                  title="Очистить"
+                >
+                  <X size={16} />
+                </button>
+              )}
+              {isSearching && (
+                <div className={styles.searchLoading}>
+                  <Loader2 size={16} className={styles.spinner} />
+                </div>
+              )}
+            </form>
+                  {searchMode && searchResults.length > 0 && (
+                    <>
+                      <div className={styles.searchResultsInfo}>
+                        <span className={styles.searchResultsCount}>
+                          {searchResults.length} найдено
+                        </span>
+                      </div>
+                      <div className={styles.searchResultsList}>
+                        {searchResults.map((msg, index) => {
+                          const isOwn = msg.senderId === user?.id;
+                          const previewText = msg.content?.length > 50 
+                            ? msg.content.substring(0, 50) + '...' 
+                            : msg.content;
+                          
+                          return (
+                            <div
+                              key={msg.id}
+                              className={styles.searchResultItem}
+                              onClick={async () => {
+                                await handleNavigateToMessage(msg.id);
+                                handleCloseSearch();
+                              }}
+                            >
+                              <div className={styles.searchResultContent}>
+                                <div className={styles.searchResultSender}>
+                                  {isOwn ? 'Вы' : (msg.senderDisplayName || msg.senderUsername)}
+                                </div>
+                                <div className={styles.searchResultText}>
+                                  {(() => {
+                                    if (!msg.content || !searchText) return previewText;
+                                    const escapedSearchText = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                                    const regex = new RegExp(`(${escapedSearchText})`, 'gi');
+                                    const parts = previewText.split(regex);
+                                    return parts.map((part, i) => 
+                                      part.toLowerCase() === searchText.toLowerCase() ? (
+                                        <mark key={i} className={styles.searchHighlight}>{part}</mark>
+                                      ) : (
+                                        <span key={i}>{part}</span>
+                                      )
+                                    );
+                                  })()}
+                                </div>
+                                <div className={styles.searchResultTime}>
+                                  {formatChatTime(msg.createdAt)}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+            </div>
         )}
 
         <PinnedMessagesHeader
@@ -1605,177 +1850,162 @@ export default function ChatPage() {
         )}
         
         {visibleMessages.length === 0 ? (
-            <div className={styles.emptyState}>
-              <p>Пока нет сообщений</p>
-              <p className={styles.emptyHint}>Начните общение!</p>
-            </div>
-          ) : (
-            visibleMessages.map((msg, index) => {
+          <div className={styles.emptyState}>
+            <p>Пока нет сообщений</p>
+            <p className={styles.emptyHint}>Начните общение!</p>
+          </div>
+        ) : (
+          <div>
+            {visibleMessages.map((msg, index) => {
               const showDate = index === 0 ||
-              formatChatDate(visibleMessages[index - 1].createdAt) !== formatChatDate(msg.createdAt);
-            const isOwn = msg.senderId === user?.id;
+                formatChatDate(visibleMessages[index - 1]?.createdAt) !== formatChatDate(msg.createdAt);
+              const isOwn = msg.senderId === user?.id;
 
-            return (
-              <div key={msg.id}>
-                {showDate && (
-                  <div className={styles.dateDivider}>
-                    {formatChatDate(msg.createdAt)}
-                  </div>
-                )}
-                <div
-                  className={`${styles.message} ${isOwn ? styles.ownMessage : ''} ${msg.pinned ? styles.messagePinned : ''} ${selectionMode && selectedMessages.has(msg.id) ? styles.messageSelected : ''} ${newMessageIdsRef.current.has(String(msg.id)) || msg.isOptimistic ? styles.messageNew : ''}`}
-                  onContextMenu={(e) => !selectionMode && handleContextMenu(e, msg)}
-                  onClick={() => selectionMode && toggleMessageSelection(msg.id)}
-                  data-message-id={msg.id}
-                >
-                  {selectionMode && (
-                    <div className={styles.messageCheckbox}>
-                      <input
-                        type="checkbox"
-                        checked={selectedMessages.has(msg.id)}
-                        onChange={() => toggleMessageSelection(msg.id)}
-                        onClick={(e) => e.stopPropagation()}
-                      />
+              return (
+                <div key={msg.id}>
+                  {showDate && (
+                    <div className={styles.dateDivider}>
+                      {formatChatDate(msg.createdAt)}
                     </div>
                   )}
-                  {!isOwn && (
-                    <div className={styles.messageAvatar}>
-                      {msg.senderDisplayName?.[0] || msg.senderUsername?.[0] || '?'}
-                    </div>
-                  )}
-                  <div className={styles.messageContent}>
+                  <div
+                    className={`${styles.message} ${isOwn ? styles.ownMessage : ''} ${msg.pinned ? styles.messagePinned : ''} ${selectionMode && selectedMessages.has(msg.id) ? styles.messageSelected : ''} ${newMessageIdsRef.current.has(String(msg.id)) || msg.isOptimistic ? styles.messageNew : ''}`}
+                    onContextMenu={(e) => !selectionMode && handleContextMenu(e, msg)}
+                    onClick={() => selectionMode && toggleMessageSelection(msg.id)}
+                    data-message-id={msg.id}
+                  >
                     {!isOwn && (
-                      <div className={styles.messageHeader}>
-                        <span className={styles.senderName}>
-                          {msg.senderDisplayName || msg.senderUsername}
-                        </span>
+                      <div className={styles.messageAvatar}>
+                        {msg.senderDisplayName?.[0] || msg.senderUsername?.[0] || '?'}
                       </div>
                     )}
-                    {msg.type === 'VOICE' && msg.fileUrl ? (
-                      (() => {
-                        const status = msg.status || (msg.isOptimistic ? MESSAGE_STATUS.SENDING : MESSAGE_STATUS.SENT);
-                        const readMeta = status === MESSAGE_STATUS.SENT ? getReadMetaForMessage(msg) : null;
-                        const isPinnedInList = pinnedMessages.some(p => {
-                          const pinnedMsgId = p.message?.id;
-                          return pinnedMsgId && Number(pinnedMsgId) === Number(msg.id);
-                        });
-                        const isPinned = msg.isPinned || isPinnedInList;
-                        return (
-                          <VoiceMessagePlayer 
-                            fileUrl={msg.fileUrl} 
-                            duration={msg.duration}
-                            messageTime={formatChatTime(msg.createdAt)}
-                            isOwn={isOwn}
-                            statusIcon={isOwn && !msg.deletedForMe && !msg.deletedForAll ? getMessageStatusIcon(status, readMeta) : null}
-                            isPinned={isPinned}
-                          />
-                        );
-                      })()
-                    ) : (
-                      <div className={`${styles.messageText} ${msg.isOptimistic ? styles.messagePending : ''} ${msg.status === MESSAGE_STATUS.FAILED ? styles.messageFailed : ''}`}>
-                        {msg.forwardedFrom && (
-                          <div className={styles.messageForwarded}>
-                            <div className={styles.messageForwardedHeader}>
-                              <span className={styles.messageForwardedIcon}>↪</span>
-                              <span className={styles.messageForwardedText}>
-                                Переслано от {msg.forwardedFrom.originalSenderDisplayName || msg.forwardedFrom.originalSenderUsername}
-                                {msg.forwardedFrom.forwardedByUserId !== msg.senderId && (
-                                  <span> • Переслал {msg.forwardedFrom.forwardedByDisplayName || msg.forwardedFrom.forwardedByUsername}</span>
-                                )}
-                              </span>
-                            </div>
-                            {msg.forwardedFrom.originalType === 'VOICE' ? (
-                              <div className={styles.messageForwardedContent}>
-                                🎤 Голосовое сообщение
-                              </div>
-                            ) : (
-                              <div className={styles.messageForwardedContent}>
-                                {msg.forwardedFrom.originalContent}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        {msg.replyTo && (
-                          <div 
-                            className={styles.messageReply}
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              // Прокручиваем к сообщению
-                              const targetMessage = document.querySelector(`[data-message-id="${msg.replyTo.id}"]`);
-                              if (targetMessage) {
-                                targetMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                // Подсвечиваем сообщение
-                                targetMessage.classList.add(styles.messageHighlight);
-                                setTimeout(() => {
-                                  targetMessage.classList.remove(styles.messageHighlight);
-                                }, 2000);
-                              } else {
-                                // Если сообщение не найдено, загружаем его
-                                try {
-                                  const fullMessage = await chatAPI.getMessage(chatId, msg.replyTo.id);
-                                  // Прокручиваем к началу чата и загружаем сообщения
-                                  messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-                                  // Сообщение будет загружено через loadMessages
-                                } catch (error) {
-                                  console.error('Failed to load message:', error);
-                                }
-                              }
-                            }}
-                          >
-                            <div className={styles.messageReplyContent}>
-                              <div className={styles.messageReplyAuthor}>
-                                {msg.replyTo.senderDisplayName || msg.replyTo.senderUsername}
-                              </div>
-                              <div className={styles.messageReplyText}>
-                                {msg.replyTo.content || (msg.replyTo.type === 'VOICE' ? '🎤 Голосовое сообщение' : '')}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        <div className={styles.messageTextContentWrapper}>
-                          <div className={styles.messageTextContent}>
-                            {msg.content}
-                          </div>
-                          <div className={styles.messageTextMeta}>
-                            {(() => {
-                              const isPinnedInList = pinnedMessages.some(p => {
-                                const pinnedMsgId = p.message?.id;
-                                return pinnedMsgId && Number(pinnedMsgId) === Number(msg.id);
-                              });
-                              const isPinned = msg.isPinned || isPinnedInList;
-                              return isPinned ? (
-                                <Pin size={12} className={styles.messagePinnedIcon} title="Закреплено" />
-                              ) : null;
-                            })()}
-                            <span className={styles.messageTime}>
-                              {formatChatTime(msg.createdAt)}
-                            </span>
-                            {msg.edited && (
-                              <span className={styles.messageEdited} title={msg.editedAt ? `Отредактировано ${formatChatTime(msg.editedAt)}` : 'Отредактировано'}>
-                                (ред.)
-                              </span>
-                            )}
-                            {isOwn && !msg.deletedForMe && !msg.deletedForAll && (() => {
-                              const status = msg.status || (msg.isOptimistic ? MESSAGE_STATUS.SENDING : MESSAGE_STATUS.SENT);
-                              const readMeta = status === MESSAGE_STATUS.SENT ? getReadMetaForMessage(msg) : null;
-                              const title = readMeta?.readCount
-                                ? (readMeta.totalOthers > 1 ? `Прочитали ${readMeta.readCount}/${readMeta.totalOthers}` : 'Прочитано')
-                                : 'Отправлено';
-                              return (
-                                <span title={title}>
-                                  {getMessageStatusIcon(status, readMeta)}
+                    <div className={styles.messageContent}>
+                      {!isOwn && (
+                        <div className={styles.messageHeader}>
+                          <span className={styles.senderName}>
+                            {msg.senderDisplayName || msg.senderUsername}
+                          </span>
+                        </div>
+                      )}
+                      {msg.type === 'VOICE' && msg.fileUrl ? (
+                        (() => {
+                          const status = msg.status || (msg.isOptimistic ? MESSAGE_STATUS.SENDING : MESSAGE_STATUS.SENT);
+                          const readMeta = status === MESSAGE_STATUS.SENT ? getReadMetaForMessage(msg) : null;
+                          const isPinnedInList = pinnedMessages.some(p => {
+                            const pinnedMsgId = p.message?.id;
+                            return pinnedMsgId && Number(pinnedMsgId) === Number(msg.id);
+                          });
+                          const isPinned = msg.isPinned || isPinnedInList;
+                          return (
+                            <VoiceMessagePlayer 
+                              fileUrl={msg.fileUrl} 
+                              duration={msg.duration}
+                              messageTime={formatChatTime(msg.createdAt)}
+                              isOwn={isOwn}
+                              statusIcon={isOwn && !msg.deletedForMe && !msg.deletedForAll ? getMessageStatusIcon(status, readMeta) : null}
+                              isPinned={isPinned}
+                            />
+                          );
+                        })()
+                      ) : (
+                        <div className={`${styles.messageText} ${msg.isOptimistic ? styles.messagePending : ''} ${msg.status === MESSAGE_STATUS.FAILED ? styles.messageFailed : ''}`}>
+                          {msg.forwardedFrom && (
+                            <div className={styles.messageForwarded}>
+                              <div className={styles.messageForwardedHeader}>
+                                <span className={styles.messageForwardedIcon}>↪</span>
+                                <span className={styles.messageForwardedText}>
+                                  Переслано от {msg.forwardedFrom.originalSenderDisplayName || msg.forwardedFrom.originalSenderUsername}
+                                  {msg.forwardedFrom.forwardedByUserId !== msg.senderId && (
+                                    <span> • Переслал {msg.forwardedFrom.forwardedByDisplayName || msg.forwardedFrom.forwardedByUsername}</span>
+                                  )}
                                 </span>
-                              );
-                            })()}
+                              </div>
+                              {msg.forwardedFrom.originalType === 'VOICE' ? (
+                                <div className={styles.messageForwardedContent}>
+                                  🎤 Голосовое сообщение
+                                </div>
+                              ) : (
+                                <div className={styles.messageForwardedContent}>
+                                  {msg.forwardedFrom.originalContent}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {msg.replyTo && (
+                            <div 
+                              className={styles.messageReply}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                handleNavigateToMessage(msg.replyTo.id);
+                              }}
+                            >
+                              <div className={styles.messageReplyContent}>
+                                <div className={styles.messageReplyAuthor}>
+                                  {msg.replyTo.senderDisplayName || msg.replyTo.senderUsername}
+                                </div>
+                                <div className={styles.messageReplyText}>
+                                  {msg.replyTo.content || (msg.replyTo.type === 'VOICE' ? '🎤 Голосовое сообщение' : '')}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          <div className={styles.messageTextContentWrapper}>
+                            <div className={styles.messageTextContent}>
+                              {(() => {
+                                if (!msg.content || !searchText) return msg.content;
+                                const escapedSearchText = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                                const regex = new RegExp(`(${escapedSearchText})`, 'gi');
+                                const parts = msg.content.split(regex);
+                                return parts.map((part, i) => 
+                                  part.toLowerCase() === searchText.toLowerCase() ? (
+                                    <mark key={i} className={styles.searchHighlight}>{part}</mark>
+                                  ) : (
+                                    <span key={i}>{part}</span>
+                                  )
+                                );
+                              })()}
+                            </div>
+                            <div className={styles.messageTextMeta}>
+                              {(() => {
+                                const isPinnedInList = pinnedMessages.some(p => {
+                                  const pinnedMsgId = p.message?.id;
+                                  return pinnedMsgId && Number(pinnedMsgId) === Number(msg.id);
+                                });
+                                const isPinned = msg.isPinned || isPinnedInList;
+                                return isPinned ? (
+                                  <Pin size={12} className={styles.messagePinnedIcon} title="Закреплено" />
+                                ) : null;
+                              })()}
+                              <span className={styles.messageTime}>
+                                {formatChatTime(msg.createdAt)}
+                              </span>
+                              {msg.edited && (
+                                <span className={styles.messageEdited} title={msg.editedAt ? `Отредактировано ${formatChatTime(msg.editedAt)}` : 'Отредактировано'}>
+                                  (ред.)
+                                </span>
+                              )}
+                              {isOwn && !msg.deletedForMe && !msg.deletedForAll && (() => {
+                                const status = msg.status || (msg.isOptimistic ? MESSAGE_STATUS.SENDING : MESSAGE_STATUS.SENT);
+                                const readMeta = status === MESSAGE_STATUS.SENT ? getReadMetaForMessage(msg) : null;
+                                const title = readMeta?.readCount
+                                  ? (readMeta.totalOthers > 1 ? `Прочитали ${readMeta.readCount}/${readMeta.totalOthers}` : 'Прочитано')
+                                  : 'Отправлено';
+                                return (
+                                  <span title={title}>
+                                    {getMessageStatusIcon(status, readMeta)}
+                                  </span>
+                                );
+                              })()}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })
+              );
+            })}
+          </div>
         )}
         <div ref={messagesEndRef} />
       </div>

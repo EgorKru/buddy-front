@@ -249,6 +249,15 @@ export const chatAPI = {
       body,
     });
   },
+
+  searchMessages: async (chatId, searchText, page = 0, size = 50) => {
+    const params = new URLSearchParams({
+      q: searchText,
+      page: page.toString(),
+      size: size.toString(),
+    });
+    return apiRequest(`/chats/${chatId}/messages/search?${params.toString()}`);
+  },
 };
 
 export const userAPI = {
