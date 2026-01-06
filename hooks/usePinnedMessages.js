@@ -15,9 +15,21 @@ export const usePinnedMessages = (chatId, messages) => {
   const unpinnedSubRef = useRef(null);
   const deletedForMeSubRef = useRef(null);
   const deletedForAllSubRef = useRef(null);
+  const loadingPinnedRef = useRef(false);
+  const lastLoadedChatIdRef = useRef(null);
 
   const loadPinnedMessages = useCallback(async () => {
     if (!chatId) return;
+    const chatIdStr = String(chatId);
+    
+    // Защита от повторных вызовов для того же чата
+    if (loadingPinnedRef.current && lastLoadedChatIdRef.current === chatIdStr) {
+      return;
+    }
+    
+    loadingPinnedRef.current = true;
+    lastLoadedChatIdRef.current = chatIdStr;
+    
     try {
       const pinned = await chatAPI.getPinnedMessages(chatId);
       const sorted = Array.isArray(pinned) 
@@ -27,6 +39,8 @@ export const usePinnedMessages = (chatId, messages) => {
       setViewedPinnedMessageId(null);
     } catch (error) {
       console.error('Error loading pinned messages:', error);
+    } finally {
+      loadingPinnedRef.current = false;
     }
   }, [chatId]);
 

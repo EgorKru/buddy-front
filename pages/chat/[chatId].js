@@ -72,12 +72,16 @@ export default function ChatPage() {
   const searchTimeoutRef = useRef(null);
   const [imageModal, setImageModal] = useState(null);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [fileName, setFileName] = useState('');
+  const selectedFileUrlRef = useRef(null);
   const fileInputRef = useRef(null);
   
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const sentAudioBlobRef = useRef(null);
   const messageInputRef = useRef(null);
+  const loadingMessagesRef = useRef(false);
   const messages = useChatMessages(chatId);
   
   const {
@@ -144,26 +148,47 @@ export default function ChatPage() {
     };
   }, [upsertMessage]);
 
+  const loadingChatRef = useRef(false);
+  const lastMarkedReadChatIdRef = useRef(null);
   const loadChat = useCallback(async () => {
     if (!chatId) return;
+    
+    // Защита от повторных вызовов для того же чата
+    const chatIdStr = String(chatId);
+    if (loadingChatRef.current && lastMarkedReadChatIdRef.current === chatIdStr) {
+      return;
+    }
+    
+    loadingChatRef.current = true;
+    lastMarkedReadChatIdRef.current = chatIdStr;
+    
     try {
-      await refreshChats();
-      // Загружаем read receipts при загрузке чата
-      // markChatAsRead может вернуть текущие read receipts или обновить их через WebSocket
-      if (markChatAsRead) {
-        await markChatAsRead(chatId);
+      // refreshChats уже вызывается в context/messaging при монтировании и подключении WebSocket
+      // Вызываем только если чата нет в списке (новый чат)
+      if (!chat) {
+        await refreshChats();
       }
+      // markChatAsRead вызывается в useChatRealtime, не дублируем здесь
       setLoading(false);
     } catch (error) {
       setLoading(false);
       if (error?.message?.includes('404')) {
         router.push('/');
       }
+    } finally {
+      loadingChatRef.current = false;
     }
   }, [chatId, router, refreshChats, markChatAsRead]);
 
   const loadMessages = useCallback(async (pageNum = 0, append = false) => {
     if (!chatId) return;
+    
+    // Защита от параллельных вызовов
+    if (loadingMessagesRef.current && !append) {
+      return;
+    }
+    
+    loadingMessagesRef.current = true;
     try {
       setLoadingMore(true);
       
@@ -220,8 +245,13 @@ export default function ChatPage() {
       isLoadingInitialRef.current = false;
     } finally {
       setLoadingMore(false);
+      loadingMessagesRef.current = false;
     }
   }, [chatId, upsertMessage]);
+
+  const loadedChatIdRef = useRef(null);
+  const loadedMessagesRef = useRef(false);
+  const loadedPinnedRef = useRef(false);
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -229,22 +259,55 @@ export default function ChatPage() {
       return;
     }
     if (chatId) {
-      scrollPositionSavedRef.current = false;
-      shouldRestorePositionRef.current = true;
-      userScrolledToBottomRef.current = false;
-      restoreAttemptsRef.current = 0;
-      if (!chat) {
-        setLoading(true);
-        loadChat();
-      } else {
-        setLoading(false);
+      const chatIdStr = String(chatId);
+      const isNewChat = loadedChatIdRef.current !== chatIdStr;
+      
+      if (isNewChat) {
+        // Очищаем выбранный файл при смене чата
+        if (selectedFileUrlRef.current) {
+          URL.revokeObjectURL(selectedFileUrlRef.current);
+          selectedFileUrlRef.current = null;
+        }
+        setSelectedFile(null);
+        setFileName('');
+        
+        scrollPositionSavedRef.current = false;
+        shouldRestorePositionRef.current = true;
+        userScrolledToBottomRef.current = false;
+        restoreAttemptsRef.current = 0;
+        loadedMessagesRef.current = false;
+        loadedPinnedRef.current = false;
+        loadedChatIdRef.current = chatIdStr;
+        
+        if (!chat) {
+          setLoading(true);
+          loadChat();
+        } else {
+          setLoading(false);
+        }
+        isLoadingInitialRef.current = true;
+        lastScrollTopRef.current = 0;
+        isUserScrollingUpRef.current = false;
+        
+        // Загружаем только если еще не загружали для этого чата
+        if (!loadedMessagesRef.current) {
+          loadMessages(0);
+          loadedMessagesRef.current = true;
+        }
+        if (!loadedPinnedRef.current) {
+          loadPinnedMessages();
+          loadedPinnedRef.current = true;
+        }
       }
-      isLoadingInitialRef.current = true;
-      lastScrollTopRef.current = 0;
-      isUserScrollingUpRef.current = false;
-      loadMessages(0);
-      loadPinnedMessages();
     }
+    
+    // Очистка при размонтировании
+    return () => {
+      if (selectedFileUrlRef.current) {
+        URL.revokeObjectURL(selectedFileUrlRef.current);
+        selectedFileUrlRef.current = null;
+      }
+    };
     
     if (typeof window !== 'undefined') {
       const checkReady = () => {
@@ -257,7 +320,7 @@ export default function ChatPage() {
       };
       setTimeout(checkReady, 100);
     }
-  }, [chatId, router, loadChat, loadMessages, chat]);
+  }, [chatId, router, loadChat, loadMessages, loadPinnedMessages, chat]);
 
   const isAtBottom = useCallback((threshold = 100) => {
     if (!messagesContainerRef.current) return false;
@@ -1115,9 +1178,9 @@ export default function ChatPage() {
       return;
     }
     
-    if (!newMessage.trim() || !user || sending) return;
-
-    const messageContent = newMessage.trimEnd();
+    if ((!newMessage.trim() && !selectedFile) || !user || sending || uploadingFile) return;
+    
+    const messageText = newMessage.trimEnd();
     
     // Сохраняем текущую высоту скролла и позицию перед отправкой
     if (messagesContainerRef.current) {
@@ -1131,11 +1194,80 @@ export default function ChatPage() {
     saveScrollPosition();
     
     const replyToId = replyingToMessageId;
+    const fileToSend = selectedFile;
     setNewMessage('');
     setReplyingToMessageId(null);
     setReplyingToMessage(null);
 
-    const result = await sendMessageHook(messageContent, 'TEXT', null, null, null, null, replyToId);
+    // Если есть выбранный файл, сначала загружаем его, потом отправляем
+    if (fileToSend) {
+      setUploadingFile(true);
+      try {
+        const isImage = fileToSend.type.startsWith('image/');
+        const uploadResponse = isImage 
+          ? await chatAPI.uploadImageFile(chatId, fileToSend)
+          : await chatAPI.uploadFile(chatId, fileToSend);
+        
+        if (!uploadResponse?.fileUrl) {
+          throw new Error('Не удалось загрузить файл: fileUrl не получен от сервера');
+        }
+        
+        if (typeof window !== 'undefined') {
+          console.log('[Chat] Upload successful, sending message:', {
+            fileUrl: uploadResponse.fileUrl,
+            type: isImage ? 'IMAGE' : 'FILE',
+            content: messageText || '(пусто)',
+            chatId
+          });
+        }
+        
+        const finalFileName = fileName.trim() || fileToSend.name;
+        const result = await sendMessageHook(messageText || '', isImage ? 'IMAGE' : 'FILE', uploadResponse.fileUrl, null, null, null, replyToId, finalFileName);
+        
+        if (result?.serverMessage) {
+          const messageId = result.serverMessage.id;
+          if (messageId) {
+            newMessageIdsRef.current.add(String(messageId));
+            setTimeout(() => {
+              newMessageIdsRef.current.delete(String(messageId));
+            }, 500);
+          }
+          addOptimistic(chatId, { ...result.serverMessage, status: MESSAGE_STATUS.SENT, isOptimistic: false });
+        } else if (result?.optimisticMessage) {
+          const messageId = result.optimisticMessage.id;
+          if (messageId) {
+            newMessageIdsRef.current.add(String(messageId));
+            setTimeout(() => {
+              newMessageIdsRef.current.delete(String(messageId));
+            }, 500);
+          }
+          addOptimistic(chatId, result.optimisticMessage);
+        }
+        
+        // Очищаем файл и URL только после успешной отправки
+        if (selectedFileUrlRef.current) {
+          URL.revokeObjectURL(selectedFileUrlRef.current);
+          selectedFileUrlRef.current = null;
+        }
+        setSelectedFile(null);
+        setFileName('');
+      } catch (error) {
+        console.error('Error uploading and sending file:', error);
+        alert(`Не удалось отправить файл: ${error.message || 'Неизвестная ошибка'}`);
+        // Возвращаем файл обратно при ошибке
+        setSelectedFile(fileToSend);
+        setFileName(fileToSend.name);
+        // Восстанавливаем URL для изображений
+        if (fileToSend && fileToSend.type.startsWith('image/') && !selectedFileUrlRef.current) {
+          selectedFileUrlRef.current = URL.createObjectURL(fileToSend);
+        }
+      } finally {
+        setUploadingFile(false);
+      }
+      return;
+    }
+
+    const result = await sendMessageHook(messageText, 'TEXT', null, null, null, null, replyToId);
 
     if (result?.serverMessage) {
       const messageId = result.serverMessage.id;
@@ -1970,6 +2102,7 @@ export default function ChatPage() {
                               isOwn={isOwn}
                               statusIcon={isOwn && !msg.deletedForMe && !msg.deletedForAll ? getMessageStatusIcon(status, readMeta) : null}
                               isPinned={isPinned}
+                              fileName={msg.fileName}
                             />
                           );
                         })()
@@ -2141,6 +2274,66 @@ export default function ChatPage() {
             </button>
           </div>
         )}
+        {selectedFile && (
+          <div className={styles.filePreview}>
+            {selectedFile.type.startsWith('image/') ? (
+              <div className={styles.imagePreview}>
+                <img 
+                  src={selectedFileUrlRef.current} 
+                  alt={selectedFile.name}
+                  className={styles.previewImage}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (selectedFileUrlRef.current) {
+                      URL.revokeObjectURL(selectedFileUrlRef.current);
+                      selectedFileUrlRef.current = null;
+                    }
+                    setSelectedFile(null);
+                    setFileName('');
+                  }}
+                  className={styles.removeFileButton}
+                  title="Удалить файл"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <div className={styles.filePreviewInfo}>
+                <File size={20} />
+                <div className={styles.filePreviewDetails}>
+                  <input
+                    type="text"
+                    value={fileName}
+                    onChange={(e) => setFileName(e.target.value)}
+                    className={styles.filePreviewNameInput}
+                    placeholder={selectedFile.name}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <div className={styles.filePreviewSize}>
+                    {(selectedFile.size / 1024).toFixed(1)} KB
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (selectedFileUrlRef.current) {
+                      URL.revokeObjectURL(selectedFileUrlRef.current);
+                      selectedFileUrlRef.current = null;
+                    }
+                    setSelectedFile(null);
+                    setFileName('');
+                  }}
+                  className={styles.removeFileButton}
+                  title="Удалить файл"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         <div className={styles.messageFormRow}>
         <textarea
           ref={messageInputRef}
@@ -2187,47 +2380,28 @@ export default function ChatPage() {
                   ref={fileInputRef}
                   type="file"
                   style={{ display: 'none' }}
-                  onChange={async (e) => {
+                  onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (!file || !chatId) return;
                     e.target.value = ''; // Сброс для возможности повторного выбора того же файла
                     
-                    setUploadingFile(true);
-                    try {
-                      const isImage = file.type.startsWith('image/');
-                      const uploadResponse = isImage 
-                        ? await chatAPI.uploadImageFile(chatId, file)
-                        : await chatAPI.uploadFile(chatId, file);
-                      
-                      if (uploadResponse?.fileUrl) {
-                        const result = await sendMessageHook('', isImage ? 'IMAGE' : 'FILE', uploadResponse.fileUrl);
-                        
-                        if (result?.serverMessage) {
-                          const messageId = result.serverMessage.id;
-                          if (messageId) {
-                            newMessageIdsRef.current.add(String(messageId));
-                            setTimeout(() => {
-                              newMessageIdsRef.current.delete(String(messageId));
-                            }, 500);
-                          }
-                          addOptimistic(chatId, { ...result.serverMessage, status: MESSAGE_STATUS.SENT, isOptimistic: false });
-                        } else if (result?.optimisticMessage) {
-                          const messageId = result.optimisticMessage.id;
-                          if (messageId) {
-                            newMessageIdsRef.current.add(String(messageId));
-                            setTimeout(() => {
-                              newMessageIdsRef.current.delete(String(messageId));
-                            }, 500);
-                          }
-                          addOptimistic(chatId, result.optimisticMessage);
-                        }
-                      }
-                    } catch (error) {
-                      console.error('Error uploading file:', error);
-                      alert(`Не удалось загрузить файл: ${error.message || 'Неизвестная ошибка'}`);
-                    } finally {
-                      setUploadingFile(false);
+                    // Освобождаем предыдущий URL если был
+                    if (selectedFileUrlRef.current) {
+                      URL.revokeObjectURL(selectedFileUrlRef.current);
+                      selectedFileUrlRef.current = null;
                     }
+                    
+                    // Создаем URL для превью изображения
+                    if (file.type.startsWith('image/')) {
+                      selectedFileUrlRef.current = URL.createObjectURL(file);
+                    }
+                    
+                    setSelectedFile(file);
+                    setFileName(file.name); // Устанавливаем оригинальное имя файла
+                    // Фокусируемся на поле ввода, чтобы пользователь мог добавить текст
+                    setTimeout(() => {
+                      messageInputRef.current?.focus();
+                    }, 100);
                   }}
                   accept="*/*"
                 />
@@ -2488,14 +2662,14 @@ export default function ChatPage() {
             )}
           </>
         )}
-        {(newMessage.trim() || editingMessageId) && !isRecording && (
+        {(newMessage.trim() || editingMessageId || selectedFile) && !isRecording && (
           <button
             type="submit"
-            disabled={(!newMessage.trim() && !editingMessageId) || (!editingContent.trim() && editingMessageId) || sending || isRecording}
+            disabled={(!newMessage.trim() && !editingMessageId && !selectedFile) || (!editingContent.trim() && editingMessageId) || sending || isRecording || uploadingFile}
             className={styles.sendButton}
             title={editingMessageId ? "Сохранить изменения" : "Отправить сообщение"}
           >
-            {sending ? (
+            {(sending || uploadingFile) ? (
               <Loader2 size={20} className={styles.spinner} />
             ) : (
               <Send size={20} />

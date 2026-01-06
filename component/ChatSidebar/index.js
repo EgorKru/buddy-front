@@ -122,6 +122,10 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
     // Загружаем последние сообщения для всех чатов, у которых нет lastMessage или оно неполное
     const chatsToLoad = chats.filter(chat => {
       const chatId = String(chat.id);
+      
+      // Пропускаем текущий открытый чат - он уже загружает сообщения на странице чата
+      if (currentChatId && String(currentChatId) === chatId) return false;
+      
       // Пропускаем, если уже загружаем
       if (loadingLastMessagesRef.current.has(chatId)) return false;
       // Загружаем, если нет lastMessage или оно неполное
@@ -150,6 +154,12 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
     // Загружаем последние сообщения параллельно
     const promises = chatsToLoad.map(async (chat) => {
       const chatId = String(chat.id);
+      
+      // Пропускаем загрузку для текущего открытого чата - он уже загружает сообщения на странице чата
+      if (currentChatId && String(currentChatId) === chatId) {
+        return;
+      }
+      
       if (loadingLastMessagesRef.current.has(chatId)) return;
       
       loadingLastMessagesRef.current.add(chatId);

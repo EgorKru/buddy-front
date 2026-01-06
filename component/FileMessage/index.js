@@ -44,20 +44,35 @@ const formatFileSize = (bytes) => {
   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
 };
 
-const getFileName = (fileUrl) => {
-  if (!fileUrl) return 'Файл';
+const getFileName = (fileUrl, originalFileName) => {
+  // Если есть оригинальное имя файла, используем его
+  if (originalFileName) {
+    const lastDotIndex = originalFileName.lastIndexOf('.');
+    if (lastDotIndex > 0) {
+      return {
+        name: originalFileName.substring(0, lastDotIndex),
+        extension: originalFileName.substring(lastDotIndex + 1)
+      };
+    }
+    return { name: originalFileName, extension: '' };
+  }
+  
+  // Иначе пытаемся извлечь из fileUrl
+  if (!fileUrl) return { name: 'Файл', extension: '' };
   const parts = fileUrl.split('/');
   const lastPart = parts[parts.length - 1];
-  // Убираем UUID, оставляем только расширение если есть
   const match = lastPart.match(/\.([^.]+)$/);
-  return match ? `Файл.${match[1]}` : 'Файл';
+  if (match) {
+    return { name: 'Файл', extension: match[1] };
+  }
+  return { name: 'Файл', extension: '' };
 };
 
-export default function FileMessage({ fileUrl, content, fileSize, mimeType, messageTime, isOwn, statusIcon, isPinned }) {
+export default function FileMessage({ fileUrl, content, fileSize, mimeType, messageTime, isOwn, statusIcon, isPinned, fileName: originalFileName }) {
   const [downloading, setDownloading] = useState(false);
   
   const FileIcon = getFileIcon(mimeType, fileUrl);
-  const fileName = getFileName(fileUrl);
+  const { name: fileName, extension } = getFileName(fileUrl, originalFileName);
   const displaySize = fileSize ? formatFileSize(fileSize) : null;
 
   const handleDownload = async (e) => {
@@ -66,10 +81,11 @@ export default function FileMessage({ fileUrl, content, fileSize, mimeType, mess
     
     setDownloading(true);
     try {
-      const downloadUrl = chatAPI.getFileUrl(fileUrl, true, fileName);
+      const fullFileName = extension ? `${fileName}.${extension}` : fileName;
+      const downloadUrl = chatAPI.getFileUrl(fileUrl, true, fullFileName);
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.download = fileName;
+      link.download = fullFileName;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -106,38 +122,45 @@ export default function FileMessage({ fileUrl, content, fileSize, mimeType, mess
           <FileIcon size={32} className={styles.fileIcon} />
         </div>
         <div className={styles.fileInfo}>
-          <div className={styles.fileName}>{fileName}</div>
+          <div className={styles.fileNameRow}>
+            <span className={styles.fileName}>{fileName}</span>
+            {extension && (
+              <span className={styles.fileExtension}>.{extension}</span>
+            )}
+          </div>
           {displaySize && (
             <div className={styles.fileSize}>{displaySize}</div>
           )}
-        </div>
-        <button
-          type="button"
-          className={styles.downloadButton}
-          onClick={handleDownload}
-          disabled={downloading}
-          title="Скачать"
-        >
-          {downloading ? (
-            <div className={styles.spinner} />
-          ) : (
-            <Download size={20} />
+          {content && content.trim() && (
+            <div className={styles.fileCaption}>
+              {content}
+            </div>
           )}
-        </button>
-      </div>
-      {content && content.trim() && (
-        <div className={styles.fileCaption}>
-          {content}
         </div>
-      )}
-      <div className={styles.fileMeta}>
-        {isPinned && (
-          <span className={styles.pinnedIcon} title="Закреплено">📌</span>
-        )}
-        <span className={styles.messageTime}>{messageTime}</span>
-        {statusIcon && (
-          <span className={styles.statusIcon}>{statusIcon}</span>
-        )}
+        <div className={styles.fileRightColumn}>
+          <button
+            type="button"
+            className={styles.downloadButton}
+            onClick={handleDownload}
+            disabled={downloading}
+            title="Скачать"
+          >
+            {downloading ? (
+              <div className={styles.spinner} />
+            ) : (
+              <Download size={20} />
+            )}
+          </button>
+          <div className={styles.fileMeta}>
+            {isPinned && (
+              <span className={styles.pinnedIcon} title="Закреплено">📌</span>
+            )}
+            <span className={styles.messageTime}>{messageTime}</span>
+            {statusIcon && (
+              <span className={styles.statusIcon}>{statusIcon}</span>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -17,11 +17,17 @@ export const useNotifications = () => {
   const [loading, setLoading] = useState(true);
   const { client, connected } = useStomp();
   const subscriptionsRef = useRef([]);
+  const loadingRef = useRef(false);
+  const loadedRef = useRef(false);
 
   useEffect(() => {
     if (!isAuthenticated()) {
       setNotifications([]);
       setLoading(false);
+      return;
+    }
+    // Защита от повторных вызовов
+    if (loadedRef.current || loadingRef.current) {
       return;
     }
     loadNotifications();
@@ -63,6 +69,12 @@ export const useNotifications = () => {
   }, [client, connected]);
 
   const loadNotifications = async () => {
+    // Защита от параллельных вызовов
+    if (loadingRef.current) {
+      return;
+    }
+    
+    loadingRef.current = true;
     setLoading(true);
     try {
       if (!isAuthenticated()) {
@@ -75,10 +87,12 @@ export const useNotifications = () => {
         new Date(b.createdAt) - new Date(a.createdAt)
       );
       setNotifications(sorted);
+      loadedRef.current = true;
     } catch (error) {
       setNotifications([]);
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
   };
 

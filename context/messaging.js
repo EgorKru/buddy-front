@@ -532,25 +532,54 @@ export const MessagingProvider = ({ children }) => {
     }
   }, []);
 
+  const lastConnectedRef = useRef(false);
+  const hasInitialLoadRef = useRef(false);
+
+  // Объединенный useEffect для начальной загрузки чатов
   useEffect(() => {
     if (!isAuthenticated()) {
       dispatch({ type: actionTypes.SET_CHATS, payload: { chats: [] } });
+      hasInitialLoadRef.current = false;
+      lastConnectedRef.current = false;
       return;
     }
-    refreshChats();
-  }, [refreshChats]);
+    
+    // Загружаем чаты только один раз:
+    // 1. При подключении WebSocket (предпочтительно, так как соединение готово)
+    // 2. Или сразу, если WebSocket еще не подключен
+    if (connected && !lastConnectedRef.current) {
+      lastConnectedRef.current = true;
+      if (!hasInitialLoadRef.current) {
+        hasInitialLoadRef.current = true;
+        refreshChats();
+      }
+    } else if (!connected) {
+      lastConnectedRef.current = false;
+      // Если WebSocket еще не подключен и еще не загружали, загружаем сразу
+      if (!hasInitialLoadRef.current) {
+        hasInitialLoadRef.current = true;
+        refreshChats();
+      }
+    }
+  }, [connected, refreshChats]);
 
   useEffect(() => {
     const handleAuthMaybeChanged = () => {
       const token = getToken();
       if (!token) {
         lastTokenRef.current = null;
+        hasInitialLoadRef.current = false;
         dispatch({ type: actionTypes.SET_CHATS, payload: { chats: [] } });
         return;
       }
       if (lastTokenRef.current !== token) {
         lastTokenRef.current = token;
-        refreshChats();
+        hasInitialLoadRef.current = false;
+        // Если WebSocket подключен, загрузим при следующем рендере через первый useEffect
+        // Иначе загружаем сразу
+        if (!connected) {
+          refreshChats();
+        }
       }
     };
 
@@ -578,13 +607,6 @@ export const MessagingProvider = ({ children }) => {
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [refreshChats]);
-
-  useEffect(() => {
-    if (!isAuthenticated()) return;
-    if (connected) {
-      refreshChats();
-    }
   }, [connected, refreshChats]);
 
   const setActiveChatId = useCallback((chatId) => {

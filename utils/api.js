@@ -102,9 +102,22 @@ export const chatAPI = {
 
   sendMessage: async (chatId, content, type = 'TEXT', fileUrl = null, replyToMessageId = null) => {
     const body = { 
-      content: (type === 'VOICE' || type === 'IMAGE' || type === 'FILE') ? (content || '') : content, 
       type 
     };
+    
+    // Для IMAGE и FILE content опционален - передаем только если не пустой
+    if (type === 'IMAGE' || type === 'FILE') {
+      if (content && content.trim()) {
+        body.content = content.trim();
+      }
+      // Если content пустой - не передаем поле вообще (будет null в БД)
+    } else if (type === 'VOICE') {
+      // Для VOICE content всегда null, не передаем
+    } else {
+      // Для TEXT и других типов content обязателен
+      body.content = content;
+    }
+    
     if ((type === 'VOICE' || type === 'IMAGE' || type === 'FILE') && fileUrl) {
       body.fileUrl = fileUrl;
     }

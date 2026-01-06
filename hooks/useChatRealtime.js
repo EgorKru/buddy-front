@@ -16,9 +16,23 @@ export const useChatRealtime = (chatId) => {
 
   const topicSubRef = useRef(null);
   const voiceTopicSubRef = useRef(null);
+  const lastMarkedReadRef = useRef(null);
+  const markReadTimeoutRef = useRef(null);
+  const loadingInitialRef = useRef(false);
+  const lastLoadedChatIdRef = useRef(null);
 
   const loadInitial = useCallback(async () => {
     if (!chatId) return;
+    const chatIdStr = String(chatId);
+    
+    // Защита от повторных вызовов для того же чата
+    if (loadingInitialRef.current && lastLoadedChatIdRef.current === chatIdStr) {
+      return;
+    }
+    
+    loadingInitialRef.current = true;
+    lastLoadedChatIdRef.current = chatIdStr;
+    
     try {
       const response = await chatAPI.getMessages(chatId, { page: 0, size: 50 });
       const list = Array.isArray(response?.content) ? response.content : [];
@@ -26,16 +40,26 @@ export const useChatRealtime = (chatId) => {
       for (const m of ordered) {
         upsertMessage({ ...m, status: MESSAGE_STATUS.SENT, isOptimistic: false }, { unreadDelta: 0 });
       }
-    } catch (e) {}
+    } catch (e) {} finally {
+      loadingInitialRef.current = false;
+    }
   }, [chatId, upsertMessage]);
 
   useEffect(() => {
     if (!chatId) return;
+    const chatIdStr = String(chatId);
     setActiveChatId(chatId);
-    markChatAsRead(chatId);
-    loadInitial();
+    
+    // Вызываем markChatAsRead только если еще не вызывали для этого чата
+    if (lastMarkedReadRef.current !== chatIdStr) {
+      lastMarkedReadRef.current = chatIdStr;
+      markChatAsRead(chatId);
+    }
+    
+    // loadInitial дублирует loadMessages из основного компонента, убираем
+    // loadInitial();
     return () => setActiveChatId(null);
-  }, [chatId, setActiveChatId, markChatAsRead, loadInitial]);
+  }, [chatId, setActiveChatId, markChatAsRead]);
 
   useEffect(() => {
     if (!chatId || !client || !connected || !client.connected || !client.active) {
@@ -97,8 +121,15 @@ export const useChatRealtime = (chatId) => {
           { unreadDelta: isVisible ? 0 : undefined }
         );
 
+        // Throttle markChatAsRead - вызываем не чаще раза в 2 секунды
         if (isVisible) {
-          markChatAsRead(chatId);
+          if (markReadTimeoutRef.current) {
+            clearTimeout(markReadTimeoutRef.current);
+          }
+          markReadTimeoutRef.current = setTimeout(() => {
+            markChatAsRead(chatId);
+            markReadTimeoutRef.current = null;
+          }, 2000);
         }
       });
       topicSubRef.current = sub;
@@ -139,6 +170,10 @@ export const useChatRealtime = (chatId) => {
       if (voiceTopicSubRef.current) {
         safeUnsubscribe(voiceTopicSubRef.current);
         voiceTopicSubRef.current = null;
+      }
+      if (markReadTimeoutRef.current) {
+        clearTimeout(markReadTimeoutRef.current);
+        markReadTimeoutRef.current = null;
       }
     };
   }, [chatId, client, connected, upsertMessage, updateMessage, markChatAsRead]);
