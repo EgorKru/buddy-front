@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
-import { Send, Loader2, Menu, Check, CheckCheck, AlertCircle, Clock, ArrowLeft, Mic, X, ChevronDown, Pause, Play, Lock, Unlock, Trash2, Edit, Reply, Pin, PinOff, Forward, Search, ChevronUp } from 'lucide-react';
+import { Send, Loader2, Menu, Check, CheckCheck, AlertCircle, Clock, ArrowLeft, Mic, X, ChevronDown, Pause, Play, Lock, Unlock, Trash2, Edit, Reply, Pin, PinOff, Forward, Search, ChevronUp, Paperclip, File } from 'lucide-react';
 import { chatAPI, getCurrentUser, isAuthenticated } from '@/utils/api';
 import { getChatName } from '@/utils/chatHelpers';
 import { formatChatDate, formatChatTime, getOnlineStatus } from '@/utils/dateHelpers';
@@ -10,6 +10,9 @@ import { MESSAGE_STATUS } from '@/utils/messageQueue';
 import ChatSidebar from '@/component/ChatSidebar';
 import VoiceMessagePlayer from '@/component/VoiceMessagePlayer';
 import MessageContextMenu from '@/component/MessageContextMenu';
+import ImageMessage from '@/component/ImageMessage';
+import FileMessage from '@/component/FileMessage';
+import ImageModal from '@/component/ImageModal';
 import styles from '@/styles/chat.module.css';
 import { useChats, useChatMessages } from '@/context/messaging';
 import { useChatRealtime } from '@/hooks/useChatRealtime';
@@ -67,6 +70,9 @@ export default function ChatPage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const searchInputRef = useRef(null);
   const searchTimeoutRef = useRef(null);
+  const [imageModal, setImageModal] = useState(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const fileInputRef = useRef(null);
   
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
@@ -1922,6 +1928,51 @@ export default function ChatPage() {
                             />
                           );
                         })()
+                      ) : msg.type === 'IMAGE' && msg.fileUrl ? (
+                        (() => {
+                          const status = msg.status || (msg.isOptimistic ? MESSAGE_STATUS.SENDING : MESSAGE_STATUS.SENT);
+                          const readMeta = status === MESSAGE_STATUS.SENT ? getReadMetaForMessage(msg) : null;
+                          const isPinnedInList = pinnedMessages.some(p => {
+                            const pinnedMsgId = p.message?.id;
+                            return pinnedMsgId && Number(pinnedMsgId) === Number(msg.id);
+                          });
+                          const isPinned = msg.isPinned || isPinnedInList;
+                          return (
+                            <ImageMessage
+                              fileUrl={msg.fileUrl}
+                              content={msg.content}
+                              messageTime={formatChatTime(msg.createdAt)}
+                              isOwn={isOwn}
+                              statusIcon={isOwn && !msg.deletedForMe && !msg.deletedForAll ? getMessageStatusIcon(status, readMeta) : null}
+                              isPinned={isPinned}
+                              onImageClick={(imageUrl, fileUrl) => {
+                                setImageModal({ imageUrl, fileUrl });
+                              }}
+                            />
+                          );
+                        })()
+                      ) : msg.type === 'FILE' && msg.fileUrl ? (
+                        (() => {
+                          const status = msg.status || (msg.isOptimistic ? MESSAGE_STATUS.SENDING : MESSAGE_STATUS.SENT);
+                          const readMeta = status === MESSAGE_STATUS.SENT ? getReadMetaForMessage(msg) : null;
+                          const isPinnedInList = pinnedMessages.some(p => {
+                            const pinnedMsgId = p.message?.id;
+                            return pinnedMsgId && Number(pinnedMsgId) === Number(msg.id);
+                          });
+                          const isPinned = msg.isPinned || isPinnedInList;
+                          return (
+                            <FileMessage
+                              fileUrl={msg.fileUrl}
+                              content={msg.content}
+                              fileSize={msg.fileSize}
+                              mimeType={msg.mimeType}
+                              messageTime={formatChatTime(msg.createdAt)}
+                              isOwn={isOwn}
+                              statusIcon={isOwn && !msg.deletedForMe && !msg.deletedForAll ? getMessageStatusIcon(status, readMeta) : null}
+                              isPinned={isPinned}
+                            />
+                          );
+                        })()
                       ) : (
                         <div className={`${styles.messageText} ${msg.isOptimistic ? styles.messagePending : ''} ${msg.status === MESSAGE_STATUS.FAILED ? styles.messageFailed : ''}`}>
                           {msg.forwardedFrom && (
@@ -1938,6 +1989,14 @@ export default function ChatPage() {
                               {msg.forwardedFrom.originalType === 'VOICE' ? (
                                 <div className={styles.messageForwardedContent}>
                                   🎤 Голосовое сообщение
+                                </div>
+                              ) : msg.forwardedFrom.originalType === 'IMAGE' ? (
+                                <div className={styles.messageForwardedContent}>
+                                  📷 Фото
+                                </div>
+                              ) : msg.forwardedFrom.originalType === 'FILE' ? (
+                                <div className={styles.messageForwardedContent}>
+                                  📎 Файл
                                 </div>
                               ) : (
                                 <div className={styles.messageForwardedContent}>
@@ -1959,7 +2018,10 @@ export default function ChatPage() {
                                   {msg.replyTo.senderDisplayName || msg.replyTo.senderUsername}
                                 </div>
                                 <div className={styles.messageReplyText}>
-                                  {msg.replyTo.content || (msg.replyTo.type === 'VOICE' ? '🎤 Голосовое сообщение' : '')}
+                                  {msg.replyTo.type === 'VOICE' ? '🎤 Голосовое сообщение' : 
+                                   msg.replyTo.type === 'IMAGE' ? '📷 Фото' :
+                                   msg.replyTo.type === 'FILE' ? '📎 Файл' :
+                                   msg.replyTo.content || ''}
                                 </div>
                               </div>
                             </div>
@@ -2063,7 +2125,10 @@ export default function ChatPage() {
                 В ответ {replyingToMessage.senderDisplayName || replyingToMessage.senderUsername}
               </div>
               <div className={styles.replyIndicatorText}>
-                {replyingToMessage.content || (replyingToMessage.type === 'VOICE' ? '🎤 Голосовое сообщение' : '')}
+                {replyingToMessage.type === 'VOICE' ? '🎤 Голосовое сообщение' : 
+                 replyingToMessage.type === 'IMAGE' ? '📷 Фото' :
+                 replyingToMessage.type === 'FILE' ? '📎 Файл' :
+                 replyingToMessage.content || ''}
               </div>
             </div>
             <button
@@ -2108,17 +2173,76 @@ export default function ChatPage() {
         {!newMessage.trim() && !editingMessageId && (
           <>
             {!isRecording && (
-              <button
-                ref={buttonRef}
-                type="button"
-                onMouseDown={handleMouseDown}
-                onTouchStart={handleTouchStart}
-                className={styles.voiceButton}
-                title="Зажмите для записи, потяните вверх для блокировки"
-                disabled={sending}
-              >
-                <Mic size={20} />
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className={styles.attachButton}
+                  title="Прикрепить файл или изображение"
+                  disabled={sending || uploadingFile}
+                >
+                  <Paperclip size={20} />
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  style={{ display: 'none' }}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file || !chatId) return;
+                    e.target.value = ''; // Сброс для возможности повторного выбора того же файла
+                    
+                    setUploadingFile(true);
+                    try {
+                      const isImage = file.type.startsWith('image/');
+                      const uploadResponse = isImage 
+                        ? await chatAPI.uploadImageFile(chatId, file)
+                        : await chatAPI.uploadFile(chatId, file);
+                      
+                      if (uploadResponse?.fileUrl) {
+                        const result = await sendMessageHook('', isImage ? 'IMAGE' : 'FILE', uploadResponse.fileUrl);
+                        
+                        if (result?.serverMessage) {
+                          const messageId = result.serverMessage.id;
+                          if (messageId) {
+                            newMessageIdsRef.current.add(String(messageId));
+                            setTimeout(() => {
+                              newMessageIdsRef.current.delete(String(messageId));
+                            }, 500);
+                          }
+                          addOptimistic(chatId, { ...result.serverMessage, status: MESSAGE_STATUS.SENT, isOptimistic: false });
+                        } else if (result?.optimisticMessage) {
+                          const messageId = result.optimisticMessage.id;
+                          if (messageId) {
+                            newMessageIdsRef.current.add(String(messageId));
+                            setTimeout(() => {
+                              newMessageIdsRef.current.delete(String(messageId));
+                            }, 500);
+                          }
+                          addOptimistic(chatId, result.optimisticMessage);
+                        }
+                      }
+                    } catch (error) {
+                      console.error('Error uploading file:', error);
+                      alert(`Не удалось загрузить файл: ${error.message || 'Неизвестная ошибка'}`);
+                    } finally {
+                      setUploadingFile(false);
+                    }
+                  }}
+                  accept="*/*"
+                />
+                <button
+                  ref={buttonRef}
+                  type="button"
+                  onMouseDown={handleMouseDown}
+                  onTouchStart={handleTouchStart}
+                  className={styles.voiceButton}
+                  title="Зажмите для записи, потяните вверх для блокировки"
+                  disabled={sending}
+                >
+                  <Mic size={20} />
+                </button>
+              </>
             )}
             {isRecording && !isLocked && (
               <div className={styles.voiceButtonWrapper}>
@@ -2423,6 +2547,14 @@ export default function ChatPage() {
         onChatSelect={(chatId) => setForwardModal(prev => ({ ...prev, selectedChatId: chatId }))}
         onCommentChange={(comment) => setForwardModal(prev => ({ ...prev, comment }))}
       />
+
+      {imageModal && (
+        <ImageModal
+          imageUrl={imageModal.imageUrl}
+          fileUrl={imageModal.fileUrl}
+          onClose={() => setImageModal(null)}
+        />
+      )}
     </div>
   );
 }

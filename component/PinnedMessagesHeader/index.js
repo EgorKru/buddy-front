@@ -1,4 +1,4 @@
-import { Mic, X } from 'lucide-react';
+import { Mic, X, Image as ImageIcon, File } from 'lucide-react';
 import { chatAPI } from '@/utils/api';
 import styles from '@/styles/chat.module.css';
 
@@ -92,6 +92,16 @@ export default function PinnedMessagesHeader({
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Mic size={14} style={{ color: '#6b7280', flexShrink: 0 }} />
                 <span>Голосовое сообщение {msg.duration ? `(${Math.round(msg.duration)}с)` : ''}</span>
+              </div>
+            ) : msg.type === 'IMAGE' ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <ImageIcon size={14} style={{ color: '#6b7280', flexShrink: 0 }} />
+                <span>{msg.content || '📷 Фото'}</span>
+              </div>
+            ) : msg.type === 'FILE' ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <File size={14} style={{ color: '#6b7280', flexShrink: 0 }} />
+                <span>{msg.content || '📎 Файл'}</span>
               </div>
             ) : (
               msg.content || ''

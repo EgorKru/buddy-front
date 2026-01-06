@@ -1,0 +1,192 @@
+.imageMessage {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 100%;
+  margin: 0.25rem 0;
+}
+
+.ownMessage {
+  align-items: flex-end;
+}
+
+.imageContainer {
+  position: relative;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: #f0f0f0;
+  max-width: 400px;
+  max-height: 400px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.imageContainer:hover {
+  transform: scale(1.01);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.imageContainer:hover .imageOverlay {
+  opacity: 1;
+}
+
+.image {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 400px;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.image.loaded {
+  opacity: 1;
+}
+
+.loadingOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(240, 240, 240, 0.9);
+  z-index: 1;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e0e0e0;
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.imageOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  background: rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 2;
+}
+
+.zoomButton,
+.downloadButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  color: #333;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.zoomButton:hover,
+.downloadButton:hover {
+  background: white;
+  transform: scale(1.1);
+}
+
+.imageCaption {
+  padding: 0.5rem 0.75rem;
+  background: #f5f7fa;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  color: #333;
+  word-wrap: break-word;
+  max-width: 400px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.ownMessage .imageCaption {
+  background: #e3f2fd;
+  text-align: right;
+}
+
+.imageMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.7rem;
+  color: #9ca3af;
+  margin-top: 0.25rem;
+}
+
+.ownMessage .imageMeta {
+  justify-content: flex-end;
+}
+
+.messageTime {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.pinnedIcon {
+  font-size: 0.75rem;
+}
+
+.statusIcon {
+  display: flex;
+  align-items: center;
+}
+
+.errorMessage {
+  padding: 1rem;
+  background: #fee;
+  border: 1px solid #fcc;
+  border-radius: 0.5rem;
+  color: #c33;
+  font-size: 0.875rem;
+}
+
+@media (max-width: 768px) {
+  .imageContainer {
+    max-width: 300px;
+    max-height: 300px;
+  }
+
+  .imageCaption {
+    max-width: 300px;
+  }
+}
+
+@media (max-width: 480px) {
+  .imageContainer {
+    max-width: 250px;
+    max-height: 250px;
+  }
+
+  .imageCaption {
+    max-width: 250px;
+  }
+
+  .zoomButton,
+  .downloadButton {
+    width: 36px;
+    height: 36px;
+  }
+}
+

@@ -104,10 +104,15 @@ export const useMessageSender = (chatId, onMessageSent) => {
 
   const sendMessage = useCallback(async (content, type = 'TEXT', fileUrl = null, voiceData = null, voiceMimeType = null, duration = null, replyToMessageId = null) => {
     if (type === 'VOICE' && !fileUrl && !voiceData) return null;
-    if (type !== 'VOICE' && !content.trim()) return null;
+    if (type === 'IMAGE' && !fileUrl) return null;
+    if (type === 'FILE' && !fileUrl) return null;
+    if (type !== 'VOICE' && type !== 'IMAGE' && type !== 'FILE' && !content.trim()) return null;
     if (sending) return null;
 
-    const messageContent = type === 'VOICE' ? '🎤 Голосовое сообщение' : content.trim();
+    const messageContent = type === 'VOICE' ? '🎤 Голосовое сообщение' : 
+                          type === 'IMAGE' ? (content?.trim() || '📷 Фото') : 
+                          type === 'FILE' ? (content?.trim() || '📎 Файл') : 
+                          content.trim();
     const user = getCurrentUser();
     const optimisticMessage = createOptimisticMessage(messageContent, type, chatId, user, fileUrl);
 
@@ -154,6 +159,19 @@ export const useMessageSender = (chatId, onMessageSent) => {
             } else {
               throw new Error('Neither fileUrl nor voiceData provided for VOICE message');
             }
+          } else if (type === 'IMAGE' || type === 'FILE') {
+            // Для IMAGE и FILE всегда используем fileUrl
+            if (fileUrl) {
+              payload.fileUrl = fileUrl;
+              if (content && content.trim()) {
+                payload.content = content.trim();
+              }
+              if (typeof window !== 'undefined') {
+                console.log(`[MessageSender] Sending ${type} message with fileUrl:`, { chatId, fileUrl, content });
+              }
+            } else {
+              throw new Error(`fileUrl is required for ${type} message`);
+            }
           } else {
             payload.content = messageContent;
           }
@@ -183,9 +201,9 @@ export const useMessageSender = (chatId, onMessageSent) => {
         }
       }
 
-      if (type === 'VOICE') {
+      if (type === 'VOICE' || type === 'IMAGE' || type === 'FILE') {
         setSending(false);
-        throw new Error('Voice messages can only be sent via WebSocket. WebSocket is not connected.');
+        throw new Error(`${type} messages can only be sent via WebSocket. WebSocket is not connected.`);
       }
 
       const serverMessage = await chatAPI.sendMessage(chatId, messageContent, type, null, replyToMessageId);
@@ -218,17 +236,24 @@ export const useMessageSender = (chatId, onMessageSent) => {
     const sendMessageFn = async (message) => {
       if (message.status === MESSAGE_STATUS.SENT) return null;
 
-      if (message.type === 'VOICE') {
+      if (message.type === 'VOICE' || message.type === 'IMAGE' || message.type === 'FILE') {
         if (!message.fileUrl) return null;
         if (client.connected && client.active) {
           try {
+            const payload = {
+              chatId: parseInt(chatId),
+              type: message.type,
+              fileUrl: message.fileUrl,
+            };
+            if (message.type === 'VOICE' && message.duration) {
+              payload.duration = message.duration;
+            }
+            if (message.content && message.content.trim()) {
+              payload.content = message.content.trim();
+            }
             client.publish({
               destination: '/app/chat.sendMessage',
-              body: JSON.stringify({
-                chatId: parseInt(chatId),
-                type: 'VOICE',
-                fileUrl: message.fileUrl,
-              }),
+              body: JSON.stringify(payload),
             });
             return { success: true };
           } catch (error) {}

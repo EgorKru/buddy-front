@@ -102,10 +102,10 @@ export const chatAPI = {
 
   sendMessage: async (chatId, content, type = 'TEXT', fileUrl = null, replyToMessageId = null) => {
     const body = { 
-      content: type === 'VOICE' ? '' : content, 
+      content: (type === 'VOICE' || type === 'IMAGE' || type === 'FILE') ? (content || '') : content, 
       type 
     };
-    if (type === 'VOICE' && fileUrl) {
+    if ((type === 'VOICE' || type === 'IMAGE' || type === 'FILE') && fileUrl) {
       body.fileUrl = fileUrl;
     }
     if (replyToMessageId) {
@@ -174,6 +174,102 @@ export const chatAPI = {
     return result;
   },
 
+  uploadImageFile: async (chatId, imageFile) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const formData = new FormData();
+    formData.append('file', imageFile);
+
+    const headers = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const uploadUrl = getApiUrl(`/chats/${chatId}/files/image`);
+    
+    if (typeof window !== 'undefined') {
+      console.log('[API] Uploading image file:', { chatId, url: uploadUrl, fileName: imageFile.name, fileSize: imageFile.size, fileType: imageFile.type });
+    }
+
+    const response = await fetch(uploadUrl, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (response.status === 401) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
+      throw new Error('Unauthorized');
+    }
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Upload failed' }));
+      if (typeof window !== 'undefined') {
+        console.error('[API] Image upload failed:', { status: response.status, error });
+      }
+      throw new Error(error.message || `Upload failed with status ${response.status}`);
+    }
+
+    const result = await response.json();
+    
+    if (typeof window !== 'undefined') {
+      console.log('[API] Image upload successful:', result);
+    }
+    
+    return result;
+  },
+
+  uploadFile: async (chatId, file) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const headers = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const uploadUrl = getApiUrl(`/chats/${chatId}/files/file`);
+    
+    if (typeof window !== 'undefined') {
+      console.log('[API] Uploading file:', { chatId, url: uploadUrl, fileName: file.name, fileSize: file.size, fileType: file.type });
+    }
+
+    const response = await fetch(uploadUrl, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (response.status === 401) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
+      throw new Error('Unauthorized');
+    }
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Upload failed' }));
+      if (typeof window !== 'undefined') {
+        console.error('[API] File upload failed:', { status: response.status, error });
+      }
+      throw new Error(error.message || `Upload failed with status ${response.status}`);
+    }
+
+    const result = await response.json();
+    
+    if (typeof window !== 'undefined') {
+      console.log('[API] File upload successful:', result);
+    }
+    
+    return result;
+  },
+
   sendVoiceMessage: async (chatId, voiceData, voiceMimeType = 'audio/webm') => {
     return apiRequest(`/chats/${chatId}/messages`, {
       method: 'POST',
@@ -186,9 +282,45 @@ export const chatAPI = {
     // Убираем начальный "/" если есть
     const cleanPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
     // fileUrl из БД: "voices/14/11/uuid.webm"
-    // Endpoint: /api/chats/files/voice/{*filePath}
-    // Итоговый URL: /api/chats/files/voice/voices/14/11/uuid.webm
-    return getApiUrl(`/chats/files/voice/${cleanPath}`);
+    // Endpoint: /api/chats/files/{fileUrl}
+    // Итоговый URL: /api/chats/files/voices/14/11/uuid.webm
+    return getApiUrl(`/chats/files/${cleanPath}`);
+  },
+
+  getImageFileUrl: (filePath, download = false, filename = null) => {
+    if (!filePath) return null;
+    const cleanPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
+    // fileUrl из БД: "images/1/12/uuid.jpg"
+    // Endpoint: /api/chats/files/{fileUrl}
+    // Итоговый URL: /api/chats/files/images/1/12/uuid.jpg
+    let url = getApiUrl(`/chats/files/${cleanPath}`);
+    const params = new URLSearchParams();
+    if (download) {
+      params.append('download', 'true');
+      if (filename) {
+        params.append('filename', filename);
+      }
+    }
+    const queryString = params.toString();
+    return queryString ? `${url}?${queryString}` : url;
+  },
+
+  getFileUrl: (filePath, download = false, filename = null) => {
+    if (!filePath) return null;
+    const cleanPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
+    // fileUrl из БД: "files/1/12/uuid.pdf"
+    // Endpoint: /api/chats/files/{fileUrl}
+    // Итоговый URL: /api/chats/files/files/1/12/uuid.pdf
+    let url = getApiUrl(`/chats/files/${cleanPath}`);
+    const params = new URLSearchParams();
+    if (download) {
+      params.append('download', 'true');
+      if (filename) {
+        params.append('filename', filename);
+      }
+    }
+    const queryString = params.toString();
+    return queryString ? `${url}?${queryString}` : url;
   },
 
   markChatAsRead: async (chatId) => {
