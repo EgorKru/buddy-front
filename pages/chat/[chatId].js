@@ -2027,6 +2027,19 @@ export default function ChatPage() {
                     onClick={() => selectionMode && toggleMessageSelection(msg.id)}
                     data-message-id={msg.id}
                   >
+                    {selectionMode && (
+                      <div className={styles.messageCheckbox}>
+                        <input
+                          type="checkbox"
+                          checked={selectedMessages.has(msg.id)}
+                          onChange={() => {}}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleMessageSelection(msg.id);
+                          }}
+                        />
+                      </div>
+                    )}
                     {!isOwn && (
                       <div className={styles.messageAvatar}>
                         {msg.senderDisplayName?.[0] || msg.senderUsername?.[0] || '?'}

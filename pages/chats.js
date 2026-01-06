@@ -134,6 +134,8 @@ export default function Chats() {
         <Search size={20} className={styles.searchIcon} />
         <input
           type="text"
+          id="chats-search"
+          name="searchQuery"
           placeholder="Поиск чатов..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -250,6 +252,8 @@ export default function Chats() {
                   <input
                     ref={createChat.searchInputRef}
                     type="text"
+                    id="create-chat-search"
+                    name="participantSearch"
                     value={createChat.participantUsernames}
                     onChange={createChat.handleSearchInputChange}
                     onFocus={() => {

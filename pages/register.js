@@ -109,6 +109,7 @@ export default function Register() {
             <label>Имя пользователя</label>
             <input
               type="text"
+              id="register-username"
               name="username"
               value={formData.username}
               onChange={handleChange}
@@ -123,6 +124,7 @@ export default function Register() {
             <label>Email</label>
             <input
               type="email"
+              id="register-email"
               name="email"
               value={formData.email}
               onChange={handleChange}
@@ -135,6 +137,7 @@ export default function Register() {
             <label>Отображаемое имя (необязательно)</label>
             <input
               type="text"
+              id="register-displayName"
               name="displayName"
               value={formData.displayName}
               onChange={handleChange}
@@ -147,6 +150,7 @@ export default function Register() {
             <div className={styles.passwordContainer}>
               <input
                 type={showPassword ? "text" : "password"}
+                id="register-password"
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
