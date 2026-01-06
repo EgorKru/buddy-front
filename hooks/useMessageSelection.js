@@ -18,6 +18,11 @@ export const useMessageSelection = () => {
       } else {
         newSet.add(messageId);
       }
+      
+      if (newSet.size === 0) {
+        setSelectionMode(false);
+      }
+      
       return newSet;
     });
   }, []);

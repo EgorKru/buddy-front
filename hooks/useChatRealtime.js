@@ -80,6 +80,17 @@ export const useChatRealtime = (chatId) => {
         const dto = data;
         if (Number(dto.chatId) !== Number(chatId)) return;
 
+        const currentUser = getCurrentUser();
+        const isOwn = currentUser?.id && dto?.senderId && Number(currentUser.id) === Number(dto.senderId);
+        
+        if (isOwn) {
+          const messageTime = new Date(dto.createdAt || Date.now()).getTime();
+          const now = Date.now();
+          if (now - messageTime < 2000) {
+            return;
+          }
+        }
+
         const isVisible = typeof document !== 'undefined' && document.visibilityState === 'visible';
         upsertMessage(
           { ...dto, status: MESSAGE_STATUS.SENT, isOptimistic: false },

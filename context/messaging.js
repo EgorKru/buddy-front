@@ -223,9 +223,17 @@ const reducer = (state, action) => {
         }
       }
 
-      // Пересортировываем весь список чатов по времени последнего сообщения
-      // Пересортировываем весь список чатов по времени последнего сообщения
-      const chatOrder = sortChatsByTime(chatsById);
+      const currentChatOrder = state.chatOrder;
+      const currentFirstChatId = currentChatOrder[0];
+      const chatTime = getChatTime(chatsById[cid]);
+      const firstChatTime = currentFirstChatId ? getChatTime(chatsById[currentFirstChatId]) : 0;
+      
+      let chatOrder = currentChatOrder;
+      if (String(currentFirstChatId) !== cid && chatTime > firstChatTime) {
+        chatOrder = sortChatsByTime(chatsById);
+      } else if (String(currentFirstChatId) === cid) {
+        chatOrder = currentChatOrder;
+      }
 
       return {
         ...state,
@@ -327,8 +335,17 @@ const reducer = (state, action) => {
         };
       }
 
-      // Пересортировываем весь список чатов по времени последнего сообщения
-      const chatOrder = sortChatsByTime(chatsById);
+      const currentChatOrder = state.chatOrder;
+      const currentFirstChatId = currentChatOrder[0];
+      const chatTime = getChatTime(chatsById[cid]);
+      const firstChatTime = currentFirstChatId ? getChatTime(chatsById[currentFirstChatId]) : 0;
+      
+      let chatOrder = currentChatOrder;
+      if (String(currentFirstChatId) !== cid && chatTime > firstChatTime) {
+        chatOrder = sortChatsByTime(chatsById);
+      } else if (String(currentFirstChatId) === cid) {
+        chatOrder = currentChatOrder;
+      }
 
       return {
         ...state,
@@ -537,12 +554,34 @@ export const MessagingProvider = ({ children }) => {
     if (!message?.id || !message?.chatId) return;
     const mid = String(message.id);
     if (processedMessageIdsRef.current.has(mid)) return;
+    
+    const currentUser = getCurrentUser();
+    const isOwn = currentUser?.id && message?.senderId && Number(currentUser.id) === Number(message.senderId);
+    
+    if (isOwn) {
+      const cid = String(message.chatId);
+      const existingIds = ensureArray(state.messageIdsByChatId[cid]);
+      const existingMessages = existingIds
+        .map(id => state.messagesById[String(id)])
+        .filter(Boolean);
+      
+      const messageTime = new Date(message.createdAt || Date.now()).getTime();
+      const isDuplicate = existingMessages.some(existing => {
+        if (!existing || !existing.id) return false;
+        if (String(existing.id) === mid) return true;
+        return false;
+      });
+      
+      if (isDuplicate) {
+        processedMessageIdsRef.current.add(mid);
+        return;
+      }
+    }
+    
     processedMessageIdsRef.current.add(mid);
 
-    const currentUser = getCurrentUser();
     const isVisible = typeof document !== 'undefined' && document.visibilityState === 'visible';
     const active = state.activeChatId && String(state.activeChatId) === String(message.chatId);
-    const isOwn = currentUser?.id && message?.senderId && Number(currentUser.id) === Number(message.senderId);
     const unreadDelta = isOwn ? 0 : (active && isVisible ? 0 : 1);
 
     dispatch({
@@ -582,6 +621,10 @@ export const MessagingProvider = ({ children }) => {
   }, []);
 
   const replaceOptimistic = useCallback((chatId, tempId, serverMessage, status) => {
+    if (serverMessage?.id) {
+      const mid = String(serverMessage.id);
+      processedMessageIdsRef.current.add(mid);
+    }
     dispatch({ type: actionTypes.REPLACE_OPTIMISTIC, payload: { chatId, tempId, message: serverMessage, status } });
   }, []);
 
@@ -737,13 +780,7 @@ export const MessagingProvider = ({ children }) => {
 
   // Возвращаем чаты в порядке chatOrder, который уже отсортирован по времени последнего сообщения
   const chats = useMemo(() => {
-    const ordered = state.chatOrder.map(id => state.chatsById[id]).filter(Boolean);
-    // Дополнительная сортировка на случай, если chatOrder не обновился
-    return ordered.sort((a, b) => {
-      const timeA = getChatTime(a);
-      const timeB = getChatTime(b);
-      return timeB - timeA; // Более новые выше
-    });
+    return state.chatOrder.map(id => state.chatsById[id]).filter(Boolean);
   }, [state.chatOrder, state.chatsById]);
 
   const updateFaviconBadge = useCallback((count) => {
