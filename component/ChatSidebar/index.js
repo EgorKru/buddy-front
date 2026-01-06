@@ -124,11 +124,20 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
       const chatId = String(chat.id);
       // Пропускаем, если уже загружаем
       if (loadingLastMessagesRef.current.has(chatId)) return false;
-      // Загружаем, если нет lastMessage или нет id/createdAt в lastMessage
-      // Для голосовых сообщений content может быть null, поэтому проверяем только id и createdAt
-      const needsLoad = !chat.lastMessage || 
-                       !chat.lastMessage.id || 
-                       !chat.lastMessage.createdAt;
+      // Загружаем, если нет lastMessage или оно неполное
+      // Для текстовых сообщений важно наличие content,
+      // для голосовых допускаем пустой content, но всё равно можем догрузить для единообразия
+      const hasLastMessage = !!chat.lastMessage;
+      const hasIdAndDate = hasLastMessage && chat.lastMessage.id && chat.lastMessage.createdAt;
+      const hasTextForTextMessage =
+        !hasLastMessage ||
+        chat.lastMessage.type !== 'TEXT' ||
+        (typeof chat.lastMessage.content === 'string' && chat.lastMessage.content.trim().length > 0);
+
+      const needsLoad =
+        !hasLastMessage ||
+        !hasIdAndDate ||
+        !hasTextForTextMessage;
       return needsLoad;
     });
 
@@ -145,14 +154,20 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
       
       loadingLastMessagesRef.current.add(chatId);
       try {
-        // Загружаем последнее сообщение (page=0, size=1)
-        const response = await chatAPI.getMessages(chatId, { page: 0, size: 1 });
+        // Загружаем несколько последних сообщений (page=0, size=20),
+        // чтобы можно было найти первое не удалённое сообщение
+        const response = await chatAPI.getMessages(chatId, { page: 0, size: 20 });
         if (response?.content && Array.isArray(response.content) && response.content.length > 0) {
-          const lastMessage = response.content[0];
-          // Фильтруем удаленные сообщения
-          if (lastMessage.deletedForMe || lastMessage.deletedForAll) {
+          // Берём самое новое не удалённое сообщение
+          const nonDeleted = response.content.find(
+            (m) => !m.deletedForMe && !m.deletedForAll
+          );
+
+          if (!nonDeleted) {
             return;
           }
+
+          const lastMessage = nonDeleted;
           
           // Обновляем сообщение через контекст, что автоматически обновит lastMessage в чате
           if (upsertMessage) {
@@ -190,7 +205,14 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
       const currentChats = chats; // Используем chats из замыкания
       if (currentChats && currentChats.length > 0) {
         const stillMissing = currentChats.filter(chat => {
-          return !chat.lastMessage || !chat.lastMessage.id || !chat.lastMessage.createdAt;
+          const hasLastMessage = !!chat.lastMessage;
+          const hasIdAndDate = hasLastMessage && chat.lastMessage.id && chat.lastMessage.createdAt;
+          const hasTextForTextMessage =
+            !hasLastMessage ||
+            chat.lastMessage.type !== 'TEXT' ||
+            (typeof chat.lastMessage.content === 'string' && chat.lastMessage.content.trim().length > 0);
+
+          return !hasLastMessage || !hasIdAndDate || !hasTextForTextMessage;
         });
         if (stillMissing.length === 0) {
           hasLoadedLastMessagesRef.current = true;
@@ -200,20 +222,22 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
   }, [chats, loading, upsertMessage, upsertChat]);
 
   useEffect(() => {
-    // Загружаем последние сообщения после загрузки чатов
-    // Используем небольшую задержку, чтобы убедиться, что refreshChats завершился
     if (!loading && chats && chats.length > 0) {
-      // Проверяем, есть ли чаты без lastMessage
+      // Проверяем, есть ли чаты без lastMessage или с неполным lastMessage
       const chatsWithoutLastMessage = chats.filter(chat => {
-        return !chat.lastMessage || !chat.lastMessage.id || !chat.lastMessage.createdAt;
+        const hasLastMessage = !!chat.lastMessage;
+        const hasIdAndDate = hasLastMessage && chat.lastMessage.id && chat.lastMessage.createdAt;
+        const hasTextForTextMessage =
+          !hasLastMessage ||
+          chat.lastMessage.type !== 'TEXT' ||
+          (typeof chat.lastMessage.content === 'string' && chat.lastMessage.content.trim().length > 0);
+
+        return !hasLastMessage || !hasIdAndDate || !hasTextForTextMessage;
       });
-      
-      // Загружаем только если есть чаты без lastMessage и мы еще не загружали
+
+      // Загружаем только если есть чаты без полноценного lastMessage и мы еще не загружали
       if (chatsWithoutLastMessage.length > 0 && !hasLoadedLastMessagesRef.current) {
-        const timeoutId = setTimeout(() => {
-          loadLastMessages();
-        }, 600); // Увеличиваем задержку для надежности
-        return () => clearTimeout(timeoutId);
+        loadLastMessages();
       } else if (chatsWithoutLastMessage.length === 0) {
         // Если все чаты имеют lastMessage, помечаем как загруженные
         hasLoadedLastMessagesRef.current = true;
@@ -288,6 +312,36 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
       )
     );
   });
+
+  const getLastMessagePreview = (chat) => {
+    const lastMessage = chat?.lastMessage;
+    if (!lastMessage) return '';
+
+    // Голосовые сообщения или любые сообщения с fileUrl, но без текста
+    if (
+      (lastMessage.type === 'VOICE' || lastMessage.fileUrl) &&
+      !lastMessage.content
+    ) {
+      return 'Голосовое сообщение';
+    }
+
+    // Если текст отсутствует, пробуем взять что‑то осмысленное из вложенных полей
+    if (!lastMessage.content) {
+      if (lastMessage.forwardedFrom?.originalContent) {
+        const original = lastMessage.forwardedFrom.originalContent;
+        return original.length > 40 ? `${original.substring(0, 40)}...` : original;
+      }
+      if (lastMessage.replyTo?.content) {
+        const replyText = lastMessage.replyTo.content;
+        return replyText.length > 40 ? `${replyText.substring(0, 40)}...` : replyText;
+      }
+      // Общий безопасный fallback, чтобы не показывать пустую строку
+      return 'Сообщение';
+    }
+
+    const text = lastMessage.content;
+    return text.length > 40 ? `${text.substring(0, 40)}...` : text;
+  };
 
   const getLastMessageReadMeta = (chat) => {
     const lastMessage = chat?.lastMessage;
@@ -460,8 +514,7 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
                             );
                           })()
                         )}
-                        {(chat.lastMessage.content || '').substring(0, 40)}
-                        {(chat.lastMessage.content || '').length > 40 ? '...' : ''}
+                        {getLastMessagePreview(chat)}
                       </span>
                     </div>
                   )}
