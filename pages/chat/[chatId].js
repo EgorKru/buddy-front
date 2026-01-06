@@ -1722,58 +1722,42 @@ export default function ChatPage() {
             })()}
             </div>
             <div className={styles.searchWrapper}>
-              <button
-                onClick={handleOpenSearch}
-                className={styles.searchToggleButton}
-                title="Поиск сообщений"
-              >
-                <Search size={20} />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {searchOpen && (
-          <div className={styles.searchPanel}>
-            <div className={styles.searchPanelHeader}>
-              <h2 className={styles.searchPanelTitle}>Поиск сообщений</h2>
-              <button
-                type="button"
-                onClick={handleCloseSearch}
-                className={styles.searchCloseButton}
-                title="Закрыть"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <form onSubmit={handleSearchSubmit} className={styles.searchForm}>
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                placeholder="Поиск сообщений..."
-                className={styles.searchInput}
-                autoFocus
-              />
-              {searchText && (
+              {!searchOpen ? (
                 <button
-                  type="button"
-                  onClick={() => setSearchText('')}
-                  className={styles.searchClearButton}
-                  title="Очистить"
+                  onClick={handleOpenSearch}
+                  className={styles.searchToggleButton}
+                  title="Поиск сообщений"
                 >
-                  <X size={16} />
+                  <Search size={20} />
                 </button>
-              )}
-              {isSearching && (
-                <div className={styles.searchLoading}>
-                  <Loader2 size={16} className={styles.spinner} />
-                </div>
-              )}
-            </form>
+              ) : (
+                <div className={styles.searchExpanded}>
+                  <form onSubmit={handleSearchSubmit} className={styles.searchFormInline}>
+                    <input
+                      ref={searchInputRef}
+                      type="text"
+                      value={searchText}
+                      onChange={(e) => setSearchText(e.target.value)}
+                      placeholder="Поиск сообщений..."
+                      className={styles.searchInputInline}
+                      autoFocus
+                    />
+                    {isSearching && (
+                      <div className={styles.searchLoadingInline}>
+                        <Loader2 size={16} className={styles.spinner} />
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleCloseSearch}
+                      className={styles.searchCloseButtonInline}
+                      title="Закрыть"
+                    >
+                      <X size={18} />
+                    </button>
+                  </form>
                   {searchMode && searchResults.length > 0 && (
-                    <>
+                    <div className={styles.searchResultsDropdown}>
                       <div className={styles.searchResultsInfo}>
                         <span className={styles.searchResultsCount}>
                           {searchResults.length} найдено
@@ -1782,9 +1766,30 @@ export default function ChatPage() {
                       <div className={styles.searchResultsList}>
                         {searchResults.map((msg, index) => {
                           const isOwn = msg.senderId === user?.id;
-                          const previewText = msg.content?.length > 50 
-                            ? msg.content.substring(0, 50) + '...' 
-                            : msg.content;
+                          
+                          const getPreviewText = () => {
+                            if (!msg.content || !searchText) return msg.content || '';
+                            
+                            const searchLower = searchText.toLowerCase();
+                            const contentLower = msg.content.toLowerCase();
+                            const matchIndex = contentLower.indexOf(searchLower);
+                            
+                            if (matchIndex === -1) {
+                              return msg.content.length > 80 ? msg.content.substring(0, 80) + '...' : msg.content;
+                            }
+                            
+                            const contextLength = 40;
+                            const start = Math.max(0, matchIndex - contextLength);
+                            const end = Math.min(msg.content.length, matchIndex + searchText.length + contextLength);
+                            
+                            let preview = msg.content.substring(start, end);
+                            if (start > 0) preview = '...' + preview;
+                            if (end < msg.content.length) preview = preview + '...';
+                            
+                            return preview;
+                          };
+                          
+                          const previewText = getPreviewText();
                           
                           return (
                             <div
@@ -1822,9 +1827,12 @@ export default function ChatPage() {
                           );
                         })}
                       </div>
-                    </>
+                    </div>
                   )}
+                </div>
+              )}
             </div>
+          </div>
         )}
 
         <PinnedMessagesHeader
@@ -1856,10 +1864,12 @@ export default function ChatPage() {
           </div>
         ) : (
           <div>
-            {visibleMessages.map((msg, index) => {
-              const showDate = index === 0 ||
-                formatChatDate(visibleMessages[index - 1]?.createdAt) !== formatChatDate(msg.createdAt);
-              const isOwn = msg.senderId === user?.id;
+            {          visibleMessages.map((msg, index) => {
+            const showDate = index === 0 ||
+              formatChatDate(visibleMessages[index - 1]?.createdAt) !== formatChatDate(msg.createdAt);
+            const isOwn = msg.senderId === user?.id;
+            const isSearchMatch = searchOpen && searchText && msg.content && 
+              msg.content.toLowerCase().includes(searchText.toLowerCase());
 
               return (
                 <div key={msg.id}>
@@ -1869,7 +1879,7 @@ export default function ChatPage() {
                     </div>
                   )}
                   <div
-                    className={`${styles.message} ${isOwn ? styles.ownMessage : ''} ${msg.pinned ? styles.messagePinned : ''} ${selectionMode && selectedMessages.has(msg.id) ? styles.messageSelected : ''} ${newMessageIdsRef.current.has(String(msg.id)) || msg.isOptimistic ? styles.messageNew : ''}`}
+                    className={`${styles.message} ${isOwn ? styles.ownMessage : ''} ${msg.pinned ? styles.messagePinned : ''} ${selectionMode && selectedMessages.has(msg.id) ? styles.messageSelected : ''} ${newMessageIdsRef.current.has(String(msg.id)) || msg.isOptimistic ? styles.messageNew : ''} ${isSearchMatch ? styles.messageSearchMatch : ''}`}
                     onContextMenu={(e) => !selectionMode && handleContextMenu(e, msg)}
                     onClick={() => selectionMode && toggleMessageSelection(msg.id)}
                     data-message-id={msg.id}
@@ -1951,8 +1961,7 @@ export default function ChatPage() {
                           )}
                           <div className={styles.messageTextContentWrapper}>
                             <div className={styles.messageTextContent}>
-                              {(() => {
-                                if (!msg.content || !searchText) return msg.content;
+                              {isSearchMatch && searchText ? (() => {
                                 const escapedSearchText = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                                 const regex = new RegExp(`(${escapedSearchText})`, 'gi');
                                 const parts = msg.content.split(regex);
@@ -1963,7 +1972,7 @@ export default function ChatPage() {
                                     <span key={i}>{part}</span>
                                   )
                                 );
-                              })()}
+                              })() : msg.content}
                             </div>
                             <div className={styles.messageTextMeta}>
                               {(() => {
