@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { authAPI, setCurrentUser } from '@/utils/api';
-import { Eye, EyeOff, Radio } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import InteractiveBackground from '@/component/InteractiveBackground';
 import styles from '@/styles/login.module.css';
 
@@ -17,6 +17,33 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isPagerEyesClosed, setIsPagerEyesClosed] = useState(false);
+  const [pupilOffset, setPupilOffset] = useState({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      if (isPagerEyesClosed) return;
+      
+      // Используем центр экрана как точку отсчета
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
+      const dx = e.clientX - cx;
+      const dy = e.clientY - cy;
+      const maxOffset = 4;
+
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      const nx = dx / dist;
+      const ny = dy / dist;
+
+      setPupilOffset({
+        x: nx * maxOffset,
+        y: ny * maxOffset,
+      });
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, [isPagerEyesClosed]);
 
   const handleChange = (e) => {
     setFormData({
@@ -53,11 +80,25 @@ export default function Register() {
         <div className={styles.logoContainer}>
           <div className={styles.logoIcon}>
             <div className={styles.logoIconWrapper}>
-              <Radio size={40} className={styles.logoIconSvg} />
-              <div className={styles.logoSignal}>
-                <div className={styles.signalWave}></div>
-                <div className={styles.signalWave}></div>
-                <div className={styles.signalWave}></div>
+              <div
+                className={`${styles.pagerEyesRow} ${isPagerEyesClosed ? styles.pagerEyesClosed : ''}`}
+              >
+                <div className={styles.pagerEye}>
+                  <div
+                    className={styles.pagerPupil}
+                    style={{
+                      transform: `translate(${pupilOffset.x}px, ${pupilOffset.y}px)`,
+                    }}
+                  />
+                </div>
+                <div className={styles.pagerEye}>
+                  <div
+                    className={styles.pagerPupil}
+                    style={{
+                      transform: `translate(${pupilOffset.x}px, ${pupilOffset.y}px)`,
+                    }}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -109,6 +150,10 @@ export default function Register() {
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
+                onFocus={() => setIsPagerEyesClosed(true)}
+                onBlur={() => setIsPagerEyesClosed(false)}
+                onMouseEnter={() => setIsPagerEyesClosed(true)}
+                onMouseLeave={() => setIsPagerEyesClosed(false)}
                 required
                 minLength={6}
                 placeholder="Минимум 6 символов"
