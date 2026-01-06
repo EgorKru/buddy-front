@@ -65,14 +65,11 @@ export const useChatRealtime = (chatId) => {
         const data = safeJsonParse(message.body);
         if (!data) return;
 
-        // Проверяем, является ли это событием редактирования
         if (data.eventType === 'MESSAGE_EDITED') {
           const editedMessage = data.message;
           if (!editedMessage) return;
           if (Number(editedMessage.chatId) !== Number(chatId)) return;
 
-          // Обновляем существующее сообщение через updateMessage
-          // Это гарантирует обновление даже если сообщение уже было обработано
           updateMessage(
             { ...editedMessage, status: MESSAGE_STATUS.SENT, isOptimistic: false },
             { unreadDelta: 0 }
@@ -80,11 +77,9 @@ export const useChatRealtime = (chatId) => {
           return;
         }
 
-        // Обычное новое сообщение
         const dto = data;
         if (Number(dto.chatId) !== Number(chatId)) return;
 
-        // Передаем unreadDelta: 0, так как мы в активном чате
         const isVisible = typeof document !== 'undefined' && document.visibilityState === 'visible';
         upsertMessage(
           { ...dto, status: MESSAGE_STATUS.SENT, isOptimistic: false },

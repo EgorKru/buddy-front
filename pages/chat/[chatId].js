@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
-import { Send, Loader2, Menu, Check, CheckCheck, AlertCircle, Clock, ArrowLeft, Mic, X, ChevronDown, Pause, Play, Lock, Unlock, Trash2, Edit, Reply, Pin } from 'lucide-react';
+import { Send, Loader2, Menu, Check, CheckCheck, AlertCircle, Clock, ArrowLeft, Mic, X, ChevronDown, Pause, Play, Lock, Unlock, Trash2, Edit, Reply, Pin, PinOff, Forward } from 'lucide-react';
 import { chatAPI, getCurrentUser, isAuthenticated } from '@/utils/api';
 import { getChatName } from '@/utils/chatHelpers';
 import { formatChatDate, formatChatTime, getOnlineStatus } from '@/utils/dateHelpers';
@@ -13,8 +13,13 @@ import MessageContextMenu from '@/component/MessageContextMenu';
 import styles from '@/styles/chat.module.css';
 import { useChats, useChatMessages } from '@/context/messaging';
 import { useChatRealtime } from '@/hooks/useChatRealtime';
+import { usePinnedMessages } from '@/hooks/usePinnedMessages';
+import { useMessageSelection } from '@/hooks/useMessageSelection';
 import { useStomp } from '@/context/socket';
-import { safeJsonParse, safeUnsubscribe } from '@/utils/safe';
+import PinnedMessagesHeader from '@/component/PinnedMessagesHeader';
+import DeleteConfirmModal from '@/component/DeleteConfirmModal';
+import ForwardModal from '@/component/ForwardModal';
+import SelectionHeader from '@/component/SelectionHeader';
 
 const DUPLICATE_WINDOW_MS = 5000;
 
@@ -31,7 +36,7 @@ export default function ChatPage() {
   const router = useRouter();
   const { chatId } = router.query;
   const user = getCurrentUser();
-  const { connected, readAtByChatIdByUserId, replaceOptimistic, addOptimistic, chats, refreshChats, upsertMessage, updateMessage } = useChats();
+  const { connected, readAtByChatIdByUserId, replaceOptimistic, addOptimistic, chats, refreshChats, upsertMessage, updateMessage, removeMessage } = useChats();
   const { client } = useStomp();
 
   const chat = useMemo(() => {
@@ -49,27 +54,48 @@ export default function ChatPage() {
   const [editingContent, setEditingContent] = useState('');
   const [replyingToMessageId, setReplyingToMessageId] = useState(null);
   const [replyingToMessage, setReplyingToMessage] = useState(null);
-  const [pinnedMessages, setPinnedMessages] = useState([]);
-  const [viewedPinnedMessageId, setViewedPinnedMessageId] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleteForAll, setDeleteForAll] = useState(false);
-
+  const [forwardModal, setForwardModal] = useState(null);
+  
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const sentAudioBlobRef = useRef(null);
   const messageInputRef = useRef(null);
   const messages = useChatMessages(chatId);
+  
+  const {
+    pinnedMessages,
+    viewedPinnedMessageId,
+    setViewedPinnedMessageId,
+    setPinnedMessages,
+    loadPinnedMessages,
+  } = usePinnedMessages(chatId, messages);
+  
+  const {
+    selectionMode,
+    selectedMessages,
+    handleSelectMessage: handleSelectMessageBase,
+    toggleMessageSelection,
+    handleSelectAll: handleSelectAllBase,
+    exitSelectionMode,
+  } = useMessageSelection();
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [scrollButtonReady, setScrollButtonReady] = useState(false);
   const scrollPositionSavedRef = useRef(false);
   const isUserScrollingRef = useRef(false);
   const scrollTimeoutRef = useRef(null);
-  const userScrolledToBottomRef = useRef(false); // Флаг, что пользователь намеренно прокрутил вниз
-  const shouldRestorePositionRef = useRef(true); // Флаг, нужно ли восстанавливать позицию
-  const restoreAttemptsRef = useRef(0); // Счетчик попыток восстановления
-  const wasAtBottomBeforeMessageRef = useRef(false); // Флаг, был ли пользователь внизу до добавления сообщения
-  const shouldAutoScrollRef = useRef(false); // Флаг, нужно ли автоматически прокручивать
-  const scrollHeightBeforeMessageRef = useRef(0); // Высота скролла до добавления сообщения
+  const userScrolledToBottomRef = useRef(false);
+  const shouldRestorePositionRef = useRef(true);
+  const restoreAttemptsRef = useRef(0);
+  const wasAtBottomBeforeMessageRef = useRef(false);
+  const shouldAutoScrollRef = useRef(false);
+  const scrollHeightBeforeMessageRef = useRef(0);
+  const isLoadingInitialRef = useRef(false);
+  const lastScrollTopRef = useRef(0);
+  const isUserScrollingUpRef = useRef(false);
+  const loadMoreTimeoutRef = useRef(null);
+  const isRestoringScrollRef = useRef(false);
 
   useChatRealtime(chatId);
 
@@ -90,20 +116,62 @@ export default function ChatPage() {
     if (!chatId) return;
     try {
       setLoadingMore(true);
+      
+      let scrollHeightBefore = 0;
+      let scrollTopBefore = 0;
+      if (append && messagesContainerRef.current) {
+        scrollHeightBefore = messagesContainerRef.current.scrollHeight;
+        scrollTopBefore = messagesContainerRef.current.scrollTop;
+      }
+      
       const response = await chatAPI.getMessages(chatId, {
         page: pageNum,
         size: 50,
       });
 
+      if (Array.isArray(response?.content)) {
+        const list = response.content;
+        const ordered = append ? list : [...list].reverse();
+        for (const m of ordered) {
+          const messageData = {
+            ...m,
+            status: MESSAGE_STATUS.SENT,
+            isOptimistic: false,
+            deletedForMe: m.deletedForMe || false,
+            deletedForAll: m.deletedForAll || false,
+          };
+          upsertMessage(messageData, { unreadDelta: 0 });
+        }
+      }
+
       setPage(response.number);
       setHasMore(!response.last);
       setLoading(false);
+      
+      if (!append) {
+        isLoadingInitialRef.current = false;
+      }
+      
+      if (append && messagesContainerRef.current) {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            if (messagesContainerRef.current) {
+              const container = messagesContainerRef.current;
+              const scrollHeightAfter = container.scrollHeight;
+              const scrollDiff = scrollHeightAfter - scrollHeightBefore;
+              container.scrollTop = scrollTopBefore + scrollDiff;
+              lastScrollTopRef.current = container.scrollTop;
+            }
+          });
+        });
+      }
     } catch (error) {
       setLoading(false);
+      isLoadingInitialRef.current = false;
     } finally {
       setLoadingMore(false);
     }
-  }, [chatId]);
+  }, [chatId, upsertMessage]);
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -111,7 +179,6 @@ export default function ChatPage() {
       return;
     }
     if (chatId) {
-      // Сбрасываем флаги при смене чата
       scrollPositionSavedRef.current = false;
       shouldRestorePositionRef.current = true;
       userScrolledToBottomRef.current = false;
@@ -122,13 +189,14 @@ export default function ChatPage() {
       } else {
         setLoading(false);
       }
+      isLoadingInitialRef.current = true;
+      lastScrollTopRef.current = 0;
+      isUserScrollingUpRef.current = false;
       loadMessages(0);
       loadPinnedMessages();
     }
     
-    // Устанавливаем готовность кнопки после загрузки страницы и применения стилей
     if (typeof window !== 'undefined') {
-      // Ждем, пока CSS переменные и стили применятся
       const checkReady = () => {
         const sidebarWidth = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width');
         if (sidebarWidth || document.body.hasAttribute('data-sidebar-position')) {
@@ -141,7 +209,6 @@ export default function ChatPage() {
     }
   }, [chatId, router, loadChat, loadMessages, chat]);
 
-  // Проверка, находится ли пользователь внизу чата
   const isAtBottom = useCallback((threshold = 100) => {
     if (!messagesContainerRef.current) return false;
     const container = messagesContainerRef.current;
@@ -149,7 +216,6 @@ export default function ChatPage() {
     return distanceFromBottom <= threshold;
   }, []);
 
-  // Сохранение позиции скролла
   const saveScrollPosition = useCallback((force = false) => {
     if (!messagesContainerRef.current || !chatId) return;
     const container = messagesContainerRef.current;
@@ -174,7 +240,6 @@ export default function ChatPage() {
     }
   }, [chatId, isAtBottom]);
 
-  // Восстановление позиции скролла
   const restoreScrollPosition = useCallback(() => {
     if (!messagesContainerRef.current || !chatId || messages.length === 0) return;
     if (!shouldRestorePositionRef.current) return;
@@ -195,21 +260,39 @@ export default function ChatPage() {
           // Если пользователь был внизу, всегда прокручиваем вниз
           if (isBottom) {
             userScrolledToBottomRef.current = true;
+            isUserScrollingUpRef.current = false;
             setTimeout(() => {
-              scrollToBottom();
+              if (messagesContainerRef.current) {
+                const container = messagesContainerRef.current;
+                container.scrollTo({
+                  top: container.scrollHeight,
+                  behavior: 'smooth'
+                });
+                lastScrollTopRef.current = container.scrollTop;
+              }
               scrollPositionSavedRef.current = true;
               shouldRestorePositionRef.current = false;
             }, 100);
             return;
           }
           
-          // Иначе восстанавливаем сохраненную позицию
+          isRestoringScrollRef.current = true;
           const attemptRestore = () => {
             if (container.scrollHeight >= scrollHeight) {
-              container.scrollTop = scrollTop;
-              scrollPositionSavedRef.current = true;
-              shouldRestorePositionRef.current = false;
-              restoreAttemptsRef.current = 0;
+              requestAnimationFrame(() => {
+                if (messagesContainerRef.current) {
+                  const container = messagesContainerRef.current;
+                  container.scrollTop = scrollTop;
+                  scrollPositionSavedRef.current = true;
+                  shouldRestorePositionRef.current = false;
+                  restoreAttemptsRef.current = 0;
+                  lastScrollTopRef.current = scrollTop;
+                  isUserScrollingUpRef.current = false;
+                  setTimeout(() => {
+                    isRestoringScrollRef.current = false;
+                  }, 300);
+                }
+              });
             } else {
               // Если контент еще не загружен, пробуем еще раз
               restoreAttemptsRef.current++;
@@ -217,9 +300,18 @@ export default function ChatPage() {
                 setTimeout(attemptRestore, 200);
               } else {
                 // Если не удалось восстановить за 5 попыток, прокручиваем вниз
-                scrollToBottom();
+                if (messagesContainerRef.current) {
+                  const container = messagesContainerRef.current;
+                  container.scrollTo({
+                    top: container.scrollHeight,
+                    behavior: 'smooth'
+                  });
+                  lastScrollTopRef.current = container.scrollTop;
+                }
                 scrollPositionSavedRef.current = true;
                 shouldRestorePositionRef.current = false;
+                isUserScrollingUpRef.current = false;
+                isRestoringScrollRef.current = false;
               }
             }
           };
@@ -227,21 +319,45 @@ export default function ChatPage() {
           setTimeout(attemptRestore, 100);
         } else {
           // Если сохранение старое, прокручиваем вниз
-          scrollToBottom();
+          if (messagesContainerRef.current) {
+            const container = messagesContainerRef.current;
+            container.scrollTo({
+              top: container.scrollHeight,
+              behavior: 'smooth'
+            });
+            lastScrollTopRef.current = container.scrollTop;
+          }
           scrollPositionSavedRef.current = true;
           shouldRestorePositionRef.current = false;
+          isUserScrollingUpRef.current = false;
         }
       } catch (e) {
         // Игнорируем ошибки парсинга, прокручиваем вниз
-        scrollToBottom();
+        if (messagesContainerRef.current) {
+          const container = messagesContainerRef.current;
+          container.scrollTo({
+            top: container.scrollHeight,
+            behavior: 'smooth'
+          });
+          lastScrollTopRef.current = container.scrollTop;
+        }
         scrollPositionSavedRef.current = true;
         shouldRestorePositionRef.current = false;
+        isUserScrollingUpRef.current = false;
       }
     } else {
       // Если нет сохраненной позиции, прокручиваем вниз
-      scrollToBottom();
+      if (messagesContainerRef.current) {
+        const container = messagesContainerRef.current;
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: 'smooth'
+        });
+        lastScrollTopRef.current = container.scrollTop;
+      }
       scrollPositionSavedRef.current = true;
       shouldRestorePositionRef.current = false;
+      isUserScrollingUpRef.current = false;
     }
   }, [chatId, messages.length]);
 
@@ -251,7 +367,6 @@ export default function ChatPage() {
     }
   }, [messages, restoreScrollPosition]);
 
-  // Автоскролл только для новых сообщений, если пользователь внизу
   useEffect(() => {
     if (!messagesContainerRef.current || messages.length === 0) return;
     if (!scrollPositionSavedRef.current) return; // Не автоскроллим, пока не восстановили позицию
@@ -272,7 +387,6 @@ export default function ChatPage() {
           } else {
             userScrolledToBottomRef.current = false;
           }
-          // Сбрасываем флаги после проверки
           wasAtBottomBeforeMessageRef.current = false;
           shouldAutoScrollRef.current = false;
         }, 50);
@@ -374,254 +488,6 @@ export default function ChatPage() {
     }
   }, [connected, chatId, syncQueue]);
 
-  // Подписка на WebSocket события закрепления/открепления
-  const pinnedSubRef = useRef(null);
-  const unpinnedSubRef = useRef(null);
-  // Подписка на WebSocket события удаления сообщений
-  const deletedForMeSubRef = useRef(null);
-  const deletedForAllSubRef = useRef(null);
-
-  useEffect(() => {
-    if (!chatId || !client || !connected || !client.connected || !client.active) {
-      if (pinnedSubRef.current) {
-        safeUnsubscribe(pinnedSubRef.current);
-        pinnedSubRef.current = null;
-      }
-      if (unpinnedSubRef.current) {
-        safeUnsubscribe(unpinnedSubRef.current);
-        unpinnedSubRef.current = null;
-      }
-      if (deletedForMeSubRef.current) {
-        safeUnsubscribe(deletedForMeSubRef.current);
-        deletedForMeSubRef.current = null;
-      }
-      if (deletedForAllSubRef.current) {
-        safeUnsubscribe(deletedForAllSubRef.current);
-        deletedForAllSubRef.current = null;
-      }
-      return;
-    }
-
-    if (pinnedSubRef.current) {
-      safeUnsubscribe(pinnedSubRef.current);
-      pinnedSubRef.current = null;
-    }
-    if (unpinnedSubRef.current) {
-      safeUnsubscribe(unpinnedSubRef.current);
-      unpinnedSubRef.current = null;
-    }
-    if (deletedForMeSubRef.current) {
-      safeUnsubscribe(deletedForMeSubRef.current);
-      deletedForMeSubRef.current = null;
-    }
-    if (deletedForAllSubRef.current) {
-      safeUnsubscribe(deletedForAllSubRef.current);
-      deletedForAllSubRef.current = null;
-    }
-
-    try {
-      console.log('Subscribing to pinned messages for chat:', chatId);
-      const pinnedSub = client.subscribe(`/topic/chat/${chatId}/pinned`, (message) => {
-        const event = safeJsonParse(message.body);
-        console.log('MESSAGE_PINNED event received:', event); // Для отладки
-        if (!event || event.eventType !== 'MESSAGE_PINNED') {
-          console.log('Event is not MESSAGE_PINNED or missing eventType');
-          return;
-        }
-        if (!event.pinnedMessage) {
-          console.log('Event missing pinnedMessage');
-          return;
-        }
-        
-        // Проверяем chatId из pinnedMessage (согласно инструкции)
-        const eventChatId = event.pinnedMessage.chatId;
-        if (Number(eventChatId) !== Number(chatId)) {
-          console.log('ChatId mismatch:', eventChatId, 'vs', chatId);
-          return;
-        }
-
-        // Согласно инструкции: pinnedMessage содержит message (полная информация о сообщении)
-        const pinnedMsg = event.pinnedMessage?.message;
-        const pinnedMsgId = pinnedMsg?.id;
-        
-        if (!pinnedMsgId) {
-          console.warn('MESSAGE_PINNED: missing message ID', event);
-          return;
-        }
-        
-        console.log('MESSAGE_PINNED WebSocket event received:', pinnedMsgId, event);
-        
-        // Сначала обновляем сообщение в списке сообщений, чтобы показать индикатор закрепления
-        updateMessage({ ...pinnedMsg, isPinned: true }, { unreadDelta: 0 });
-
-        // Затем обновляем список закрепленных сообщений
-        setPinnedMessages(prev => {
-          console.log('Updating pinned messages list, current length:', prev.length);
-          // Проверяем, есть ли уже такое сообщение (включая временные оптимистичные)
-          // Ищем по message.id внутри pinnedMessage
-          const existingIndex = prev.findIndex(p => {
-            const pMsgId = p.message?.id;
-            return pMsgId && Number(pMsgId) === Number(pinnedMsgId);
-          });
-          
-          if (existingIndex >= 0) {
-            console.log('Replacing existing pinned message at index:', existingIndex);
-            // Заменяем существующее (включая временное оптимистичное) на реальное из сервера
-            const updated = [...prev];
-            updated[existingIndex] = event.pinnedMessage;
-            const sorted = updated.sort((a, b) => (b.orderIndex || 0) - (a.orderIndex || 0));
-            console.log('Pinned messages after replace:', sorted.length);
-            
-            // Если замененное сообщение было первым в списке, сбрасываем viewedPinnedMessageId
-            // чтобы показать обновленное сообщение
-            if (sorted[0] && sorted[0].message?.id && Number(sorted[0].message.id) === Number(pinnedMsgId)) {
-              setViewedPinnedMessageId(null);
-            }
-            
-            return sorted;
-          }
-          
-          console.log('Adding new pinned message to list');
-          // Добавляем новое закрепленное сообщение и сортируем по orderIndex DESC
-          const updated = [...prev, event.pinnedMessage];
-          const sorted = updated.sort((a, b) => (b.orderIndex || 0) - (a.orderIndex || 0));
-          console.log('Pinned messages after add:', sorted.length);
-          
-          // Сбрасываем просмотренное сообщение, чтобы показать новое закрепленное (первое в списке)
-          setViewedPinnedMessageId(null);
-          
-          return sorted;
-        });
-      });
-      pinnedSubRef.current = pinnedSub;
-      console.log('Successfully subscribed to pinned messages');
-
-      const unpinnedSub = client.subscribe(`/topic/chat/${chatId}/unpinned`, (message) => {
-        const event = safeJsonParse(message.body);
-        console.log('MESSAGE_UNPINNED event received:', event); // Для отладки
-        if (!event || event.eventType !== 'MESSAGE_UNPINNED') {
-          console.log('Event is not MESSAGE_UNPINNED or missing eventType');
-          return;
-        }
-        if (Number(event.chatId) !== Number(chatId)) {
-          console.log('ChatId mismatch:', event.chatId, 'vs', chatId);
-          return;
-        }
-
-        // Обновляем сообщение в списке сообщений, чтобы убрать индикатор закрепления
-        if (event.messageId) {
-          // Находим сообщение в списке и обновляем его
-          const messageToUpdate = messages.find(m => Number(m.id) === Number(event.messageId));
-          if (messageToUpdate) {
-            updateMessage({ ...messageToUpdate, isPinned: false }, { unreadDelta: 0 });
-          }
-        }
-
-        // Согласно инструкции: event содержит messageId
-        setPinnedMessages(prev => prev.filter(p => {
-          const pMsgId = p.message?.id;
-          return !pMsgId || Number(pMsgId) !== Number(event.messageId);
-        }));
-
-        // Сбрасываем просмотренное сообщение, если оно было откреплено
-        setViewedPinnedMessageId(prev => {
-          if (prev && Number(prev) === Number(event.messageId)) {
-            return null;
-          }
-          return prev;
-        });
-      });
-      unpinnedSubRef.current = unpinnedSub;
-      console.log('Successfully subscribed to unpinned messages');
-
-      // Подписка на удаление сообщения для себя
-      const deletedForMeSub = client.subscribe('/user/queue/message-deleted', (message) => {
-        const event = safeJsonParse(message.body);
-        console.log('MESSAGE_DELETED_FOR_ME event received:', event);
-        if (!event || event.eventType !== 'MESSAGE_DELETED_FOR_ME') return;
-        if (!event.messageId) return;
-
-        // Находим сообщение в актуальном состоянии и обновляем его
-        const messageToDelete = messages.find(m => Number(m.id) === Number(event.messageId));
-        if (messageToDelete) {
-          updateMessage({ ...messageToDelete, deletedForMe: true }, { unreadDelta: 0 });
-        }
-
-        // Убираем из списка закрепленных ТОЛЬКО удаленное сообщение
-        const deletedMessageId = Number(event.messageId);
-        setPinnedMessages(prev => prev.filter(p => {
-          const pMsgId = p.message?.id;
-          // Фильтруем только если message.id совпадает с удаленным
-          return !pMsgId || Number(pMsgId) !== deletedMessageId;
-        }));
-
-        // Сбрасываем просмотренное сообщение, если оно было удалено
-        setViewedPinnedMessageId(prev => {
-          if (prev && Number(prev) === Number(event.messageId)) {
-            return null;
-          }
-          return prev;
-        });
-      });
-      deletedForMeSubRef.current = deletedForMeSub;
-
-      // Подписка на удаление сообщения для всех
-      const deletedForAllSub = client.subscribe(`/topic/chat/${chatId}/deleted`, (message) => {
-        const event = safeJsonParse(message.body);
-        console.log('MESSAGE_DELETED_FOR_ALL event received:', event);
-        if (!event || event.eventType !== 'MESSAGE_DELETED_FOR_ALL') return;
-        if (Number(event.chatId) !== Number(chatId)) return;
-        if (!event.messageId) return;
-
-        const deletedMessageId = Number(event.messageId);
-
-        // Находим сообщение в актуальном состоянии и обновляем его
-        const messageToDelete = messages.find(m => Number(m.id) === deletedMessageId);
-        if (messageToDelete) {
-          updateMessage({ ...messageToDelete, deletedForAll: true }, { unreadDelta: 0 });
-        }
-
-        // Убираем из списка закрепленных ТОЛЬКО удаленное сообщение
-        // Важно: проверяем именно message.id внутри pinnedMessage, а не id самого pinnedMessage
-        setPinnedMessages(prev => prev.filter(p => {
-          const pMsgId = p.message?.id;
-          // Фильтруем только если message.id совпадает с удаленным
-          return !pMsgId || Number(pMsgId) !== deletedMessageId;
-        }));
-
-        // Сбрасываем просмотренное сообщение, если оно было удалено
-        setViewedPinnedMessageId(prev => {
-          if (prev && Number(prev) === deletedMessageId) {
-            return null;
-          }
-          return prev;
-        });
-      });
-      deletedForAllSubRef.current = deletedForAllSub;
-    } catch (e) {
-      console.error('Error subscribing to pinned/deleted messages:', e);
-    }
-
-    return () => {
-      if (pinnedSubRef.current) {
-        safeUnsubscribe(pinnedSubRef.current);
-        pinnedSubRef.current = null;
-      }
-      if (unpinnedSubRef.current) {
-        safeUnsubscribe(unpinnedSubRef.current);
-        unpinnedSubRef.current = null;
-      }
-      if (deletedForMeSubRef.current) {
-        safeUnsubscribe(deletedForMeSubRef.current);
-        deletedForMeSubRef.current = null;
-      }
-      if (deletedForAllSubRef.current) {
-        safeUnsubscribe(deletedForAllSubRef.current);
-        deletedForAllSubRef.current = null;
-      }
-    };
-  }, [chatId, client, connected, updateMessage, messages]);
-
   const handleContextMenu = useCallback((e, message) => {
     e.preventDefault();
     e.stopPropagation();
@@ -676,21 +542,6 @@ export default function ChatPage() {
     }
   }, []);
 
-  const loadPinnedMessages = useCallback(async () => {
-    if (!chatId) return;
-    try {
-      const pinned = await chatAPI.getPinnedMessages(chatId);
-      // Сортируем по orderIndex DESC (последние закрепленные первыми)
-      const sorted = Array.isArray(pinned) 
-        ? [...pinned].sort((a, b) => (b.orderIndex || 0) - (a.orderIndex || 0))
-        : [];
-      setPinnedMessages(sorted);
-      // Сбрасываем просмотренное сообщение при загрузке новых закрепленных
-      setViewedPinnedMessageId(null);
-    } catch (error) {
-      console.error('Error loading pinned messages:', error);
-    }
-  }, [chatId]);
 
   const handleDeleteMessage = useCallback((message) => {
     if (!message?.id || !chatId) return;
@@ -699,53 +550,69 @@ export default function ChatPage() {
   }, [chatId]);
 
   const handleConfirmDelete = useCallback(async () => {
-    if (!deleteConfirm?.message?.id || !chatId) return;
-    const message = deleteConfirm.message;
-    const shouldDeleteForAll = deleteForAll && message.senderId === user?.id;
-    setDeleteConfirm(null);
-    setDeleteForAll(false);
+    const messageIds = deleteConfirm?.messageIds || (deleteConfirm?.message?.id ? [deleteConfirm.message.id] : null);
+    if (!messageIds || messageIds.length === 0 || !chatId) return;
     
-    // Оптимистичное обновление: сразу удаляем из UI
-    const messageToDelete = messages.find(m => Number(m.id) === Number(message.id));
-    if (messageToDelete) {
-      if (shouldDeleteForAll) {
-        updateMessage({ ...messageToDelete, deletedForAll: true }, { unreadDelta: 0 });
-      } else {
-        updateMessage({ ...messageToDelete, deletedForMe: true }, { unreadDelta: 0 });
+    const shouldDeleteForAll = deleteForAll;
+    const deletedMessageIds = new Set(messageIds.map(id => Number(id)));
+    
+    // НЕМЕДЛЕННОЕ удаление сообщений из списка - так же, как новые сообщения сразу появляются
+    for (const messageId of messageIds) {
+      const messageToDelete = messages.find(m => Number(m.id) === Number(messageId));
+      if (messageToDelete) {
+        const canDeleteForAll = messageToDelete.senderId === user?.id;
+        const deletedForMe = shouldDeleteForAll && canDeleteForAll ? false : true;
+        const deletedForAll = shouldDeleteForAll && canDeleteForAll ? true : false;
+        // Удаляем сообщение из списка напрямую - так же, как новые сообщения добавляются
+        removeMessage(chatId, messageId, deletedForMe, deletedForAll);
       }
     }
     
-    // Убираем из списка закрепленных ТОЛЬКО удаленное сообщение
-    const deletedMessageId = Number(message.id);
-    setPinnedMessages(prev => prev.filter(p => {
-      const pMsgId = p.message?.id;
-      // Фильтруем только если message.id совпадает с удаленным
-      return !pMsgId || Number(pMsgId) !== deletedMessageId;
-    }));
+    setPinnedMessages(prev => {
+      const filtered = prev.filter(p => {
+        const pMsgId = p.message?.id;
+        return !pMsgId || !deletedMessageIds.has(Number(pMsgId));
+      });
+      return filtered;
+    });
     
-    // Сбрасываем просмотренное сообщение, если оно было удалено
-    if (viewedPinnedMessageId && Number(viewedPinnedMessageId) === Number(message.id)) {
+    if (viewedPinnedMessageId && deletedMessageIds.has(Number(viewedPinnedMessageId))) {
       setViewedPinnedMessageId(null);
     }
     
+    setDeleteConfirm(null);
+    setDeleteForAll(false);
+    
+    if (selectionMode) {
+      exitSelectionMode();
+    }
+    
     try {
-      if (shouldDeleteForAll) {
-        await chatAPI.deleteMessageForAll(chatId, message.id);
-      } else {
-        await chatAPI.deleteMessageForMe(chatId, message.id);
-      }
-      // WebSocket события подтвердят удаление
-    } catch (error) {
-      console.error('Error deleting message:', error);
-      // Откатываем оптимистичное обновление при ошибке
-      if (messageToDelete) {
-        if (shouldDeleteForAll) {
-          updateMessage({ ...messageToDelete, deletedForAll: false }, { unreadDelta: 0 });
+      for (const messageId of messageIds) {
+        const message = messages.find(m => Number(m.id) === Number(messageId));
+        const canDeleteForAll = message?.senderId === user?.id;
+        if (shouldDeleteForAll && canDeleteForAll) {
+          await chatAPI.deleteMessageForAll(chatId, messageId);
         } else {
-          updateMessage({ ...messageToDelete, deletedForMe: false }, { unreadDelta: 0 });
+          await chatAPI.deleteMessageForMe(chatId, messageId);
         }
       }
-      // Перезагружаем закрепленные сообщения при ошибке
+      if (selectionMode) {
+        exitSelectionMode();
+      }
+    } catch (error) {
+      console.error('Error deleting messages:', error);
+      for (const messageId of messageIds) {
+        const messageToDelete = messages.find(m => Number(m.id) === Number(messageId));
+        if (messageToDelete) {
+          const canDeleteForAll = messageToDelete.senderId === user?.id;
+          if (shouldDeleteForAll && canDeleteForAll) {
+            updateMessage({ ...messageToDelete, deletedForAll: false }, { unreadDelta: 0 });
+          } else {
+            updateMessage({ ...messageToDelete, deletedForMe: false }, { unreadDelta: 0 });
+          }
+        }
+      }
       loadPinnedMessages();
     }
   }, [chatId, deleteConfirm, deleteForAll, messages, updateMessage, viewedPinnedMessageId, loadPinnedMessages, user]);
@@ -754,7 +621,6 @@ export default function ChatPage() {
     setEditingMessageId(message.id);
     setEditingContent(message.content || '');
     setContextMenu(null);
-    // Фокусируемся на поле ввода
     setTimeout(() => {
       messageInputRef.current?.focus();
     }, 100);
@@ -767,15 +633,11 @@ export default function ChatPage() {
       return;
     }
 
-    // Находим текущее сообщение в списке
     const currentMessage = messages.find(m => String(m.id) === String(editingMessageId));
-    
-    // Проверяем, изменился ли текст
     const originalContent = currentMessage?.content?.trim() || '';
     const newContent = editingContent.trim();
     
     if (originalContent === newContent) {
-      // Текст не изменился, просто закрываем режим редактирования
       setEditingMessageId(null);
       setEditingContent('');
       setNewMessage('');
@@ -786,15 +648,12 @@ export default function ChatPage() {
       const editedMessage = await chatAPI.editMessage(chatId, editingMessageId, newContent);
       
       if (currentMessage) {
-        // Обновляем сообщение локально с новым содержимым и флагом edited
         const updatedMessage = {
           ...currentMessage,
           content: newContent,
           edited: true,
           editedAt: editedMessage?.editedAt || new Date().toISOString(),
         };
-        
-        // Обновляем сообщение через updateMessage (для существующих сообщений)
         updateMessage(updatedMessage, { unreadDelta: 0 });
       }
       
@@ -846,44 +705,33 @@ export default function ChatPage() {
           const pMsgId = p.message?.id;
           return !pMsgId || Number(pMsgId) !== messageIdToUnpin;
         }));
-        // Обновляем сообщение в списке
         updateMessage({ ...message, isPinned: false }, { unreadDelta: 0 });
         
         await chatAPI.unpinMessage(chatId, message.id);
       } else {
-        // Оптимистичное обновление: сначала обновляем сообщение в списке сообщений
         updateMessage({ ...message, isPinned: true }, { unreadDelta: 0 });
         
-        // Затем добавляем в список закрепленных
         setPinnedMessages(prev => {
-          // Проверяем, нет ли уже такого сообщения (на случай двойного клика)
           const exists = prev.some(p => {
             const pMsgId = p.message?.id;
             return pMsgId && Number(pMsgId) === Number(message.id);
           });
           if (exists) {
-            console.warn('Message already in pinned list:', message.id);
             return prev;
           }
           
-          // Используем prev для получения максимального orderIndex
           const maxOrderIndex = prev.length > 0 
             ? Math.max(...prev.map(p => p.orderIndex || 0))
             : 0;
           
-          // Используем временный ID, но с правильной структурой для замены при получении WebSocket события
           const optimisticPinned = {
-            id: `temp-${message.id}-${Date.now()}`, // Временный ID с message.id для легкой идентификации
+            id: `temp-${message.id}-${Date.now()}`,
             message: message,
-            orderIndex: maxOrderIndex + 1, // Новое сообщение должно быть первым (самый большой orderIndex)
+            orderIndex: maxOrderIndex + 1,
           };
           
-          console.log('Adding optimistic pinned message:', message.id, 'orderIndex:', optimisticPinned.orderIndex, 'to list of', prev.length);
           const updated = [optimisticPinned, ...prev];
           const sorted = updated.sort((a, b) => (b.orderIndex || 0) - (a.orderIndex || 0));
-          console.log('Pinned messages after add:', sorted.length, 'first message ID:', sorted[0]?.message?.id);
-          
-          // Сбрасываем просмотренное сообщение, чтобы показать новое закрепленное (первое в списке)
           setViewedPinnedMessageId(null);
           
           return sorted;
@@ -891,10 +739,8 @@ export default function ChatPage() {
         
         await chatAPI.pinMessage(chatId, message.id);
       }
-      // WebSocket событие подтвердит и обновит данные
     } catch (error) {
       console.error('Error pinning/unpinning message:', error);
-      // Откатываем оптимистичное обновление при ошибке
       loadPinnedMessages();
       alert(`Не удалось ${isCurrentlyPinned ? 'открепить' : 'закрепить'} сообщение`);
     }
@@ -912,36 +758,110 @@ export default function ChatPage() {
         return !pMsgId || Number(pMsgId) !== messageIdToUnpin;
       }));
       
-      // Сбрасываем просмотренное сообщение, если оно было откреплено
       if (viewedPinnedMessageId && Number(viewedPinnedMessageId) === Number(messageId)) {
         setViewedPinnedMessageId(null);
       }
       
-      // Обновляем сообщение в списке сообщений
       const messageToUpdate = messages.find(m => Number(m.id) === Number(messageId));
       if (messageToUpdate) {
         updateMessage({ ...messageToUpdate, isPinned: false }, { unreadDelta: 0 });
       }
       
       await chatAPI.unpinMessage(chatId, messageId);
-      // WebSocket событие подтвердит и обновит данные
     } catch (error) {
       console.error('Error unpinning message:', error);
-      // Откатываем оптимистичное обновление при ошибке
       loadPinnedMessages();
       alert('Не удалось открепить сообщение');
     }
   }, [chatId, messages, updateMessage, loadPinnedMessages, viewedPinnedMessageId]);
 
   const handleForwardMessage = useCallback((message) => {
-    // TODO: Реализовать пересылку сообщения
+    if (!message?.id || !chatId) return;
     setContextMenu(null);
-  }, []);
+    setForwardModal({ message, selectedChatId: null, comment: '' });
+  }, [chatId]);
+
+  const handleConfirmForward = useCallback(async () => {
+    const messageIds = forwardModal?.messageIds || (forwardModal?.message?.id ? [forwardModal.message.id] : null);
+    if (!messageIds || messageIds.length === 0 || !forwardModal?.selectedChatId || !chatId) return;
+    
+    try {
+      await chatAPI.forwardMessages(
+        forwardModal.selectedChatId,
+        chatId,
+        messageIds,
+        forwardModal.comment || null
+      );
+      setForwardModal(null);
+      if (selectionMode) {
+        exitSelectionMode();
+      }
+    } catch (error) {
+      console.error('Error forwarding message:', error);
+      alert('Не удалось переслать сообщение');
+    }
+  }, [forwardModal, chatId, selectionMode, exitSelectionMode]);
 
   const handleSelectMessage = useCallback((message) => {
-    // TODO: Реализовать выделение сообщения
+    if (!message?.id) return;
     setContextMenu(null);
-  }, []);
+    handleSelectMessageBase(message);
+  }, [handleSelectMessageBase]);
+
+  const handleSelectAll = useCallback(() => {
+    handleSelectAllBase(messages);
+  }, [handleSelectAllBase, messages]);
+
+  const handleForwardSelected = useCallback(() => {
+    if (selectedMessages.size === 0) return;
+    setForwardModal({ 
+      messageIds: Array.from(selectedMessages), 
+      selectedChatId: null, 
+      comment: '' 
+    });
+  }, [selectedMessages]);
+
+  const handleDeleteSelected = useCallback(() => {
+    if (selectedMessages.size === 0) return;
+    setDeleteConfirm({ 
+      messageIds: Array.from(selectedMessages),
+      isMultiple: true 
+    });
+  }, [selectedMessages]);
+
+  const handlePinSelected = useCallback(async () => {
+    if (selectedMessages.size === 0 || !chatId) return;
+    try {
+      const messageIds = Array.from(selectedMessages);
+      for (const messageId of messageIds) {
+        const message = messages.find(m => Number(m.id) === Number(messageId));
+        if (message && !message.isPinned) {
+          await chatAPI.pinMessage(chatId, messageId);
+        }
+      }
+      exitSelectionMode();
+    } catch (error) {
+      console.error('Error pinning messages:', error);
+      alert('Не удалось закрепить сообщения');
+    }
+  }, [selectedMessages, chatId, messages, exitSelectionMode]);
+
+  const handleUnpinSelected = useCallback(async () => {
+    if (selectedMessages.size === 0 || !chatId) return;
+    try {
+      const messageIds = Array.from(selectedMessages);
+      for (const messageId of messageIds) {
+        const message = messages.find(m => Number(m.id) === Number(messageId));
+        if (message && message.isPinned) {
+          await chatAPI.unpinMessage(chatId, messageId);
+        }
+      }
+      exitSelectionMode();
+    } catch (error) {
+      console.error('Error unpinning messages:', error);
+      alert('Не удалось открепить сообщения');
+    }
+  }, [selectedMessages, chatId, messages, exitSelectionMode]);
 
   const sendMessage = async (e) => {
     e.preventDefault();
@@ -1011,7 +931,6 @@ export default function ChatPage() {
       
       // Задержка перед началом записи - запись начнется только после удержания минимум 0.5 секунды
       startDelayTimeoutRef.current = setTimeout(async () => {
-        // Проверяем, что кнопка все еще удерживается
         if (startTimeRef.current > 0 && !isRecording) {
           try {
             await startRecording();
@@ -1045,7 +964,6 @@ export default function ChatPage() {
       return;
     }
     
-    // Если запись началась, но кнопка была отпущена слишком быстро - отменяем
     if (isRecording && !isLocked && holdDuration < minHoldTime) {
       cancelRecording();
       setDragDistance(0);
@@ -1200,37 +1118,15 @@ export default function ChatPage() {
       let fileUrl = null;
       let finalDuration = recordingTime > 0 ? recordingTime : null;
 
-      // Шаг 1: Загрузка файла через REST API
-      // POST /api/chats/{chatId}/files/voice
-      // Возвращает fileUrl: "voices/14/11/uuid.webm"
-      if (typeof window !== 'undefined') {
-        console.log('[Voice] Step 1: Uploading voice file via REST API...');
-      }
-      
       try {
-        // Передаём recordingTime как duration (в секундах)
         const duration = recordingTime > 0 ? recordingTime : null;
         const uploadResponse = await chatAPI.uploadVoiceFile(chatId, audioBlob, duration);
         fileUrl = uploadResponse?.fileUrl;
-        // Используем duration из ответа сервера (если есть) или наш
         finalDuration = uploadResponse?.duration || duration;
-        
-        if (typeof window !== 'undefined') {
-          console.log('[Voice] Step 1 complete: fileUrl =', fileUrl, 'duration =', finalDuration);
-        }
       } catch (uploadError) {
-        // Способ 3 (fallback): Base64 через WebSocket
-        if (typeof window !== 'undefined') {
-          console.warn('[Voice] REST upload failed, falling back to Base64 method:', uploadError.message);
-        }
-        
         const base64 = await convertToBase64(audioBlob);
         const mimeType = audioBlob.type || 'audio/webm';
         const duration = recordingTime > 0 ? recordingTime : null;
-        
-        if (typeof window !== 'undefined') {
-          console.log('[Voice] Sending via WebSocket with Base64 (fallback)...');
-        }
         
         const result = await sendMessageHook(null, 'VOICE', null, base64, mimeType, duration);
 
@@ -1249,17 +1145,7 @@ export default function ChatPage() {
         throw new Error('Failed to upload voice file: no fileUrl returned from server');
       }
 
-      // Шаг 2: Отправка сообщения через WebSocket с fileUrl
-      // Payload: { chatId, type: "VOICE", fileUrl: "voices/...", duration: ... }
-      if (typeof window !== 'undefined') {
-        console.log('[Voice] Step 2: Sending VOICE message via WebSocket with fileUrl...');
-      }
-      
       const result = await sendMessageHook(null, 'VOICE', fileUrl, null, null, finalDuration);
-
-      if (typeof window !== 'undefined') {
-        console.log('[Voice] Step 2 complete: result =', result);
-      }
 
       if (result?.serverMessage) {
         addOptimistic(chatId, { ...result.serverMessage, status: MESSAGE_STATUS.SENT, isOptimistic: false });
@@ -1278,14 +1164,11 @@ export default function ChatPage() {
     }
   }, [audioBlob, user, sending, recordingTime, convertToBase64, sendMessageHook, chatId, addOptimistic, resetVoice, isAtBottom]);
 
-  // Используем рекомендуемый способ 2: загрузка файла через REST + отправка через WebSocket
   const handleVoiceSend = useCallback(async () => {
-    // Проверяем условия перед отправкой
     if (!audioBlob || !user) {
       return;
     }
     
-    // Проверяем, не отправляется ли уже сообщение
     if (sending) {
       return;
     }
@@ -1293,9 +1176,7 @@ export default function ChatPage() {
     try {
       await handleVoiceSendSimple();
     } catch (error) {
-      if (typeof window !== 'undefined') {
-        console.error('[Voice] Failed to send voice message:', error);
-      }
+      console.error('[Voice] Failed to send voice message:', error);
       resetVoice();
       sentAudioBlobRef.current = null;
     }
@@ -1307,10 +1188,7 @@ export default function ChatPage() {
   };
 
   useEffect(() => {
-    // Отправляем голосовое сообщение, когда запись завершена
-    // НЕ отправляем, если запись была отменена (isLocked сброшен, но audioBlob есть)
     if (audioBlob && !isRecording && sentAudioBlobRef.current !== audioBlob && !isLocked) {
-      // Проверяем, что мы не в процессе отправки другого сообщения
       if (!sending) {
         sentAudioBlobRef.current = audioBlob;
         // Небольшая задержка, чтобы убедиться, что audioBlob полностью установлен
@@ -1333,31 +1211,61 @@ export default function ChatPage() {
     const scrollHeight = container.scrollHeight;
     const clientHeight = container.clientHeight;
     
-    // Проверка на загрузку старых сообщений
-    if (scrollTop < 100 && hasMore && !loadingMore) {
-      loadMessages(page + 1, true);
+    // Определяем направление прокрутки (только если это не первая загрузка)
+    if (!isLoadingInitialRef.current && lastScrollTopRef.current > 0) {
+      const scrollDelta = scrollTop - lastScrollTopRef.current;
+      // Если прокручиваем вверх (scrollDelta < 0), помечаем это
+      if (scrollDelta < -10) { // Небольшой порог, чтобы игнорировать мелкие колебания
+        isUserScrollingUpRef.current = true;
+      } else if (scrollDelta > 10) { // Прокручиваем вниз
+        isUserScrollingUpRef.current = false;
+      }
+    }
+    lastScrollTopRef.current = scrollTop;
+    
+    if (
+      scrollTop > 0 && 
+      scrollTop < 500 && 
+      hasMore && 
+      !loadingMore && 
+      !isLoadingInitialRef.current &&
+      !isRestoringScrollRef.current &&
+      isUserScrollingUpRef.current // Только если пользователь сам прокручивает вверх
+    ) {
+      // Очищаем предыдущий таймер
+      if (loadMoreTimeoutRef.current) {
+        clearTimeout(loadMoreTimeoutRef.current);
+      }
+      // Debounce загрузки - ждем 200ms после последнего скролла
+      loadMoreTimeoutRef.current = setTimeout(() => {
+        if (messagesContainerRef.current && messagesContainerRef.current.scrollTop < 500) {
+          loadMessages(page + 1, true);
+        }
+      }, 200);
     }
     
     // Показываем кнопку "вниз" если пользователь не внизу
     const isNearBottom = isAtBottom(100);
     setShowScrollToBottom(!isNearBottom);
     
-    // Если пользователь прокрутил вниз, помечаем это
     if (isNearBottom) {
       userScrolledToBottomRef.current = true;
+      isUserScrollingUpRef.current = false;
     } else {
-      // Если прокрутил вверх, сбрасываем флаг
+      // Если прокрутил вверх, сбрасываем флаг "внизу"
       userScrolledToBottomRef.current = false;
     }
     
-    // Сохраняем позицию с задержкой
+    // Сохраняем позицию с задержкой (debounce)
     isUserScrollingRef.current = true;
     if (scrollTimeoutRef.current) {
       clearTimeout(scrollTimeoutRef.current);
     }
     
     scrollTimeoutRef.current = setTimeout(() => {
-      saveScrollPosition();
+      if (!isRestoringScrollRef.current) {
+        saveScrollPosition();
+      }
       isUserScrollingRef.current = false;
     }, 500);
   }, [hasMore, loadingMore, page, loadMessages, saveScrollPosition, isAtBottom]);
@@ -1373,7 +1281,7 @@ export default function ChatPage() {
       });
       
       setShowScrollToBottom(false);
-      userScrolledToBottomRef.current = true; // Помечаем, что пользователь намеренно прокрутил вниз
+      userScrolledToBottomRef.current = true;
       
       // Сохраняем позицию после скролла
       setTimeout(() => {
@@ -1457,16 +1365,29 @@ export default function ChatPage() {
       {sidebarOpen && <div className={styles.sidebarOverlay} onClick={() => setSidebarOpen(false)} />}
       
       <div className={styles.mainContent}>
-        <div className={styles.header}>
-          <button 
-            onClick={() => router.back()} 
-            className={styles.backButton}
-            title="Назад"
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <div className={styles.chatInfo}>
-            <h1>{getDisplayChatName()}</h1>
+        {selectionMode ? (
+          <SelectionHeader
+            selectedCount={selectedMessages.size}
+            onClose={exitSelectionMode}
+            onSelectAll={handleSelectAll}
+            onForward={handleForwardSelected}
+            onPin={handlePinSelected}
+            onUnpin={handleUnpinSelected}
+            onDelete={handleDeleteSelected}
+            canPin={true}
+            canUnpin={true}
+          />
+        ) : (
+          <div className={styles.header}>
+            <button 
+              onClick={() => router.back()} 
+              className={styles.backButton}
+              title="Назад"
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <div className={styles.chatInfo}>
+              <h1>{getDisplayChatName()}</h1>
             {(() => {
               const status = getOtherParticipantStatus();
               if (!status.text) return null;
@@ -1481,94 +1402,17 @@ export default function ChatPage() {
             })()}
           </div>
         </div>
+        )}
 
-        {pinnedMessages.length > 0 && (() => {
-          // Определяем, какое закрепленное сообщение показывать
-          // Если есть просмотренное сообщение, показываем следующее после него
-          // Иначе показываем первое (последнее закрепленное)
-          let messageToShow = null;
-          if (viewedPinnedMessageId) {
-            // Находим индекс просмотренного сообщения
-            const viewedIndex = pinnedMessages.findIndex(p => {
-              const msgId = p.message?.id;
-              return msgId && Number(msgId) === Number(viewedPinnedMessageId);
-            });
-            // Показываем следующее сообщение после просмотренного
-            if (viewedIndex >= 0 && viewedIndex < pinnedMessages.length - 1) {
-              messageToShow = pinnedMessages[viewedIndex + 1];
-            } else {
-              // Если это было последнее сообщение, показываем первое
-              messageToShow = pinnedMessages[0];
-            }
-          } else {
-            // Показываем первое (последнее закрепленное)
-            messageToShow = pinnedMessages[0];
-          }
-
-          if (!messageToShow) return null;
-
-          const msg = messageToShow.message || messageToShow;
-          return (
-            <div className={styles.pinnedMessagesContainer}>
-              <div
-                key={messageToShow.id || msg.id}
-                className={styles.pinnedMessage}
-                onClick={async () => {
-                  // Прокручиваем к сообщению
-                  const targetMessage = document.querySelector(`[data-message-id="${msg.id}"]`);
-                  if (targetMessage) {
-                    targetMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    // Подсвечиваем сообщение
-                    targetMessage.classList.add(styles.messageHighlight);
-                    setTimeout(() => {
-                      targetMessage.classList.remove(styles.messageHighlight);
-                    }, 2000);
-                    // Устанавливаем это сообщение как просмотренное
-                    setViewedPinnedMessageId(msg.id);
-                  } else {
-                    // Если сообщение не найдено, загружаем его
-                    try {
-                      const fullMessage = await chatAPI.getMessage(chatId, msg.id);
-                      // Прокручиваем к началу чата и загружаем сообщения
-                      messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-                      // Сообщение будет загружено через loadMessages
-                      setViewedPinnedMessageId(msg.id);
-                    } catch (error) {
-                      console.error('Failed to load message:', error);
-                    }
-                  }
-                }}
-              >
-                <div className={styles.pinnedMessageLine} />
-                <div className={styles.pinnedMessageContent}>
-                  <div className={styles.pinnedMessageHeader}>
-                    <span className={styles.pinnedMessageLabel}>Закреплённое сообщение</span>
-                    <button
-                      className={styles.pinnedMessageUnpin}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleUnpinMessage(messageToShow);
-                      }}
-                      title="Открепить"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                  <div className={styles.pinnedMessageText}>
-                    {msg.type === 'VOICE' ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Mic size={14} style={{ color: '#6b7280', flexShrink: 0 }} />
-                        <span>Голосовое сообщение {msg.duration ? `(${Math.round(msg.duration)}с)` : ''}</span>
-                      </div>
-                    ) : (
-                      msg.content || ''
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
+        <PinnedMessagesHeader
+          pinnedMessages={pinnedMessages}
+          viewedPinnedMessageId={viewedPinnedMessageId}
+          messages={messages}
+          chatId={chatId}
+          messagesContainerRef={messagesContainerRef}
+          onUnpin={handleUnpinMessage}
+          onViewedChange={setViewedPinnedMessageId}
+        />
 
       <div
         ref={messagesContainerRef}
@@ -1583,8 +1427,11 @@ export default function ChatPage() {
         )}
         
         {(() => {
-          // Фильтруем удаленные сообщения
-          const visibleMessages = messages.filter(msg => !msg.deletedForMe && !msg.deletedForAll);
+          const visibleMessages = messages.filter(msg => {
+            if (!msg || !msg.id) return false;
+            const isDeleted = msg.deletedForMe === true || msg.deletedForAll === true;
+            return !isDeleted;
+          });
           return visibleMessages.length === 0 ? (
             <div className={styles.emptyState}>
               <p>Пока нет сообщений</p>
@@ -1604,10 +1451,21 @@ export default function ChatPage() {
                   </div>
                 )}
                 <div
-                  className={`${styles.message} ${isOwn ? styles.ownMessage : ''} ${msg.pinned ? styles.messagePinned : ''}`}
-                  onContextMenu={(e) => handleContextMenu(e, msg)}
+                  className={`${styles.message} ${isOwn ? styles.ownMessage : ''} ${msg.pinned ? styles.messagePinned : ''} ${selectionMode && selectedMessages.has(msg.id) ? styles.messageSelected : ''}`}
+                  onContextMenu={(e) => !selectionMode && handleContextMenu(e, msg)}
+                  onClick={() => selectionMode && toggleMessageSelection(msg.id)}
                   data-message-id={msg.id}
                 >
+                  {selectionMode && (
+                    <div className={styles.messageCheckbox}>
+                      <input
+                        type="checkbox"
+                        checked={selectedMessages.has(msg.id)}
+                        onChange={() => toggleMessageSelection(msg.id)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                  )}
                   {!isOwn && (
                     <div className={styles.messageAvatar}>
                       {msg.senderDisplayName?.[0] || msg.senderUsername?.[0] || '?'}
@@ -1625,18 +1483,46 @@ export default function ChatPage() {
                       (() => {
                         const status = msg.status || (msg.isOptimistic ? MESSAGE_STATUS.SENDING : MESSAGE_STATUS.SENT);
                         const readMeta = status === MESSAGE_STATUS.SENT ? getReadMetaForMessage(msg) : null;
+                        const isPinnedInList = pinnedMessages.some(p => {
+                          const pinnedMsgId = p.message?.id;
+                          return pinnedMsgId && Number(pinnedMsgId) === Number(msg.id);
+                        });
+                        const isPinned = msg.isPinned || isPinnedInList;
                         return (
                           <VoiceMessagePlayer 
                             fileUrl={msg.fileUrl} 
                             duration={msg.duration}
                             messageTime={formatChatTime(msg.createdAt)}
                             isOwn={isOwn}
-                            statusIcon={isOwn ? getMessageStatusIcon(status, readMeta) : null}
+                            statusIcon={isOwn && !msg.deletedForMe && !msg.deletedForAll ? getMessageStatusIcon(status, readMeta) : null}
+                            isPinned={isPinned}
                           />
                         );
                       })()
                     ) : (
                       <div className={`${styles.messageText} ${msg.isOptimistic ? styles.messagePending : ''} ${msg.status === MESSAGE_STATUS.FAILED ? styles.messageFailed : ''}`}>
+                        {msg.forwardedFrom && (
+                          <div className={styles.messageForwarded}>
+                            <div className={styles.messageForwardedHeader}>
+                              <span className={styles.messageForwardedIcon}>↪</span>
+                              <span className={styles.messageForwardedText}>
+                                Переслано от {msg.forwardedFrom.originalSenderDisplayName || msg.forwardedFrom.originalSenderUsername}
+                                {msg.forwardedFrom.forwardedByUserId !== msg.senderId && (
+                                  <span> • Переслал {msg.forwardedFrom.forwardedByDisplayName || msg.forwardedFrom.forwardedByUsername}</span>
+                                )}
+                              </span>
+                            </div>
+                            {msg.forwardedFrom.originalType === 'VOICE' ? (
+                              <div className={styles.messageForwardedContent}>
+                                🎤 Голосовое сообщение
+                              </div>
+                            ) : (
+                              <div className={styles.messageForwardedContent}>
+                                {msg.forwardedFrom.originalContent}
+                              </div>
+                            )}
+                          </div>
+                        )}
                         {msg.replyTo && (
                           <div 
                             className={styles.messageReply}
@@ -1680,7 +1566,6 @@ export default function ChatPage() {
                           </div>
                           <div className={styles.messageTextMeta}>
                             {(() => {
-                              // Проверяем и флаг isPinned на сообщении, и наличие в pinnedMessages
                               const isPinnedInList = pinnedMessages.some(p => {
                                 const pinnedMsgId = p.message?.id;
                                 return pinnedMsgId && Number(pinnedMsgId) === Number(msg.id);
@@ -1698,7 +1583,7 @@ export default function ChatPage() {
                                 (ред.)
                               </span>
                             )}
-                            {isOwn && (() => {
+                            {isOwn && !msg.deletedForMe && !msg.deletedForAll && (() => {
                               const status = msg.status || (msg.isOptimistic ? MESSAGE_STATUS.SENDING : MESSAGE_STATUS.SENT);
                               const readMeta = status === MESSAGE_STATUS.SENT ? getReadMetaForMessage(msg) : null;
                               const title = readMeta?.readCount
@@ -2102,53 +1987,27 @@ export default function ChatPage() {
         />
       )}
 
-      {deleteConfirm && (() => {
-        // Получаем имя другого участника для чекбокса
-        const getOtherParticipantName = () => {
-          if (!chat?.participants || !user?.id) return '';
-          if (chat.type !== 'DIRECT') {
-            // Для группового чата показываем количество участников
-            return `${chat.participants?.length || 0} участников`;
-          }
-          const other = chat.participants.find(p => Number(p.id) !== Number(user.id));
-          return other?.displayName || other?.username || '';
-        };
+      <DeleteConfirmModal
+        deleteConfirm={deleteConfirm}
+        deleteForAll={deleteForAll}
+        messages={messages}
+        user={user}
+        chat={chat}
+        onClose={() => { setDeleteConfirm(null); setDeleteForAll(false); }}
+        onConfirm={handleConfirmDelete}
+        onDeleteForAllChange={setDeleteForAll}
+      />
 
-        const otherParticipantName = getOtherParticipantName();
-        const canDeleteForAll = deleteConfirm.message?.senderId === user?.id;
-
-        return (
-          <div className={styles.deleteModalOverlay} onClick={() => { setDeleteConfirm(null); setDeleteForAll(false); }}>
-            <div className={styles.deleteModal} onClick={(e) => e.stopPropagation()}>
-              <h3 className={styles.deleteModalTitle}>Удалить это сообщение?</h3>
-              {canDeleteForAll && otherParticipantName && (
-                <label className={styles.deleteModalCheckbox}>
-                  <input
-                    type="checkbox"
-                    checked={deleteForAll}
-                    onChange={(e) => setDeleteForAll(e.target.checked)}
-                  />
-                  <span>Также удалить для {otherParticipantName}</span>
-                </label>
-              )}
-              <div className={styles.deleteModalButtons}>
-                <button
-                  className={styles.deleteModalCancel}
-                  onClick={() => { setDeleteConfirm(null); setDeleteForAll(false); }}
-                >
-                  Отмена
-                </button>
-                <button
-                  className={styles.deleteModalConfirm}
-                  onClick={handleConfirmDelete}
-                >
-                  Удалить
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      <ForwardModal
+        forwardModal={forwardModal}
+        chats={chats}
+        chatId={chatId}
+        user={user}
+        onClose={() => setForwardModal(null)}
+        onConfirm={handleConfirmForward}
+        onChatSelect={(chatId) => setForwardModal(prev => ({ ...prev, selectedChatId: chatId }))}
+        onCommentChange={(comment) => setForwardModal(prev => ({ ...prev, comment }))}
+      />
     </div>
   );
 }

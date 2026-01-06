@@ -40,6 +40,7 @@ const actionTypes = {
   UPSERT_CHAT: 'UPSERT_CHAT',
   SET_ACTIVE_CHAT: 'SET_ACTIVE_CHAT',
   UPSERT_MESSAGE: 'UPSERT_MESSAGE',
+  REMOVE_MESSAGE: 'REMOVE_MESSAGE',
   ADD_OPTIMISTIC: 'ADD_OPTIMISTIC',
   REPLACE_OPTIMISTIC: 'REPLACE_OPTIMISTIC',
   APPLY_READ_RECEIPT: 'APPLY_READ_RECEIPT',
@@ -167,7 +168,10 @@ const reducer = (state, action) => {
       const cid = String(chatId);
       const mid = String(message.id);
 
-      const messagesById = { ...state.messagesById, [mid]: message };
+      // Мержим существующее сообщение с новым, чтобы сохранить все поля
+      const existingMessage = state.messagesById[mid];
+      const mergedMessage = existingMessage ? { ...existingMessage, ...message } : message;
+      const messagesById = { ...state.messagesById, [mid]: mergedMessage };
       const existingIds = ensureArray(state.messageIdsByChatId[cid]);
       const has = existingIds.some(x => String(x) === mid);
       const nextIds = has ? existingIds : [...existingIds, mid];
@@ -230,6 +234,30 @@ const reducer = (state, action) => {
         chatsById,
         chatOrder,
       };
+    }
+
+    case actionTypes.REMOVE_MESSAGE: {
+      const messageId = action.payload?.messageId;
+      const chatId = action.payload?.chatId;
+      if (!messageId || !chatId) return state;
+      const cid = String(chatId);
+      const mid = String(messageId);
+
+      const existingIds = ensureArray(state.messageIdsByChatId[cid]);
+      const nextIds = existingIds.filter(id => String(id) !== mid);
+      const messageIdsByChatId = { ...state.messageIdsByChatId, [cid]: nextIds };
+
+      const messagesById = { ...state.messagesById };
+      const existingMessage = messagesById[mid];
+      if (existingMessage) {
+        messagesById[mid] = {
+          ...existingMessage,
+          deletedForMe: action.payload.deletedForMe ?? existingMessage.deletedForMe,
+          deletedForAll: action.payload.deletedForAll ?? existingMessage.deletedForAll,
+        };
+      }
+
+      return { ...state, messagesById, messageIdsByChatId };
     }
 
     case actionTypes.ADD_OPTIMISTIC: {
@@ -405,8 +433,10 @@ export const useChats = () => {
 export const useChatMessages = (chatId) => {
   const { messageIdsByChatId, messagesById } = useChats();
   const cid = chatId ? String(chatId) : null;
-  const ids = cid ? ensureArray(messageIdsByChatId[cid]) : [];
-  return ids.map(id => messagesById[String(id)]).filter(Boolean);
+  return useMemo(() => {
+    const ids = cid ? ensureArray(messageIdsByChatId[cid]) : [];
+    return ids.map(id => messagesById[String(id)]).filter(Boolean);
+  }, [cid, messageIdsByChatId, messagesById]);
 };
 
 export const MessagingProvider = ({ children }) => {
@@ -538,6 +568,14 @@ export const MessagingProvider = ({ children }) => {
       payload: { message, chatId: message.chatId, unreadDelta: meta.unreadDelta ?? unreadDelta },
     });
   }, [state.activeChatId]);
+
+  const removeMessage = useCallback((chatId, messageId, deletedForMe = false, deletedForAll = false) => {
+    if (!chatId || !messageId) return;
+    dispatch({
+      type: actionTypes.REMOVE_MESSAGE,
+      payload: { chatId, messageId, deletedForMe, deletedForAll },
+    });
+  }, []);
 
   const addOptimistic = useCallback((chatId, optimisticMessage) => {
     dispatch({ type: actionTypes.ADD_OPTIMISTIC, payload: { chatId, message: optimisticMessage } });
@@ -785,6 +823,7 @@ export const MessagingProvider = ({ children }) => {
       upsertReadReceipt,
       upsertMessage,
       updateMessage,
+      removeMessage,
       addOptimistic,
       replaceOptimistic,
     };
@@ -800,6 +839,7 @@ export const MessagingProvider = ({ children }) => {
     upsertReadReceipt,
     upsertMessage,
     updateMessage,
+    removeMessage,
     addOptimistic,
     replaceOptimistic,
   ]);

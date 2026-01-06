@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Play, Pause } from 'lucide-react';
+import { Play, Pause, Pin } from 'lucide-react';
 import { chatAPI, getToken } from '@/utils/api';
 import { useVoicePlayer } from '@/context/voicePlayer';
 import styles from './index.module.css';
@@ -25,7 +25,7 @@ const generateWaveform = (seed, barCount = 40) => {
   return bars;
 };
 
-export default function VoiceMessagePlayer({ fileUrl, duration: propDuration, messageTime, isOwn, statusIcon }) {
+export default function VoiceMessagePlayer({ fileUrl, duration: propDuration, messageTime, isOwn, statusIcon, isPinned }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [audioDuration, setAudioDuration] = useState(propDuration || 0);
@@ -271,6 +271,9 @@ export default function VoiceMessagePlayer({ fileUrl, duration: propDuration, me
               )}
               
               <div className={styles.messageStatus}>
+                {isPinned && (
+                  <Pin size={12} className={styles.pinnedIcon} title="Закреплено" />
+                )}
                 {messageTime && (
                   <span className={styles.messageTime}>{messageTime}</span>
                 )}

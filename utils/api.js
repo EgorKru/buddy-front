@@ -237,6 +237,18 @@ export const chatAPI = {
       method: 'DELETE',
     });
   },
+
+  forwardMessages: async (toChatId, fromChatId, messageIds, comment = null) => {
+    const queryString = new URLSearchParams({ fromChatId }).toString();
+    const body = { messageIds };
+    if (comment) {
+      body.comment = comment;
+    }
+    return apiRequest(`/chats/${toChatId}/forward?${queryString}`, {
+      method: 'POST',
+      body,
+    });
+  },
 };
 
 export const userAPI = {
