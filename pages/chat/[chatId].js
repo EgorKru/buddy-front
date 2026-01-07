@@ -215,6 +215,32 @@ export default function ChatPage() {
         const list = response.content;
         const ordered = append ? list : [...list].reverse();
         for (const m of ordered) {
+          // Fallback: Восстанавливаем метаданные файла из localStorage для старых сообщений
+          // (новые сообщения уже содержат fileSize, fileName, mimeType от сервера)
+          if ((m.type === 'FILE' || m.type === 'IMAGE') && m.fileUrl && typeof window !== 'undefined') {
+            if (!m.fileSize || !m.fileName || !m.mimeType) {
+              const metadataKey = `file_metadata_${m.fileUrl}`;
+              const savedMetadata = localStorage.getItem(metadataKey);
+              if (savedMetadata) {
+                try {
+                  const metadata = JSON.parse(savedMetadata);
+                  // Используем сохраненные данные только если их нет в сообщении
+                  if (!m.fileSize && metadata.fileSize) {
+                    m.fileSize = metadata.fileSize;
+                  }
+                  if (!m.fileName && metadata.fileName) {
+                    m.fileName = metadata.fileName;
+                  }
+                  if (!m.mimeType && metadata.mimeType) {
+                    m.mimeType = metadata.mimeType;
+                  }
+                } catch (e) {
+                  // Игнорируем ошибки парсинга
+                }
+              }
+            }
+          }
+          
           const messageData = {
             ...m,
             status: MESSAGE_STATUS.SENT,
@@ -1227,6 +1253,10 @@ export default function ChatPage() {
           });
         }
         
+        const fileSize = uploadResponse.fileSize || fileToSend.size;
+        const mimeType = uploadResponse.mimeType || fileToSend.type;
+        const fileName = fileToSend.name;
+        
         const result = await sendMessageHook(
           messageText || '', 
           isImage ? 'IMAGE' : 'FILE', 
@@ -1235,13 +1265,24 @@ export default function ChatPage() {
           null, 
           null, 
           replyToId, 
-          fileToSend.name,
-          uploadResponse.fileSize || fileToSend.size,
-          uploadResponse.mimeType || fileToSend.type
+          fileName,
+          fileSize,
+          mimeType
         );
         
         if (typeof window !== 'undefined') {
           console.log('[Chat] sendMessageHook result:', result);
+        }
+        
+        // Сохраняем метаданные файла в localStorage для восстановления после перезагрузки
+        if (typeof window !== 'undefined' && uploadResponse.fileUrl) {
+          const fileMetadata = {
+            fileSize,
+            fileName,
+            mimeType,
+            timestamp: Date.now()
+          };
+          localStorage.setItem(`file_metadata_${uploadResponse.fileUrl}`, JSON.stringify(fileMetadata));
         }
         
         if (result?.serverMessage) {

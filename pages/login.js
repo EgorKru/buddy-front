@@ -134,7 +134,7 @@ export default function Login() {
         <h1>Вход</h1>
         <form onSubmit={handleLogin}>
           <div className={styles.formGroup}>
-            <label>Имя пользователя</label>
+            <label htmlFor="login-username">Имя пользователя</label>
             <input
               type="text"
               id="login-username"
@@ -147,7 +147,7 @@ export default function Login() {
             />
           </div>
           <div className={styles.formGroup}>
-            <label>Пароль</label>
+            <label htmlFor="login-password">Пароль</label>
             <div className={styles.passwordContainer}>
               <input
                 type={showPassword ? "text" : "password"}

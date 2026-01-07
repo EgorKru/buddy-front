@@ -106,7 +106,7 @@ export default function Register() {
         <h1>Регистрация</h1>
         <form onSubmit={handleRegister}>
           <div className={styles.formGroup}>
-            <label>Имя пользователя</label>
+            <label htmlFor="register-username">Имя пользователя</label>
             <input
               type="text"
               id="register-username"
@@ -121,7 +121,7 @@ export default function Register() {
             />
           </div>
           <div className={styles.formGroup}>
-            <label>Email</label>
+            <label htmlFor="register-email">Email</label>
             <input
               type="email"
               id="register-email"
@@ -134,7 +134,7 @@ export default function Register() {
             />
           </div>
           <div className={styles.formGroup}>
-            <label>Отображаемое имя (необязательно)</label>
+            <label htmlFor="register-displayName">Отображаемое имя (необязательно)</label>
             <input
               type="text"
               id="register-displayName"
@@ -146,7 +146,7 @@ export default function Register() {
             />
           </div>
           <div className={styles.formGroup}>
-            <label>Пароль</label>
+            <label htmlFor="register-password">Пароль</label>
             <div className={styles.passwordContainer}>
               <input
                 type={showPassword ? "text" : "password"}

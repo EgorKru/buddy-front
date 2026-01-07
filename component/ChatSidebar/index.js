@@ -327,12 +327,37 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
     const lastMessage = chat?.lastMessage;
     if (!lastMessage) return '';
 
-    // Голосовые сообщения или любые сообщения с fileUrl, но без текста
-    if (
-      (lastMessage.type === 'VOICE' || lastMessage.fileUrl) &&
-      !lastMessage.content
-    ) {
+    // Голосовые сообщения без текста
+    if (lastMessage.type === 'VOICE' && !lastMessage.content) {
       return 'Голосовое сообщение';
+    }
+
+    // Файловые сообщения (FILE или IMAGE) без текста
+    if ((lastMessage.type === 'FILE' || lastMessage.type === 'IMAGE') && !lastMessage.content) {
+      // Используем fileName из сообщения, если есть
+      if (lastMessage.fileName) {
+        const fileName = lastMessage.fileName.length > 40 
+          ? `${lastMessage.fileName.substring(0, 40)}...` 
+          : lastMessage.fileName;
+        return fileName;
+      }
+      
+      // Если fileName нет, пытаемся извлечь из fileUrl
+      if (lastMessage.fileUrl) {
+        const parts = lastMessage.fileUrl.split('/');
+        const lastPart = parts[parts.length - 1];
+        // Убираем UUID и расширение, если есть
+        const match = lastPart.match(/^[^.]*\.(.+)$/);
+        if (match) {
+          const extension = match[1];
+          return lastMessage.type === 'IMAGE' 
+            ? `Изображение.${extension}` 
+            : `Файл.${extension}`;
+        }
+        return lastMessage.type === 'IMAGE' ? 'Изображение' : 'Файл';
+      }
+      
+      return lastMessage.type === 'IMAGE' ? 'Изображение' : 'Файл';
     }
 
     // Если текст отсутствует, пробуем взять что‑то осмысленное из вложенных полей
@@ -577,7 +602,7 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
               )}
 
               <div className={styles.formGroup}>
-                <label>
+                <label htmlFor="chat-create-participants">
                   {createChat.chatType === 'DIRECT' 
                     ? 'Поиск пользователя *' 
                     : 'Поиск участников *'}

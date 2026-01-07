@@ -38,6 +38,31 @@ export const useChatRealtime = (chatId) => {
       const list = Array.isArray(response?.content) ? response.content : [];
       const ordered = [...list].reverse();
       for (const m of ordered) {
+        // Fallback: Восстанавливаем метаданные файла из localStorage для старых сообщений
+        // (новые сообщения уже содержат fileSize, fileName, mimeType от сервера)
+        if ((m.type === 'FILE' || m.type === 'IMAGE') && m.fileUrl && typeof window !== 'undefined') {
+          if (!m.fileSize || !m.fileName || !m.mimeType) {
+            const metadataKey = `file_metadata_${m.fileUrl}`;
+            const savedMetadata = localStorage.getItem(metadataKey);
+            if (savedMetadata) {
+              try {
+                const metadata = JSON.parse(savedMetadata);
+                // Используем сохраненные данные только если их нет в сообщении
+                if (!m.fileSize && metadata.fileSize) {
+                  m.fileSize = metadata.fileSize;
+                }
+                if (!m.fileName && metadata.fileName) {
+                  m.fileName = metadata.fileName;
+                }
+                if (!m.mimeType && metadata.mimeType) {
+                  m.mimeType = metadata.mimeType;
+                }
+              } catch (e) {
+                // Игнорируем ошибки парсинга
+              }
+            }
+          }
+        }
         upsertMessage({ ...m, status: MESSAGE_STATUS.SENT, isOptimistic: false }, { unreadDelta: 0 });
       }
     } catch (e) {} finally {
@@ -112,6 +137,32 @@ export const useChatRealtime = (chatId) => {
           const now = Date.now();
           if (now - messageTime < 2000) {
             return;
+          }
+        }
+
+        // Fallback: Восстанавливаем метаданные файла из localStorage для старых сообщений
+        // (новые сообщения уже содержат fileSize, fileName, mimeType от сервера)
+        if ((dto.type === 'FILE' || dto.type === 'IMAGE') && dto.fileUrl && typeof window !== 'undefined') {
+          if (!dto.fileSize || !dto.fileName || !dto.mimeType) {
+            const metadataKey = `file_metadata_${dto.fileUrl}`;
+            const savedMetadata = localStorage.getItem(metadataKey);
+            if (savedMetadata) {
+              try {
+                const metadata = JSON.parse(savedMetadata);
+                // Используем сохраненные данные только если их нет в сообщении
+                if (!dto.fileSize && metadata.fileSize) {
+                  dto.fileSize = metadata.fileSize;
+                }
+                if (!dto.fileName && metadata.fileName) {
+                  dto.fileName = metadata.fileName;
+                }
+                if (!dto.mimeType && metadata.mimeType) {
+                  dto.mimeType = metadata.mimeType;
+                }
+              } catch (e) {
+                // Игнорируем ошибки парсинга
+              }
+            }
           }
         }
 
