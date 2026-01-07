@@ -100,6 +100,46 @@ export const chatAPI = {
     return apiRequest(`/chats/${chatId}/messages${queryString ? `?${queryString}` : ''}`);
   },
 
+  // Новый подход: полная загрузка состояния одним запросом
+  getChatStateFull: async (chatId, messageLimit = 100) => {
+    const params = new URLSearchParams({ messageLimit: String(messageLimit) });
+    return apiRequest(`/chats/${chatId}/state/full?${params}`);
+  },
+
+  // Курсорная пагинация: загрузка сообщений до указанного ID
+  getMessagesBefore: async (chatId, beforeId, limit = 100) => {
+    const params = new URLSearchParams({ beforeId: String(beforeId), limit: String(limit) });
+    return apiRequest(`/chats/${chatId}/messages/before?${params}`);
+  },
+
+  // Курсорная пагинация: загрузка сообщений до указанной даты
+  getMessagesBeforeDate: async (chatId, beforeDate, limit = 100) => {
+    const params = new URLSearchParams({ beforeDate: String(beforeDate), limit: String(limit) });
+    return apiRequest(`/chats/${chatId}/messages/before?${params}`);
+  },
+
+  // Telegram-подход: получение состояния чата (pts) - для Gap Recovery
+  getChatState: async (chatId) => {
+    return apiRequest(`/chats/${chatId}/state`);
+  },
+
+  // Telegram-подход: получение пропущенных обновлений (Gap Recovery)
+  getChatUpdates: async (chatId, fromPts, limit = 100) => {
+    const params = new URLSearchParams({ fromPts: String(fromPts), limit: String(limit) });
+    return apiRequest(`/chats/${chatId}/updates?${params}`);
+  },
+
+  // Telegram-подход: получение глобального состояния пользователя (seq)
+  getUserState: async () => {
+    return apiRequest('/user/state');
+  },
+
+  // Telegram-подход: получение пропущенных глобальных обновлений
+  getUserUpdates: async (fromSeq, limit = 100) => {
+    const params = new URLSearchParams({ fromSeq: String(fromSeq), limit: String(limit) });
+    return apiRequest(`/user/updates?${params}`);
+  },
+
   sendMessage: async (chatId, content, type = 'TEXT', fileUrl = null, replyToMessageId = null) => {
     const body = { 
       type 
@@ -187,7 +227,7 @@ export const chatAPI = {
     return result;
   },
 
-  uploadImageFile: async (chatId, imageFile) => {
+  uploadImageFile: async (chatId, imageFile, onProgress) => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     const formData = new FormData();
     formData.append('file', imageFile);
@@ -203,6 +243,60 @@ export const chatAPI = {
       console.log('[API] Uploading image file:', { chatId, url: uploadUrl, fileName: imageFile.name, fileSize: imageFile.size, fileType: imageFile.type });
     }
 
+    // Оптимизация: используем XMLHttpRequest для отслеживания прогресса с requestAnimationFrame
+    if (onProgress && typeof window !== 'undefined' && typeof XMLHttpRequest !== 'undefined') {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            requestAnimationFrame(() => {
+              onProgress(e.loaded / e.total);
+            });
+          }
+        });
+        
+        xhr.addEventListener('load', () => {
+          if (xhr.status === 401) {
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              window.location.href = '/login';
+            }
+            reject(new Error('Unauthorized'));
+            return;
+          }
+          
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const result = JSON.parse(xhr.responseText);
+              resolve(result);
+            } catch (e) {
+              reject(new Error('Failed to parse response'));
+            }
+          } else {
+            try {
+              const error = JSON.parse(xhr.responseText);
+              reject(new Error(error.message || `Upload failed with status ${xhr.status}`));
+            } catch (e) {
+              reject(new Error(`Upload failed with status ${xhr.status}`));
+            }
+          }
+        });
+        
+        xhr.addEventListener('error', () => {
+          reject(new Error('Upload failed'));
+        });
+        
+        xhr.open('POST', uploadUrl);
+        if (token) {
+          xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        }
+        xhr.send(formData);
+      });
+    }
+
+    // Fallback на fetch если onProgress не передан
     const response = await fetch(uploadUrl, {
       method: 'POST',
       headers,
@@ -235,7 +329,7 @@ export const chatAPI = {
     return result;
   },
 
-  uploadFile: async (chatId, file) => {
+  uploadFile: async (chatId, file, onProgress) => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     const formData = new FormData();
     formData.append('file', file);
@@ -251,6 +345,60 @@ export const chatAPI = {
       console.log('[API] Uploading file:', { chatId, url: uploadUrl, fileName: file.name, fileSize: file.size, fileType: file.type });
     }
 
+    // Оптимизация: используем XMLHttpRequest для отслеживания прогресса с requestAnimationFrame
+    if (onProgress && typeof window !== 'undefined' && typeof XMLHttpRequest !== 'undefined') {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            requestAnimationFrame(() => {
+              onProgress(e.loaded / e.total);
+            });
+          }
+        });
+        
+        xhr.addEventListener('load', () => {
+          if (xhr.status === 401) {
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              window.location.href = '/login';
+            }
+            reject(new Error('Unauthorized'));
+            return;
+          }
+          
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const result = JSON.parse(xhr.responseText);
+              resolve(result);
+            } catch (e) {
+              reject(new Error('Failed to parse response'));
+            }
+          } else {
+            try {
+              const error = JSON.parse(xhr.responseText);
+              reject(new Error(error.message || `Upload failed with status ${xhr.status}`));
+            } catch (e) {
+              reject(new Error(`Upload failed with status ${xhr.status}`));
+            }
+          }
+        });
+        
+        xhr.addEventListener('error', () => {
+          reject(new Error('Upload failed'));
+        });
+        
+        xhr.open('POST', uploadUrl);
+        if (token) {
+          xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        }
+        xhr.send(formData);
+      });
+    }
+
+    // Fallback на fetch если onProgress не передан
     const response = await fetch(uploadUrl, {
       method: 'POST',
       headers,

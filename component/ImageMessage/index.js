@@ -8,12 +8,40 @@ export default function ImageMessage({ fileUrl, content, messageTime, isOwn, sta
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [shouldLoad, setShouldLoad] = useState(false); // Lazy loading флаг
   const imgRef = useRef(null);
+  const containerRef = useRef(null);
 
+  // Telegram-подход: lazy loading через IntersectionObserver
   useEffect(() => {
-    if (!fileUrl) {
-      setError('No file URL provided');
-      setLoading(false);
+    if (!fileUrl || !containerRef.current) return;
+
+    // Создаем IntersectionObserver для lazy loading
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setShouldLoad(true);
+            observer.disconnect(); // Отключаем после первого появления в viewport
+          }
+        });
+      },
+      {
+        rootMargin: '200px', // Начинаем загрузку за 200px до появления в viewport (как в Telegram)
+        threshold: 0.01,
+      }
+    );
+
+    observer.observe(containerRef.current);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [fileUrl]);
+
+  // Загружаем изображение только когда оно должно быть загружено (lazy loading)
+  useEffect(() => {
+    if (!fileUrl || !shouldLoad) {
       return;
     }
 
@@ -39,7 +67,7 @@ export default function ImageMessage({ fileUrl, content, messageTime, isOwn, sta
       img.onload = null;
       img.onerror = null;
     };
-  }, [fileUrl]);
+  }, [fileUrl, shouldLoad]);
 
   const handleImageClick = (e) => {
     e.stopPropagation();
@@ -72,14 +100,19 @@ export default function ImageMessage({ fileUrl, content, messageTime, isOwn, sta
   }
 
   return (
-    <div className={`${styles.imageMessage} ${isOwn ? styles.ownMessage : ''}`}>
+    <div className={`${styles.imageMessage} ${isOwn ? styles.ownMessage : ''}`} ref={containerRef}>
       <div className={styles.imageContainer}>
-        {loading && (
+        {loading && shouldLoad && (
           <div className={styles.loadingOverlay}>
             <div className={styles.spinner} />
           </div>
         )}
-        {imageUrl && (
+        {!shouldLoad && (
+          <div className={styles.loadingOverlay}>
+            <div className={styles.spinner} />
+          </div>
+        )}
+        {imageUrl && shouldLoad && (
           <>
             <img
               ref={imgRef}
@@ -87,6 +120,7 @@ export default function ImageMessage({ fileUrl, content, messageTime, isOwn, sta
               alt={content || 'Изображение'}
               className={`${styles.image} ${imageLoaded ? styles.loaded : ''}`}
               onClick={handleImageClick}
+              loading="lazy" // Нативный lazy loading как дополнительная оптимизация
               onError={() => {
                 setError('Не удалось загрузить изображение');
                 setLoading(false);

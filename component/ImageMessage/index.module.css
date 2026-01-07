@@ -39,6 +39,8 @@
   object-fit: contain;
   opacity: 0;
   transition: opacity 0.3s ease;
+  /* Фиксируем минимальную высоту для предотвращения скачков при загрузке */
+  min-height: 200px;
 }
 
 .image.loaded {

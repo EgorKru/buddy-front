@@ -179,7 +179,43 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
 
           const lastMessage = nonDeleted;
           
+          // Обработка метаданных файлов: приоритет серверным данным, fallback на localStorage
+          if ((lastMessage.type === 'FILE' || lastMessage.type === 'IMAGE') && lastMessage.fileUrl && typeof window !== 'undefined') {
+            const metadataKey = `file_metadata_${lastMessage.fileUrl}`;
+            
+            // Если метаданные пришли от сервера - обновляем localStorage
+            if (lastMessage.fileSize && lastMessage.fileName && lastMessage.mimeType) {
+              const fileMetadata = {
+                fileSize: lastMessage.fileSize,
+                fileName: lastMessage.fileName,
+                mimeType: lastMessage.mimeType,
+                timestamp: Date.now()
+              };
+              localStorage.setItem(metadataKey, JSON.stringify(fileMetadata));
+            } else {
+              // Fallback: восстанавливаем из localStorage для старых сообщений без метаданных
+              const savedMetadata = localStorage.getItem(metadataKey);
+              if (savedMetadata) {
+                try {
+                  const metadata = JSON.parse(savedMetadata);
+                  if (!lastMessage.fileSize && metadata.fileSize) {
+                    lastMessage.fileSize = metadata.fileSize;
+                  }
+                  if (!lastMessage.fileName && metadata.fileName) {
+                    lastMessage.fileName = metadata.fileName;
+                  }
+                  if (!lastMessage.mimeType && metadata.mimeType) {
+                    lastMessage.mimeType = metadata.mimeType;
+                  }
+                } catch (e) {
+                  // Игнорируем ошибки парсинга
+                }
+              }
+            }
+          }
+          
           // Обновляем сообщение через контекст, что автоматически обновит lastMessage в чате
+          // upsertMessage автоматически обновит существующее сообщение, если оно уже загружено
           if (upsertMessage) {
             upsertMessage({
               ...lastMessage,

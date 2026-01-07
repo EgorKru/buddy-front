@@ -10,6 +10,7 @@ export default function PinnedMessagesHeader({
   messagesContainerRef,
   onUnpin,
   onViewedChange,
+  onNavigateToMessage,
 }) {
   if (pinnedMessages.length === 0) return null;
 
@@ -46,21 +47,28 @@ export default function PinnedMessagesHeader({
   const msg = messageToShow.message || messageToShow;
   
   const handleClick = async () => {
-    const targetMessage = document.querySelector(`[data-message-id="${msg.id}"]`);
-    if (targetMessage) {
-      targetMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      targetMessage.classList.add(styles.messageHighlight);
-      setTimeout(() => {
-        targetMessage.classList.remove(styles.messageHighlight);
-      }, 2000);
+    if (onNavigateToMessage) {
+      // Используем улучшенную функцию навигации из родительского компонента
+      await onNavigateToMessage(msg.id);
       onViewedChange(msg.id);
     } else {
-      try {
-        await chatAPI.getMessage(chatId, msg.id);
-        messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+      // Fallback на старую логику
+      const targetMessage = document.querySelector(`[data-message-id="${msg.id}"]`);
+      if (targetMessage) {
+        targetMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        targetMessage.classList.add(styles.messageHighlight);
+        setTimeout(() => {
+          targetMessage.classList.remove(styles.messageHighlight);
+        }, 2000);
         onViewedChange(msg.id);
-      } catch (error) {
-        console.error('Failed to load message:', error);
+      } else {
+        try {
+          await chatAPI.getMessage(chatId, msg.id);
+          messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+          onViewedChange(msg.id);
+        } catch (error) {
+          console.error('Failed to load message:', error);
+        }
       }
     }
   };

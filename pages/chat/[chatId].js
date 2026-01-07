@@ -1,4 +1,24 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+
+// Throttle функция для оптимизации обработчиков событий
+const throttle = (func, delay) => {
+  let timeoutId = null;
+  let lastExecTime = 0;
+  return function (...args) {
+    const currentTime = Date.now();
+    
+    if (currentTime - lastExecTime > delay) {
+      func.apply(this, args);
+      lastExecTime = currentTime;
+    } else {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        func.apply(this, args);
+        lastExecTime = Date.now();
+      }, delay - (currentTime - lastExecTime));
+    }
+  };
+};
 import { useRouter } from 'next/router';
 import { Send, Loader2, Menu, Check, CheckCheck, AlertCircle, Clock, ArrowLeft, Mic, X, ChevronDown, Pause, Play, Lock, Unlock, Trash2, Edit, Reply, Pin, PinOff, Forward, Search, ChevronUp, Paperclip, File } from 'lucide-react';
 import { chatAPI, getCurrentUser, isAuthenticated } from '@/utils/api';
@@ -23,6 +43,7 @@ import PinnedMessagesHeader from '@/component/PinnedMessagesHeader';
 import DeleteConfirmModal from '@/component/DeleteConfirmModal';
 import ForwardModal from '@/component/ForwardModal';
 import SelectionHeader from '@/component/SelectionHeader';
+import MessageRow from '@/component/MessageRow';
 
 const DUPLICATE_WINDOW_MS = 5000;
 
@@ -56,9 +77,10 @@ export default function ChatPage() {
   }, [chatId, chats]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(0);
+  const [page, setPage] = useState(0); // Оставляем для обратной совместимости, но не используем
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [oldestMessageId, setOldestMessageId] = useState(null); // Для курсорной пагинации
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState(null);
   const [editingMessageId, setEditingMessageId] = useState(null);
@@ -125,6 +147,17 @@ export default function ChatPage() {
   const isRestoringScrollRef = useRef(false);
   const newMessageIdsRef = useRef(new Set());
   const isAutoScrollingRef = useRef(false);
+  const loadedMessageIdsRef = useRef(new Set()); // Для отслеживания только что загруженных сообщений
+  
+  // Refs для предотвращения утечек памяти при восстановлении позиции скролла
+  const isRestoringScrollPositionRef = useRef(false);
+  const correctionFrameIdRef = useRef(null);
+  const resizeObserverRef = useRef(null);
+  const correctionTimeoutRef = useRef(null);
+  const scrollStateRef = useRef({ hasMore: false, loadingMore: false, page: 0 });
+  
+  // AbortController для предотвращения race conditions
+  const abortControllerRef = useRef(null);
 
   useChatRealtime(chatId);
 
@@ -187,9 +220,275 @@ export default function ChatPage() {
     }
   }, [chatId, router, refreshChats, markChatAsRead]);
 
+  // Новая функция: загрузка полного состояния одним запросом
+  const loadChatStateFull = useCallback(async (chatId) => {
+    if (!chatId) return;
+    
+    // Отменяем предыдущий запрос если он еще выполняется
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+    
+    try {
+      setLoading(true);
+      isLoadingInitialRef.current = true;
+      
+      // Один запрос за все: чат, сообщения, закрепленные, состояние
+      const state = await chatAPI.getChatStateFull(chatId, 100);
+      
+      if (state) {
+        // Обновляем чат
+        if (state.chat) {
+          refreshChats(); // Обновляем список чатов
+        }
+        
+        // Загружаем сообщения
+        if (state.messages && Array.isArray(state.messages)) {
+          const ordered = [...state.messages].reverse();
+          for (const m of ordered) {
+            // Обработка метаданных файлов
+            if ((m.type === 'FILE' || m.type === 'IMAGE') && m.fileUrl && typeof window !== 'undefined') {
+              const metadataKey = `file_metadata_${m.fileUrl}`;
+              if (m.fileSize && m.fileName && m.mimeType) {
+                const fileMetadata = {
+                  fileSize: m.fileSize,
+                  fileName: m.fileName,
+                  mimeType: m.mimeType,
+                  timestamp: Date.now()
+                };
+                localStorage.setItem(metadataKey, JSON.stringify(fileMetadata));
+              }
+            }
+            upsertMessage({ ...m, status: MESSAGE_STATUS.SENT, isOptimistic: false }, { unreadDelta: 0 });
+          }
+        }
+        
+        // Обновляем последовательности
+        if (state.pts !== undefined) {
+          const chatIdStr = String(chatId);
+          localPtsRef.current.set(chatIdStr, state.pts);
+        }
+        if (state.seq !== undefined) {
+          localSeqRef.current = state.seq;
+        }
+        
+        // Устанавливаем курсор для следующей загрузки
+        if (state.oldestMessageId) {
+          setOldestMessageId(state.oldestMessageId);
+        }
+        
+        // Обновляем флаг наличия еще сообщений
+        if (state.hasMoreMessages !== undefined) {
+          setHasMore(state.hasMoreMessages);
+        }
+        
+        // Прокручиваем вниз после первой загрузки
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            if (messagesContainerRef.current) {
+              const container = messagesContainerRef.current;
+              container.scrollTop = container.scrollHeight;
+              lastScrollTopRef.current = container.scrollHeight;
+              userScrolledToBottomRef.current = true;
+              isUserScrollingUpRef.current = false;
+            }
+          });
+        });
+      }
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        return; // Запрос был отменен, игнорируем
+      }
+      console.error('[Load Chat State Full] Error:', error);
+    } finally {
+      setLoading(false);
+      isLoadingInitialRef.current = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current = null;
+      }
+    }
+  }, [chatId, refreshChats, upsertMessage]);
+
+  // Курсорная пагинация: загрузка старых сообщений до указанного ID
+  const loadOlderMessages = useCallback(async (beforeMessageId) => {
+    if (!chatId || !beforeMessageId || loadingMessagesRef.current) return;
+    
+    // Отменяем предыдущий запрос если он еще выполняется
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+    
+    loadingMessagesRef.current = true;
+    try {
+      setLoadingMore(true);
+      
+      // Сохраняем anchor point для восстановления позиции скролла
+      let anchorMessageId = null;
+      let anchorViewportTop = 0;
+      if (messagesContainerRef.current) {
+        const container = messagesContainerRef.current;
+        const containerRect = container.getBoundingClientRect();
+        const messages = container.querySelectorAll('[data-message-id]');
+        
+        let bestMessage = null;
+        let bestDistance = Infinity;
+        
+        for (const msgEl of messages) {
+          const msgRect = msgEl.getBoundingClientRect();
+          const msgTop = msgRect.top;
+          const msgBottom = msgRect.bottom;
+          const containerTop = containerRect.top;
+          const containerBottom = containerRect.bottom;
+          
+          if (msgTop <= containerBottom && msgBottom >= containerTop) {
+            const distanceFromTop = Math.abs(msgTop - containerTop);
+            if (distanceFromTop < bestDistance) {
+              bestDistance = distanceFromTop;
+              bestMessage = msgEl;
+            }
+          }
+        }
+        
+        if (bestMessage) {
+          anchorMessageId = bestMessage.getAttribute('data-message-id');
+          const msgRect = bestMessage.getBoundingClientRect();
+          anchorViewportTop = msgRect.top - containerRect.top;
+        }
+      }
+      
+      // Загружаем сообщения через курсорную пагинацию
+      const messages = await chatAPI.getMessagesBefore(chatId, beforeMessageId, 100);
+      
+      if (messages && Array.isArray(messages)) {
+        if (messages.length === 0) {
+          setHasMore(false);
+          return;
+        }
+        
+        // Обрабатываем и добавляем сообщения
+        for (const m of messages) {
+          if ((m.type === 'FILE' || m.type === 'IMAGE') && m.fileUrl && typeof window !== 'undefined') {
+            const metadataKey = `file_metadata_${m.fileUrl}`;
+            if (m.fileSize && m.fileName && m.mimeType) {
+              const fileMetadata = {
+                fileSize: m.fileSize,
+                fileName: m.fileName,
+                mimeType: m.mimeType,
+                timestamp: Date.now()
+              };
+              localStorage.setItem(metadataKey, JSON.stringify(fileMetadata));
+            }
+          }
+          upsertMessage({ ...m, status: MESSAGE_STATUS.SENT, isOptimistic: false }, { unreadDelta: 0 });
+        }
+        
+        // Обновляем oldestMessageId для следующей загрузки
+        const oldestMsg = messages[messages.length - 1];
+        if (oldestMsg?.id) {
+          setOldestMessageId(String(oldestMsg.id));
+        }
+        
+        // Если загрузили меньше чем limit - больше нет сообщений
+        if (messages.length < 100) {
+          setHasMore(false);
+        }
+        
+        // Восстанавливаем позицию скролла (Telegram-подход)
+        if (messagesContainerRef.current && anchorMessageId) {
+          // Используем refs для предотвращения утечек памяти
+          isRestoringScrollPositionRef.current = true;
+          
+          // Очищаем предыдущие таймеры и observers
+          if (correctionFrameIdRef.current) {
+            cancelAnimationFrame(correctionFrameIdRef.current);
+            correctionFrameIdRef.current = null;
+          }
+          if (resizeObserverRef.current) {
+            resizeObserverRef.current.disconnect();
+            resizeObserverRef.current = null;
+          }
+          if (correctionTimeoutRef.current) {
+            clearTimeout(correctionTimeoutRef.current);
+            correctionTimeoutRef.current = null;
+          }
+          
+          const performRestore = () => {
+            if (!messagesContainerRef.current || !anchorMessageId || !isRestoringScrollPositionRef.current) return;
+            
+            const container = messagesContainerRef.current;
+            const anchorMessage = container.querySelector(`[data-message-id="${anchorMessageId}"]`);
+            
+            if (anchorMessage) {
+              const containerRect = container.getBoundingClientRect();
+              const msgRect = anchorMessage.getBoundingClientRect();
+              const currentViewportTop = msgRect.top - containerRect.top;
+              const viewportDiff = currentViewportTop - anchorViewportTop;
+              
+              if (Math.abs(viewportDiff) > 0.01) {
+                container.scrollTop = container.scrollTop - viewportDiff;
+                lastScrollTopRef.current = container.scrollTop;
+              }
+            }
+          };
+          
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              performRestore();
+              
+              // Непрерывная корректировка на 60fps
+              let frameCount = 0;
+              const maxFrames = 60;
+              
+              const correctionFrame = () => {
+                if (frameCount >= maxFrames || !isRestoringScrollPositionRef.current) {
+                  correctionFrameIdRef.current = null;
+                  return;
+                }
+                performRestore();
+                frameCount++;
+                correctionFrameIdRef.current = requestAnimationFrame(correctionFrame);
+              };
+              
+              correctionFrameIdRef.current = requestAnimationFrame(correctionFrame);
+              
+              // Останавливаем корректировку через 1 секунду
+              correctionTimeoutRef.current = setTimeout(() => {
+                isRestoringScrollPositionRef.current = false;
+                if (correctionFrameIdRef.current) {
+                  cancelAnimationFrame(correctionFrameIdRef.current);
+                  correctionFrameIdRef.current = null;
+                }
+                performRestore();
+              }, 1000);
+            });
+          });
+        }
+      }
+    } catch (error) {
+      console.error('[Load Older Messages] Error:', error);
+      setHasMore(false);
+    } finally {
+      setLoadingMore(false);
+      loadingMessagesRef.current = false;
+    }
+  }, [chatId, upsertMessage]);
+
   const loadMessages = useCallback(async (pageNum = 0, append = false) => {
     if (!chatId) return;
     
+    // Если это первая загрузка - используем новый endpoint
+    if (!append && pageNum === 0) {
+      return loadChatStateFull(chatId);
+    }
+    
+    // Для загрузки старых сообщений используем курсорную пагинацию
+    if (append && oldestMessageId) {
+      return loadOlderMessages(oldestMessageId);
+    }
+    
+    // Fallback на старую логику для обратной совместимости
     // Защита от параллельных вызовов
     if (loadingMessagesRef.current && !append) {
       return;
@@ -201,9 +500,50 @@ export default function ChatPage() {
       
       let scrollHeightBefore = 0;
       let scrollTopBefore = 0;
+      let anchorMessageId = null;
+      let anchorMessageTop = 0; // offsetTop сообщения до загрузки
+      let anchorViewportTop = 0; // Позиция сообщения относительно верха viewport (через getBoundingClientRect)
+      let anchorScrollTop = 0; // Точная позиция скролла для проверки
       if (append && messagesContainerRef.current) {
-        scrollHeightBefore = messagesContainerRef.current.scrollHeight;
-        scrollTopBefore = messagesContainerRef.current.scrollTop;
+        const container = messagesContainerRef.current;
+        scrollHeightBefore = container.scrollHeight;
+        scrollTopBefore = container.scrollTop;
+        anchorScrollTop = scrollTopBefore;
+        
+        // Telegram-подход: находим первое видимое сообщение как "anchor point"
+        // Используем getBoundingClientRect для максимальной точности
+        const containerRect = container.getBoundingClientRect();
+        const messages = container.querySelectorAll('[data-message-id]');
+        
+        // Ищем первое сообщение, которое видно в viewport
+        // Используем более точный поиск - берем сообщение ближе к верху viewport
+        let bestMessage = null;
+        let bestDistance = Infinity;
+        
+        for (const msgEl of messages) {
+          const msgRect = msgEl.getBoundingClientRect();
+          const msgTop = msgRect.top;
+          const msgBottom = msgRect.bottom;
+          const containerTop = containerRect.top;
+          const containerBottom = containerRect.bottom;
+          
+          // Проверяем, видно ли сообщение в viewport
+          if (msgTop <= containerBottom && msgBottom >= containerTop) {
+            // Выбираем сообщение, которое ближе всего к верху viewport
+            const distanceFromTop = Math.abs(msgTop - containerTop);
+            if (distanceFromTop < bestDistance) {
+              bestDistance = distanceFromTop;
+              bestMessage = msgEl;
+            }
+          }
+        }
+        
+        if (bestMessage) {
+          anchorMessageId = bestMessage.getAttribute('data-message-id');
+          anchorMessageTop = bestMessage.offsetTop;
+          const msgRect = bestMessage.getBoundingClientRect();
+          anchorViewportTop = msgRect.top - containerRect.top; // Точное расстояние от верха viewport
+        }
       }
       
       const response = await chatAPI.getMessages(chatId, {
@@ -214,12 +554,33 @@ export default function ChatPage() {
       if (Array.isArray(response?.content)) {
         const list = response.content;
         const ordered = append ? list : [...list].reverse();
+        
+        // Отслеживаем ID только что загруженных сообщений для плавной анимации
+        const newlyLoadedIds = new Set();
+        if (append) {
+          ordered.forEach(m => {
+            if (m.id) {
+              newlyLoadedIds.add(String(m.id));
+            }
+          });
+        }
+        
         for (const m of ordered) {
-          // Fallback: Восстанавливаем метаданные файла из localStorage для старых сообщений
-          // (новые сообщения уже содержат fileSize, fileName, mimeType от сервера)
+          // Обработка метаданных файлов: приоритет серверным данным, fallback на localStorage
           if ((m.type === 'FILE' || m.type === 'IMAGE') && m.fileUrl && typeof window !== 'undefined') {
-            if (!m.fileSize || !m.fileName || !m.mimeType) {
-              const metadataKey = `file_metadata_${m.fileUrl}`;
+            const metadataKey = `file_metadata_${m.fileUrl}`;
+            
+            // Если метаданные пришли от сервера - обновляем localStorage
+            if (m.fileSize && m.fileName && m.mimeType) {
+              const fileMetadata = {
+                fileSize: m.fileSize,
+                fileName: m.fileName,
+                mimeType: m.mimeType,
+                timestamp: Date.now()
+              };
+              localStorage.setItem(metadataKey, JSON.stringify(fileMetadata));
+            } else {
+              // Fallback: восстанавливаем из localStorage для старых сообщений без метаданных
               const savedMetadata = localStorage.getItem(metadataKey);
               if (savedMetadata) {
                 try {
@@ -241,6 +602,8 @@ export default function ChatPage() {
             }
           }
           
+          // upsertMessage автоматически обновит существующее сообщение, если оно уже загружено
+          // Это позволяет обновлять старые сообщения при получении обновлений через WebSocket
           const messageData = {
             ...m,
             status: MESSAGE_STATUS.SENT,
@@ -250,26 +613,176 @@ export default function ChatPage() {
           };
           upsertMessage(messageData, { unreadDelta: 0 });
         }
+        
+        // Сохраняем ID загруженных сообщений для анимации
+        if (append && newlyLoadedIds.size > 0) {
+          newlyLoadedIds.forEach(id => {
+            loadedMessageIdsRef.current.add(id);
+          });
+          // Удаляем через 1 секунду, чтобы анимация успела проиграться
+          setTimeout(() => {
+            newlyLoadedIds.forEach(id => {
+              loadedMessageIdsRef.current.delete(id);
+            });
+          }, 1000);
+        }
       }
 
       setPage(response.number);
       setHasMore(!response.last);
+      
+      // Обновляем oldestMessageId для курсорной пагинации
+      if (response.content && response.content.length > 0) {
+        const oldestMsg = response.content[0]; // Первое сообщение (самое старое)
+        if (oldestMsg?.id) {
+          setOldestMessageId(String(oldestMsg.id));
+        }
+      }
+      
       setLoading(false);
       
       if (!append) {
+        // Telegram Web: после первой загрузки всегда прокручиваем вниз
         isLoadingInitialRef.current = false;
+        
+        // Проверяем, есть ли сохраненная позиция для восстановления
+        const saved = typeof window !== 'undefined' 
+          ? localStorage.getItem(`chat_scroll_${chatId}`)
+          : null;
+        
+        let shouldScrollToBottom = true;
+        if (saved) {
+          try {
+            const { timestamp, isBottom } = JSON.parse(saved);
+            const isRecent = Date.now() - timestamp < 10 * 60 * 1000;
+            // Если есть свежая сохраненная позиция и пользователь НЕ был внизу - восстанавливаем позже
+            if (isRecent && !isBottom) {
+              shouldScrollToBottom = false;
+            }
+          } catch (e) {
+            // Игнорируем ошибки, прокручиваем вниз
+          }
+        }
+        
+        // Если это первое открытие (нет сохраненной позиции или она старая) - прокручиваем вниз
+        if (shouldScrollToBottom) {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              if (messagesContainerRef.current) {
+                const container = messagesContainerRef.current;
+                container.scrollTop = container.scrollHeight;
+                lastScrollTopRef.current = container.scrollHeight;
+                userScrolledToBottomRef.current = true;
+                isUserScrollingUpRef.current = false;
+              }
+            });
+          });
+        }
       }
       
       if (append && messagesContainerRef.current) {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            if (messagesContainerRef.current) {
-              const container = messagesContainerRef.current;
-              const scrollHeightAfter = container.scrollHeight;
-              const scrollDiff = scrollHeightAfter - scrollHeightBefore;
-              container.scrollTop = scrollTopBefore + scrollDiff;
+        // Telegram Web метод: идеальное сохранение позиции через anchor point
+        // Используем refs для предотвращения утечек памяти
+        isRestoringScrollPositionRef.current = true;
+        
+        // Очищаем предыдущие таймеры и observers
+        if (correctionFrameIdRef.current) {
+          cancelAnimationFrame(correctionFrameIdRef.current);
+          correctionFrameIdRef.current = null;
+        }
+        if (resizeObserverRef.current) {
+          resizeObserverRef.current.disconnect();
+          resizeObserverRef.current = null;
+        }
+        if (correctionTimeoutRef.current) {
+          clearTimeout(correctionTimeoutRef.current);
+          correctionTimeoutRef.current = null;
+        }
+        
+        // Telegram/WhatsApp метод: идеальное сохранение позиции
+        // Ключевой момент - синхронное обновление сразу после добавления DOM
+        const performRestore = () => {
+          if (!messagesContainerRef.current || !anchorMessageId || !isRestoringScrollPositionRef.current) return;
+          
+          const container = messagesContainerRef.current;
+          const anchorMessage = container.querySelector(`[data-message-id="${anchorMessageId}"]`);
+          
+          if (anchorMessage) {
+            const containerRect = container.getBoundingClientRect();
+            const msgRect = anchorMessage.getBoundingClientRect();
+            const currentViewportTop = msgRect.top - containerRect.top;
+            const viewportDiff = currentViewportTop - anchorViewportTop;
+            
+            // Telegram/WhatsApp: синхронная корректировка для мгновенного обновления
+            if (Math.abs(viewportDiff) > 0.01) {
+              container.scrollTop = container.scrollTop - viewportDiff;
               lastScrollTopRef.current = container.scrollTop;
             }
+          }
+        };
+        
+        // Первое восстановление - ждем обновления DOM
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            performRestore();
+            
+            // Непрерывная корректировка на 60fps для идеальной плавности
+            let frameCount = 0;
+            const maxFrames = 60; // ~1 секунда при 60fps
+            
+            const correctionFrame = () => {
+              if (frameCount >= maxFrames || !isRestoringScrollPositionRef.current) {
+                correctionFrameIdRef.current = null;
+                return;
+              }
+              
+              performRestore();
+              frameCount++;
+              correctionFrameIdRef.current = requestAnimationFrame(correctionFrame);
+            };
+            
+            correctionFrameIdRef.current = requestAnimationFrame(correctionFrame);
+            
+            // ResizeObserver для отслеживания изменений размеров (Telegram/WhatsApp)
+            if (typeof ResizeObserver !== 'undefined' && anchorMessageId) {
+              const anchorMessage = messagesContainerRef.current?.querySelector(`[data-message-id="${anchorMessageId}"]`);
+              if (anchorMessage) {
+                resizeObserverRef.current = new ResizeObserver(() => {
+                  if (isRestoringScrollPositionRef.current) {
+                    performRestore();
+                  }
+                });
+                
+                // Наблюдаем за anchor сообщением и всеми медиа-элементами
+                resizeObserverRef.current.observe(anchorMessage);
+                anchorMessage.querySelectorAll('img, video, iframe').forEach(media => {
+                  resizeObserverRef.current.observe(media);
+                });
+                
+                // Останавливаем наблюдение через 1 секунду
+                correctionTimeoutRef.current = setTimeout(() => {
+                  if (resizeObserverRef.current) {
+                    resizeObserverRef.current.disconnect();
+                    resizeObserverRef.current = null;
+                  }
+                }, 1000);
+              }
+            }
+            
+            // Останавливаем корректировку через 1 секунду
+            correctionTimeoutRef.current = setTimeout(() => {
+              isRestoringScrollPositionRef.current = false;
+              if (correctionFrameIdRef.current) {
+                cancelAnimationFrame(correctionFrameIdRef.current);
+                correctionFrameIdRef.current = null;
+              }
+              if (resizeObserverRef.current) {
+                resizeObserverRef.current.disconnect();
+                resizeObserverRef.current = null;
+              }
+              // Финальная корректировка
+              performRestore();
+            }, 1000);
           });
         });
       }
@@ -285,6 +798,172 @@ export default function ChatPage() {
   const loadedChatIdRef = useRef(null);
   const loadedMessagesRef = useRef(false);
   const loadedPinnedRef = useRef(false);
+  const loadMoreObserverRef = useRef(null); // Intersection Observer для предзагрузки
+  
+  // Telegram-подход: хранение локальных последовательностей
+  const localSeqRef = useRef(0);
+  const localPtsRef = useRef(new Map()); // Map<chatId, pts>
+  const gapRecoveryInProgressRef = useRef(new Set());
+
+  // Telegram/WhatsApp подход: Intersection Observer для предзагрузки сообщений
+  // Это создает впечатление, что сообщения всегда загружены
+  useEffect(() => {
+    if (!chatId || !messagesContainerRef.current || !hasMore) return;
+    
+    const container = messagesContainerRef.current;
+    
+    // Создаем sentinel элемент для отслеживания приближения к верху
+    // Размещаем его динамически в зависимости от текущей позиции скролла
+    const updateSentinel = () => {
+      let sentinel = document.getElementById('messages-load-sentinel');
+      if (!sentinel) {
+        sentinel = document.createElement('div');
+        sentinel.id = 'messages-load-sentinel';
+        sentinel.style.height = '1px';
+        sentinel.style.width = '1px';
+        sentinel.style.position = 'absolute';
+        sentinel.style.pointerEvents = 'none';
+        sentinel.style.visibility = 'hidden';
+        sentinel.style.opacity = '0';
+        container.appendChild(sentinel);
+      }
+      
+      // Размещаем sentinel за 1000px до верха для предзагрузки
+      sentinel.style.top = '1000px';
+      
+      return sentinel;
+    };
+    
+    const sentinel = updateSentinel();
+    
+    // Создаем Intersection Observer для предзагрузки (как в Telegram)
+    if (typeof IntersectionObserver !== 'undefined') {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (
+              entry.isIntersecting && 
+              hasMore && 
+              !loadingMore && 
+              !isLoadingInitialRef.current &&
+              !isRestoringScrollRef.current &&
+              oldestMessageId // Используем курсорную пагинацию
+            ) {
+              // Предзагружаем сообщения заранее через курсорную пагинацию
+              loadOlderMessages(oldestMessageId);
+            }
+          });
+        },
+        {
+          root: container,
+          rootMargin: '800px 0px 0px 0px', // Предзагрузка за 800px до появления
+          threshold: 0,
+        }
+      );
+      
+      observer.observe(sentinel);
+      loadMoreObserverRef.current = observer;
+      
+      // Обновляем позицию sentinel при скролле
+      const handleScrollForSentinel = () => {
+        if (sentinel && container) {
+          const scrollTop = container.scrollTop;
+          // Обновляем позицию sentinel для предзагрузки
+          sentinel.style.top = `${Math.max(800, scrollTop + 800)}px`;
+        }
+      };
+      
+      container.addEventListener('scroll', handleScrollForSentinel, { passive: true });
+      
+      return () => {
+        observer.disconnect();
+        container.removeEventListener('scroll', handleScrollForSentinel);
+        if (sentinel && sentinel.parentNode) {
+          sentinel.parentNode.removeChild(sentinel);
+        }
+      };
+    }
+  }, [chatId, hasMore, loadingMore, page, loadMessages, isLoadingInitialRef, isRestoringScrollRef]);
+
+  // Telegram-подход: обработка STATE_SYNC при подключении
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const handleStateSync = async (event) => {
+      const stateData = event.detail;
+      if (!stateData || stateData.eventType !== 'STATE_SYNC') return;
+      
+      // Обновляем глобальный seq
+      if (stateData.seq !== undefined && stateData.seq > localSeqRef.current) {
+        const oldSeq = localSeqRef.current;
+        localSeqRef.current = stateData.seq;
+        
+        // Если есть разрыв - запрашиваем пропущенные обновления
+        if (stateData.seq > oldSeq + 1 && oldSeq > 0) {
+          try {
+            const updates = await chatAPI.getUserUpdates(oldSeq + 1, 100);
+            if (updates?.updates && Array.isArray(updates.updates)) {
+              // Применяем глобальные обновления
+              // TODO: обработать глобальные обновления
+            }
+          } catch (error) {
+            console.error('[State Sync] Failed to recover global updates:', error);
+          }
+        }
+      }
+      
+      // Обновляем pts для каждого чата
+      if (stateData.chats && Array.isArray(stateData.chats)) {
+        for (const chatState of stateData.chats) {
+          const chatIdStr = String(chatState.chatId);
+          const serverPts = chatState.pts;
+          const currentLocalPts = localPtsRef.current.get(chatIdStr) || 0;
+          
+          // Если есть разрыв - запускаем Gap Recovery
+          if (serverPts > currentLocalPts + 1) {
+            const gapKey = `${chatIdStr}_${currentLocalPts}`;
+            if (!gapRecoveryInProgressRef.current.has(gapKey)) {
+              gapRecoveryInProgressRef.current.add(gapKey);
+              chatAPI.getChatUpdates(chatState.chatId, currentLocalPts + 1, 100)
+                .then((updates) => {
+                  if (updates?.updates && Array.isArray(updates.updates)) {
+                    // Применяем обновления
+                    updates.updates.forEach((update) => {
+                      if (update.eventData?.message) {
+                        upsertMessage(
+                          { ...update.eventData.message, status: MESSAGE_STATUS.SENT, isOptimistic: false },
+                          { unreadDelta: 0 }
+                        );
+                      }
+                    });
+                    // Обновляем pts
+                    if (updates.updates.length > 0) {
+                      const lastUpdate = updates.updates[updates.updates.length - 1];
+                      localPtsRef.current.set(chatIdStr, lastUpdate.pts);
+                    }
+                  }
+                })
+                .catch((error) => {
+                  console.error(`[State Sync] Failed to recover updates for chat ${chatIdStr}:`, error);
+                })
+                .finally(() => {
+                  gapRecoveryInProgressRef.current.delete(gapKey);
+                });
+            }
+          } else {
+            // Нет разрыва - просто обновляем pts
+            localPtsRef.current.set(chatIdStr, serverPts);
+          }
+        }
+      }
+    };
+    
+    window.addEventListener('state-sync', handleStateSync);
+    
+    return () => {
+      window.removeEventListener('state-sync', handleStateSync);
+    };
+  }, [upsertMessage]);
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -304,12 +983,31 @@ export default function ChatPage() {
         setSelectedFile(null);
         
         scrollPositionSavedRef.current = false;
-        shouldRestorePositionRef.current = true;
         userScrolledToBottomRef.current = false;
         restoreAttemptsRef.current = 0;
         loadedMessagesRef.current = false;
         loadedPinnedRef.current = false;
         loadedChatIdRef.current = chatIdStr;
+        
+        // Telegram Web: проверяем, есть ли свежая сохраненная позиция для восстановления
+        const saved = typeof window !== 'undefined' 
+          ? localStorage.getItem(`chat_scroll_${chatIdStr}`)
+          : null;
+        
+        if (saved) {
+          try {
+            const { timestamp, isBottom } = JSON.parse(saved);
+            const isRecent = Date.now() - timestamp < 10 * 60 * 1000;
+            // Восстанавливаем позицию только если сохранение свежее и пользователь НЕ был внизу
+            shouldRestorePositionRef.current = isRecent && !isBottom;
+          } catch (e) {
+            // Если ошибка парсинга - считаем первым открытием
+            shouldRestorePositionRef.current = false;
+          }
+        } else {
+          // Нет сохраненной позиции - это первое открытие, всегда вниз
+          shouldRestorePositionRef.current = false;
+        }
         
         if (!chat) {
           setLoading(true);
@@ -322,8 +1020,9 @@ export default function ChatPage() {
         isUserScrollingUpRef.current = false;
         
         // Загружаем только если еще не загружали для этого чата
+        // Используем новый endpoint для полной загрузки состояния
         if (!loadedMessagesRef.current) {
-          loadMessages(0);
+          loadChatStateFull(chatId);
           loadedMessagesRef.current = true;
         }
         if (!loadedPinnedRef.current) {
@@ -368,11 +1067,43 @@ export default function ChatPage() {
     const scrollHeight = container.scrollHeight;
     const isBottom = isAtBottom(50); // Более строгая проверка для "внизу"
     
+    // Находим сообщение, которое ближе всего к верху viewport
+    let messageId = null;
+    if (!isBottom && container) {
+      const containerRect = container.getBoundingClientRect();
+      const messages = container.querySelectorAll('[data-message-id]');
+      let bestMessage = null;
+      let bestDistance = Infinity;
+      
+      for (const msgEl of messages) {
+        const msgRect = msgEl.getBoundingClientRect();
+        const msgTop = msgRect.top;
+        const msgBottom = msgRect.bottom;
+        const containerTop = containerRect.top;
+        const containerBottom = containerRect.bottom;
+        
+        // Проверяем, видно ли сообщение в viewport
+        if (msgTop <= containerBottom && msgBottom >= containerTop) {
+          // Выбираем сообщение, которое ближе всего к верху viewport
+          const distanceFromTop = Math.abs(msgTop - containerTop);
+          if (distanceFromTop < bestDistance) {
+            bestDistance = distanceFromTop;
+            bestMessage = msgEl;
+          }
+        }
+      }
+      
+      if (bestMessage) {
+        messageId = bestMessage.getAttribute('data-message-id');
+      }
+    }
+    
     if (typeof window !== 'undefined') {
       const scrollData = {
         scrollTop,
         scrollHeight,
         isBottom, // Сохраняем, был ли пользователь внизу
+        messageId, // Сохраняем ID сообщения для точного восстановления
         timestamp: Date.now()
       };
       
@@ -393,124 +1124,152 @@ export default function ChatPage() {
       ? localStorage.getItem(`chat_scroll_${chatId}`)
       : null;
     
-    if (saved) {
-      try {
-        const { scrollTop, scrollHeight, isBottom, timestamp } = JSON.parse(saved);
+    // Если нет сохраненной позиции - это первое открытие чата, скроллим вниз
+    if (!saved) {
+      if (messagesContainerRef.current) {
         const container = messagesContainerRef.current;
-        
-        // Восстанавливаем только если сохранение было недавно (в течение 10 минут)
-        const isRecent = Date.now() - timestamp < 10 * 60 * 1000;
-        
-        if (isRecent) {
-          // Если пользователь был внизу, всегда прокручиваем вниз
-          if (isBottom) {
-            userScrolledToBottomRef.current = true;
-            isUserScrollingUpRef.current = false;
-            setTimeout(() => {
-              if (messagesContainerRef.current) {
-                const container = messagesContainerRef.current;
-                container.scrollTo({
-                  top: container.scrollHeight,
-                  behavior: 'smooth'
-                });
-                lastScrollTopRef.current = container.scrollTop;
-              }
-              scrollPositionSavedRef.current = true;
-              shouldRestorePositionRef.current = false;
-            }, 100);
-            return;
-          }
-          
-          isRestoringScrollRef.current = true;
-          const attemptRestore = () => {
-            if (container.scrollHeight >= scrollHeight) {
-              requestAnimationFrame(() => {
-                if (messagesContainerRef.current) {
-                  const container = messagesContainerRef.current;
-                  container.scrollTop = scrollTop;
-                  scrollPositionSavedRef.current = true;
-                  shouldRestorePositionRef.current = false;
-                  restoreAttemptsRef.current = 0;
-                  lastScrollTopRef.current = scrollTop;
-                  isUserScrollingUpRef.current = false;
-                  setTimeout(() => {
-                    isRestoringScrollRef.current = false;
-                  }, 300);
-                }
-              });
-            } else {
-              // Если контент еще не загружен, пробуем еще раз
-              restoreAttemptsRef.current++;
-              if (restoreAttemptsRef.current < 5) {
-                setTimeout(attemptRestore, 200);
-              } else {
-                // Если не удалось восстановить за 5 попыток, прокручиваем вниз
-                if (messagesContainerRef.current) {
-                  const container = messagesContainerRef.current;
-                  container.scrollTo({
-                    top: container.scrollHeight,
-                    behavior: 'smooth'
-                  });
-                  lastScrollTopRef.current = container.scrollTop;
-                }
-                scrollPositionSavedRef.current = true;
-                shouldRestorePositionRef.current = false;
-                isUserScrollingUpRef.current = false;
-                isRestoringScrollRef.current = false;
-              }
-            }
-          };
-          
-          setTimeout(attemptRestore, 100);
-        } else {
-          // Если сохранение старое, прокручиваем вниз
-          if (messagesContainerRef.current) {
-            const container = messagesContainerRef.current;
-            container.scrollTo({
-              top: container.scrollHeight,
-              behavior: 'smooth'
-            });
-            lastScrollTopRef.current = container.scrollTop;
-          }
-          scrollPositionSavedRef.current = true;
-          shouldRestorePositionRef.current = false;
-          isUserScrollingUpRef.current = false;
-        }
-      } catch (e) {
-        // Игнорируем ошибки парсинга, прокручиваем вниз
+        // Используем 'auto' для мгновенной прокрутки вниз при первом открытии
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: 'auto'
+        });
+        lastScrollTopRef.current = container.scrollHeight;
+      }
+      scrollPositionSavedRef.current = true;
+      shouldRestorePositionRef.current = false;
+      userScrolledToBottomRef.current = true;
+      isUserScrollingUpRef.current = false;
+      return;
+    }
+    
+    // Если есть сохраненная позиция - это возврат/обновление, восстанавливаем позицию
+    try {
+      const { scrollTop, scrollHeight, isBottom, timestamp, messageId } = JSON.parse(saved);
+      const container = messagesContainerRef.current;
+      
+      // Восстанавливаем только если сохранение было недавно (в течение 10 минут)
+      const isRecent = Date.now() - timestamp < 10 * 60 * 1000;
+      
+      if (!isRecent) {
+        // Если сохранение старое, считаем это первым открытием - скроллим вниз
         if (messagesContainerRef.current) {
           const container = messagesContainerRef.current;
           container.scrollTo({
             top: container.scrollHeight,
-            behavior: 'smooth'
+            behavior: 'auto'
           });
-          lastScrollTopRef.current = container.scrollTop;
+          lastScrollTopRef.current = container.scrollHeight;
         }
         scrollPositionSavedRef.current = true;
         shouldRestorePositionRef.current = false;
+        userScrolledToBottomRef.current = true;
         isUserScrollingUpRef.current = false;
+        return;
       }
-    } else {
-      // Если нет сохраненной позиции, прокручиваем вниз
+      
+      // Если пользователь был внизу, всегда прокручиваем вниз
+      if (isBottom) {
+        userScrolledToBottomRef.current = true;
+        isUserScrollingUpRef.current = false;
+        setTimeout(() => {
+          if (messagesContainerRef.current) {
+            const container = messagesContainerRef.current;
+            container.scrollTo({
+              top: container.scrollHeight,
+              behavior: 'auto'
+            });
+            lastScrollTopRef.current = container.scrollHeight;
+          }
+          scrollPositionSavedRef.current = true;
+          shouldRestorePositionRef.current = false;
+        }, 100);
+        return;
+      }
+      
+      // Если есть messageId - пытаемся найти и прокрутить к конкретному сообщению
+      if (messageId) {
+        const targetMessage = document.querySelector(`[data-message-id="${messageId}"]`);
+        if (targetMessage) {
+          // Сообщение уже в DOM - прокручиваем к нему
+          targetMessage.scrollIntoView({ behavior: 'auto', block: 'center' });
+          scrollPositionSavedRef.current = true;
+          shouldRestorePositionRef.current = false;
+          isUserScrollingUpRef.current = false;
+          lastScrollTopRef.current = messagesContainerRef.current.scrollTop;
+          return;
+        }
+      }
+      
+      // Восстанавливаем позицию скролла
+      isRestoringScrollRef.current = true;
+      const attemptRestore = () => {
+        if (container.scrollHeight >= scrollHeight) {
+          requestAnimationFrame(() => {
+            if (messagesContainerRef.current) {
+              const container = messagesContainerRef.current;
+              container.scrollTop = scrollTop;
+              scrollPositionSavedRef.current = true;
+              shouldRestorePositionRef.current = false;
+              restoreAttemptsRef.current = 0;
+              lastScrollTopRef.current = scrollTop;
+              isUserScrollingUpRef.current = false;
+              setTimeout(() => {
+                isRestoringScrollRef.current = false;
+              }, 300);
+            }
+          });
+        } else {
+          // Если контент еще не загружен, пробуем еще раз
+          restoreAttemptsRef.current++;
+          if (restoreAttemptsRef.current < 5) {
+            setTimeout(attemptRestore, 200);
+          } else {
+            // Если не удалось восстановить за 5 попыток, прокручиваем вниз
+            if (messagesContainerRef.current) {
+              const container = messagesContainerRef.current;
+              container.scrollTo({
+                top: container.scrollHeight,
+                behavior: 'auto'
+              });
+              lastScrollTopRef.current = container.scrollHeight;
+            }
+            scrollPositionSavedRef.current = true;
+            shouldRestorePositionRef.current = false;
+            isUserScrollingUpRef.current = false;
+            isRestoringScrollRef.current = false;
+          }
+        }
+      };
+      
+      setTimeout(attemptRestore, 100);
+    } catch (e) {
+      // Игнорируем ошибки парсинга, прокручиваем вниз (первое открытие)
       if (messagesContainerRef.current) {
         const container = messagesContainerRef.current;
         container.scrollTo({
           top: container.scrollHeight,
-          behavior: 'smooth'
+          behavior: 'auto'
         });
-        lastScrollTopRef.current = container.scrollTop;
+        lastScrollTopRef.current = container.scrollHeight;
       }
       scrollPositionSavedRef.current = true;
       shouldRestorePositionRef.current = false;
+      userScrolledToBottomRef.current = true;
       isUserScrollingUpRef.current = false;
     }
   }, [chatId, messages.length]);
 
   useEffect(() => {
-    if (messages.length > 0 && !scrollPositionSavedRef.current && shouldRestorePositionRef.current) {
+    // Telegram Web: восстанавливаем позицию только после полной загрузки и если не была первая загрузка
+    if (
+      messages.length > 0 && 
+      !scrollPositionSavedRef.current && 
+      shouldRestorePositionRef.current &&
+      !isLoadingInitialRef.current // Не восстанавливаем во время первой загрузки
+    ) {
       restoreScrollPosition();
     }
-  }, [messages, restoreScrollPosition]);
+  }, [messages, restoreScrollPosition, isLoadingInitialRef]);
 
   useEffect(() => {
     if (!messagesContainerRef.current || messages.length === 0) return;
@@ -970,6 +1729,8 @@ export default function ChatPage() {
 
     setIsSearching(true);
     try {
+      // Поиск работает для ВСЕХ сообщений в чате через серверный API,
+      // а не только для загруженных на клиенте. API ищет по всей истории чата.
       const response = await chatAPI.searchMessages(chatId, query.trim(), pageNum, 50);
       const results = Array.isArray(response?.content) ? response.content : (Array.isArray(response) ? response : []);
       
@@ -1052,32 +1813,153 @@ export default function ChatPage() {
   }, [searchOpen, handleCloseSearch]);
 
   const handleNavigateToMessage = useCallback(async (messageId) => {
+    if (!chatId || !messageId) return;
+    
+    // Сначала проверяем, загружено ли сообщение уже
     const targetMessage = document.querySelector(`[data-message-id="${messageId}"]`);
     if (targetMessage) {
+      // Сообщение уже загружено - просто прокручиваем к нему
       targetMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
       targetMessage.classList.add(styles.messageHighlight);
       setTimeout(() => {
         targetMessage.classList.remove(styles.messageHighlight);
       }, 2000);
-    } else {
-      try {
-        await chatAPI.getMessage(chatId, messageId);
-        messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-        setTimeout(() => {
-          const targetMessage = document.querySelector(`[data-message-id="${messageId}"]`);
-          if (targetMessage) {
-            targetMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            targetMessage.classList.add(styles.messageHighlight);
-            setTimeout(() => {
-              targetMessage.classList.remove(styles.messageHighlight);
-            }, 2000);
-          }
-        }, 500);
-      } catch (error) {
-        console.error('Failed to load message:', error);
-      }
+      return;
     }
-  }, [chatId]);
+
+    // Сообщение не загружено - загружаем его и контекст вокруг
+    try {
+      isRestoringScrollRef.current = true;
+      
+      // Получаем информацию о сообщении
+      const messageData = await chatAPI.getMessage(chatId, messageId);
+      if (!messageData || !messageData.createdAt) {
+        console.error('Failed to load message data');
+        isRestoringScrollRef.current = false;
+        return;
+      }
+
+      // Загружаем сообщения вокруг нужного сообщения
+      // Сначала загружаем само сообщение в контекст
+      if ((messageData.type === 'FILE' || messageData.type === 'IMAGE') && messageData.fileUrl && typeof window !== 'undefined') {
+        const metadataKey = `file_metadata_${messageData.fileUrl}`;
+        if (messageData.fileSize && messageData.fileName && messageData.mimeType) {
+          const fileMetadata = { fileSize: messageData.fileSize, fileName: messageData.fileName, mimeType: messageData.mimeType, timestamp: Date.now() };
+          localStorage.setItem(metadataKey, JSON.stringify(fileMetadata));
+        }
+      }
+      upsertMessage({ ...messageData, status: MESSAGE_STATUS.SENT, isOptimistic: false }, { unreadDelta: 0 });
+      
+      // Используем дату сообщения для поиска нужной страницы
+      const messageDate = new Date(messageData.createdAt);
+      const messageTime = messageDate.getTime();
+      
+      // Бинарный поиск страницы с нужным сообщением
+      // Сначала получаем общее количество страниц
+      let firstPageResponse = await chatAPI.getMessages(chatId, { page: 0, size: 50 });
+      const totalPages = firstPageResponse?.totalPages || 1;
+      
+      // Если сообщение на первой странице, загружаем её
+      let found = false;
+      let targetPage = 0;
+      
+      // Проверяем первую страницу
+      const firstList = Array.isArray(firstPageResponse?.content) ? firstPageResponse.content : [];
+      if (firstList.some(m => Number(m.id) === Number(messageId))) {
+        found = true;
+        targetPage = 0;
+      } else if (totalPages > 1) {
+        // Бинарный поиск страницы
+        let left = 0;
+        let right = totalPages - 1;
+        
+        while (left <= right) {
+          const mid = Math.floor((left + right) / 2);
+          const response = await chatAPI.getMessages(chatId, { page: mid, size: 50 });
+          const list = Array.isArray(response?.content) ? response.content : [];
+          
+          if (list.length === 0) {
+            break;
+          }
+          
+          const firstMessageTime = new Date(list[0].createdAt).getTime();
+          const lastMessageTime = new Date(list[list.length - 1].createdAt).getTime();
+          
+          // Проверяем, есть ли нужное сообщение на этой странице
+          if (list.some(m => Number(m.id) === Number(messageId))) {
+            found = true;
+            targetPage = mid;
+            break;
+          }
+          
+          // Определяем направление поиска
+          if (messageTime < lastMessageTime) {
+            // Сообщение старше - ищем на более поздних страницах
+            left = mid + 1;
+          } else {
+            // Сообщение новее - ищем на более ранних страницах
+            right = mid - 1;
+          }
+        }
+      }
+      
+      if (found) {
+        // Загружаем сообщения вокруг найденного (до и после)
+        const pagesToLoad = [
+          Math.max(0, targetPage - 1), // Предыдущая страница
+          targetPage, // Текущая страница
+          Math.min(totalPages - 1, targetPage + 1) // Следующая страница
+        ];
+        
+        // Убираем дубликаты
+        const uniquePages = [...new Set(pagesToLoad)];
+        
+        // Загружаем все нужные страницы параллельно
+        const loadPromises = uniquePages.map(async (pageNum) => {
+          const response = await chatAPI.getMessages(chatId, { page: pageNum, size: 50 });
+          const list = Array.isArray(response?.content) ? response.content : [];
+          return list;
+        });
+        
+        const allMessages = await Promise.all(loadPromises);
+        const flatMessages = allMessages.flat();
+        
+        // Загружаем все сообщения в контекст
+        for (const m of flatMessages) {
+          if ((m.type === 'FILE' || m.type === 'IMAGE') && m.fileUrl && typeof window !== 'undefined') {
+            const metadataKey = `file_metadata_${m.fileUrl}`;
+            if (m.fileSize && m.fileName && m.mimeType) {
+              const fileMetadata = { fileSize: m.fileSize, fileName: m.fileName, mimeType: m.mimeType, timestamp: Date.now() };
+              localStorage.setItem(metadataKey, JSON.stringify(fileMetadata));
+            }
+          }
+          upsertMessage({ ...m, status: MESSAGE_STATUS.SENT, isOptimistic: false }, { unreadDelta: 0 });
+        }
+        
+        // Ждем обновления DOM и прокручиваем к сообщению
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const targetMessage = document.querySelector(`[data-message-id="${messageId}"]`);
+            if (targetMessage) {
+              // Моментальная прокрутка без анимации для скорости (как в Telegram)
+              targetMessage.scrollIntoView({ behavior: 'auto', block: 'center' });
+              targetMessage.classList.add(styles.messageHighlight);
+              setTimeout(() => {
+                targetMessage.classList.remove(styles.messageHighlight);
+              }, 2000);
+            }
+            isRestoringScrollRef.current = false;
+          });
+        });
+      } else {
+        console.error('Message not found in chat history');
+        isRestoringScrollRef.current = false;
+      }
+    } catch (error) {
+      console.error('Failed to navigate to message:', error);
+      isRestoringScrollRef.current = false;
+    }
+  }, [chatId, upsertMessage]);
 
   const handleNextSearchResult = useCallback(() => {
     if (searchResults.length === 0) return;
@@ -1688,6 +2570,11 @@ export default function ChatPage() {
     }
   }, [audioBlob, isRecording, sending, isLocked, handleVoiceSend]);
 
+  // Обновляем scrollStateRef при изменении зависимостей
+  useEffect(() => {
+    scrollStateRef.current = { hasMore, loadingMore, page, oldestMessageId };
+  }, [hasMore, loadingMore, page, oldestMessageId]);
+  
   const handleScroll = useCallback(() => {
     if (!messagesContainerRef.current) return;
     
@@ -1708,26 +2595,38 @@ export default function ChatPage() {
     }
     lastScrollTopRef.current = scrollTop;
     
+    // Telegram/WhatsApp подход: предзагрузка через Intersection Observer
+    // Загружаем сообщения заранее, когда пользователь близко к верху
+    const loadThreshold = 1000; // Предзагрузка за 1000px до верха
+    
+    // Используем значения из ref для уменьшения зависимостей
+    const { hasMore: hasMoreRef, loadingMore: loadingMoreRef, page: pageRef, oldestMessageId: oldestMessageIdRef } = scrollStateRef.current;
+    
     if (
       scrollTop > 0 && 
-      scrollTop < 500 && 
-      hasMore && 
-      !loadingMore && 
+      scrollTop < loadThreshold && 
+      hasMoreRef && 
+      !loadingMoreRef && 
       !isLoadingInitialRef.current &&
       !isRestoringScrollRef.current &&
-      !isAutoScrollingRef.current &&
-      isUserScrollingUpRef.current // Только если пользователь сам прокручивает вверх
+      !isAutoScrollingRef.current
     ) {
       // Очищаем предыдущий таймер
       if (loadMoreTimeoutRef.current) {
         clearTimeout(loadMoreTimeoutRef.current);
       }
-      // Debounce загрузки - ждем 200ms после последнего скролла
+      // Telegram загружает очень быстро - минимальная задержка
       loadMoreTimeoutRef.current = setTimeout(() => {
-        if (messagesContainerRef.current && messagesContainerRef.current.scrollTop < 500) {
-          loadMessages(page + 1, true);
+        if (messagesContainerRef.current && messagesContainerRef.current.scrollTop < loadThreshold) {
+          // Используем курсорную пагинацию если есть oldestMessageId
+          if (oldestMessageIdRef) {
+            loadOlderMessages(oldestMessageIdRef);
+          } else {
+            // Fallback на старую логику
+            loadMessages(pageRef + 1, true);
+          }
         }
-      }, 200);
+      }, 50); // Быстрая загрузка для создания впечатления "всегда загружено"
     }
     
     // Показываем кнопку "вниз" если пользователь не внизу
@@ -1754,7 +2653,12 @@ export default function ChatPage() {
       }
       isUserScrollingRef.current = false;
     }, 500);
-  }, [hasMore, loadingMore, page, loadMessages, saveScrollPosition, isAtBottom]);
+  }, [loadOlderMessages, loadMessages, saveScrollPosition, isAtBottom]);
+  
+  // Throttled версия handleScroll для оптимизации производительности
+  const handleScrollThrottled = useMemo(() => {
+    return throttle(handleScroll, 100);
+  }, [handleScroll]);
 
   const scrollToBottom = useCallback((immediate = false) => {
     if (messagesContainerRef.current) {
@@ -2055,12 +2959,13 @@ export default function ChatPage() {
           messagesContainerRef={messagesContainerRef}
           onUnpin={handleUnpinMessage}
           onViewedChange={setViewedPinnedMessageId}
+          onNavigateToMessage={handleNavigateToMessage}
         />
 
       <div
         ref={messagesContainerRef}
         className={styles.messagesContainer}
-        onScroll={handleScroll}
+        onScroll={handleScrollThrottled}
       >
         {loadingMore && (
           <div className={styles.loadingMore}>
@@ -2076,224 +2981,31 @@ export default function ChatPage() {
           </div>
         ) : (
           <div>
-            {          visibleMessages.map((msg, index) => {
-            const showDate = index === 0 ||
-              formatChatDate(visibleMessages[index - 1]?.createdAt) !== formatChatDate(msg.createdAt);
-            const isOwn = msg.senderId === user?.id;
-            const isSearchMatch = searchOpen && searchText && msg.content && 
-              msg.content.toLowerCase().includes(searchText.toLowerCase());
-
+            {visibleMessages.map((msg, index) => {
+              const isOwn = msg.senderId === user?.id;
+              
               return (
-                <div key={msg.id}>
-                  {showDate && (
-                    <div className={styles.dateDivider}>
-                      {formatChatDate(msg.createdAt)}
-                    </div>
-                  )}
-                  <div
-                    className={`${styles.message} ${isOwn ? styles.ownMessage : ''} ${msg.pinned ? styles.messagePinned : ''} ${selectionMode && selectedMessages.has(msg.id) ? styles.messageSelected : ''} ${newMessageIdsRef.current.has(String(msg.id)) || msg.isOptimistic ? styles.messageNew : ''} ${isSearchMatch ? styles.messageSearchMatch : ''}`}
-                    onContextMenu={(e) => !selectionMode && handleContextMenu(e, msg)}
-                    onClick={() => selectionMode && toggleMessageSelection(msg.id)}
-                    data-message-id={msg.id}
-                  >
-                    {selectionMode && (
-                      <div className={styles.messageCheckbox}>
-                        <input
-                          type="checkbox"
-                          checked={selectedMessages.has(msg.id)}
-                          onChange={() => {}}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleMessageSelection(msg.id);
-                          }}
-                        />
-                      </div>
-                    )}
-                    {!isOwn && (
-                      <div className={styles.messageAvatar}>
-                        {msg.senderDisplayName?.[0] || msg.senderUsername?.[0] || '?'}
-                      </div>
-                    )}
-                    <div className={styles.messageContent}>
-                      {!isOwn && (
-                        <div className={styles.messageHeader}>
-                          <span className={styles.senderName}>
-                            {msg.senderDisplayName || msg.senderUsername}
-                          </span>
-                        </div>
-                      )}
-                      {msg.type === 'VOICE' && msg.fileUrl ? (
-                        (() => {
-                          const status = msg.status || (msg.isOptimistic ? MESSAGE_STATUS.SENDING : MESSAGE_STATUS.SENT);
-                          const readMeta = status === MESSAGE_STATUS.SENT ? getReadMetaForMessage(msg) : null;
-                          const isPinnedInList = pinnedMessages.some(p => {
-                            const pinnedMsgId = p.message?.id;
-                            return pinnedMsgId && Number(pinnedMsgId) === Number(msg.id);
-                          });
-                          const isPinned = msg.isPinned || isPinnedInList;
-                          return (
-                            <VoiceMessagePlayer 
-                              fileUrl={msg.fileUrl} 
-                              duration={msg.duration}
-                              messageTime={formatChatTime(msg.createdAt)}
-                              isOwn={isOwn}
-                              statusIcon={isOwn && !msg.deletedForMe && !msg.deletedForAll ? getMessageStatusIcon(status, readMeta) : null}
-                              isPinned={isPinned}
-                            />
-                          );
-                        })()
-                      ) : msg.type === 'IMAGE' && msg.fileUrl ? (
-                        (() => {
-                          const status = msg.status || (msg.isOptimistic ? MESSAGE_STATUS.SENDING : MESSAGE_STATUS.SENT);
-                          const readMeta = status === MESSAGE_STATUS.SENT ? getReadMetaForMessage(msg) : null;
-                          const isPinnedInList = pinnedMessages.some(p => {
-                            const pinnedMsgId = p.message?.id;
-                            return pinnedMsgId && Number(pinnedMsgId) === Number(msg.id);
-                          });
-                          const isPinned = msg.isPinned || isPinnedInList;
-                          return (
-                            <ImageMessage
-                              fileUrl={msg.fileUrl}
-                              content={msg.content}
-                              messageTime={formatChatTime(msg.createdAt)}
-                              isOwn={isOwn}
-                              statusIcon={isOwn && !msg.deletedForMe && !msg.deletedForAll ? getMessageStatusIcon(status, readMeta) : null}
-                              isPinned={isPinned}
-                              onImageClick={(imageUrl, fileUrl) => {
-                                setImageModal({ imageUrl, fileUrl });
-                              }}
-                            />
-                          );
-                        })()
-                      ) : msg.type === 'FILE' && msg.fileUrl ? (
-                        (() => {
-                          const status = msg.status || (msg.isOptimistic ? MESSAGE_STATUS.SENDING : MESSAGE_STATUS.SENT);
-                          const readMeta = status === MESSAGE_STATUS.SENT ? getReadMetaForMessage(msg) : null;
-                          const isPinnedInList = pinnedMessages.some(p => {
-                            const pinnedMsgId = p.message?.id;
-                            return pinnedMsgId && Number(pinnedMsgId) === Number(msg.id);
-                          });
-                          const isPinned = msg.isPinned || isPinnedInList;
-                          return (
-                            <FileMessage
-                              fileUrl={msg.fileUrl}
-                              content={msg.content}
-                              fileSize={msg.fileSize}
-                              mimeType={msg.mimeType}
-                              messageTime={formatChatTime(msg.createdAt)}
-                              isOwn={isOwn}
-                              statusIcon={isOwn && !msg.deletedForMe && !msg.deletedForAll ? getMessageStatusIcon(status, readMeta) : null}
-                              isPinned={isPinned}
-                              fileName={msg.fileName}
-                            />
-                          );
-                        })()
-                      ) : (
-                        <div className={`${styles.messageText} ${msg.isOptimistic ? styles.messagePending : ''} ${msg.status === MESSAGE_STATUS.FAILED ? styles.messageFailed : ''}`}>
-                          {msg.forwardedFrom && (
-                            <div className={styles.messageForwarded}>
-                              <div className={styles.messageForwardedHeader}>
-                                <span className={styles.messageForwardedIcon}>↪</span>
-                                <span className={styles.messageForwardedText}>
-                                  Переслано от {msg.forwardedFrom.originalSenderDisplayName || msg.forwardedFrom.originalSenderUsername}
-                                  {msg.forwardedFrom.forwardedByUserId !== msg.senderId && (
-                                    <span> • Переслал {msg.forwardedFrom.forwardedByDisplayName || msg.forwardedFrom.forwardedByUsername}</span>
-                                  )}
-                                </span>
-                              </div>
-                              {msg.forwardedFrom.originalType === 'VOICE' ? (
-                                <div className={styles.messageForwardedContent}>
-                                  🎤 Голосовое сообщение
-                                </div>
-                              ) : msg.forwardedFrom.originalType === 'IMAGE' ? (
-                                <div className={styles.messageForwardedContent}>
-                                  📷 Фото
-                                </div>
-                              ) : msg.forwardedFrom.originalType === 'FILE' ? (
-                                <div className={styles.messageForwardedContent}>
-                                  📎 Файл
-                                </div>
-                              ) : (
-                                <div className={styles.messageForwardedContent}>
-                                  {msg.forwardedFrom.originalContent}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          {msg.replyTo && (
-                            <div 
-                              className={styles.messageReply}
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                handleNavigateToMessage(msg.replyTo.id);
-                              }}
-                            >
-                              <div className={styles.messageReplyContent}>
-                                <div className={styles.messageReplyAuthor}>
-                                  {msg.replyTo.senderDisplayName || msg.replyTo.senderUsername}
-                                </div>
-                                <div className={styles.messageReplyText}>
-                                  {msg.replyTo.type === 'VOICE' ? '🎤 Голосовое сообщение' : 
-                                   msg.replyTo.type === 'IMAGE' ? '📷 Фото' :
-                                   msg.replyTo.type === 'FILE' ? '📎 Файл' :
-                                   msg.replyTo.content || ''}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                          <div className={styles.messageTextContentWrapper}>
-                            <div className={styles.messageTextContent}>
-                              {isSearchMatch && searchText ? (() => {
-                                const escapedSearchText = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                                const regex = new RegExp(`(${escapedSearchText})`, 'gi');
-                                const parts = msg.content.split(regex);
-                                return parts.map((part, i) => 
-                                  part.toLowerCase() === searchText.toLowerCase() ? (
-                                    <mark key={i} className={styles.searchHighlight}>{part}</mark>
-                                  ) : (
-                                    <span key={i}>{part}</span>
-                                  )
-                                );
-                              })() : msg.content}
-                            </div>
-                            <div className={styles.messageTextMeta}>
-                              {(() => {
-                                const isPinnedInList = pinnedMessages.some(p => {
-                                  const pinnedMsgId = p.message?.id;
-                                  return pinnedMsgId && Number(pinnedMsgId) === Number(msg.id);
-                                });
-                                const isPinned = msg.isPinned || isPinnedInList;
-                                return isPinned ? (
-                                  <Pin size={12} className={styles.messagePinnedIcon} title="Закреплено" />
-                                ) : null;
-                              })()}
-                              <span className={styles.messageTime}>
-                                {formatChatTime(msg.createdAt)}
-                              </span>
-                              {msg.edited && (
-                                <span className={styles.messageEdited} title={msg.editedAt ? `Отредактировано ${formatChatTime(msg.editedAt)}` : 'Отредактировано'}>
-                                  (ред.)
-                                </span>
-                              )}
-                              {isOwn && !msg.deletedForMe && !msg.deletedForAll && (() => {
-                                const status = msg.status || (msg.isOptimistic ? MESSAGE_STATUS.SENDING : MESSAGE_STATUS.SENT);
-                                const readMeta = status === MESSAGE_STATUS.SENT ? getReadMetaForMessage(msg) : null;
-                                const title = readMeta?.readCount
-                                  ? (readMeta.totalOthers > 1 ? `Прочитали ${readMeta.readCount}/${readMeta.totalOthers}` : 'Прочитано')
-                                  : 'Отправлено';
-                                return (
-                                  <span title={title}>
-                                    {getMessageStatusIcon(status, readMeta)}
-                                  </span>
-                                );
-                              })()}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                <MessageRow
+                  key={msg.id}
+                  msg={msg}
+                  index={index}
+                  visibleMessages={visibleMessages}
+                  user={user}
+                  isOwn={isOwn}
+                  selectionMode={selectionMode}
+                  selectedMessages={selectedMessages}
+                  toggleMessageSelection={toggleMessageSelection}
+                  handleContextMenu={handleContextMenu}
+                  getReadMetaForMessage={getReadMetaForMessage}
+                  getMessageStatusIcon={getMessageStatusIcon}
+                  pinnedMessages={pinnedMessages}
+                  searchOpen={searchOpen}
+                  searchText={searchText}
+                  newMessageIdsRef={newMessageIdsRef}
+                  loadedMessageIdsRef={loadedMessageIdsRef}
+                  setImageModal={setImageModal}
+                  handleNavigateToMessage={handleNavigateToMessage}
+                />
               );
             })}
           </div>
