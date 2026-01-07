@@ -35,6 +35,7 @@ const createOptimisticMessage = (content, type, chatId, user, fileUrl = null, fi
     content: messageContent,
     type,
     fileUrl,
+    fileName,
     status: MESSAGE_STATUS.SENDING,
     createdAt: new Date().toISOString(),
     isOptimistic: true,
@@ -43,6 +44,7 @@ const createOptimisticMessage = (content, type, chatId, user, fileUrl = null, fi
     senderDisplayName: user?.displayName || user?.username,
     retryCount: 0,
   };
+  return message;
 };
 
 const findQueuedMessageForConfirmation = (lastSent, queue, chatId) => {

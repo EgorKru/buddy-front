@@ -1,40 +1,7 @@
 import { useState } from 'react';
-import { Download, File, FileText, FileImage, FileVideo, FileMusic, Archive, FileCode } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { chatAPI } from '@/utils/api';
 import styles from './index.module.css';
-
-const getFileIcon = (mimeType, fileName) => {
-  if (!mimeType && !fileName) return File;
-  
-  const mime = mimeType?.toLowerCase() || '';
-  const name = fileName?.toLowerCase() || '';
-  
-  if (mime.startsWith('image/') || name.match(/\.(jpg|jpeg|png|gif|webp|svg)$/)) {
-    return FileImage;
-  }
-  if (mime.startsWith('video/') || name.match(/\.(mp4|avi|mov|webm|mkv)$/)) {
-    return FileVideo;
-  }
-  if (mime.startsWith('audio/') || name.match(/\.(mp3|wav|ogg|flac|m4a)$/)) {
-    return FileMusic;
-  }
-  if (mime.includes('pdf') || name.endsWith('.pdf')) {
-    return FileText;
-  }
-  if (mime.includes('zip') || mime.includes('rar') || mime.includes('7z') || 
-      name.match(/\.(zip|rar|7z|tar|gz)$/)) {
-    return Archive;
-  }
-  if (mime.includes('text') || mime.includes('code') || 
-      name.match(/\.(txt|js|ts|jsx|tsx|html|css|json|xml|yaml|yml)$/)) {
-    return FileCode;
-  }
-  if (mime.includes('document') || mime.includes('word') || 
-      name.match(/\.(doc|docx|odt)$/)) {
-    return FileText;
-  }
-  return File;
-};
 
 const formatFileSize = (bytes) => {
   if (!bytes || bytes === 0) return '0 B';
@@ -71,9 +38,8 @@ const getFileName = (fileUrl, originalFileName) => {
 export default function FileMessage({ fileUrl, content, fileSize, mimeType, messageTime, isOwn, statusIcon, isPinned, fileName: originalFileName }) {
   const [downloading, setDownloading] = useState(false);
   
-  const FileIcon = getFileIcon(mimeType, fileUrl);
   const { name: fileName, extension } = getFileName(fileUrl, originalFileName);
-  const displaySize = fileSize ? formatFileSize(fileSize) : null;
+  const displaySize = fileSize ? formatFileSize(fileSize) : 'Неизвестно';
 
   const handleDownload = async (e) => {
     e.stopPropagation();
@@ -119,7 +85,15 @@ export default function FileMessage({ fileUrl, content, fileSize, mimeType, mess
         onClick={handleClick}
       >
         <div className={styles.fileIconWrapper}>
-          <FileIcon size={32} className={styles.fileIcon} />
+          <div className={styles.fileIconContainer}>
+            <div className={styles.fileIconDocument}>
+              {extension ? (
+                <span className={styles.fileExtensionIcon}>{extension.toUpperCase()}</span>
+              ) : (
+                <span className={styles.fileIconPlaceholder}>FILE</span>
+              )}
+            </div>
+          </div>
         </div>
         <div className={styles.fileInfo}>
           <div className={styles.fileNameRow}>
@@ -128,9 +102,7 @@ export default function FileMessage({ fileUrl, content, fileSize, mimeType, mess
               <span className={styles.fileExtension}>.{extension}</span>
             )}
           </div>
-          {displaySize && (
-            <div className={styles.fileSize}>{displaySize}</div>
-          )}
+          <div className={styles.fileSize}>{displaySize}</div>
           {content && content.trim() && (
             <div className={styles.fileCaption}>
               {content}

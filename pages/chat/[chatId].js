@@ -1224,6 +1224,10 @@ export default function ChatPage() {
         const finalFileName = fileName.trim() || fileToSend.name;
         const result = await sendMessageHook(messageText || '', isImage ? 'IMAGE' : 'FILE', uploadResponse.fileUrl, null, null, null, replyToId, finalFileName);
         
+        if (typeof window !== 'undefined') {
+          console.log('[Chat] sendMessageHook result:', result);
+        }
+        
         if (result?.serverMessage) {
           const messageId = result.serverMessage.id;
           if (messageId) {
@@ -1242,6 +1246,16 @@ export default function ChatPage() {
             }, 500);
           }
           addOptimistic(chatId, result.optimisticMessage);
+        } else if (result?.success) {
+          // Сообщение отправлено через WebSocket, но serverMessage еще не получен
+          // Оптимистичное сообщение уже добавлено в очередь, просто очищаем форму
+          if (typeof window !== 'undefined') {
+            console.log('[Chat] Message sent via WebSocket, waiting for server confirmation');
+          }
+        } else {
+          if (typeof window !== 'undefined') {
+            console.error('[Chat] Unexpected result from sendMessageHook:', result);
+          }
         }
         
         // Очищаем файл и URL только после успешной отправки
