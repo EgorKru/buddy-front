@@ -34,6 +34,14 @@ const isDuplicate = (a, b) => {
   return timeDiff < DUPLICATE_WINDOW_MS;
 };
 
+const formatFileSize = (bytes) => {
+  if (!bytes || bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+};
+
 
 export default function ChatPage() {
   const router = useRouter();
@@ -73,7 +81,6 @@ export default function ChatPage() {
   const [imageModal, setImageModal] = useState(null);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
-  const [fileName, setFileName] = useState('');
   const selectedFileUrlRef = useRef(null);
   const fileInputRef = useRef(null);
   
@@ -269,7 +276,6 @@ export default function ChatPage() {
           selectedFileUrlRef.current = null;
         }
         setSelectedFile(null);
-        setFileName('');
         
         scrollPositionSavedRef.current = false;
         shouldRestorePositionRef.current = true;
@@ -1221,8 +1227,18 @@ export default function ChatPage() {
           });
         }
         
-        const finalFileName = fileName.trim() || fileToSend.name;
-        const result = await sendMessageHook(messageText || '', isImage ? 'IMAGE' : 'FILE', uploadResponse.fileUrl, null, null, null, replyToId, finalFileName);
+        const result = await sendMessageHook(
+          messageText || '', 
+          isImage ? 'IMAGE' : 'FILE', 
+          uploadResponse.fileUrl, 
+          null, 
+          null, 
+          null, 
+          replyToId, 
+          fileToSend.name,
+          uploadResponse.fileSize || fileToSend.size,
+          uploadResponse.mimeType || fileToSend.type
+        );
         
         if (typeof window !== 'undefined') {
           console.log('[Chat] sendMessageHook result:', result);
@@ -1264,13 +1280,11 @@ export default function ChatPage() {
           selectedFileUrlRef.current = null;
         }
         setSelectedFile(null);
-        setFileName('');
       } catch (error) {
         console.error('Error uploading and sending file:', error);
         alert(`Не удалось отправить файл: ${error.message || 'Неизвестная ошибка'}`);
         // Возвращаем файл обратно при ошибке
         setSelectedFile(fileToSend);
-        setFileName(fileToSend.name);
         // Восстанавливаем URL для изображений
         if (fileToSend && fileToSend.type.startsWith('image/') && !selectedFileUrlRef.current) {
           selectedFileUrlRef.current = URL.createObjectURL(fileToSend);
@@ -2318,7 +2332,6 @@ export default function ChatPage() {
                       selectedFileUrlRef.current = null;
                     }
                     setSelectedFile(null);
-                    setFileName('');
                   }}
                   className={styles.removeFileButton}
                   title="Удалить файл"
@@ -2330,16 +2343,11 @@ export default function ChatPage() {
               <div className={styles.filePreviewInfo}>
                 <File size={20} />
                 <div className={styles.filePreviewDetails}>
-                  <input
-                    type="text"
-                    value={fileName}
-                    onChange={(e) => setFileName(e.target.value)}
-                    className={styles.filePreviewNameInput}
-                    placeholder={selectedFile.name}
-                    onClick={(e) => e.stopPropagation()}
-                  />
+                  <div className={styles.filePreviewName}>
+                    {selectedFile.name}
+                  </div>
                   <div className={styles.filePreviewSize}>
-                    {(selectedFile.size / 1024).toFixed(1)} KB
+                    {formatFileSize(selectedFile.size)}
                   </div>
                 </div>
                 <button
@@ -2350,7 +2358,6 @@ export default function ChatPage() {
                       selectedFileUrlRef.current = null;
                     }
                     setSelectedFile(null);
-                    setFileName('');
                   }}
                   className={styles.removeFileButton}
                   title="Удалить файл"
@@ -2424,7 +2431,6 @@ export default function ChatPage() {
                     }
                     
                     setSelectedFile(file);
-                    setFileName(file.name); // Устанавливаем оригинальное имя файла
                     // Фокусируемся на поле ввода, чтобы пользователь мог добавить текст
                     setTimeout(() => {
                       messageInputRef.current?.focus();

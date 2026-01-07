@@ -18,7 +18,7 @@ const DEDUP_CLEANUP_INTERVAL = 5 * 60 * 1000;
 const DEDUP_CLEANUP_THRESHOLD = 100;
 const QUEUE_REMOVAL_DELAY = 1000;
 
-const createOptimisticMessage = (content, type, chatId, user, fileUrl = null, fileName = null) => {
+const createOptimisticMessage = (content, type, chatId, user, fileUrl = null, fileName = null, fileSize = null, mimeType = null) => {
   const tempId = `temp-${Date.now()}-${Math.random()}`;
   let messageContent;
   if (type === 'VOICE') {
@@ -36,6 +36,8 @@ const createOptimisticMessage = (content, type, chatId, user, fileUrl = null, fi
     type,
     fileUrl,
     fileName,
+    fileSize,
+    mimeType,
     status: MESSAGE_STATUS.SENDING,
     createdAt: new Date().toISOString(),
     isOptimistic: true,
@@ -123,7 +125,7 @@ export const useMessageSender = (chatId, onMessageSent) => {
     }, delay);
   }, [chatId]);
 
-  const sendMessage = useCallback(async (content, type = 'TEXT', fileUrl = null, voiceData = null, voiceMimeType = null, duration = null, replyToMessageId = null, fileName = null) => {
+  const sendMessage = useCallback(async (content, type = 'TEXT', fileUrl = null, voiceData = null, voiceMimeType = null, duration = null, replyToMessageId = null, fileName = null, fileSize = null, mimeType = null) => {
     if (type === 'VOICE' && !fileUrl && !voiceData) return null;
     if (type === 'IMAGE' && !fileUrl) return null;
     if (type === 'FILE' && !fileUrl) return null;
@@ -135,7 +137,7 @@ export const useMessageSender = (chatId, onMessageSent) => {
                           type === 'FILE' ? (content?.trim() || '📎 Файл') : 
                           content.trim();
     const user = getCurrentUser();
-    const optimisticMessage = createOptimisticMessage(messageContent, type, chatId, user, fileUrl, fileName);
+    const optimisticMessage = createOptimisticMessage(messageContent, type, chatId, user, fileUrl, fileName, fileSize, mimeType);
 
     if (!saveMessageToQueue(optimisticMessage)) return null;
 
@@ -205,11 +207,17 @@ export const useMessageSender = (chatId, onMessageSent) => {
             if (fileName) {
               payload.fileName = fileName;
             }
+            if (fileSize !== null && fileSize !== undefined) {
+              payload.fileSize = fileSize;
+            }
+            if (mimeType) {
+              payload.mimeType = mimeType;
+            }
             if (content && content.trim()) {
               payload.content = content.trim();
             }
             if (typeof window !== 'undefined') {
-              console.log(`[MessageSender] Sending ${type} message with fileUrl:`, { chatId, fileUrl, fileName, content: content || '(пусто)' });
+              console.log(`[MessageSender] Sending ${type} message with fileUrl:`, { chatId, fileUrl, fileName, fileSize, mimeType, content: content || '(пусто)' });
             }
           } else {
             payload.content = messageContent;

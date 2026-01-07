@@ -357,8 +357,23 @@ const reducer = (state, action) => {
           : [...idsWithoutTemp.slice(0, idx), mid, ...idsWithoutTemp.slice(idx)];
 
       const messagesById = { ...state.messagesById };
+      const optimisticMsg = messagesById[tid];
       delete messagesById[tid];
-      messagesById[mid] = { ...message, status, isOptimistic: false };
+      
+      // Сохраняем fileSize и mimeType из оптимистичного сообщения, если их нет в серверном
+      const finalMessage = { ...message, status, isOptimistic: false };
+      if (optimisticMsg) {
+        if (!finalMessage.fileSize && optimisticMsg.fileSize) {
+          finalMessage.fileSize = optimisticMsg.fileSize;
+        }
+        if (!finalMessage.mimeType && optimisticMsg.mimeType) {
+          finalMessage.mimeType = optimisticMsg.mimeType;
+        }
+        if (!finalMessage.fileName && optimisticMsg.fileName) {
+          finalMessage.fileName = optimisticMsg.fileName;
+        }
+      }
+      messagesById[mid] = finalMessage;
 
       withReal.sort((a, b) => {
         const ma = messagesById[String(a)];
