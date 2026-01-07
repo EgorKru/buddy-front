@@ -26,6 +26,11 @@ export const useInfiniteScroll = ({
       return;
     }
 
+    // Не создаем observer во время начальной загрузки
+    if (isLoadingInitial) {
+      return;
+    }
+
     const container = containerRef.current;
 
     /**

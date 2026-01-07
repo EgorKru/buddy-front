@@ -41,6 +41,7 @@ export const useChatInitialization = ({
       const chatIdStr = String(chatId);
       const isNewChat = loadedChatIdRef.current !== chatIdStr;
 
+      // Telegram Web: при переходе между чатами (включая возврат) всегда скроллим вниз
       if (isNewChat) {
         // Очищаем выбранный файл при смене чата
         clearSelectedFile();
@@ -53,25 +54,8 @@ export const useChatInitialization = ({
         loadedPinnedRef.current = false;
         loadedChatIdRef.current = chatIdStr;
 
-        // Telegram Web: проверяем, есть ли свежая сохраненная позиция для восстановления
-        const saved = typeof window !== 'undefined'
-          ? localStorage.getItem(`chat_scroll_${chatIdStr}`)
-          : null;
-
-        if (saved) {
-          try {
-            const { timestamp, isBottom } = JSON.parse(saved);
-            const isRecent = Date.now() - timestamp < SCROLL_RESTORE_TIMEOUT;
-            // Восстанавливаем позицию только если сохранение свежее и пользователь НЕ был внизу
-            shouldRestorePositionRef.current = isRecent && !isBottom;
-          } catch (e) {
-            // Если ошибка парсинга - считаем первым открытием
-            shouldRestorePositionRef.current = false;
-          }
-        } else {
-          // Нет сохраненной позиции - это первое открытие, всегда вниз
-          shouldRestorePositionRef.current = false;
-        }
+        // Всегда скроллим вниз при переходе между чатами (без восстановления позиции)
+        shouldRestorePositionRef.current = false;
 
         if (!chat) {
           // Обновляем список чатов если чата нет
@@ -97,6 +81,14 @@ export const useChatInitialization = ({
           loadedPinnedRef.current = true;
           loadPinnedMessages();
         }
+      } else {
+        // Возврат в уже открытый чат - всегда скроллим вниз
+        scrollPositionSavedRef.current = false;
+        userScrolledToBottomRef.current = false;
+        shouldRestorePositionRef.current = false;
+        isLoadingInitialRef.current = true;
+        lastScrollTopRef.current = 0;
+        isUserScrollingUpRef.current = false;
       }
     }
 

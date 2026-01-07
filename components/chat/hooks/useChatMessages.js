@@ -23,6 +23,7 @@ export const useChatMessages = ({
   const abortControllerRef = useRef(null);
   const isLoadingInitialRef = useRef(false);
   const loadingMessagesRef = useRef(false);
+  const lastLoadedMessageIdRef = useRef(null);
 
   /**
    * Загружает полное состояние чата одним запросом
@@ -62,11 +63,17 @@ export const useChatMessages = ({
         }
         
         // Обновляем последовательности
-        if (state.pts !== undefined) {
+        if (state.pts !== undefined && localPtsRef) {
+          if (!localPtsRef.current) {
+            localPtsRef.current = new Map();
+          }
           const chatIdStr = String(chatId);
           localPtsRef.current.set(chatIdStr, state.pts);
         }
-        if (state.seq !== undefined) {
+        if (state.seq !== undefined && localSeqRef) {
+          if (localSeqRef.current === undefined) {
+            localSeqRef.current = 0;
+          }
           localSeqRef.current = state.seq;
         }
         
@@ -100,6 +107,11 @@ export const useChatMessages = ({
   const loadOlderMessages = useCallback(async (beforeMessageId) => {
     if (!chatId || !beforeMessageId || loadingMessagesRef.current) return;
     
+    // Защита от повторных запросов с тем же ID
+    if (lastLoadedMessageIdRef.current === beforeMessageId) {
+      return;
+    }
+    
     // Отменяем предыдущий запрос
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -107,6 +119,8 @@ export const useChatMessages = ({
     abortControllerRef.current = new AbortController();
     
     loadingMessagesRef.current = true;
+    lastLoadedMessageIdRef.current = beforeMessageId;
+    
     try {
       setLoadingMore(true);
       
@@ -116,6 +130,7 @@ export const useChatMessages = ({
         const newMessages = response.content;
         if (newMessages.length === 0) {
           setHasMore(false);
+          lastLoadedMessageIdRef.current = null;
           return;
         }
         
@@ -128,14 +143,22 @@ export const useChatMessages = ({
           );
         }
         
-        // Обновляем курсор
-        setOldestMessageId(newMessages[0]?.id);
+        // Обновляем курсор только если получили новые сообщения
+        const newOldestId = newMessages[0]?.id;
+        if (newOldestId && newOldestId !== oldestMessageId) {
+          setOldestMessageId(newOldestId);
+          lastLoadedMessageIdRef.current = null;
+        } else {
+          setHasMore(false);
+          lastLoadedMessageIdRef.current = null;
+        }
       }
     } catch (error) {
       if (error.name === 'AbortError') {
         return;
       }
       console.error('[Load Older Messages] Error:', error);
+      lastLoadedMessageIdRef.current = null;
     } finally {
       setLoadingMore(false);
       loadingMessagesRef.current = false;
@@ -143,7 +166,7 @@ export const useChatMessages = ({
         abortControllerRef.current = null;
       }
     }
-  }, [chatId, upsertMessage]);
+  }, [chatId, upsertMessage, oldestMessageId]);
 
   /**
    * Загружает сообщения (обертка для обратной совместимости)
@@ -167,6 +190,9 @@ export const useChatMessages = ({
   useEffect(() => {
     if (!chatId) {
       setLoading(false);
+    } else {
+      // Сбрасываем защиту от повторных запросов при смене чата
+      lastLoadedMessageIdRef.current = null;
     }
   }, [chatId]);
 

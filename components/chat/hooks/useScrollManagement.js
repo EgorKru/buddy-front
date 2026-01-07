@@ -58,21 +58,15 @@ export const useScrollManagement = ({
 
   const loadMoreObserverRef = useRef(null); // Оставляем для обратной совместимости, если нужно
 
-  // Инициализация: проверяем сохраненную позицию при смене чата
+  // Инициализация: при смене чата всегда скроллим вниз (как в Telegram Web)
   useEffect(() => {
     if (!chatId) return;
     
-    const saved = loadScrollPositionFromStorage(chatId);
-    if (saved) {
-      shouldRestorePositionRef.current = saved.isRecent && !saved.isBottom;
-    } else {
-      shouldRestorePositionRef.current = false;
-    }
-    
-    // Сбрасываем флаги при смене чата
+    // При смене чата всегда сбрасываем флаги и скроллим вниз
     scrollPositionSavedRef.current = false;
     userScrolledToBottomRef.current = false;
     restoreAttemptsRef.current = 0;
+    shouldRestorePositionRef.current = false;
   }, [chatId]);
 
   /**

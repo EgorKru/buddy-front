@@ -617,7 +617,7 @@ export const MessagingProvider = ({ children }) => {
         .map(id => state.messagesById[String(id)])
         .filter(Boolean);
       
-      const messageTime = new Date(message.createdAt || Date.now()).getTime();
+      // Проверяем, есть ли уже сообщение с таким ID
       const isDuplicate = existingMessages.some(existing => {
         if (!existing || !existing.id) return false;
         if (String(existing.id) === mid) return true;
@@ -640,7 +640,7 @@ export const MessagingProvider = ({ children }) => {
       type: actionTypes.UPSERT_MESSAGE,
       payload: { message, chatId: message.chatId, unreadDelta: meta.unreadDelta ?? unreadDelta },
     });
-  }, [state.activeChatId]);
+  }, [state.activeChatId, state.messageIdsByChatId, state.messagesById]);
 
   const updateMessage = useCallback((message, meta = {}) => {
     if (!message?.id || !message?.chatId) return;

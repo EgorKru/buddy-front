@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect } from 'react';
 import { CHECK_BOTTOM_AUTO_SCROLL_THRESHOLD, AUTO_SCROLL_DELAY, CHECK_BOTTOM_DEFAULT_THRESHOLD } from '../constants/chat';
 
 export const useMessageEffects = ({
@@ -17,36 +17,79 @@ export const useMessageEffects = ({
   isUserScrollingUpRef,
   lastScrollTopRef
 }) => {
-  useEffect(() => {
+  // Используем useLayoutEffect для синхронного скролла ДО отрисовки (как в Telegram Web)
+  useLayoutEffect(() => {
     if (messages.length > 0 && !scrollPositionSavedRef.current && messagesContainerRef.current) {
       const container = messagesContainerRef.current;
       
-      if (isLoadingInitialRef.current && !shouldRestorePositionRef.current) {
-        const targetScrollTop = container.scrollHeight;
-        if (targetScrollTop > 0) {
-          container.scrollTop = targetScrollTop;
-          lastScrollTopRef.current = targetScrollTop;
-          scrollPositionSavedRef.current = true;
-          userScrolledToBottomRef.current = true;
-          isUserScrollingUpRef.current = false;
-        }
+      // Синхронно устанавливаем позицию вниз сразу при рендере
+      if (!shouldRestorePositionRef.current) {
+        // Двойной requestAnimationFrame для гарантии, что DOM полностью обновлен
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const targetScrollTop = container.scrollHeight;
+            if (targetScrollTop > 0 && targetScrollTop > container.clientHeight) {
+              container.scrollTop = targetScrollTop;
+              lastScrollTopRef.current = targetScrollTop;
+              userScrolledToBottomRef.current = true;
+              isUserScrollingUpRef.current = false;
+              scrollPositionSavedRef.current = true;
+            }
+          });
+        });
       }
     }
-  }, [messages.length, scrollPositionSavedRef, messagesContainerRef, isLoadingInitialRef, shouldRestorePositionRef, lastScrollTopRef, userScrolledToBottomRef, isUserScrollingUpRef]);
+  }, [messages.length, scrollPositionSavedRef, messagesContainerRef, shouldRestorePositionRef, userScrolledToBottomRef, isUserScrollingUpRef, lastScrollTopRef]);
 
+  // Дополнительная проверка после отрисовки для гарантированного скролла
   useEffect(() => {
-    if (messages.length > 0 && !scrollPositionSavedRef.current && messagesContainerRef.current) {
+    if (messages.length > 0 && messagesContainerRef.current && !scrollPositionSavedRef.current) {
       const container = messagesContainerRef.current;
       
-      if (!isLoadingInitialRef.current) {
+      const performScroll = () => {
         if (shouldRestorePositionRef.current) {
           restoreScrollPosition();
         } else {
-          restoreScrollPosition();
+          const targetScrollTop = container.scrollHeight;
+          if (targetScrollTop > 0) {
+            container.scrollTop = targetScrollTop;
+            lastScrollTopRef.current = targetScrollTop;
+            userScrolledToBottomRef.current = true;
+            isUserScrollingUpRef.current = false;
+            scrollPositionSavedRef.current = true;
+          }
         }
-      }
+      };
+
+      // Используем несколько попыток для гарантии скролла
+      const attemptScroll = (attempt = 0) => {
+        if (container.scrollHeight > container.clientHeight) {
+          performScroll();
+          // Дополнительная проверка через небольшую задержку
+          setTimeout(() => {
+            const currentScrollTop = container.scrollTop;
+            const maxScrollTop = container.scrollHeight - container.clientHeight;
+            if (currentScrollTop < maxScrollTop - 50) {
+              performScroll();
+            }
+          }, 100);
+        } else if (attempt < 20) {
+          // Если контент еще не загружен, ждем (максимум 20 попыток = 1 секунда)
+          setTimeout(() => {
+            if (!scrollPositionSavedRef.current) {
+              attemptScroll(attempt + 1);
+            }
+          }, 50);
+        }
+      };
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          attemptScroll();
+        });
+      });
     }
-  }, [messages, restoreScrollPosition, isLoadingInitialRef, scrollPositionSavedRef, messagesContainerRef, shouldRestorePositionRef]);
+  }, [messages.length, scrollPositionSavedRef, messagesContainerRef, shouldRestorePositionRef, restoreScrollPosition, userScrolledToBottomRef, isUserScrollingUpRef, lastScrollTopRef]);
 
   useEffect(() => {
     if (!messagesContainerRef.current || messages.length === 0) return;

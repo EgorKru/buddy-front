@@ -13,6 +13,10 @@ export const useChatRealtime = (chatId) => {
     upsertMessage,
     updateMessage,
     removeMessage,
+    replaceOptimistic,
+    chats,
+    messageIdsByChatId,
+    messagesById,
   } = useChats();
 
   const topicSubRef = useRef(null);
@@ -279,12 +283,28 @@ export const useChatRealtime = (chatId) => {
         const currentUser = getCurrentUser();
         const isOwn = currentUser?.id && dto?.senderId && Number(currentUser.id) === Number(dto.senderId);
         
-        if (isOwn) {
-          const messageTime = new Date(dto.createdAt || Date.now()).getTime();
-          const now = Date.now();
-          if (now - messageTime < 2000) {
-            return;
+        if (isOwn && dto.id) {
+          const cid = String(chatId);
+          const messageIds = messageIdsByChatId?.[cid] || [];
+          
+          const optimisticMessages = messageIds
+            .map(id => messagesById?.[String(id)])
+            .filter(msg => msg && msg.isOptimistic && msg.tempId && msg.type === dto.type)
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          
+          if (optimisticMessages.length > 0) {
+            const latestOptimistic = optimisticMessages[0];
+            const now = Date.now();
+            const optimisticTime = new Date(latestOptimistic.createdAt || Date.now()).getTime();
+            const timeDiff = now - optimisticTime;
+            
+            if (timeDiff < 30000) {
+              replaceOptimistic(chatId, latestOptimistic.tempId, dto, MESSAGE_STATUS.SENT);
+              return;
+            }
           }
+          
+          return;
         }
 
         if ((dto.type === 'FILE' || dto.type === 'IMAGE') && dto.fileUrl && typeof window !== 'undefined') {
@@ -385,7 +405,7 @@ export const useChatRealtime = (chatId) => {
         markReadTimeoutRef.current = null;
       }
     };
-  }, [chatId, client, connected, upsertMessage, updateMessage, markChatAsRead]);
+  }, [chatId, client, connected, upsertMessage, updateMessage, markChatAsRead, replaceOptimistic, messageIdsByChatId, messagesById]);
 };
 
 
