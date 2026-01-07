@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { Reply, Pin, PinOff, Copy, Forward, Trash2, CheckCircle2, Edit } from 'lucide-react';
+import { useEffect, useRef, useMemo } from 'react';
+import { adjustMenuPosition, getMenuItems } from './utils';
 import styles from './index.module.css';
 
 export default function MessageContextMenu({ 
@@ -44,49 +44,27 @@ export default function MessageContextMenu({
 
   useEffect(() => {
     if (menuRef.current && position) {
-      const menu = menuRef.current;
-      const rect = menu.getBoundingClientRect();
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-
-      let { x, y } = position;
-
-      // Проверяем, не выходит ли меню за правый край
-      if (x + rect.width > viewportWidth) {
-        x = viewportWidth - rect.width - 10;
+      const adjustedPosition = adjustMenuPosition(menuRef.current, position);
+      if (adjustedPosition) {
+        menuRef.current.style.left = `${adjustedPosition.x}px`;
+        menuRef.current.style.top = `${adjustedPosition.y}px`;
       }
-
-      // Проверяем, не выходит ли меню за нижний край
-      if (y + rect.height > viewportHeight) {
-        y = viewportHeight - rect.height - 10;
-      }
-
-      // Проверяем, не выходит ли меню за левый край
-      if (x < 10) {
-        x = 10;
-      }
-
-      // Проверяем, не выходит ли меню за верхний край
-      if (y < 10) {
-        y = 10;
-      }
-
-      menu.style.left = `${x}px`;
-      menu.style.top = `${y}px`;
     }
   }, [position]);
 
-  if (!position) return null;
+  const menuItems = useMemo(() => {
+    return getMenuItems(message, isOwn, isPinned, {
+      onReply,
+      onPin,
+      onCopy,
+      onForward,
+      onEdit,
+      onDelete,
+      onSelect
+    });
+  }, [message, isOwn, isPinned, onReply, onPin, onCopy, onForward, onEdit, onDelete, onSelect]);
 
-  const menuItems = [
-    { icon: Reply, label: 'Ответить', onClick: onReply, show: true },
-    { icon: isPinned ? PinOff : Pin, label: isPinned ? 'Открепить' : 'Закрепить', onClick: onPin, show: true },
-    { icon: Copy, label: 'Копировать текст', onClick: onCopy, show: message.type === 'TEXT' },
-    { icon: Forward, label: 'Переслать', onClick: onForward, show: true },
-    { icon: Edit, label: 'Редактировать', onClick: onEdit, show: isOwn && message.type === 'TEXT' && !message.isOptimistic },
-    { icon: Trash2, label: 'Удалить', onClick: onDelete, show: !message.isOptimistic, isDelete: true },
-    { icon: CheckCircle2, label: 'Выделить', onClick: onSelect, show: true },
-  ].filter(item => item.show);
+  if (!position) return null;
 
   return (
     <div ref={menuRef} className={styles.contextMenu} style={{ left: position.x, top: position.y }}>
@@ -110,4 +88,3 @@ export default function MessageContextMenu({
     </div>
   );
 }
-

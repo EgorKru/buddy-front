@@ -27,7 +27,6 @@ const ChatPanel = ({ roomId, isOpen, onClose }) => {
       const newHeight = Math.min(textarea.scrollHeight, 120);
       textarea.style.height = `${newHeight}px`;
       
-      // Показываем скроллбар только если контент переполняется
       if (textarea.scrollHeight > 120) {
         textarea.style.overflowY = 'auto';
         textarea.style.paddingRight = '20px';

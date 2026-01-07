@@ -8,26 +8,24 @@ export default function ImageMessage({ fileUrl, content, messageTime, isOwn, sta
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [imageLoaded, setImageLoaded] = useState(false);
-  const [shouldLoad, setShouldLoad] = useState(false); // Lazy loading флаг
+  const [shouldLoad, setShouldLoad] = useState(false);
   const imgRef = useRef(null);
   const containerRef = useRef(null);
 
-  // Telegram-подход: lazy loading через IntersectionObserver
   useEffect(() => {
     if (!fileUrl || !containerRef.current) return;
 
-    // Создаем IntersectionObserver для lazy loading
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
             setShouldLoad(true);
-            observer.disconnect(); // Отключаем после первого появления в viewport
+            observer.disconnect();
           }
         });
       },
       {
-        rootMargin: '200px', // Начинаем загрузку за 200px до появления в viewport (как в Telegram)
+        rootMargin: '200px',
         threshold: 0.01,
       }
     );
@@ -39,7 +37,6 @@ export default function ImageMessage({ fileUrl, content, messageTime, isOwn, sta
     };
   }, [fileUrl]);
 
-  // Загружаем изображение только когда оно должно быть загружено (lazy loading)
   useEffect(() => {
     if (!fileUrl || !shouldLoad) {
       return;
@@ -51,7 +48,6 @@ export default function ImageMessage({ fileUrl, content, messageTime, isOwn, sta
     setError(null);
     setImageLoaded(false);
 
-    // Проверяем, загружается ли изображение
     const img = new Image();
     img.onload = () => {
       setImageLoaded(true);
@@ -120,7 +116,7 @@ export default function ImageMessage({ fileUrl, content, messageTime, isOwn, sta
               alt={content || 'Изображение'}
               className={`${styles.image} ${imageLoaded ? styles.loaded : ''}`}
               onClick={handleImageClick}
-              loading="lazy" // Нативный lazy loading как дополнительная оптимизация
+              loading="lazy"
               onError={() => {
                 setError('Не удалось загрузить изображение');
                 setLoading(false);

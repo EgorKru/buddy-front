@@ -100,41 +100,34 @@ export const chatAPI = {
     return apiRequest(`/chats/${chatId}/messages${queryString ? `?${queryString}` : ''}`);
   },
 
-  // Новый подход: полная загрузка состояния одним запросом
   getChatStateFull: async (chatId, messageLimit = 100) => {
     const params = new URLSearchParams({ messageLimit: String(messageLimit) });
     return apiRequest(`/chats/${chatId}/state/full?${params}`);
   },
 
-  // Курсорная пагинация: загрузка сообщений до указанного ID
   getMessagesBefore: async (chatId, beforeId, limit = 100) => {
     const params = new URLSearchParams({ beforeId: String(beforeId), limit: String(limit) });
     return apiRequest(`/chats/${chatId}/messages/before?${params}`);
   },
 
-  // Курсорная пагинация: загрузка сообщений до указанной даты
   getMessagesBeforeDate: async (chatId, beforeDate, limit = 100) => {
     const params = new URLSearchParams({ beforeDate: String(beforeDate), limit: String(limit) });
     return apiRequest(`/chats/${chatId}/messages/before?${params}`);
   },
 
-  // Telegram-подход: получение состояния чата (pts) - для Gap Recovery
   getChatState: async (chatId) => {
     return apiRequest(`/chats/${chatId}/state`);
   },
 
-  // Telegram-подход: получение пропущенных обновлений (Gap Recovery)
   getChatUpdates: async (chatId, fromPts, limit = 100) => {
     const params = new URLSearchParams({ fromPts: String(fromPts), limit: String(limit) });
     return apiRequest(`/chats/${chatId}/updates?${params}`);
   },
 
-  // Telegram-подход: получение глобального состояния пользователя (seq)
   getUserState: async () => {
     return apiRequest('/user/state');
   },
 
-  // Telegram-подход: получение пропущенных глобальных обновлений
   getUserUpdates: async (fromSeq, limit = 100) => {
     const params = new URLSearchParams({ fromSeq: String(fromSeq), limit: String(limit) });
     return apiRequest(`/user/updates?${params}`);
@@ -145,16 +138,12 @@ export const chatAPI = {
       type 
     };
     
-    // Для IMAGE и FILE content опционален - передаем только если не пустой
     if (type === 'IMAGE' || type === 'FILE') {
       if (content && content.trim()) {
         body.content = content.trim();
       }
-      // Если content пустой - не передаем поле вообще (будет null в БД)
     } else if (type === 'VOICE') {
-      // Для VOICE content всегда null, не передаем
     } else {
-      // Для TEXT и других типов content обязателен
       body.content = content;
     }
     
@@ -179,7 +168,6 @@ export const chatAPI = {
     const formData = new FormData();
     formData.append('file', audioBlob, 'voice.webm');
     
-    // Передаём duration если указан
     if (duration !== null && duration !== undefined) {
       formData.append('duration', duration.toString());
     }
@@ -243,7 +231,6 @@ export const chatAPI = {
       console.log('[API] Uploading image file:', { chatId, url: uploadUrl, fileName: imageFile.name, fileSize: imageFile.size, fileType: imageFile.type });
     }
 
-    // Оптимизация: используем XMLHttpRequest для отслеживания прогресса с requestAnimationFrame
     if (onProgress && typeof window !== 'undefined' && typeof XMLHttpRequest !== 'undefined') {
       return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
@@ -345,7 +332,6 @@ export const chatAPI = {
       console.log('[API] Uploading file:', { chatId, url: uploadUrl, fileName: file.name, fileSize: file.size, fileType: file.type });
     }
 
-    // Оптимизация: используем XMLHttpRequest для отслеживания прогресса с requestAnimationFrame
     if (onProgress && typeof window !== 'undefined' && typeof XMLHttpRequest !== 'undefined') {
       return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
@@ -440,20 +426,13 @@ export const chatAPI = {
 
   getVoiceFileUrl: (filePath) => {
     if (!filePath) return null;
-    // Убираем начальный "/" если есть
     const cleanPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
-    // fileUrl из БД: "voices/14/11/uuid.webm"
-    // Endpoint: /api/chats/files/{fileUrl}
-    // Итоговый URL: /api/chats/files/voices/14/11/uuid.webm
     return getApiUrl(`/chats/files/${cleanPath}`);
   },
 
   getImageFileUrl: (filePath, download = false, filename = null) => {
     if (!filePath) return null;
     const cleanPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
-    // fileUrl из БД: "images/1/12/uuid.jpg"
-    // Endpoint: /api/chats/files/{fileUrl}
-    // Итоговый URL: /api/chats/files/images/1/12/uuid.jpg
     let url = getApiUrl(`/chats/files/${cleanPath}`);
     const params = new URLSearchParams();
     if (download) {
@@ -469,9 +448,6 @@ export const chatAPI = {
   getFileUrl: (filePath, download = false, filename = null) => {
     if (!filePath) return null;
     const cleanPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
-    // fileUrl из БД: "files/1/12/uuid.pdf"
-    // Endpoint: /api/chats/files/{fileUrl}
-    // Итоговый URL: /api/chats/files/files/1/12/uuid.pdf
     let url = getApiUrl(`/chats/files/${cleanPath}`);
     const params = new URLSearchParams();
     if (download) {

@@ -64,7 +64,6 @@ export const playPagerNotificationSound = async (opts = {}) => {
     const pattern = opts.pattern || 'pager';
 
     if (pattern === 'pager') {
-      // “Пейджер”: bip-bip … пауза … bip-bip (похоже на классические)
       const seq = [
         { freq: 880, durationMs: 70, gapMs: 50 },
         { freq: 880, durationMs: 70, gapMs: 240 },
@@ -77,7 +76,6 @@ export const playPagerNotificationSound = async (opts = {}) => {
       return true;
     }
 
-    // fallback single beep
     await playTone(ctx, { freq: 880, durationMs: 80, gapMs: 0 });
     return true;
   } catch (e) {

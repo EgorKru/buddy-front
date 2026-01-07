@@ -26,7 +26,6 @@ const getNotificationMessage = (n) => {
   return n?.message ?? n?.payload?.message ?? null;
 };
 
-// Загружаем read receipts из localStorage при инициализации
 const loadReadReceiptsFromStorage = () => {
   if (typeof window === 'undefined') return {};
   try {
@@ -35,7 +34,6 @@ const loadReadReceiptsFromStorage = () => {
       return JSON.parse(stored);
     }
   } catch (e) {
-    // Игнорируем ошибки
   }
   return {};
 };
@@ -70,11 +68,7 @@ const upsertOrder = (order, chatId) => {
   return [id, ...filtered];
 };
 
-// Функция для получения времени последнего сообщения чата
-// Экспортируем для использования в компонентах
 export const getChatTime = (chat) => {
-  // Используем максимальное время из updatedAt и lastMessage.createdAt
-  // Это нужно, потому что бэкенд может не обновлять updatedAt при новых сообщениях
   const updatedAt = chat?.updatedAt;
   const lastMessageTime = chat?.lastMessage?.createdAt;
   const createdAt = chat?.createdAt;
@@ -82,7 +76,6 @@ export const getChatTime = (chat) => {
   let time = null;
   
   if (updatedAt && lastMessageTime) {
-    // Если есть оба, берем более новое
     const updatedDate = new Date(updatedAt);
     const lastMsgDate = new Date(lastMessageTime);
     time = updatedDate.getTime() > lastMsgDate.getTime() ? updatedAt : lastMessageTime;
@@ -105,12 +98,11 @@ export const getChatTime = (chat) => {
   }
 };
 
-// Функция для сортировки чатов по времени последнего сообщения (более новые выше)
 const sortChatsByTime = (chatsById) => {
   return Object.keys(chatsById).sort((a, b) => {
     const timeA = getChatTime(chatsById[a]);
     const timeB = getChatTime(chatsById[b]);
-    return timeB - timeA; // Более новые (большее время) идут первыми
+    return timeB - timeA;
   });
 };
 
@@ -123,28 +115,20 @@ const reducer = (state, action) => {
       for (const c of list) {
         if (!c?.id) continue;
         const id = String(c.id);
-        // Сохраняем существующий чат из state, чтобы не потерять lastMessage
         const existingChat = state.chatsById[id];
         
-        // Проверяем, является ли lastMessage из нового чата валидным (имеет id и createdAt)
-        // Для голосовых сообщений content может быть null, поэтому проверяем только id и createdAt
         const newLastMessageValid = c.lastMessage && 
                                    c.lastMessage.id && 
                                    c.lastMessage.createdAt;
         
-        // Нормализуем данные чата, убеждаясь что есть поля для сортировки
-        // Важно: сохраняем lastMessage из нового чата только если оно валидное, иначе из существующего
         const normalizedChat = {
           ...c,
-          // Если есть lastMessage, но нет updatedAt, используем время последнего сообщения
           updatedAt: c.updatedAt ?? c.lastMessage?.createdAt ?? c.createdAt,
-          // Сохраняем lastMessage: сначала валидное из нового чата, если нет - из существующего
           lastMessage: newLastMessageValid ? c.lastMessage : (existingChat?.lastMessage || null),
         };
         chatsById[id] = normalizedChat;
       }
 
-      // Всегда сортируем чаты по времени последнего сообщения при загрузке
       const chatOrder = sortChatsByTime(chatsById);
 
       return { ...state, chatsById, chatOrder };
@@ -156,24 +140,18 @@ const reducer = (state, action) => {
       const id = String(chat.id);
       const existing = state.chatsById[id] || {};
       
-      // Проверяем, является ли lastMessage из нового чата валидным (имеет id и createdAt)
-      // Для голосовых сообщений content может быть null, поэтому проверяем только id и createdAt
       const newLastMessageValid = chat.lastMessage && 
                                   chat.lastMessage.id && 
                                   chat.lastMessage.createdAt;
       
-      // При мерже сохраняем lastMessage: приоритет у валидного нового, если нет - сохраняем существующее
       const merged = { 
         ...existing, 
         ...chat,
-        // Сохраняем lastMessage: сначала валидное из нового чата, если нет - из существующего
         lastMessage: newLastMessageValid ? chat.lastMessage : (existing.lastMessage || null),
-        // Обновляем updatedAt, если есть новое время
         updatedAt: chat.updatedAt || existing.updatedAt || null,
       };
       const updatedChatsById = { ...state.chatsById, [id]: merged };
       
-      // Пересортировываем весь список чатов по времени последнего сообщения
       const chatOrder = sortChatsByTime(updatedChatsById);
       
       return {
@@ -187,7 +165,6 @@ const reducer = (state, action) => {
       const newActiveChatId = action.payload?.chatId ? String(action.payload.chatId) : null;
       const chatsById = { ...state.chatsById };
       
-      // Сбрасываем счетчик непрочитанных для нового активного чата
       if (newActiveChatId && chatsById[newActiveChatId]) {
         chatsById[newActiveChatId] = {
           ...chatsById[newActiveChatId],
@@ -209,7 +186,6 @@ const reducer = (state, action) => {
       const cid = String(chatId);
       const mid = String(message.id);
 
-      // Мержим существующее сообщение с новым, чтобы сохранить все поля
       const existingMessage = state.messagesById[mid];
       const mergedMessage = existingMessage ? { ...existingMessage, ...message } : message;
       const messagesById = { ...state.messagesById, [mid]: mergedMessage };
@@ -232,7 +208,6 @@ const reducer = (state, action) => {
         const last = chat?.lastMessage;
         const isLastMessage = last?.id && String(last.id) === mid;
         if (!last?.createdAt || isNewer(message.createdAt, last.createdAt) || isLastMessage) {
-          // Если чат активен и окно видимо, сбрасываем счетчик непрочитанных
           const newUnreadCount = shouldResetUnread 
             ? 0 
             : (action.payload?.unreadDelta != null
@@ -246,7 +221,6 @@ const reducer = (state, action) => {
             unreadCount: newUnreadCount,
           };
         } else if (action.payload?.unreadDelta != null) {
-          // Если чат активен и окно видимо, сбрасываем счетчик непрочитанных
           const newUnreadCount = shouldResetUnread 
             ? 0 
             : Math.max(0, Number(chat.unreadCount || 0) + Number(action.payload.unreadDelta));
@@ -256,7 +230,6 @@ const reducer = (state, action) => {
             unreadCount: newUnreadCount,
           };
         } else if (shouldResetUnread && chat.unreadCount > 0) {
-          // Сбрасываем счетчик, если чат активен и окно видимо
           chatsById[cid] = {
             ...chat,
             unreadCount: 0,
@@ -328,7 +301,6 @@ const reducer = (state, action) => {
         };
       }
 
-      // Пересортировываем весь список чатов по времени последнего сообщения
       const chatOrder = sortChatsByTime(chatsById);
 
       return {
@@ -360,7 +332,6 @@ const reducer = (state, action) => {
       const optimisticMsg = messagesById[tid];
       delete messagesById[tid];
       
-      // Сохраняем fileSize и mimeType из оптимистичного сообщения, если их нет в серверном
       const finalMessage = { ...message, status, isOptimistic: false };
       if (optimisticMsg) {
         if (!finalMessage.fileSize && optimisticMsg.fileSize) {
@@ -430,12 +401,10 @@ const reducer = (state, action) => {
         },
       };
       
-      // Сохраняем read receipts в localStorage для восстановления после обновления страницы
       if (typeof window !== 'undefined') {
         try {
           localStorage.setItem('readReceipts', JSON.stringify(newReadAtByChatIdByUserId));
         } catch (e) {
-          // Игнорируем ошибки localStorage
         }
       }
       
@@ -550,7 +519,6 @@ export const MessagingProvider = ({ children }) => {
   const lastConnectedRef = useRef(false);
   const hasInitialLoadRef = useRef(false);
 
-  // Объединенный useEffect для начальной загрузки чатов
   useEffect(() => {
     if (!isAuthenticated()) {
       dispatch({ type: actionTypes.SET_CHATS, payload: { chats: [] } });
@@ -559,9 +527,6 @@ export const MessagingProvider = ({ children }) => {
       return;
     }
     
-    // Загружаем чаты только один раз:
-    // 1. При подключении WebSocket (предпочтительно, так как соединение готово)
-    // 2. Или сразу, если WebSocket еще не подключен
     if (connected && !lastConnectedRef.current) {
       lastConnectedRef.current = true;
       if (!hasInitialLoadRef.current) {
@@ -570,7 +535,6 @@ export const MessagingProvider = ({ children }) => {
       }
     } else if (!connected) {
       lastConnectedRef.current = false;
-      // Если WebSocket еще не подключен и еще не загружали, загружаем сразу
       if (!hasInitialLoadRef.current) {
         hasInitialLoadRef.current = true;
         refreshChats();
@@ -590,8 +554,6 @@ export const MessagingProvider = ({ children }) => {
       if (lastTokenRef.current !== token) {
         lastTokenRef.current = token;
         hasInitialLoadRef.current = false;
-        // Если WebSocket подключен, загрузим при следующем рендере через первый useEffect
-        // Иначе загружаем сразу
         if (!connected) {
           refreshChats();
         }
@@ -683,7 +645,6 @@ export const MessagingProvider = ({ children }) => {
   const updateMessage = useCallback((message, meta = {}) => {
     if (!message?.id || !message?.chatId) return;
     const mid = String(message.id);
-    // Для обновления существующих сообщений очищаем из processedMessageIdsRef
     processedMessageIdsRef.current.delete(mid);
 
     const currentUser = getCurrentUser();
@@ -738,10 +699,9 @@ export const MessagingProvider = ({ children }) => {
       if (now - lastSoundAtRef.current < 500) return;
       lastSoundAtRef.current = now;
       playPagerNotificationSound({ pattern: 'pager' });
-    } catch (e) {}
+    } catch (e) {    }
   }, [state.activeChatId]);
 
-  // Эффект для автоматического сброса счетчика непрочитанных в активном чате
   useEffect(() => {
     if (!state.activeChatId) return;
     const isVisible = typeof document !== 'undefined' && document.visibilityState === 'visible';
@@ -754,7 +714,6 @@ export const MessagingProvider = ({ children }) => {
     }
   }, [state.activeChatId, state.chatsById, markChatAsRead]);
 
-  // Эффект для сброса счетчика при изменении видимости окна
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
@@ -836,7 +795,6 @@ export const MessagingProvider = ({ children }) => {
 
     const chatIds = new Set(state.chatOrder.map(String));
 
-    // Отписываемся от чатов, которых больше нет
     for (const [cid, sub] of readSubsRef.current.entries()) {
       if (!chatIds.has(cid)) {
         safeUnsubscribe(sub);
@@ -844,7 +802,6 @@ export const MessagingProvider = ({ children }) => {
       }
     }
 
-    // Подписываемся на read receipts для всех чатов
     for (const cid of chatIds) {
       if (readSubsRef.current.has(cid)) continue;
       try {
@@ -872,7 +829,6 @@ export const MessagingProvider = ({ children }) => {
     };
   }, []);
 
-  // Возвращаем чаты в порядке chatOrder, который уже отсортирован по времени последнего сообщения
   const chats = useMemo(() => {
     return state.chatOrder.map(id => state.chatsById[id]).filter(Boolean);
   }, [state.chatOrder, state.chatsById]);

@@ -4,10 +4,20 @@ import { formatChatDate, formatChatTime } from '@/utils/dateHelpers';
 import VoiceMessagePlayer from '@/component/VoiceMessagePlayer';
 import ImageMessage from '@/component/ImageMessage';
 import FileMessage from '@/component/FileMessage';
-import { Pin, Clock, Check, CheckCheck } from 'lucide-react';
+import { Pin } from 'lucide-react';
+import ForwardedMessage from './ForwardedMessage';
+import ReplyMessage from './ReplyMessage';
+import {
+  shouldShowDate,
+  isSearchMatch as checkSearchMatch,
+  getMessageStatus,
+  isPinnedInList,
+  getMessageClasses,
+  highlightSearchText
+} from './utils';
+import { messageRowComparison } from './memoComparison';
 import styles from '@/styles/chat.module.css';
 
-// Оптимизированный компонент строки сообщения с React.memo
 const MessageRow = React.memo(({ 
   msg, 
   index, 
@@ -28,35 +38,29 @@ const MessageRow = React.memo(({
   setImageModal, 
   handleNavigateToMessage 
 }) => {
-  // Мемоизация тяжелых вычислений
   const showDate = useMemo(() => {
-    return index === 0 ||
-      formatChatDate(visibleMessages[index - 1]?.createdAt) !== formatChatDate(msg.createdAt);
+    return shouldShowDate(index, msg, visibleMessages);
   }, [index, msg.createdAt, visibleMessages]);
 
   const isSearchMatch = useMemo(() => {
-    return searchOpen && searchText && msg.content && 
-      msg.content.toLowerCase().includes(searchText.toLowerCase());
+    return checkSearchMatch(searchOpen, searchText, msg.content);
   }, [searchOpen, searchText, msg.content]);
 
   const status = useMemo(() => {
-    return msg.status || (msg.isOptimistic ? MESSAGE_STATUS.SENDING : MESSAGE_STATUS.SENT);
+    return getMessageStatus(msg);
   }, [msg.status, msg.isOptimistic]);
 
   const readMeta = useMemo(() => {
     return status === MESSAGE_STATUS.SENT ? getReadMetaForMessage(msg) : null;
   }, [status, msg, getReadMetaForMessage]);
 
-  const isPinnedInList = useMemo(() => {
-    return pinnedMessages.some(p => {
-      const pinnedMsgId = p.message?.id;
-      return pinnedMsgId && Number(pinnedMsgId) === Number(msg.id);
-    });
+  const isPinnedInListValue = useMemo(() => {
+    return isPinnedInList(pinnedMessages, msg.id);
   }, [pinnedMessages, msg.id]);
 
   const isPinned = useMemo(() => {
-    return msg.isPinned || isPinnedInList;
-  }, [msg.isPinned, isPinnedInList]);
+    return msg.isPinned || isPinnedInListValue;
+  }, [msg.isPinned, isPinnedInListValue]);
 
   const statusIcon = useMemo(() => {
     if (isOwn && !msg.deletedForMe && !msg.deletedForAll) {
@@ -66,23 +70,22 @@ const MessageRow = React.memo(({
   }, [isOwn, msg.deletedForMe, msg.deletedForAll, status, readMeta, getMessageStatusIcon]);
 
   const messageClasses = useMemo(() => {
-    return `${styles.message} ${isOwn ? styles.ownMessage : ''} ${isPinned ? styles.messagePinned : ''} ${selectionMode && selectedMessages.has(msg.id) ? styles.messageSelected : ''} ${newMessageIdsRef.current.has(String(msg.id)) || msg.isOptimistic ? styles.messageNew : ''} ${loadedMessageIdsRef.current.has(String(msg.id)) ? styles.messageLoaded : ''} ${isSearchMatch ? styles.messageSearchMatch : ''}`;
-  }, [isOwn, isPinned, selectionMode, selectedMessages, msg.id, msg.isOptimistic, isSearchMatch]);
+    return getMessageClasses(styles, {
+      isOwn,
+      isPinned,
+      selectionMode,
+      selectedMessages,
+      msgId: msg.id,
+      isOptimistic: msg.isOptimistic,
+      isSearchMatch,
+      newMessageIdsRef,
+      loadedMessageIdsRef
+    });
+  }, [isOwn, isPinned, selectionMode, selectedMessages, msg.id, msg.isOptimistic, isSearchMatch, newMessageIdsRef, loadedMessageIdsRef]);
 
-  // Обработка поиска с подсветкой
   const highlightedContent = useMemo(() => {
     if (!isSearchMatch || !searchText) return msg.content;
-    
-    const escapedSearchText = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(`(${escapedSearchText})`, 'gi');
-    const parts = msg.content.split(regex);
-    return parts.map((part, i) => 
-      part.toLowerCase() === searchText.toLowerCase() ? (
-        <mark key={i} className={styles.searchHighlight}>{part}</mark>
-      ) : (
-        <span key={i}>{part}</span>
-      )
-    );
+    return highlightSearchText(msg.content, searchText, styles);
   }, [isSearchMatch, searchText, msg.content]);
 
   return (
@@ -160,55 +163,16 @@ const MessageRow = React.memo(({
           ) : (
             <div className={`${styles.messageText} ${msg.isOptimistic ? styles.messagePending : ''} ${msg.status === MESSAGE_STATUS.FAILED ? styles.messageFailed : ''}`}>
               {msg.forwardedFrom && (
-                <div className={styles.messageForwarded}>
-                  <div className={styles.messageForwardedHeader}>
-                    <span className={styles.messageForwardedIcon}>↪</span>
-                    <span className={styles.messageForwardedText}>
-                      Переслано от {msg.forwardedFrom.originalSenderDisplayName || msg.forwardedFrom.originalSenderUsername}
-                      {msg.forwardedFrom.forwardedByUserId !== msg.senderId && (
-                        <span> • Переслал {msg.forwardedFrom.forwardedByDisplayName || msg.forwardedFrom.forwardedByUsername}</span>
-                      )}
-                    </span>
-                  </div>
-                  {msg.forwardedFrom.originalType === 'VOICE' ? (
-                    <div className={styles.messageForwardedContent}>
-                      🎤 Голосовое сообщение
-                    </div>
-                  ) : msg.forwardedFrom.originalType === 'IMAGE' ? (
-                    <div className={styles.messageForwardedContent}>
-                      📷 Фото
-                    </div>
-                  ) : msg.forwardedFrom.originalType === 'FILE' ? (
-                    <div className={styles.messageForwardedContent}>
-                      📎 Файл
-                    </div>
-                  ) : (
-                    <div className={styles.messageForwardedContent}>
-                      {msg.forwardedFrom.originalContent}
-                    </div>
-                  )}
-                </div>
+                <ForwardedMessage 
+                  forwardedFrom={msg.forwardedFrom}
+                  senderId={msg.senderId}
+                />
               )}
               {msg.replyTo && (
-                <div 
-                  className={styles.messageReply}
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    handleNavigateToMessage(msg.replyTo.id);
-                  }}
-                >
-                  <div className={styles.messageReplyContent}>
-                    <div className={styles.messageReplyAuthor}>
-                      {msg.replyTo.senderDisplayName || msg.replyTo.senderUsername}
-                    </div>
-                    <div className={styles.messageReplyText}>
-                      {msg.replyTo.type === 'VOICE' ? '🎤 Голосовое сообщение' : 
-                       msg.replyTo.type === 'IMAGE' ? '📷 Фото' :
-                       msg.replyTo.type === 'FILE' ? '📎 Файл' :
-                       msg.replyTo.content || ''}
-                    </div>
-                  </div>
-                </div>
+                <ReplyMessage 
+                  replyTo={msg.replyTo}
+                  onNavigate={handleNavigateToMessage}
+                />
               )}
               <div className={styles.messageTextContentWrapper}>
                 <div className={styles.messageTextContent}>
@@ -241,35 +205,8 @@ const MessageRow = React.memo(({
       </div>
     </div>
   );
-}, (prevProps, nextProps) => {
-  // Кастомная логика сравнения для оптимизации
-  const prevMsg = prevProps.msg;
-  const nextMsg = nextProps.msg;
-  
-  // Сравниваем основные поля
-  if (prevMsg.id !== nextMsg.id) return false;
-  if (prevMsg.status !== nextMsg.status) return false;
-  if (prevMsg.content !== nextMsg.content) return false;
-  if (prevMsg.isOptimistic !== nextMsg.isOptimistic) return false;
-  if (prevMsg.isPinned !== nextMsg.isPinned) return false;
-  if (prevMsg.deletedForMe !== nextMsg.deletedForMe) return false;
-  if (prevMsg.deletedForAll !== nextMsg.deletedForAll) return false;
-  
-  // Сравниваем состояние выбора
-  if (prevProps.selectionMode !== nextProps.selectionMode) return false;
-  if (prevProps.selectedMessages.has(prevMsg.id) !== nextProps.selectedMessages.has(nextMsg.id)) return false;
-  
-  // Сравниваем поиск
-  if (prevProps.searchOpen !== nextProps.searchOpen) return false;
-  if (prevProps.searchText !== nextProps.searchText) return false;
-  
-  // Сравниваем закрепленные сообщения
-  if (prevProps.pinnedMessages.length !== nextProps.pinnedMessages.length) return false;
-  
-  return true; // Пропсы одинаковые, не перерисовываем
-});
+}, messageRowComparison);
 
 MessageRow.displayName = 'MessageRow';
 
 export default MessageRow;
-

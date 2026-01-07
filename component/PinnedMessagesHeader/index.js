@@ -48,11 +48,9 @@ export default function PinnedMessagesHeader({
   
   const handleClick = async () => {
     if (onNavigateToMessage) {
-      // Используем улучшенную функцию навигации из родительского компонента
       await onNavigateToMessage(msg.id);
       onViewedChange(msg.id);
     } else {
-      // Fallback на старую логику
       const targetMessage = document.querySelector(`[data-message-id="${msg.id}"]`);
       if (targetMessage) {
         targetMessage.scrollIntoView({ behavior: 'smooth', block: 'center' });

@@ -1,41 +1,20 @@
 import { useState } from 'react';
 import { Download } from 'lucide-react';
 import { chatAPI } from '@/utils/api';
+import { formatFileSize, getFileName, canViewInBrowser } from './utils';
 import styles from './index.module.css';
 
-const formatFileSize = (bytes) => {
-  if (!bytes || bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
-};
-
-const getFileName = (fileUrl, originalFileName) => {
-  // Если есть оригинальное имя файла, используем его
-  if (originalFileName) {
-    const lastDotIndex = originalFileName.lastIndexOf('.');
-    if (lastDotIndex > 0) {
-      return {
-        name: originalFileName.substring(0, lastDotIndex),
-        extension: originalFileName.substring(lastDotIndex + 1)
-      };
-    }
-    return { name: originalFileName, extension: '' };
-  }
-  
-  // Иначе пытаемся извлечь из fileUrl
-  if (!fileUrl) return { name: 'Файл', extension: '' };
-  const parts = fileUrl.split('/');
-  const lastPart = parts[parts.length - 1];
-  const match = lastPart.match(/\.([^.]+)$/);
-  if (match) {
-    return { name: 'Файл', extension: match[1] };
-  }
-  return { name: 'Файл', extension: '' };
-};
-
-export default function FileMessage({ fileUrl, content, fileSize, mimeType, messageTime, isOwn, statusIcon, isPinned, fileName: originalFileName }) {
+export default function FileMessage({ 
+  fileUrl, 
+  content, 
+  fileSize, 
+  mimeType, 
+  messageTime, 
+  isOwn, 
+  statusIcon, 
+  isPinned, 
+  fileName: originalFileName 
+}) {
   const [downloading, setDownloading] = useState(false);
   
   const { name: fileName, extension } = getFileName(fileUrl, originalFileName);
@@ -65,25 +44,17 @@ export default function FileMessage({ fileUrl, content, fileSize, mimeType, mess
 
   const handleClick = (e) => {
     e.stopPropagation();
-    // Для PDF и изображений открываем в новой вкладке для просмотра
-    if (mimeType) {
-      const mime = mimeType.toLowerCase();
-      if (mime.includes('pdf') || mime.startsWith('image/')) {
-        const viewUrl = chatAPI.getFileUrl(fileUrl, false);
-        window.open(viewUrl, '_blank');
-        return;
-      }
+    if (canViewInBrowser(mimeType)) {
+      const viewUrl = chatAPI.getFileUrl(fileUrl, false);
+      window.open(viewUrl, '_blank');
+      return;
     }
-    // Для остальных файлов - скачиваем
     handleDownload(e);
   };
 
   return (
     <div className={`${styles.fileMessage} ${isOwn ? styles.ownMessage : ''}`}>
-      <div 
-        className={styles.fileContainer}
-        onClick={handleClick}
-      >
+      <div className={styles.fileContainer} onClick={handleClick}>
         <div className={styles.fileIconWrapper}>
           <div className={styles.fileIconContainer}>
             <div className={styles.fileIconDocument}>
@@ -104,9 +75,7 @@ export default function FileMessage({ fileUrl, content, fileSize, mimeType, mess
           </div>
           <div className={styles.fileSize}>{displaySize}</div>
           {content && content.trim() && (
-            <div className={styles.fileCaption}>
-              {content}
-            </div>
+            <div className={styles.fileCaption}>{content}</div>
           )}
         </div>
         <div className={styles.fileRightColumn}>
@@ -137,4 +106,3 @@ export default function FileMessage({ fileUrl, content, fileSize, mimeType, mess
     </div>
   );
 }
-

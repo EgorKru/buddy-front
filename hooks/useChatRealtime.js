@@ -22,18 +22,15 @@ export const useChatRealtime = (chatId) => {
   const loadingInitialRef = useRef(false);
   const lastLoadedChatIdRef = useRef(null);
   
-  // Telegram-подход: хранение локальных последовательностей
-  const localSeqRef = useRef(0); // Глобальная последовательность
-  const localPtsRef = useRef(new Map()); // pts для каждого чата: Map<chatId, pts>
-  const gapRecoveryInProgressRef = useRef(new Set()); // Защита от множественных Gap Recovery
+  const localSeqRef = useRef(0);
+  const localPtsRef = useRef(new Map());
+  const gapRecoveryInProgressRef = useRef(new Set());
 
-  // Telegram-подход: Gap Recovery для восстановления пропущенных обновлений
   const handleGapRecovery = useCallback(async (chatId, fromPts, toPts) => {
     try {
       const updates = await chatAPI.getChatUpdates(chatId, fromPts, 100);
       if (!updates?.updates || !Array.isArray(updates.updates)) return;
       
-      // Применяем все пропущенные обновления в порядке pts
       const sortedUpdates = updates.updates.sort((a, b) => a.pts - b.pts);
       
       for (const update of sortedUpdates) {
@@ -59,19 +56,16 @@ export const useChatRealtime = (chatId) => {
             break;
           case 'MESSAGE_DELETED_FOR_ALL':
             if (eventData.messageId) {
-              // Удаление сообщения для всех
               removeMessage(eventData.messageId);
             }
             break;
           case 'MESSAGE_DELETED_FOR_ME':
             if (eventData.messageId) {
-              // Удаление сообщения для текущего пользователя
               removeMessage(eventData.messageId);
             }
             break;
           case 'MESSAGE_PINNED':
             if (eventData.message) {
-              // Закрепление сообщения - обновляем сообщение
               updateMessage(
                 { ...eventData.message, status: MESSAGE_STATUS.SENT, isOptimistic: false },
                 { unreadDelta: 0 }
@@ -80,7 +74,6 @@ export const useChatRealtime = (chatId) => {
             break;
           case 'MESSAGE_UNPINNED':
             if (eventData.message) {
-              // Открепление сообщения - обновляем сообщение
               updateMessage(
                 { ...eventData.message, status: MESSAGE_STATUS.SENT, isOptimistic: false },
                 { unreadDelta: 0 }
@@ -89,7 +82,6 @@ export const useChatRealtime = (chatId) => {
             break;
         }
         
-        // Обновляем локальный pts
         const chatIdStr = String(chatId);
         localPtsRef.current.set(chatIdStr, update.pts);
       }
@@ -102,7 +94,6 @@ export const useChatRealtime = (chatId) => {
     if (!chatId) return;
     const chatIdStr = String(chatId);
     
-    // Защита от повторных вызовов для того же чата
     if (loadingInitialRef.current && lastLoadedChatIdRef.current === chatIdStr) {
       return;
     }
@@ -111,7 +102,6 @@ export const useChatRealtime = (chatId) => {
     lastLoadedChatIdRef.current = chatIdStr;
     
     try {
-      // Telegram-подход: получаем состояние чата перед загрузкой сообщений
       const chatState = await chatAPI.getChatState(chatId);
       if (chatState?.pts !== undefined) {
         localPtsRef.current.set(chatIdStr, chatState.pts);
@@ -121,11 +111,9 @@ export const useChatRealtime = (chatId) => {
       const list = Array.isArray(response?.content) ? response.content : [];
       const ordered = [...list].reverse();
       for (const m of ordered) {
-        // Обработка метаданных файлов: приоритет серверным данным, fallback на localStorage
         if ((m.type === 'FILE' || m.type === 'IMAGE') && m.fileUrl && typeof window !== 'undefined') {
           const metadataKey = `file_metadata_${m.fileUrl}`;
           
-          // Если метаданные пришли от сервера - обновляем localStorage
           if (m.fileSize && m.fileName && m.mimeType) {
             const fileMetadata = {
               fileSize: m.fileSize,
@@ -135,12 +123,10 @@ export const useChatRealtime = (chatId) => {
             };
             localStorage.setItem(metadataKey, JSON.stringify(fileMetadata));
           } else {
-            // Fallback: восстанавливаем из localStorage для старых сообщений без метаданных
             const savedMetadata = localStorage.getItem(metadataKey);
             if (savedMetadata) {
               try {
                 const metadata = JSON.parse(savedMetadata);
-                // Используем сохраненные данные только если их нет в сообщении
                 if (!m.fileSize && metadata.fileSize) {
                   m.fileSize = metadata.fileSize;
                 }
@@ -151,12 +137,10 @@ export const useChatRealtime = (chatId) => {
                   m.mimeType = metadata.mimeType;
                 }
               } catch (e) {
-                // Игнорируем ошибки парсинга
               }
             }
           }
         }
-        // upsertMessage автоматически обновит существующее сообщение, если оно уже загружено
         upsertMessage({ ...m, status: MESSAGE_STATUS.SENT, isOptimistic: false }, { unreadDelta: 0 });
       }
     } catch (e) {} finally {
@@ -169,14 +153,11 @@ export const useChatRealtime = (chatId) => {
     const chatIdStr = String(chatId);
     setActiveChatId(chatId);
     
-    // Вызываем markChatAsRead только если еще не вызывали для этого чата
     if (lastMarkedReadRef.current !== chatIdStr) {
       lastMarkedReadRef.current = chatIdStr;
       markChatAsRead(chatId);
     }
     
-    // loadInitial дублирует loadMessages из основного компонента, убираем
-    // loadInitial();
     return () => setActiveChatId(null);
   }, [chatId, setActiveChatId, markChatAsRead]);
 
@@ -208,15 +189,12 @@ export const useChatRealtime = (chatId) => {
         const data = safeJsonParse(message.body);
         if (!data) return;
 
-        // Telegram-подход: обработка последовательностей
         const receivedPts = data.pts;
         const receivedPtsCount = data.ptsCount || 1;
         const chatIdStr = String(chatId);
         const currentLocalPts = localPtsRef.current.get(chatIdStr) || 0;
         
-        // Проверяем разрыв в последовательности (Gap Detection)
         if (receivedPts !== undefined && receivedPts > currentLocalPts + receivedPtsCount) {
-          // Обнаружен разрыв - запускаем Gap Recovery
           const gapKey = `${chatIdStr}_${currentLocalPts}`;
           if (!gapRecoveryInProgressRef.current.has(gapKey)) {
             gapRecoveryInProgressRef.current.add(gapKey);
@@ -226,12 +204,10 @@ export const useChatRealtime = (chatId) => {
           }
         }
         
-        // Обновляем локальный pts после обработки
         if (receivedPts !== undefined) {
           localPtsRef.current.set(chatIdStr, receivedPts);
         }
         
-        // Обновляем глобальный seq
         if (data.seq !== undefined && data.seq > localSeqRef.current) {
           localSeqRef.current = data.seq;
         }
@@ -241,14 +217,11 @@ export const useChatRealtime = (chatId) => {
           if (!editedMessage) return;
           if (Number(editedMessage.chatId) !== Number(chatId)) return;
 
-          // Обновляем сообщение полностью, включая метаданные файлов
           const updatedMessage = { ...editedMessage, status: MESSAGE_STATUS.SENT, isOptimistic: false };
           
-          // Если это файловое сообщение, проверяем и обновляем метаданные
           if ((updatedMessage.type === 'FILE' || updatedMessage.type === 'IMAGE') && updatedMessage.fileUrl && typeof window !== 'undefined') {
             const metadataKey = `file_metadata_${updatedMessage.fileUrl}`;
             
-            // Приоритет: данные от сервера > localStorage
             if (!updatedMessage.fileSize || !updatedMessage.fileName || !updatedMessage.mimeType) {
               const savedMetadata = localStorage.getItem(metadataKey);
               if (savedMetadata) {
@@ -264,11 +237,9 @@ export const useChatRealtime = (chatId) => {
                     updatedMessage.mimeType = metadata.mimeType;
                   }
                 } catch (e) {
-                  // Игнорируем ошибки парсинга
                 }
               }
             } else {
-              // Если метаданные пришли от сервера, обновляем localStorage
               const fileMetadata = {
                 fileSize: updatedMessage.fileSize,
                 fileName: updatedMessage.fileName,
@@ -283,7 +254,6 @@ export const useChatRealtime = (chatId) => {
           return;
         }
 
-        // Обработка других типов событий
         if (data.eventType === 'MESSAGE_DELETED_FOR_ALL' || data.eventType === 'MESSAGE_DELETED_FOR_ME') {
           if (data.messageId) {
             removeMessage(data.messageId);
@@ -301,18 +271,14 @@ export const useChatRealtime = (chatId) => {
           return;
         }
 
-        // Обработка нового сообщения (MESSAGE_NEW или без eventType для обратной совместимости)
-        // Оптимизация: выносим тяжелые операции в requestIdleCallback
         const dto = data;
         
-        // Используем requestIdleCallback для неблокирующей обработки
         const processMessage = () => {
           if (Number(dto.chatId) !== Number(chatId)) return;
 
         const currentUser = getCurrentUser();
         const isOwn = currentUser?.id && dto?.senderId && Number(currentUser.id) === Number(dto.senderId);
         
-        // Пропускаем собственные сообщения, которые только что отправили (чтобы избежать дубликатов)
         if (isOwn) {
           const messageTime = new Date(dto.createdAt || Date.now()).getTime();
           const now = Date.now();
@@ -321,11 +287,9 @@ export const useChatRealtime = (chatId) => {
           }
         }
 
-        // Обработка метаданных файлов: приоритет серверным данным, fallback на localStorage
         if ((dto.type === 'FILE' || dto.type === 'IMAGE') && dto.fileUrl && typeof window !== 'undefined') {
           const metadataKey = `file_metadata_${dto.fileUrl}`;
           
-          // Если метаданные пришли от сервера - обновляем localStorage
           if (dto.fileSize && dto.fileName && dto.mimeType) {
             const fileMetadata = {
               fileSize: dto.fileSize,
@@ -335,12 +299,10 @@ export const useChatRealtime = (chatId) => {
             };
             localStorage.setItem(metadataKey, JSON.stringify(fileMetadata));
           } else {
-            // Fallback: восстанавливаем из localStorage для старых сообщений
             const savedMetadata = localStorage.getItem(metadataKey);
             if (savedMetadata) {
               try {
                 const metadata = JSON.parse(savedMetadata);
-                // Используем сохраненные данные только если их нет в сообщении
                 if (!dto.fileSize && metadata.fileSize) {
                   dto.fileSize = metadata.fileSize;
                 }
@@ -351,20 +313,17 @@ export const useChatRealtime = (chatId) => {
                   dto.mimeType = metadata.mimeType;
                 }
               } catch (e) {
-                // Игнорируем ошибки парсинга
               }
             }
           }
         }
 
         const isVisible = typeof document !== 'undefined' && document.visibilityState === 'visible';
-        // upsertMessage автоматически обновит существующее сообщение, если оно уже загружено
         upsertMessage(
           { ...dto, status: MESSAGE_STATUS.SENT, isOptimistic: false },
           { unreadDelta: isVisible ? 0 : undefined }
         );
 
-        // Throttle markChatAsRead - вызываем не чаще раза в 2 секунды
         if (isVisible) {
           if (markReadTimeoutRef.current) {
             clearTimeout(markReadTimeoutRef.current);
@@ -376,11 +335,9 @@ export const useChatRealtime = (chatId) => {
         }
         };
         
-        // Используем requestIdleCallback с таймаутом для гарантированного выполнения
         if (typeof window !== 'undefined' && window.requestIdleCallback) {
           window.requestIdleCallback(processMessage, { timeout: 1000 });
         } else {
-          // Fallback для браузеров без requestIdleCallback
           setTimeout(processMessage, 0);
         }
       });

@@ -29,7 +29,6 @@ export default function ImageModal({ imageUrl, fileUrl, onClose }) {
     document.addEventListener('keydown', handleEscape);
     document.addEventListener('wheel', handleWheel, { passive: false });
 
-    // Блокируем скролл страницы
     document.body.style.overflow = 'hidden';
 
     return () => {

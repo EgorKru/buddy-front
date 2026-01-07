@@ -4,10 +4,8 @@ import { chatAPI, getToken } from '@/utils/api';
 import { useVoicePlayer } from '@/context/voicePlayer';
 import styles from './index.module.css';
 
-// Генерация псевдо-waveform из размера файла (пока нет реальных данных)
 const generateWaveform = (seed, barCount = 40) => {
   const bars = [];
-  // Используем seed для псевдо-случайных, но стабильных значений
   let hash = 0;
   for (let i = 0; i < seed.length; i++) {
     const char = seed.charCodeAt(i);
@@ -16,7 +14,6 @@ const generateWaveform = (seed, barCount = 40) => {
   }
   
   for (let i = 0; i < barCount; i++) {
-    // Псевдо-случайное значение от 15% до 100% высоты
     const val = Math.abs(Math.sin(hash * (i + 1) * 0.1)) * 0.85 + 0.15;
     bars.push(val);
     hash = ((hash << 5) - hash) + i;
@@ -35,16 +32,13 @@ export default function VoiceMessagePlayer({ fileUrl, duration: propDuration, me
   const audioRef = useRef(null);
   const blobUrlRef = useRef(null);
   
-  // Уникальный ID для этого плеера
   const playerIdRef = useRef(fileUrl || `player-${Date.now()}-${Math.random()}`);
   const { activePlayerId, registerPlayer, unregisterPlayer } = useVoicePlayer();
 
-  // Генерируем waveform на основе fileUrl (стабильный для одного файла)
   const waveform = useMemo(() => {
     return generateWaveform(fileUrl || 'default', 35);
   }, [fileUrl]);
 
-  // Функция остановки воспроизведения
   const stopPlayback = useCallback(() => {
     const audio = audioRef.current;
     if (audio) {
@@ -53,14 +47,12 @@ export default function VoiceMessagePlayer({ fileUrl, duration: propDuration, me
     }
   }, []);
 
-  // Если другой плеер стал активным - останавливаем этот
   useEffect(() => {
     if (activePlayerId && activePlayerId !== playerIdRef.current && isPlaying) {
       stopPlayback();
     }
   }, [activePlayerId, isPlaying, stopPlayback]);
 
-  // Используем propDuration если передан (от бэкенда)
   useEffect(() => {
     if (propDuration && propDuration > 0) {
       setAudioDuration(propDuration);
@@ -107,8 +99,6 @@ export default function VoiceMessagePlayer({ fileUrl, duration: propDuration, me
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
       audio.removeEventListener('durationchange', handleDurationChange);
       audio.removeEventListener('error', handleError);
-      // Очищаем blob URL только при размонтировании компонента
-      // и только если audio не играет
       if (blobUrlRef.current && !isPlaying) {
         URL.revokeObjectURL(blobUrlRef.current);
         blobUrlRef.current = null;
@@ -162,7 +152,6 @@ export default function VoiceMessagePlayer({ fileUrl, duration: propDuration, me
       setIsPlaying(false);
       unregisterPlayer(playerIdRef.current);
     } else {
-      // Регистрируем этот плеер как активный (остановит другие)
       registerPlayer(playerIdRef.current, stopPlayback);
       
       try {
