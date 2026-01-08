@@ -10,7 +10,6 @@ import SelectionHeader from '@/component/SelectionHeader';
 import ChatHeader from '@/components/chat/components/ChatHeader';
 import MessageList from '@/components/chat/components/MessageList';
 import MessageInputArea from '@/components/chat/components/MessageInputArea';
-import SearchBar from '@/components/chat/components/SearchBar';
 import { ErrorMessage } from '@/components/chat/components/ErrorMessage';
 
 const ChatPresenter = ({
@@ -183,18 +182,25 @@ const ChatPresenter = ({
             onCloseSearch={handleCloseSearch}
             onSearchSubmit={handleSearchSubmit}
             onSearchTextChange={setSearchText}
-            onMenuClick={() => setSidebarOpen(true)}
+            onMenuClick={() => {}}
           />
         )}
         
-        <SearchBar
-          searchMode={searchMode}
-          searchResults={searchResults}
-          searchText={searchText}
-          user={user}
-          onNavigateToResult={handleNavigateToSearchResult}
-          onCloseSearch={handleCloseSearch}
-        />
+        {searchMode && searchText.trim() && (
+          <div className={styles.searchResultsHeader}>
+            <span className={styles.searchResultsCount}>
+              {searchResults.length > 0 ? `${searchResults.length} найдено` : 'Ничего не найдено'}
+            </span>
+            <button
+              type="button"
+              onClick={handleCloseSearch}
+              className={styles.searchCloseButton}
+              title="Закрыть поиск"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         <PinnedMessagesHeader
           pinnedMessages={pinnedMessages}
@@ -219,12 +225,15 @@ const ChatPresenter = ({
           selectionMode={selectionMode}
           selectedMessages={selectedMessages}
           toggleMessageSelection={toggleMessageSelection}
+          handleSelectMessage={handleSelectMessage}
           handleContextMenu={handleContextMenu}
           getReadMetaForMessage={getReadMetaForMessage}
           getMessageStatusIcon={getMessageStatusIcon}
           pinnedMessages={pinnedMessages}
           searchOpen={searchOpen}
           searchText={searchText}
+          searchMode={searchMode}
+          searchResults={searchResults}
           newMessageIdsRef={newMessageIdsRef}
           loadedMessageIdsRef={loadedMessageIdsRef}
           setImageModal={setImageModal}

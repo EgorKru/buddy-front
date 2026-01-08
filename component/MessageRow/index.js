@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useCallback } from 'react';
 import { MESSAGE_STATUS } from '@/utils/messageQueue';
 import { formatChatDate, formatChatTime } from '@/utils/dateHelpers';
 import VoiceMessagePlayer from '@/component/VoiceMessagePlayer';
@@ -26,7 +26,8 @@ const MessageRow = React.memo(({
   isOwn, 
   selectionMode, 
   selectedMessages, 
-  toggleMessageSelection, 
+  toggleMessageSelection,
+  handleSelectMessage,
   handleContextMenu, 
   getReadMetaForMessage, 
   getMessageStatusIcon, 
@@ -89,6 +90,38 @@ const MessageRow = React.memo(({
     return highlightSearchText(msg.content, searchText, styles);
   }, [isSearchMatch, searchText, msg.content]);
 
+  const longPressTimerRef = useRef(null);
+  const longPressStartRef = useRef(null);
+  const LONG_PRESS_DURATION = 500;
+
+  const handleLongPressStart = useCallback((e) => {
+    if (selectionMode || !handleSelectMessage) return;
+    
+    longPressStartRef.current = Date.now();
+    longPressTimerRef.current = setTimeout(() => {
+      if (handleSelectMessage) {
+        handleSelectMessage(msg);
+      }
+      longPressTimerRef.current = null;
+    }, LONG_PRESS_DURATION);
+  }, [selectionMode, handleSelectMessage, msg]);
+
+  const handleLongPressEnd = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressStartRef.current = null;
+  }, []);
+
+  const handleClick = useCallback((e) => {
+    if (selectionMode) {
+      toggleMessageSelection(msg.id);
+    } else if (longPressStartRef.current && Date.now() - longPressStartRef.current < LONG_PRESS_DURATION) {
+      handleLongPressEnd();
+    }
+  }, [selectionMode, toggleMessageSelection, msg.id, handleLongPressEnd]);
+
   return (
     <div key={msg.id}>
       {showDate && (
@@ -99,7 +132,13 @@ const MessageRow = React.memo(({
       <div
         className={messageClasses}
         onContextMenu={(e) => !selectionMode && handleContextMenu(e, msg)}
-        onClick={() => selectionMode && toggleMessageSelection(msg.id)}
+        onClick={handleClick}
+        onMouseDown={handleLongPressStart}
+        onMouseUp={handleLongPressEnd}
+        onMouseLeave={handleLongPressEnd}
+        onTouchStart={handleLongPressStart}
+        onTouchEnd={handleLongPressEnd}
+        onTouchCancel={handleLongPressEnd}
         data-message-id={msg.id}
       >
         {selectionMode && (

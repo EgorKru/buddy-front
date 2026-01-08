@@ -472,9 +472,24 @@
   color: #666;
 }
 
+.searchResultsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e5e7eb;
+}
+
 .searchResultsCount {
   font-weight: 500;
   color: #333;
+  font-size: 0.875rem;
+}
+
+.searchResultsEmpty {
+  color: #6b7280;
+  font-size: 0.875rem;
 }
 
 .searchNavigation {

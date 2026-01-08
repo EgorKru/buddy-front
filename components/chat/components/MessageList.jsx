@@ -14,23 +14,39 @@ export default function MessageList({
   selectionMode,
   selectedMessages,
   toggleMessageSelection,
+  handleSelectMessage,
   handleContextMenu,
   getReadMetaForMessage,
   getMessageStatusIcon,
   pinnedMessages,
   searchOpen,
   searchText,
+  searchMode,
+  searchResults,
   newMessageIdsRef,
   loadedMessageIdsRef,
   setImageModal,
   setFileViewerModal,
   handleNavigateToMessage
 }) {
-  const visibleMessages = messages.filter(msg => {
-    if (!msg || !msg.id) return false;
-    const isDeleted = msg.deletedForMe === true || msg.deletedForAll === true;
-    return !isDeleted;
-  });
+  const visibleMessages = (() => {
+    // Если активен режим поиска, показываем только найденные сообщения
+    if (searchMode && searchResults && searchResults.length > 0) {
+      const resultIds = new Set(searchResults.map(r => String(r.id)));
+      return searchResults.filter(msg => {
+        if (!msg || !msg.id) return false;
+        const isDeleted = msg.deletedForMe === true || msg.deletedForAll === true;
+        return !isDeleted;
+      });
+    }
+    
+    // Обычный режим - показываем все сообщения
+    return messages.filter(msg => {
+      if (!msg || !msg.id) return false;
+      const isDeleted = msg.deletedForMe === true || msg.deletedForAll === true;
+      return !isDeleted;
+    });
+  })();
 
   return (
     <>
@@ -67,6 +83,7 @@ export default function MessageList({
                   selectionMode={selectionMode}
                   selectedMessages={selectedMessages}
                   toggleMessageSelection={toggleMessageSelection}
+                  handleSelectMessage={handleSelectMessage}
                   handleContextMenu={handleContextMenu}
                   getReadMetaForMessage={getReadMetaForMessage}
                   getMessageStatusIcon={getMessageStatusIcon}

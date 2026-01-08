@@ -1,4 +1,4 @@
-import { ArrowLeft, Search, Loader2, X, Menu } from 'lucide-react';
+import { ArrowLeft, Search, Loader2, X } from 'lucide-react';
 import { useRouter } from 'next/router';
 import { getChatName } from '@/utils/chatHelpers';
 import { getOnlineStatus } from '@/utils/dateHelpers';
@@ -58,22 +58,13 @@ export default function ChatHeader({
       
       <div className={styles.searchWrapper}>
         {!searchOpen ? (
-          <>
-            <button
-              onClick={onOpenSearch}
-              className={styles.searchToggleButton}
-              title="Поиск сообщений"
-            >
-              <Search size={20} />
-            </button>
-            <button
-              onClick={onMenuClick}
-              className={styles.menuButton}
-              title="Меню"
-            >
-              <Menu size={20} />
-            </button>
-          </>
+          <button
+            onClick={onOpenSearch}
+            className={styles.searchToggleButton}
+            title="Поиск сообщений"
+          >
+            <Search size={20} />
+          </button>
         ) : (
           <div className={styles.searchExpanded}>
             <form onSubmit={onSearchSubmit} className={styles.searchFormInline}>

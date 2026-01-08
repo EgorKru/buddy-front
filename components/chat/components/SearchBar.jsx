@@ -9,8 +9,20 @@ export default function SearchBar({
   onNavigateToResult,
   onCloseSearch
 }) {
-  if (!searchMode || searchResults.length === 0) {
+  if (!searchMode || !searchText.trim()) {
     return null;
+  }
+  
+  if (searchResults.length === 0) {
+    return (
+      <div className={styles.searchResultsDropdown}>
+        <div className={styles.searchResultsInfo}>
+          <span className={styles.searchResultsEmpty}>
+            Ничего не найдено
+          </span>
+        </div>
+      </div>
+    );
   }
 
   const getPreviewText = (msg) => {

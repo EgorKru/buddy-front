@@ -121,7 +121,8 @@ export const useChat = (chatId, modals = {}) => {
   
   const messageSearch = useMessageSearch({
     chatId,
-    onNavigateToMessage: handleNavigateToMessage
+    onNavigateToMessage: handleNavigateToMessage,
+    upsertMessage: chatContext.upsertMessage
   });
   
   const setContextMenuRef = useRef(null);
@@ -163,8 +164,8 @@ export const useChat = (chatId, modals = {}) => {
     setPinnedMessages,
     loadPinnedMessages,
     exitSelectionMode,
-    setDeleteConfirm: messageActions.setDeleteConfirm,
-    setForwardModal: messageActions.setForwardModal
+    setDeleteConfirm,
+    setForwardModal
   });
   
   useChatRealtime(chatId);
