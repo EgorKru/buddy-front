@@ -30,13 +30,35 @@ export const useCreateChat = () => {
     }
 
     setSearching(true);
+    setCreateError('');
     try {
       const users = await userAPI.searchUsers(query);
-      const filteredUsers = users.filter(u => u.id !== user?.id);
-      setSearchResults(filteredUsers);
-      setShowSearchResults(true);
+      if (Array.isArray(users)) {
+        const filteredUsers = users.filter(u => u.id !== user?.id);
+        setSearchResults(filteredUsers);
+        setShowSearchResults(filteredUsers.length > 0);
+      } else {
+        setSearchResults([]);
+        setShowSearchResults(false);
+      }
     } catch (error) {
+      console.error('Error searching users:', error);
       setSearchResults([]);
+      setShowSearchResults(false);
+      
+      const errorMessage = error.message || '';
+      if (errorMessage.includes('500') || errorMessage.includes('Internal server error')) {
+        setCreateError('Сервер временно недоступен. Попробуйте позже.');
+      } else if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+        setCreateError('Необходима авторизация');
+      } else if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
+        setCreateError('Доступ запрещен');
+      } else if (errorMessage.includes('404') || errorMessage.includes('Not found')) {
+        setSearchResults([]);
+        setShowSearchResults(false);
+      } else {
+        setCreateError('Ошибка при поиске пользователей');
+      }
     } finally {
       setSearching(false);
     }
@@ -45,13 +67,20 @@ export const useCreateChat = () => {
   const handleSearchInputChange = (e) => {
     const value = e.target.value;
     setParticipantUsernames(value);
+    setCreateError('');
 
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
 
+    if (!value || value.trim().length < MIN_SEARCH_LENGTH) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
+
     searchTimeoutRef.current = setTimeout(() => {
-      searchUsers(value);
+      searchUsers(value.trim());
     }, SEARCH_DELAY);
   };
 

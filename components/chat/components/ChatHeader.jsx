@@ -34,10 +34,14 @@ export default function ChatHeader({
 
   const status = getOtherParticipantStatus();
 
+  const handleBack = () => {
+    router.push('/');
+  };
+
   return (
     <div className={styles.header}>
       <button 
-        onClick={() => router.back()} 
+        onClick={handleBack} 
         className={styles.backButton}
         title="Назад"
       >

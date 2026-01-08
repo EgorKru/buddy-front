@@ -31,8 +31,20 @@ export const apiRequest = async (endpoint, options = {}) => {
     }
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'Request failed' }));
-      throw new Error(error.message || `Request failed with status ${response.status}`);
+      let errorMessage = `Request failed with status ${response.status}`;
+      try {
+        const error = await response.json();
+        errorMessage = error.message || errorMessage;
+      } catch {
+        if (response.status === 500) {
+          errorMessage = 'Internal server error';
+        } else if (response.status === 404) {
+          errorMessage = 'Not found';
+        } else if (response.status === 403) {
+          errorMessage = 'Forbidden';
+        }
+      }
+      throw new Error(errorMessage);
     }
 
     const contentType = response.headers.get('content-type');
@@ -534,7 +546,9 @@ export const userAPI = {
     if (!username || username.trim().length === 0) {
       return [];
     }
-    return apiRequest(`/users/search?username=${encodeURIComponent(username.trim())}`);
+    const query = username.trim();
+    const url = `/users/search?username=${encodeURIComponent(query)}`;
+    return apiRequest(url);
   },
 };
 
