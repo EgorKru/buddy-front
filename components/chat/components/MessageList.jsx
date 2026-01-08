@@ -23,6 +23,7 @@ export default function MessageList({
   newMessageIdsRef,
   loadedMessageIdsRef,
   setImageModal,
+  setFileViewerModal,
   handleNavigateToMessage
 }) {
   const visibleMessages = messages.filter(msg => {
@@ -75,6 +76,7 @@ export default function MessageList({
                   newMessageIdsRef={newMessageIdsRef}
                   loadedMessageIdsRef={loadedMessageIdsRef}
                   setImageModal={setImageModal}
+                  setFileViewerModal={setFileViewerModal}
                   handleNavigateToMessage={handleNavigateToMessage}
                 />
               );

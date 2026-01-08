@@ -35,7 +35,8 @@ const MessageRow = React.memo(({
   searchText, 
   newMessageIdsRef, 
   loadedMessageIdsRef, 
-  setImageModal, 
+  setImageModal,
+  setFileViewerModal,
   handleNavigateToMessage 
 }) => {
   const showDate = useMemo(() => {
@@ -155,10 +156,11 @@ const MessageRow = React.memo(({
               fileSize={msg.fileSize}
               mimeType={msg.mimeType}
               messageTime={formatChatTime(msg.createdAt)}
+              fileName={msg.fileName}
+              setFileViewerModal={setFileViewerModal}
               isOwn={isOwn}
               statusIcon={statusIcon}
               isPinned={isPinned}
-              fileName={msg.fileName}
             />
           ) : (
             <div className={`${styles.messageText} ${msg.isOptimistic ? styles.messagePending : ''} ${msg.status === MESSAGE_STATUS.FAILED ? styles.messageFailed : ''}`}>

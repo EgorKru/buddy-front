@@ -1,6 +1,7 @@
 import ChatSidebar from '@/component/ChatSidebar';
 import MessageContextMenu from '@/component/MessageContextMenu';
 import ImageModal from '@/component/ImageModal';
+import FileViewerModal from '@/component/FileViewerModal';
 import styles from '@/styles/chat.module.css';
 import PinnedMessagesHeader from '@/component/PinnedMessagesHeader';
 import DeleteConfirmModal from '@/component/DeleteConfirmModal';
@@ -107,6 +108,8 @@ const ChatPresenter = ({
   handleConfirmForward,
   imageModal,
   setImageModal,
+  fileViewerModal,
+  setFileViewerModal,
   handleCopyMessage,
   handleDeleteMessage,
   handleEditMessage,
@@ -225,6 +228,7 @@ const ChatPresenter = ({
           newMessageIdsRef={newMessageIdsRef}
           loadedMessageIdsRef={loadedMessageIdsRef}
           setImageModal={setImageModal}
+          setFileViewerModal={setFileViewerModal}
           handleNavigateToMessage={handleNavigateToMessage}
         />
 
@@ -341,6 +345,15 @@ const ChatPresenter = ({
           imageUrl={imageModal.imageUrl}
           fileUrl={imageModal.fileUrl}
           onClose={() => setImageModal(null)}
+        />
+      )}
+
+      {fileViewerModal && (
+        <FileViewerModal
+          fileUrl={fileViewerModal.fileUrl}
+          fileName={fileViewerModal.fileName}
+          mimeType={fileViewerModal.mimeType}
+          onClose={() => setFileViewerModal(null)}
         />
       )}
     </div>

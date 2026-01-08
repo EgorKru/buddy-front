@@ -31,6 +31,15 @@ export const getFileName = (fileUrl, originalFileName) => {
 export const canViewInBrowser = (mimeType) => {
   if (!mimeType) return false;
   const mime = mimeType.toLowerCase();
-  return mime.includes('pdf') || mime.startsWith('image/');
+  return (
+    mime.includes('pdf') ||
+    mime.startsWith('image/') ||
+    mime.startsWith('text/') ||
+    mime.includes('json') ||
+    mime.includes('xml') ||
+    mime.includes('html') ||
+    mime.includes('css') ||
+    mime.includes('javascript')
+  );
 };
 

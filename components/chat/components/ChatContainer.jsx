@@ -107,6 +107,8 @@ const ChatContainer = ({ chatId }) => {
   const {
     imageModal,
     setImageModal,
+    fileViewerModal,
+    setFileViewerModal,
     deleteConfirm,
     setDeleteConfirm,
     forwardModal,
@@ -472,6 +474,7 @@ const ChatContainer = ({ chatId }) => {
       newMessageIdsRef={newMessageIdsRef}
       loadedMessageIdsRef={loadedMessageIdsRef}
       setImageModal={setImageModal}
+      setFileViewerModal={setFileViewerModal}
       voiceError={voiceError}
       newMessage={newMessage}
       setNewMessage={setNewMessage}
@@ -522,6 +525,8 @@ const ChatContainer = ({ chatId }) => {
       handleConfirmForward={handleConfirmForward}
       imageModal={imageModal}
       setImageModal={setImageModal}
+      fileViewerModal={fileViewerModal}
+      setFileViewerModal={setFileViewerModal}
       handleCopyMessage={handleCopyMessage}
       handleDeleteMessage={handleDeleteMessage}
       handleEditMessage={handleEditMessage}

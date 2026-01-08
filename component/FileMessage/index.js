@@ -13,7 +13,8 @@ export default function FileMessage({
   isOwn, 
   statusIcon, 
   isPinned, 
-  fileName: originalFileName 
+  fileName: originalFileName,
+  setFileViewerModal
 }) {
   const [downloading, setDownloading] = useState(false);
   
@@ -27,13 +28,37 @@ export default function FileMessage({
     setDownloading(true);
     try {
       const fullFileName = extension ? `${fileName}.${extension}` : fileName;
-      const downloadUrl = chatAPI.getFileUrl(fileUrl, true, fullFileName);
+      const url = chatAPI.getFileUrl(fileUrl, true, fullFileName);
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+
+      const headers = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(url, { headers });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+          }
+          throw new Error('Unauthorized');
+        }
+        throw new Error(`Failed to download file: ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = downloadUrl;
+      link.href = blobUrl;
       link.download = fullFileName;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
     } catch (error) {
       console.error('Error downloading file:', error);
       alert('Не удалось скачать файл');
@@ -44,12 +69,16 @@ export default function FileMessage({
 
   const handleClick = (e) => {
     e.stopPropagation();
+    if (!fileUrl || !setFileViewerModal) return;
+
     if (canViewInBrowser(mimeType)) {
-      const viewUrl = chatAPI.getFileUrl(fileUrl, false);
-      window.open(viewUrl, '_blank');
-      return;
+      const fullFileName = extension ? `${fileName}.${extension}` : fileName;
+      setFileViewerModal({
+        fileUrl,
+        fileName: fullFileName,
+        mimeType
+      });
     }
-    handleDownload(e);
   };
 
   return (
