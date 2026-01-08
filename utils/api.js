@@ -75,6 +75,13 @@ export const authAPI = {
     });
   },
 
+  sendVerificationCode: async (email) => {
+    return apiRequest('/auth/send-verification-code', {
+      method: 'POST',
+      body: { email },
+    });
+  },
+
   logout: () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('token');

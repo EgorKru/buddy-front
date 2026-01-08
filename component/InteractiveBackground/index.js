@@ -6,6 +6,7 @@ const InteractiveBackground = () => {
   const particlesRef = useRef([]);
   const mouseRef = useRef({ x: 0, y: 0 });
   const animationFrameRef = useRef(null);
+  const lastMouseUpdateRef = useRef(0);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -14,40 +15,27 @@ const InteractiveBackground = () => {
     const ctx = canvas.getContext('2d');
     const dpr = window.devicePixelRatio || 1;
     
-    const resizeCanvas = () => {
-      canvas.width = window.innerWidth * dpr;
-      canvas.height = window.innerHeight * dpr;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      canvas.style.width = window.innerWidth + 'px';
-      canvas.style.height = window.innerHeight + 'px';
-    };
-
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
-
-    const particleCount = 150;
-    particlesRef.current = [];
-
     class Particle {
       constructor() {
         this.x = Math.random() * canvas.width / dpr;
         this.y = Math.random() * canvas.height / dpr;
-        this.size = Math.random() * 4 + 1.5;
-        this.speedX = (Math.random() - 0.5) * 0.8;
-        this.speedY = (Math.random() - 0.5) * 0.8;
-        this.opacity = Math.random() * 0.6 + 0.3;
+        this.size = Math.random() * 3 + 1;
+        this.speedX = (Math.random() - 0.5) * 0.5;
+        this.speedY = (Math.random() - 0.5) * 0.5;
+        this.opacity = Math.random() * 0.4 + 0.2;
         this.baseOpacity = this.opacity;
         this.colorIndex = Math.floor(Math.random() * 3);
-        this.colors = [
-          `rgba(102, 126, 234, ${this.opacity})`,
-          `rgba(140, 100, 200, ${this.opacity})`,
-          `rgba(59, 130, 246, ${this.opacity})`
+        const colors = [
+          [102, 126, 234],
+          [140, 100, 200],
+          [59, 130, 246]
         ];
-        this.color = this.colors[this.colorIndex];
+        this.colorRGB = colors[this.colorIndex];
         this.pulse = Math.random() * Math.PI * 2;
-        this.pulseSpeed = 0.03 + Math.random() * 0.02;
+        this.pulseSpeed = 0.02 + Math.random() * 0.01;
         this.trail = [];
-        this.maxTrailLength = 5;
+        this.maxTrailLength = 3;
+        this.lastInteractionCheck = 0;
       }
 
       update() {
@@ -62,38 +50,51 @@ const InteractiveBackground = () => {
 
         const dx = mouseRef.current.x - this.x;
         const dy = mouseRef.current.y - this.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        const maxDistance = 200;
+        const distanceSq = dx * dx + dy * dy;
+        const maxDistanceSq = 200 * 200;
 
-        if (distance < maxDistance && distance > 0) {
-          const force = (maxDistance - distance) / maxDistance;
+        if (distanceSq < maxDistanceSq && distanceSq > 0) {
+          const distance = Math.sqrt(distanceSq);
+          const force = (200 - distance) / 200;
           const angle = Math.atan2(dy, dx);
           
-          this.x -= Math.cos(angle) * force * 4;
-          this.y -= Math.sin(angle) * force * 4;
+          this.speedX -= Math.cos(angle) * force * 2 * 0.1;
+          this.speedY -= Math.sin(angle) * force * 2 * 0.1;
           
-          this.opacity = Math.min(1, this.baseOpacity + force * 0.5);
+          this.opacity = Math.min(1, this.baseOpacity + force * 0.3);
         } else {
           this.opacity = this.baseOpacity;
         }
 
-        particlesRef.current.forEach(other => {
-          if (other === this) return;
-          const dx = other.x - this.x;
-          const dy = other.y - this.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
+        const now = Date.now();
+        if (now - this.lastInteractionCheck > 100) {
+          let nearbyCount = 0;
+          const maxNearby = 5;
           
-          if (distance > 0 && distance < 80) {
-            const force = (80 - distance) / 80 * 0.01;
-            const angle = Math.atan2(dy, dx);
-            this.speedX += Math.cos(angle) * force;
-            this.speedY += Math.sin(angle) * force;
+          for (let i = 0; i < particlesRef.current.length && nearbyCount < maxNearby; i++) {
+            const other = particlesRef.current[i];
+            if (other === this) continue;
+            
+            const dx = other.x - this.x;
+            const dy = other.y - this.y;
+            const distSq = dx * dx + dy * dy;
+            
+            if (distSq < 6400) {
+              const dist = Math.sqrt(distSq);
+              const force = (80 - dist) / 80 * 0.008;
+              const angle = Math.atan2(dy, dx);
+              this.speedX += Math.cos(angle) * force;
+              this.speedY += Math.sin(angle) * force;
+              nearbyCount++;
+            }
           }
-        });
+          this.lastInteractionCheck = now;
+        }
 
-        const maxSpeed = 2;
-        const speed = Math.sqrt(this.speedX * this.speedX + this.speedY * this.speedY);
-        if (speed > maxSpeed) {
+        const maxSpeed = 1.5;
+        const speedSq = this.speedX * this.speedX + this.speedY * this.speedY;
+        if (speedSq > maxSpeed * maxSpeed) {
+          const speed = Math.sqrt(speedSq);
           this.speedX = (this.speedX / speed) * maxSpeed;
           this.speedY = (this.speedY / speed) * maxSpeed;
         }
@@ -109,129 +110,138 @@ const InteractiveBackground = () => {
       }
 
       draw() {
-        this.trail.forEach((point, index) => {
-          const trailOpacity = (index / this.trail.length) * this.opacity * 0.3;
+        if (this.trail.length > 1) {
           ctx.beginPath();
-          ctx.arc(point.x, point.y, this.size * 0.5, 0, Math.PI * 2);
-          ctx.fillStyle = this.color.replace(/[\d\.]+\)$/g, `${trailOpacity})`);
-          ctx.fill();
-        });
+          ctx.moveTo(this.trail[0].x, this.trail[0].y);
+          for (let i = 1; i < this.trail.length; i++) {
+            ctx.lineTo(this.trail[i].x, this.trail[i].y);
+          }
+          ctx.strokeStyle = `rgba(${this.colorRGB.join(',')}, ${this.opacity * 0.2})`;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
 
-        const size = this.size + Math.sin(this.pulse) * 1;
-        const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, size);
-        gradient.addColorStop(0, this.color.replace(/[\d\.]+\)$/g, `${this.opacity})`));
-        gradient.addColorStop(0.5, this.color.replace(/[\d\.]+\)$/g, `${this.opacity * 0.5})`));
-        gradient.addColorStop(1, this.color.replace(/[\d\.]+\)$/g, '0)'));
-        
+        const size = this.size + Math.sin(this.pulse) * 0.5;
         ctx.beginPath();
         ctx.arc(this.x, this.y, size, 0, Math.PI * 2);
-        ctx.fillStyle = gradient;
+        ctx.fillStyle = `rgba(${this.colorRGB.join(',')}, ${this.opacity})`;
         ctx.fill();
         
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = this.color;
-        ctx.fill();
-        ctx.shadowBlur = 0;
+        if (this.opacity > 0.5) {
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, size * 2, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(${this.colorRGB.join(',')}, ${this.opacity * 0.1})`;
+          ctx.fill();
+        }
       }
     }
+    
+    const getParticleCount = () => {
+      return Math.min(80, Math.floor((window.innerWidth * window.innerHeight) / 20000));
+    };
+    
+    const resizeCanvas = () => {
+      canvas.width = window.innerWidth * dpr;
+      canvas.height = window.innerHeight * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      canvas.style.width = window.innerWidth + 'px';
+      canvas.style.height = window.innerHeight + 'px';
+      
+      const particleCount = getParticleCount();
+      particlesRef.current = [];
+      for (let i = 0; i < particleCount; i++) {
+        particlesRef.current.push(new Particle());
+      }
+    };
 
-    for (let i = 0; i < particleCount; i++) {
-      particlesRef.current.push(new Particle());
-    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas, { passive: true });
 
     const handleMouseMove = (e) => {
+      const now = performance.now();
+      if (now - lastMouseUpdateRef.current < 16) return;
+      lastMouseUpdateRef.current = now;
+      
       mouseRef.current.x = e.clientX;
       mouseRef.current.y = e.clientY;
     };
 
-    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
 
-    const animate = () => {
-      ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+    let lastTime = 0;
+    const targetFPS = 60;
+    const frameInterval = 1000 / targetFPS;
+
+    const animate = (currentTime) => {
+      const elapsed = currentTime - lastTime;
       
-      for (let i = 0; i < particlesRef.current.length; i++) {
-        for (let j = i + 1; j < particlesRef.current.length; j++) {
-          const dx = particlesRef.current[i].x - particlesRef.current[j].x;
-          const dy = particlesRef.current[i].y - particlesRef.current[j].y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
+      if (elapsed >= frameInterval) {
+        lastTime = currentTime - (elapsed % frameInterval);
+        
+        ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+        
+        const connectionDistance = 120;
+        const connectionDistanceSq = connectionDistance * connectionDistance;
+        
+        for (let i = 0; i < particlesRef.current.length; i++) {
+          const particle = particlesRef.current[i];
+          
+          let checked = 0;
+          const maxChecks = 8;
+          
+          for (let j = i + 1; j < particlesRef.current.length && checked < maxChecks; j++) {
+            const other = particlesRef.current[j];
+            const dx = particle.x - other.x;
+            const dy = particle.y - other.y;
+            const distSq = dx * dx + dy * dy;
 
-          if (distance < 150) {
-            const opacity = 0.3 * (1 - distance / 150);
-            const gradient = ctx.createLinearGradient(
-              particlesRef.current[i].x, 
-              particlesRef.current[i].y,
-              particlesRef.current[j].x,
-              particlesRef.current[j].y
-            );
-            gradient.addColorStop(0, particlesRef.current[i].color.replace(/[\d\.]+\)$/g, `${opacity})`));
-            gradient.addColorStop(1, particlesRef.current[j].color.replace(/[\d\.]+\)$/g, `${opacity})`));
+            if (distSq < connectionDistanceSq) {
+              const dist = Math.sqrt(distSq);
+              const opacity = 0.2 * (1 - dist / connectionDistance);
+              
+              ctx.beginPath();
+              ctx.strokeStyle = `rgba(${particle.colorRGB.join(',')}, ${opacity})`;
+              ctx.lineWidth = 1;
+              ctx.moveTo(particle.x, particle.y);
+              ctx.lineTo(other.x, other.y);
+              ctx.stroke();
+              checked++;
+            }
+          }
+        }
+
+        particlesRef.current.forEach(particle => {
+          particle.update();
+        });
+
+        particlesRef.current.forEach(particle => {
+          particle.draw();
+        });
+
+        particlesRef.current.forEach(particle => {
+          const dx = mouseRef.current.x - particle.x;
+          const dy = mouseRef.current.y - particle.y;
+          const distSq = dx * dx + dy * dy;
+          const maxDistSq = 150 * 150;
+
+          if (distSq < maxDistSq) {
+            const dist = Math.sqrt(distSq);
+            const opacity = 0.4 * (1 - dist / 150);
             
             ctx.beginPath();
-            ctx.strokeStyle = gradient;
+            ctx.strokeStyle = `rgba(102, 126, 234, ${opacity})`;
             ctx.lineWidth = 1.5;
-            ctx.moveTo(particlesRef.current[i].x, particlesRef.current[i].y);
-            ctx.lineTo(particlesRef.current[j].x, particlesRef.current[j].y);
+            ctx.moveTo(mouseRef.current.x, mouseRef.current.y);
+            ctx.lineTo(particle.x, particle.y);
             ctx.stroke();
           }
-        }
+        });
       }
-
-      particlesRef.current.forEach(particle => {
-        particle.update();
-      });
-
-      particlesRef.current.forEach(particle => {
-        particle.draw();
-      });
-
-      particlesRef.current.forEach(particle => {
-        const dx = mouseRef.current.x - particle.x;
-        const dy = mouseRef.current.y - particle.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-
-        if (distance < 150) {
-          const opacity = 0.6 * (1 - distance / 150);
-          const gradient = ctx.createLinearGradient(
-            mouseRef.current.x,
-            mouseRef.current.y,
-            particle.x,
-            particle.y
-          );
-          gradient.addColorStop(0, `rgba(102, 126, 234, ${opacity})`);
-          gradient.addColorStop(1, particle.color.replace(/[\d\.]+\)$/g, `${opacity * 0.5})`));
-          
-          ctx.beginPath();
-          ctx.strokeStyle = gradient;
-          ctx.lineWidth = 2.5;
-          ctx.moveTo(mouseRef.current.x, mouseRef.current.y);
-          ctx.lineTo(particle.x, particle.y);
-          ctx.stroke();
-          
-          if (distance < 80) {
-            const glowSize = (80 - distance) / 80 * 30;
-            const glowGradient = ctx.createRadialGradient(
-              mouseRef.current.x,
-              mouseRef.current.y,
-              0,
-              mouseRef.current.x,
-              mouseRef.current.y,
-              glowSize
-            );
-            glowGradient.addColorStop(0, `rgba(102, 126, 234, ${opacity * 0.3})`);
-            glowGradient.addColorStop(1, 'rgba(102, 126, 234, 0)');
-            
-            ctx.beginPath();
-            ctx.arc(mouseRef.current.x, mouseRef.current.y, glowSize, 0, Math.PI * 2);
-            ctx.fillStyle = glowGradient;
-            ctx.fill();
-          }
-        }
-      });
 
       animationFrameRef.current = requestAnimationFrame(animate);
     };
 
-    animate();
+    animationFrameRef.current = requestAnimationFrame(animate);
 
     return () => {
       window.removeEventListener('resize', resizeCanvas);
@@ -246,4 +256,3 @@ const InteractiveBackground = () => {
 };
 
 export default InteractiveBackground;
-
