@@ -20,7 +20,15 @@ import { useStateSync } from './useStateSync';
 import { useChatInitialization } from './useChatInitialization';
 import { useMessageSending } from './useMessageSending';
 
-export const useChat = (chatId) => {
+export const useChat = (chatId, modals = {}) => {
+  const {
+    deleteConfirm = null,
+    setDeleteConfirm = null,
+    deleteForAll = false,
+    setDeleteForAll = null,
+    forwardModal = null,
+    setForwardModal = null
+  } = modals;
   const router = useRouter();
   const user = getCurrentUser();
   
@@ -135,7 +143,13 @@ export const useChat = (chatId) => {
     viewedPinnedMessageId,
     setViewedPinnedMessageId,
     selectionMode,
-    exitSelectionMode
+    exitSelectionMode,
+    deleteConfirm,
+    setDeleteConfirm,
+    deleteForAll,
+    setDeleteForAll,
+    forwardModal,
+    setForwardModal
   });
   
   const voiceRecording = useVoiceRecordingUI();

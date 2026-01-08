@@ -18,7 +18,27 @@ const ChatContainer = ({ chatId }) => {
   const router = useRouter();
   const user = getCurrentUser();
   
-  const chatHook = useChat(chatId);
+  const {
+    imageModal,
+    setImageModal,
+    fileViewerModal,
+    setFileViewerModal,
+    deleteConfirm,
+    setDeleteConfirm,
+    deleteForAll,
+    setDeleteForAll,
+    forwardModal,
+    setForwardModal
+  } = useChatModals();
+
+  const chatHook = useChat(chatId, {
+    deleteConfirm,
+    setDeleteConfirm,
+    deleteForAll,
+    setDeleteForAll,
+    forwardModal,
+    setForwardModal
+  });
   
   const {
     chatContext,
@@ -104,17 +124,6 @@ const ChatContainer = ({ chatId }) => {
     setScrollButtonReady
   } = useChatUI();
 
-  const {
-    imageModal,
-    setImageModal,
-    fileViewerModal,
-    setFileViewerModal,
-    deleteConfirm,
-    setDeleteConfirm,
-    forwardModal,
-    setForwardModal
-  } = useChatModals();
-  
   useEffect(() => {
     setContextMenuRef.current = setContextMenu;
   }, [setContextMenu, setContextMenuRef]);
@@ -124,22 +133,8 @@ const ChatContainer = ({ chatId }) => {
     editingContent,
     replyingToMessageId,
     replyingToMessage,
-    deleteForAll,
-    setEditingContent,
-    setDeleteForAll
+    setEditingContent
   } = messageActions;
-
-  useEffect(() => {
-    if (messageActions.setDeleteConfirm && deleteConfirm !== messageActions.deleteConfirm) {
-      messageActions.setDeleteConfirm(deleteConfirm);
-    }
-  }, [deleteConfirm, messageActions]);
-
-  useEffect(() => {
-    if (messageActions.setForwardModal && forwardModal !== messageActions.forwardModal) {
-      messageActions.setForwardModal(forwardModal);
-    }
-  }, [forwardModal, messageActions]);
   
   const {
     uploadingFile,

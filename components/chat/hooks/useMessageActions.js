@@ -19,15 +19,18 @@ export const useMessageActions = ({
   viewedPinnedMessageId,
   setViewedPinnedMessageId,
   selectionMode,
-  exitSelectionMode
+  exitSelectionMode,
+  deleteConfirm,
+  setDeleteConfirm,
+  deleteForAll,
+  setDeleteForAll,
+  forwardModal,
+  setForwardModal
 }) => {
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [editingContent, setEditingContent] = useState('');
   const [replyingToMessageId, setReplyingToMessageId] = useState(null);
   const [replyingToMessage, setReplyingToMessage] = useState(null);
-  const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [deleteForAll, setDeleteForAll] = useState(false);
-  const [forwardModal, setForwardModal] = useState(null);
   
   const user = getCurrentUser();
 
@@ -78,15 +81,29 @@ export const useMessageActions = ({
   const handleDeleteMessage = useCallback((message) => {
     if (!message?.id || !chatId) return;
     setContextMenu(null);
-    setDeleteConfirm({ message });
-  }, [chatId, setContextMenu]);
+    if (setDeleteConfirm) {
+      setDeleteConfirm({ message });
+    }
+  }, [chatId, setContextMenu, setDeleteConfirm]);
 
   /**
    * Подтверждение удаления
    */
   const handleConfirmDelete = useCallback(async () => {
-    const messageIds = deleteConfirm?.messageIds || (deleteConfirm?.message?.id ? [deleteConfirm.message.id] : null);
-    if (!messageIds || messageIds.length === 0 || !chatId) return;
+    if (!deleteConfirm || !chatId) {
+      return;
+    }
+    
+    let messageIds = [];
+    if (deleteConfirm.messageIds && Array.isArray(deleteConfirm.messageIds)) {
+      messageIds = deleteConfirm.messageIds;
+    } else if (deleteConfirm.message?.id) {
+      messageIds = [deleteConfirm.message.id];
+    }
+    
+    if (messageIds.length === 0) {
+      return;
+    }
     
     const shouldDeleteForAll = deleteForAll;
     const deletedMessageIds = new Set(messageIds.map(id => Number(id)));
@@ -336,13 +353,9 @@ export const useMessageActions = ({
     editingContent,
     replyingToMessageId,
     replyingToMessage,
-    deleteConfirm,
-    deleteForAll,
-    forwardModal,
     
     // Setters
     setEditingContent,
-    setDeleteForAll,
     
     // Обработчики
     handleCopyMessage,
@@ -356,9 +369,7 @@ export const useMessageActions = ({
     handlePinMessage,
     handleUnpinMessage,
     handleForwardMessage,
-    handleConfirmForward,
-    setForwardModal,
-    setDeleteConfirm
+    handleConfirmForward
   };
 };
 

@@ -54,8 +54,17 @@ export default function DeleteConfirmModal({
             Отмена
           </button>
           <button
+            type="button"
             className={styles.deleteModalConfirm}
-            onClick={onConfirm}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (onConfirm && typeof onConfirm === 'function') {
+                onConfirm();
+              } else {
+                console.error('[DeleteModal] onConfirm is not a function:', typeof onConfirm);
+              }
+            }}
           >
             Удалить
           </button>
