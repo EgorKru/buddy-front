@@ -53,8 +53,9 @@ const MessageRow = React.memo(({
   }, [msg.status, msg.isOptimistic]);
 
   const readMeta = useMemo(() => {
-    return status === MESSAGE_STATUS.SENT ? getReadMetaForMessage(msg) : null;
-  }, [status, msg, getReadMetaForMessage]);
+    if (status !== MESSAGE_STATUS.SENT) return null;
+    return getReadMetaForMessage(msg);
+  }, [status, msg.id, msg.createdAt, getReadMetaForMessage]);
 
   const isPinnedInListValue = useMemo(() => {
     return isPinnedInList(pinnedMessages, msg.id);

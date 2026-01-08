@@ -18,6 +18,9 @@ export const messageRowComparison = (prevProps, nextProps) => {
   
   if (prevProps.pinnedMessages.length !== nextProps.pinnedMessages.length) return false;
   
+  if (prevProps.getReadMetaForMessage !== nextProps.getReadMetaForMessage) return false;
+  if (prevProps.getMessageStatusIcon !== nextProps.getMessageStatusIcon) return false;
+  
   return true;
 };
 
