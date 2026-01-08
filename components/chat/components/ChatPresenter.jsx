@@ -119,14 +119,6 @@ const ChatPresenter = ({
   handleForwardMessage,
   handleSelectMessage
 }) => {
-  useEffect(() => {
-    console.log('[ChatPresenter] imageModal state:', imageModal);
-  }, [imageModal]);
-
-  useEffect(() => {
-    console.log('[ChatPresenter] fileViewerModal state:', fileViewerModal);
-  }, [fileViewerModal]);
-
   if (messagesLoading) {
     return (
       <div className={styles.container}>
@@ -364,10 +356,7 @@ const ChatPresenter = ({
         <ImageModal
           imageUrl={imageModal.imageUrl}
           fileUrl={imageModal.fileUrl}
-          onClose={() => {
-            console.log('[ChatPresenter] Closing ImageModal');
-            setImageModal(null);
-          }}
+          onClose={() => setImageModal(null)}
         />
       )}
 
@@ -376,10 +365,7 @@ const ChatPresenter = ({
           fileUrl={fileViewerModal.fileUrl}
           fileName={fileViewerModal.fileName}
           mimeType={fileViewerModal.mimeType}
-          onClose={() => {
-            console.log('[ChatPresenter] Closing FileViewerModal');
-            setFileViewerModal(null);
-          }}
+          onClose={() => setFileViewerModal(null)}
         />
       )}
     </div>

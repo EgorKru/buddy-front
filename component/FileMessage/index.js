@@ -71,12 +71,7 @@ export default function FileMessage({
     e.stopPropagation();
     e.preventDefault();
     
-    console.log('[FileMessage] handleClick called', { fileUrl, setFileViewerModal: !!setFileViewerModal, extension, mimeType });
-    
-    if (!fileUrl || !setFileViewerModal) {
-      console.log('[FileMessage] Missing required props');
-      return;
-    }
+    if (!fileUrl || !setFileViewerModal) return;
 
     const ext = extension ? extension.toLowerCase() : '';
     const canViewByMime = canViewInBrowser(mimeType);
@@ -100,18 +95,13 @@ export default function FileMessage({
       'config'
     ].includes(ext);
 
-    console.log('[FileMessage] View check', { ext, canViewByMime, canViewByExtension });
-
     if (canViewByMime || canViewByExtension) {
       const fullFileName = extension ? `${fileName}.${extension}` : fileName;
-      console.log('[FileMessage] Opening modal', { fileUrl, fileName: fullFileName, mimeType });
       setFileViewerModal({
         fileUrl,
         fileName: fullFileName,
         mimeType: mimeType || (ext ? `text/${ext}` : 'text/plain')
       });
-    } else {
-      console.log('[FileMessage] Cannot view - not a viewable file type');
     }
   };
 

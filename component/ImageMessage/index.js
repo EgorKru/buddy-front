@@ -122,18 +122,11 @@ export default function ImageMessage({ fileUrl, content, messageTime, isOwn, sta
     e.stopPropagation();
     e.preventDefault();
     
-    console.log('[ImageMessage] handleImageClick called', { onImageClick: !!onImageClick, fileUrl, imageUrl: !!imageUrl });
-    
-    if (!onImageClick || !fileUrl) {
-      console.log('[ImageMessage] Missing required props');
-      return;
-    }
+    if (!onImageClick || !fileUrl) return;
     
     if (imageUrl) {
-      console.log('[ImageMessage] Opening modal with existing imageUrl');
       onImageClick(imageUrl, fileUrl);
     } else {
-      console.log('[ImageMessage] Loading image for modal');
       const url = chatAPI.getImageFileUrl(fileUrl);
       const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
       const headers = {};
@@ -148,11 +141,10 @@ export default function ImageMessage({ fileUrl, content, messageTime, isOwn, sta
         })
         .then(blob => {
           const blobUrl = URL.createObjectURL(blob);
-          console.log('[ImageMessage] Image loaded, opening modal');
           onImageClick(blobUrl, fileUrl);
         })
         .catch(err => {
-          console.error('[ImageMessage] Error loading image for modal:', err);
+          console.error('Error loading image for modal:', err);
         });
     }
   };
