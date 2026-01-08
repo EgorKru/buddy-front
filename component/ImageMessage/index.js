@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Download, X, ZoomIn } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { chatAPI } from '@/utils/api';
 import styles from './index.module.css';
 
@@ -229,14 +229,6 @@ export default function ImageMessage({ fileUrl, content, messageTime, isOwn, sta
               }}
             />
             <div className={styles.imageOverlay}>
-              <button
-                type="button"
-                className={styles.zoomButton}
-                onClick={handleImageClick}
-                title="Увеличить"
-              >
-                <ZoomIn size={18} />
-              </button>
               <button
                 type="button"
                 className={styles.downloadButton}

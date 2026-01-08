@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Edit, Reply, X, Paperclip, Mic, Send, Lock, Unlock, ChevronDown, File, Loader2, Pause, Play, Trash2 } from 'lucide-react';
+import { Edit, Reply, X, Paperclip, Mic, Send, Lock, Unlock, ChevronDown, File as FileIcon, Loader2, Pause, Play, Trash2 } from 'lucide-react';
 import { formatFileSize } from '../utils/messageHelpers';
 import { useAutoResizeTextarea } from '../hooks/useAutoResizeTextarea';
 import styles from '@/styles/chat.module.css';
@@ -112,7 +112,7 @@ export default function MessageInputArea({
             </div>
           ) : (
             <div className={styles.filePreviewInfo}>
-              <File size={20} />
+              <FileIcon size={20} />
               <div className={styles.filePreviewDetails}>
                 <div className={styles.filePreviewName}>
                   {selectedFile.name || 'Файл'}
@@ -148,6 +148,31 @@ export default function MessageInputArea({
             }
           }}
           onKeyDown={onKeyDown}
+          onPaste={async (e) => {
+            if (editingMessageId || isRecording || sending) return;
+            
+            const items = e.clipboardData?.items;
+            if (!items) return;
+            
+            for (let i = 0; i < items.length; i++) {
+              const item = items[i];
+              if (item.type.indexOf('image') !== -1) {
+                e.preventDefault();
+                const blob = item.getAsFile();
+                if (blob && onFileSelect) {
+                  const file = new File([blob], `pasted-image-${Date.now()}.${blob.type.split('/')[1] || 'png'}`, { type: blob.type });
+                  const syntheticEvent = {
+                    target: {
+                      files: [file],
+                      value: ''
+                    }
+                  };
+                  onFileSelect(syntheticEvent);
+                }
+                break;
+              }
+            }
+          }}
           placeholder={isRecording ? "Идет запись..." : editingMessageId ? "Редактируйте сообщение..." : "Введите сообщение..."}
           disabled={sending || isRecording}
           className={styles.messageInput}
