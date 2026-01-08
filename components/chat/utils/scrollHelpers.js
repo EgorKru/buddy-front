@@ -67,3 +67,25 @@ export const findFirstVisibleMessage = (container) => {
   return bestMessage;
 };
 
+/**
+ * Подсчитывает количество сообщений ниже видимой области
+ */
+export const countMessagesBelowViewport = (container) => {
+  if (!container) return 0;
+  
+  const containerRect = container.getBoundingClientRect();
+  const viewportBottom = containerRect.bottom;
+  const messages = container.querySelectorAll('[data-message-id]');
+  let count = 0;
+  
+  for (const msgEl of messages) {
+    const msgRect = msgEl.getBoundingClientRect();
+    // Если сообщение полностью ниже видимой области
+    if (msgRect.top > viewportBottom) {
+      count++;
+    }
+  }
+  
+  return count;
+};
+

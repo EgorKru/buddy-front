@@ -64,6 +64,7 @@ const ChatContainer = ({ chatId }) => {
     restoreScrollPosition,
     scrollToBottom,
     checkIsAtBottom,
+    unreadCount,
     scrollPositionSavedRef,
     userScrolledToBottomRef,
     isUserScrollingUpRef,
@@ -401,6 +402,13 @@ const ChatContainer = ({ chatId }) => {
   useEffect(() => {
     scrollStateRef.current = { hasMore, loadingMore, oldestMessageId };
   }, [hasMore, loadingMore, oldestMessageId, scrollStateRef]);
+  
+  // Устанавливаем scrollButtonReady после загрузки сообщений
+  useEffect(() => {
+    if (messages.length > 0 && messagesContainerRef.current && !messagesLoading) {
+      setScrollButtonReady(true);
+    }
+  }, [messages.length, messagesLoading, messagesContainerRef, setScrollButtonReady]);
 
   const { handleScrollThrottled } = useScrollHandlers({
     messagesContainerRef,
@@ -459,6 +467,7 @@ const ChatContainer = ({ chatId }) => {
       scrollButtonReady={scrollButtonReady}
       showScrollToBottom={showScrollToBottom}
       scrollToBottom={scrollToBottom}
+      unreadCount={unreadCount}
       toggleMessageSelection={toggleMessageSelection}
       getReadMetaForMessage={getReadMetaForMessage}
       getMessageStatusIcon={getMessageStatusIcon}
@@ -524,10 +533,6 @@ const ChatContainer = ({ chatId }) => {
       setForwardModal={setForwardModal}
       chats={chats}
       handleConfirmForward={handleConfirmForward}
-      imageModal={imageModal}
-      setImageModal={setImageModal}
-      fileViewerModal={fileViewerModal}
-      setFileViewerModal={setFileViewerModal}
       handleCopyMessage={handleCopyMessage}
       handleDeleteMessage={handleDeleteMessage}
       handleEditMessage={handleEditMessage}

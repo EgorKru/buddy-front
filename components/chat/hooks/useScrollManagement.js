@@ -1,5 +1,5 @@
-import { useRef, useCallback, useEffect } from 'react';
-import { isAtBottom, findFirstVisibleMessage, saveScrollPositionToStorage, loadScrollPositionFromStorage } from '../utils/scrollHelpers';
+import { useRef, useCallback, useEffect, useState } from 'react';
+import { isAtBottom, findFirstVisibleMessage, saveScrollPositionToStorage, loadScrollPositionFromStorage, countMessagesBelowViewport } from '../utils/scrollHelpers';
 import { 
   SCROLL_RESTORE_TIMEOUT, 
   LOAD_MORE_THRESHOLD,
@@ -23,7 +23,8 @@ export const useScrollManagement = ({
   hasMore,
   loadingMore,
   oldestMessageId,
-  onLoadOlderMessages
+  onLoadOlderMessages,
+  setShowScrollToBottom
 }) => {
   // Refs для управления состоянием скролла
   const scrollPositionSavedRef = useRef(false);
@@ -39,9 +40,81 @@ export const useScrollManagement = ({
   const scrollTimeoutRef = useRef(null);
   const loadMoreTimeoutRef = useRef(null);
   const isUserScrollingRef = useRef(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const unreadCountUpdateTimeoutRef = useRef(null);
+  const lastReadMessageIdRef = useRef(null);
+  
   // Используем хук для бесконечной прокрутки
   // Создаем функцию для получения актуального значения isRestoringScroll
   const getIsRestoringScroll = () => isRestoringScrollRef.current;
+  
+  /**
+   * Проверяет, находится ли пользователь внизу контейнера
+   */
+  const checkIsAtBottom = useCallback((threshold = CHECK_BOTTOM_DEFAULT_THRESHOLD) => {
+    if (!messagesContainerRef.current) return false;
+    return isAtBottom(messagesContainerRef.current, threshold);
+  }, [messagesContainerRef]);
+  
+  /**
+   * Обновляет счетчик непрочитанных сообщений ниже видимой области
+   * Считает только те сообщения, которые появились после последнего прочитанного
+   */
+  const updateUnreadCount = useCallback(() => {
+    if (!messagesContainerRef.current || !messages || messages.length === 0) {
+      setUnreadCount(0);
+      return;
+    }
+    
+    const isAtBottomNow = checkIsAtBottom(50);
+    if (isAtBottomNow) {
+      // Пользователь внизу - обновляем последнее прочитанное сообщение
+      const sortedMessages = [...messages].sort((a, b) => {
+        const timeA = new Date(a.createdAt || 0).getTime();
+        const timeB = new Date(b.createdAt || 0).getTime();
+        return timeB - timeA;
+      });
+      if (sortedMessages.length > 0) {
+        const lastMessage = sortedMessages[0];
+        lastReadMessageIdRef.current = lastMessage.id;
+      }
+      setUnreadCount(0);
+      return;
+    }
+    
+    // Пользователь не внизу - считаем только новые сообщения
+    if (!lastReadMessageIdRef.current) {
+      // Если еще не было прочитанного сообщения, считаем все ниже видимой области
+      const count = countMessagesBelowViewport(messagesContainerRef.current);
+      setUnreadCount(count);
+      return;
+    }
+    
+    // Считаем только сообщения, которые появились после последнего прочитанного
+    const containerRect = messagesContainerRef.current.getBoundingClientRect();
+    const viewportBottom = containerRect.bottom;
+    const messageElements = messagesContainerRef.current.querySelectorAll('[data-message-id]');
+    let count = 0;
+    let foundLastRead = false;
+    
+    for (const msgEl of messageElements) {
+      const messageId = msgEl.getAttribute('data-message-id');
+      if (messageId && String(messageId) === String(lastReadMessageIdRef.current)) {
+        foundLastRead = true;
+        continue;
+      }
+      
+      if (foundLastRead) {
+        const msgRect = msgEl.getBoundingClientRect();
+        // Если сообщение полностью ниже видимой области или это новое сообщение после последнего прочитанного
+        if (msgRect.top > viewportBottom) {
+          count++;
+        }
+      }
+    }
+    
+    setUnreadCount(count);
+  }, [checkIsAtBottom, messages]);
   
   useInfiniteScroll({
     containerRef: messagesContainerRef,
@@ -67,15 +140,8 @@ export const useScrollManagement = ({
     userScrolledToBottomRef.current = false;
     restoreAttemptsRef.current = 0;
     shouldRestorePositionRef.current = false;
+    lastReadMessageIdRef.current = null;
   }, [chatId]);
-
-  /**
-   * Проверяет, находится ли пользователь внизу контейнера
-   */
-  const checkIsAtBottom = useCallback((threshold = CHECK_BOTTOM_DEFAULT_THRESHOLD) => {
-    if (!messagesContainerRef.current) return false;
-    return isAtBottom(messagesContainerRef.current, threshold);
-  }, [messagesContainerRef]);
 
   /**
    * Сохраняет текущую позицию скролла
@@ -106,8 +172,20 @@ export const useScrollManagement = ({
     
     if (isBottom) {
       userScrolledToBottomRef.current = true;
+      // Обновляем последнее прочитанное сообщение при скролле вниз
+      if (messages && messages.length > 0) {
+        const sortedMessages = [...messages].sort((a, b) => {
+          const timeA = new Date(a.createdAt || 0).getTime();
+          const timeB = new Date(b.createdAt || 0).getTime();
+          return timeB - timeA;
+        });
+        if (sortedMessages.length > 0) {
+          lastReadMessageIdRef.current = sortedMessages[0].id;
+        }
+      }
+      setUnreadCount(0);
     }
-  }, [chatId, checkIsAtBottom]);
+  }, [chatId, checkIsAtBottom, messages]);
 
   /**
    * Скроллит контейнер вниз
@@ -118,15 +196,33 @@ export const useScrollManagement = ({
     const container = messagesContainerRef.current;
     const targetScrollTop = container.scrollHeight;
     
+    // Убеждаемся, что behavior - это валидная строка
+    const validBehavior = (typeof behavior === 'string' && (behavior === 'auto' || behavior === 'smooth')) 
+      ? behavior 
+      : 'auto';
+    
     container.scrollTo({
       top: targetScrollTop,
-      behavior
+      behavior: validBehavior
     });
     
     lastScrollTopRef.current = targetScrollTop;
     userScrolledToBottomRef.current = true;
     isUserScrollingUpRef.current = false;
-  }, []);
+    
+    // Обновляем последнее прочитанное сообщение при скролле вниз
+    if (messages && messages.length > 0) {
+      const sortedMessages = [...messages].sort((a, b) => {
+        const timeA = new Date(a.createdAt || 0).getTime();
+        const timeB = new Date(b.createdAt || 0).getTime();
+        return timeB - timeA;
+      });
+      if (sortedMessages.length > 0) {
+        lastReadMessageIdRef.current = sortedMessages[0].id;
+      }
+    }
+    setUnreadCount(0);
+  }, [messages]);
 
   /**
    * Восстанавливает позицию скролла
@@ -241,10 +337,23 @@ export const useScrollManagement = ({
           scrollPositionSavedRef.current = true;
           userScrolledToBottomRef.current = true;
           isUserScrollingUpRef.current = false;
+          
+          // Обновляем последнее прочитанное сообщение
+          if (messages && messages.length > 0) {
+            const sortedMessages = [...messages].sort((a, b) => {
+              const timeA = new Date(a.createdAt || 0).getTime();
+              const timeB = new Date(b.createdAt || 0).getTime();
+              return timeB - timeA;
+            });
+            if (sortedMessages.length > 0) {
+              lastReadMessageIdRef.current = sortedMessages[0].id;
+            }
+          }
+          setUnreadCount(0);
         }
       }
     }
-  }, [messages.length, isLoadingInitial]);
+  }, [messages.length, isLoadingInitial, messages]);
 
   // useEffect для восстановления позиции после загрузки
   useEffect(() => {
@@ -277,13 +386,54 @@ export const useScrollManagement = ({
             }
             wasAtBottomBeforeMessageRef.current = false;
             shouldAutoScrollRef.current = false;
+            updateUnreadCount();
           }, AUTO_SCROLL_DELAY);
         });
+      } else {
+        updateUnreadCount();
       }
+    } else {
+      updateUnreadCount();
     }
     
     scrollHeightBeforeMessageRef.current = currentScrollHeight;
-  }, [messages.length, checkIsAtBottom, scrollToBottom]);
+  }, [messages.length, checkIsAtBottom, scrollToBottom, updateUnreadCount]);
+  
+  // Обновление счетчика при скролле и изменении сообщений
+  useEffect(() => {
+    if (!messagesContainerRef.current) return;
+    
+    const container = messagesContainerRef.current;
+    
+    const handleScroll = () => {
+      if (unreadCountUpdateTimeoutRef.current) {
+        clearTimeout(unreadCountUpdateTimeoutRef.current);
+      }
+      
+      unreadCountUpdateTimeoutRef.current = setTimeout(() => {
+        updateUnreadCount();
+      }, 100);
+    };
+    
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    
+    // Обновляем счетчик при изменении размера контейнера
+    const resizeObserver = new ResizeObserver(() => {
+      updateUnreadCount();
+    });
+    resizeObserver.observe(container);
+    
+    // Первоначальное обновление
+    updateUnreadCount();
+    
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      resizeObserver.disconnect();
+      if (unreadCountUpdateTimeoutRef.current) {
+        clearTimeout(unreadCountUpdateTimeoutRef.current);
+      }
+    };
+  }, [updateUnreadCount, messages.length]);
 
   return {
     // Функции
@@ -291,6 +441,9 @@ export const useScrollManagement = ({
     restoreScrollPosition,
     scrollToBottom,
     checkIsAtBottom,
+    
+    // Состояние
+    unreadCount,
     
     // Refs для внешнего использования
     scrollPositionSavedRef,

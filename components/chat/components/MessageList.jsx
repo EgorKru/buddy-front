@@ -10,6 +10,7 @@ export default function MessageList({
   scrollButtonReady,
   showScrollToBottom,
   onScrollToBottom,
+  unreadCount,
   user,
   selectionMode,
   selectedMessages,
@@ -102,13 +103,22 @@ export default function MessageList({
         )}
       </div>
       
-      {scrollButtonReady && (
+      {scrollButtonReady && (showScrollToBottom || unreadCount > 0) && (
         <button
-          onClick={onScrollToBottom}
-          className={`${styles.scrollToBottomButton} ${!showScrollToBottom ? styles.hidden : ''}`}
-          title="Прокрутить к новым сообщениям"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onScrollToBottom('smooth');
+          }}
+          className={styles.scrollToBottomButton}
+          title={unreadCount > 0 ? `${unreadCount} новых сообщений` : "Прокрутить к новым сообщениям"}
         >
           <ChevronDown size={20} />
+          {unreadCount > 0 && (
+            <span className={styles.scrollToBottomBadge}>
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
         </button>
       )}
     </>

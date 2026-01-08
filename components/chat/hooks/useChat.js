@@ -97,7 +97,8 @@ export const useChat = (chatId, modals = {}) => {
     hasMore,
     loadingMore,
     oldestMessageId,
-    onLoadOlderMessages: loadOlderMessages
+    onLoadOlderMessages: loadOlderMessages,
+    setShowScrollToBottom: null
   });
   
   const {
@@ -110,6 +111,7 @@ export const useChat = (chatId, modals = {}) => {
     scrollTimeoutRef,
     loadMoreTimeoutRef,
     isUserScrollingRef,
+    unreadCount,
     ...restScrollManagement
   } = scrollManagement;
   
@@ -256,6 +258,7 @@ export const useChat = (chatId, modals = {}) => {
     shouldRestorePositionRef,
     lastScrollTopRef,
     isUserScrollingUpRef,
+    unreadCount,
     
     // Навигация
     handleNavigateToMessage,

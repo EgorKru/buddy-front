@@ -42,6 +42,7 @@ const ChatPresenter = ({
   scrollButtonReady,
   showScrollToBottom,
   scrollToBottom,
+  unreadCount,
   toggleMessageSelection,
   getReadMetaForMessage,
   getMessageStatusIcon,
@@ -221,6 +222,7 @@ const ChatPresenter = ({
           scrollButtonReady={scrollButtonReady}
           showScrollToBottom={showScrollToBottom}
           onScrollToBottom={scrollToBottom}
+          unreadCount={unreadCount}
           user={user}
           selectionMode={selectionMode}
           selectedMessages={selectedMessages}
