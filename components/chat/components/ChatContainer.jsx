@@ -483,7 +483,9 @@ const ChatContainer = ({ chatId }) => {
       searchInputRef={searchInputRef}
       newMessageIdsRef={newMessageIdsRef}
       loadedMessageIdsRef={loadedMessageIdsRef}
+      imageModal={imageModal}
       setImageModal={setImageModal}
+      fileViewerModal={fileViewerModal}
       setFileViewerModal={setFileViewerModal}
       voiceError={voiceError}
       newMessage={newMessage}

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import ChatSidebar from '@/component/ChatSidebar';
 import MessageContextMenu from '@/component/MessageContextMenu';
 import ImageModal from '@/component/ImageModal';
@@ -118,6 +119,14 @@ const ChatPresenter = ({
   handleForwardMessage,
   handleSelectMessage
 }) => {
+  useEffect(() => {
+    console.log('[ChatPresenter] imageModal state:', imageModal);
+  }, [imageModal]);
+
+  useEffect(() => {
+    console.log('[ChatPresenter] fileViewerModal state:', fileViewerModal);
+  }, [fileViewerModal]);
+
   if (messagesLoading) {
     return (
       <div className={styles.container}>
@@ -355,7 +364,10 @@ const ChatPresenter = ({
         <ImageModal
           imageUrl={imageModal.imageUrl}
           fileUrl={imageModal.fileUrl}
-          onClose={() => setImageModal(null)}
+          onClose={() => {
+            console.log('[ChatPresenter] Closing ImageModal');
+            setImageModal(null);
+          }}
         />
       )}
 
@@ -364,7 +376,10 @@ const ChatPresenter = ({
           fileUrl={fileViewerModal.fileUrl}
           fileName={fileViewerModal.fileName}
           mimeType={fileViewerModal.mimeType}
-          onClose={() => setFileViewerModal(null)}
+          onClose={() => {
+            console.log('[ChatPresenter] Closing FileViewerModal');
+            setFileViewerModal(null);
+          }}
         />
       )}
     </div>

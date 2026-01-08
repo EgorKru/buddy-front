@@ -69,15 +69,49 @@ export default function FileMessage({
 
   const handleClick = (e) => {
     e.stopPropagation();
-    if (!fileUrl || !setFileViewerModal) return;
+    e.preventDefault();
+    
+    console.log('[FileMessage] handleClick called', { fileUrl, setFileViewerModal: !!setFileViewerModal, extension, mimeType });
+    
+    if (!fileUrl || !setFileViewerModal) {
+      console.log('[FileMessage] Missing required props');
+      return;
+    }
 
-    if (canViewInBrowser(mimeType)) {
+    const ext = extension ? extension.toLowerCase() : '';
+    const canViewByMime = canViewInBrowser(mimeType);
+    const canViewByExtension = ext && [
+      'txt',
+      'log',
+      'md',
+      'json',
+      'xml',
+      'html',
+      'css',
+      'js',
+      'ts',
+      'jsx',
+      'tsx',
+      'csv',
+      'yaml',
+      'yml',
+      'ini',
+      'conf',
+      'config'
+    ].includes(ext);
+
+    console.log('[FileMessage] View check', { ext, canViewByMime, canViewByExtension });
+
+    if (canViewByMime || canViewByExtension) {
       const fullFileName = extension ? `${fileName}.${extension}` : fileName;
+      console.log('[FileMessage] Opening modal', { fileUrl, fileName: fullFileName, mimeType });
       setFileViewerModal({
         fileUrl,
         fileName: fullFileName,
-        mimeType
+        mimeType: mimeType || (ext ? `text/${ext}` : 'text/plain')
       });
+    } else {
+      console.log('[FileMessage] Cannot view - not a viewable file type');
     }
   };
 
