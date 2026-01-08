@@ -123,6 +123,15 @@ export const useMessageSending = ({
           }, 500);
         }
         addOptimistic(chatId, result.optimisticMessage);
+      } else if (result?.success && result?.optimisticMessage) {
+        const messageId = result.optimisticMessage.id;
+        if (messageId) {
+          newMessageIdsRef.current.add(String(messageId));
+          setTimeout(() => {
+            newMessageIdsRef.current.delete(String(messageId));
+          }, 500);
+        }
+        addOptimistic(chatId, result.optimisticMessage);
       } else if (result?.success) {
         if (typeof window !== 'undefined') {
           console.log('[Chat] Message sent via WebSocket, waiting for server confirmation');

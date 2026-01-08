@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { VOICE_MIN_HOLD_TIME, VOICE_LOCK_THRESHOLD } from '../constants/chat';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 
@@ -20,6 +20,8 @@ export const useVoiceRecordingUI = () => {
   const startTimeRef = useRef(0);
   const startDelayTimeoutRef = useRef(null);
   const audioPreviewRef = useRef(null);
+  const isHoldingRef = useRef(false);
+  const reachedLockThresholdRef = useRef(false);
   
   const lockThreshold = VOICE_LOCK_THRESHOLD;
   const minHoldTime = VOICE_MIN_HOLD_TIME;
@@ -27,64 +29,76 @@ export const useVoiceRecordingUI = () => {
   const handleMouseDown = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
+    isHoldingRef.current = true;
     setIsHolding(true);
     startYRef.current = e.clientY;
     startTimeRef.current = Date.now();
     setDragDistance(0);
+    reachedLockThresholdRef.current = false;
     setReachedLockThreshold(false);
+    setIsLocked(false);
     
     startDelayTimeoutRef.current = setTimeout(() => {
-      if (isHolding && !voiceRecorder.isRecording) {
+      if (isHoldingRef.current && !voiceRecorder.isRecording) {
         voiceRecorder.startRecording();
       }
     }, minHoldTime);
-  }, [isHolding, voiceRecorder]);
+  }, [voiceRecorder, minHoldTime]);
 
   const handleTouchStart = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
+    isHoldingRef.current = true;
     setIsHolding(true);
     startYRef.current = e.touches[0].clientY;
     startTimeRef.current = Date.now();
     setDragDistance(0);
+    reachedLockThresholdRef.current = false;
     setReachedLockThreshold(false);
+    setIsLocked(false);
     
     startDelayTimeoutRef.current = setTimeout(() => {
-      if (isHolding && !voiceRecorder.isRecording) {
+      if (isHoldingRef.current && !voiceRecorder.isRecording) {
         voiceRecorder.startRecording();
       }
     }, minHoldTime);
-  }, [isHolding, voiceRecorder]);
+  }, [voiceRecorder, minHoldTime]);
 
   const handleMouseMove = useCallback((e) => {
-    if (!isHolding || !voiceRecorder.isRecording) return;
+    if (!isHoldingRef.current || !voiceRecorder.isRecording) return;
     
     const currentY = e.clientY;
     const distance = startYRef.current - currentY;
-    setDragDistance(Math.max(0, distance));
+    const clampedDistance = Math.max(0, distance);
+    setDragDistance(clampedDistance);
     
-    if (distance >= lockThreshold && !reachedLockThreshold) {
+    if (clampedDistance >= lockThreshold && !reachedLockThresholdRef.current) {
+      reachedLockThresholdRef.current = true;
       setReachedLockThreshold(true);
       setIsLocked(true);
     }
-  }, [isHolding, voiceRecorder.isRecording, reachedLockThreshold]);
+  }, [voiceRecorder.isRecording, lockThreshold]);
 
   const handleTouchMove = useCallback((e) => {
-    if (!isHolding || !voiceRecorder.isRecording) return;
+    if (!isHoldingRef.current || !voiceRecorder.isRecording) return;
     
     const currentY = e.touches[0].clientY;
     const distance = startYRef.current - currentY;
-    setDragDistance(Math.max(0, distance));
+    const clampedDistance = Math.max(0, distance);
+    setDragDistance(clampedDistance);
     
-    if (distance >= lockThreshold && !reachedLockThreshold) {
+    if (clampedDistance >= lockThreshold && !reachedLockThresholdRef.current) {
+      reachedLockThresholdRef.current = true;
       setReachedLockThreshold(true);
       setIsLocked(true);
     }
-  }, [isHolding, voiceRecorder.isRecording, reachedLockThreshold]);
+  }, [voiceRecorder.isRecording, lockThreshold]);
 
   const handleMouseUp = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
+    
+    isHoldingRef.current = false;
     
     if (startDelayTimeoutRef.current) {
       clearTimeout(startDelayTimeoutRef.current);
@@ -98,12 +112,10 @@ export const useVoiceRecordingUI = () => {
     }
     
     if (isLocked) {
-      // Если заблокировано, не останавливаем запись
       setIsHolding(false);
       return;
     }
     
-    // Останавливаем запись если не заблокировано
     voiceRecorder.stopRecording();
     setIsHolding(false);
     setDragDistance(0);
@@ -112,6 +124,8 @@ export const useVoiceRecordingUI = () => {
   const handleTouchEnd = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
+    
+    isHoldingRef.current = false;
     
     if (startDelayTimeoutRef.current) {
       clearTimeout(startDelayTimeoutRef.current);
@@ -151,6 +165,7 @@ export const useVoiceRecordingUI = () => {
       voiceRecorder.stopRecording();
       setIsLocked(false);
       setDragDistance(0);
+      reachedLockThresholdRef.current = false;
       setReachedLockThreshold(false);
     }
   }, [voiceRecorder]);
@@ -159,6 +174,7 @@ export const useVoiceRecordingUI = () => {
     voiceRecorder.cancelRecording();
     setIsLocked(false);
     setDragDistance(0);
+    reachedLockThresholdRef.current = false;
     setReachedLockThreshold(false);
     setIsPlayingPreview(false);
   }, [voiceRecorder]);
@@ -167,24 +183,23 @@ export const useVoiceRecordingUI = () => {
     setIsPlayingPreview(playing);
   }, []);
 
-  // Добавляем обработчики событий
-  useState(() => {
+  useEffect(() => {
     if (typeof window === 'undefined') return;
     
     const handleGlobalMouseMove = (e) => {
-      if (isHolding) handleMouseMove(e);
+      if (isHoldingRef.current) handleMouseMove(e);
     };
     
     const handleGlobalMouseUp = (e) => {
-      if (isHolding) handleMouseUp(e);
+      if (isHoldingRef.current) handleMouseUp(e);
     };
     
     const handleGlobalTouchMove = (e) => {
-      if (isHolding) handleTouchMove(e);
+      if (isHoldingRef.current) handleTouchMove(e);
     };
     
     const handleGlobalTouchEnd = (e) => {
-      if (isHolding) handleTouchEnd(e);
+      if (isHoldingRef.current) handleTouchEnd(e);
     };
     
     window.addEventListener('mousemove', handleGlobalMouseMove);
@@ -198,7 +213,7 @@ export const useVoiceRecordingUI = () => {
       window.removeEventListener('touchmove', handleGlobalTouchMove);
       window.removeEventListener('touchend', handleGlobalTouchEnd);
     };
-  });
+  }, [handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
 
   return {
     ...voiceRecorder,

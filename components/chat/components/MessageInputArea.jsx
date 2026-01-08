@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Edit, Reply, X, Paperclip, Mic, Send, Lock, Unlock, ChevronDown, File, Loader2, Pause, Play, Trash2 } from 'lucide-react';
 import { formatFileSize } from '../utils/messageHelpers';
 import { useAutoResizeTextarea } from '../hooks/useAutoResizeTextarea';
@@ -43,8 +44,6 @@ export default function MessageInputArea({
   recordingTime,
   audioLevel
 }) {
-  // Автоматическое изменение высоты textarea
-  // Используем editingContent если редактируем, иначе newMessage
   const textareaValue = editingMessageId ? editingContent : newMessage;
   useAutoResizeTextarea(messageInputRef, textareaValue);
 
@@ -91,12 +90,15 @@ export default function MessageInputArea({
       )}
       
       {selectedFile && (
-        <div className={styles.filePreview}>
-          {selectedFile.type.startsWith('image/') ? (
+        <div 
+          key={`file-preview-${selectedFile.name}-${selectedFile.size}`}
+          className={styles.filePreview}
+        >
+            {selectedFile.type && selectedFile.type.startsWith('image/') ? (
             <div className={styles.imagePreview}>
               <img 
-                src={selectedFileUrlRef.current} 
-                alt={selectedFile.name}
+                src={selectedFileUrlRef?.current || ''} 
+                alt={selectedFile.name || 'Preview'}
                 className={styles.previewImage}
               />
               <button
@@ -113,10 +115,10 @@ export default function MessageInputArea({
               <File size={20} />
               <div className={styles.filePreviewDetails}>
                 <div className={styles.filePreviewName}>
-                  {selectedFile.name}
+                  {selectedFile.name || 'Файл'}
                 </div>
                 <div className={styles.filePreviewSize}>
-                  {formatFileSize(selectedFile.size)}
+                  {formatFileSize(selectedFile.size || 0)}
                 </div>
               </div>
               <button
@@ -173,7 +175,11 @@ export default function MessageInputArea({
                   ref={fileInputRef}
                   type="file"
                   style={{ display: 'none' }}
-                  onChange={onFileSelect}
+                  onChange={(e) => {
+                    if (onFileSelect) {
+                      onFileSelect(e);
+                    }
+                  }}
                   accept="*/*"
                 />
                 <button
@@ -196,9 +202,11 @@ export default function MessageInputArea({
                   className={`${styles.lockIndicator} ${reachedLockThreshold ? styles.lockIndicatorActive : ''} ${reachedLockThreshold ? styles.lockIndicatorCollapse : ''}`}
                   style={{ 
                     opacity: isHolding && dragDistance > 20 ? Math.min(1, 0.4 + (dragDistance / lockThreshold) * 0.6) : 0.4,
-                    transform: isHolding && dragDistance > 20 
-                      ? `translateX(-50%) translateY(-${Math.min(dragDistance, lockThreshold)}px) ${reachedLockThreshold ? 'scale(0.85)' : 'scale(1)'}` 
-                      : 'translateX(-50%) translateY(-20px)'
+                    transform: reachedLockThreshold 
+                      ? undefined
+                      : (isHolding && dragDistance > 20 
+                        ? `translateX(-50%) translateY(-${Math.min(dragDistance, lockThreshold)}px)` 
+                        : 'translateX(-50%) translateY(-20px)')
                   }}
                 >
                   {reachedLockThreshold ? (
@@ -249,6 +257,17 @@ export default function MessageInputArea({
                     {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}
                   </div>
                 )}
+                <button
+                  ref={buttonRef}
+                  type="button"
+                  onMouseDown={onMouseDown}
+                  onTouchStart={onTouchStart}
+                  className={`${styles.voiceButton} ${styles.voiceButtonRecording}`}
+                  title="Запись голосового сообщения"
+                  disabled={sending}
+                >
+                  <Mic size={20} />
+                </button>
               </div>
             )}
             
@@ -325,7 +344,7 @@ export default function MessageInputArea({
                     onStopRecording();
                   }}
                   className={styles.sendButton}
-                  title="Отправить запись"
+                  title="Остановить и отправить запись"
                   disabled={sending}
                 >
                   <Send size={20} />
@@ -417,7 +436,7 @@ export default function MessageInputArea({
                       onStopRecording();
                     }}
                     className={styles.voiceSendButton}
-                    title="Отправить запись"
+                    title="Остановить и отправить запись"
                   >
                     <Send size={18} />
                   </button>

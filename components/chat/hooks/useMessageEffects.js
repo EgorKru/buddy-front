@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect } from 'react';
+import { useEffect } from 'react';
 import { CHECK_BOTTOM_AUTO_SCROLL_THRESHOLD, AUTO_SCROLL_DELAY, CHECK_BOTTOM_DEFAULT_THRESHOLD } from '../constants/chat';
 
 export const useMessageEffects = ({
@@ -17,8 +17,7 @@ export const useMessageEffects = ({
   isUserScrollingUpRef,
   lastScrollTopRef
 }) => {
-  // Используем useLayoutEffect для синхронного скролла ДО отрисовки (как в Telegram Web)
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (messages.length > 0 && !scrollPositionSavedRef.current && messagesContainerRef.current) {
       const container = messagesContainerRef.current;
       

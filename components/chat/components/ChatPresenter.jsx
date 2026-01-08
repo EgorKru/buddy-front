@@ -259,11 +259,20 @@ const ChatPresenter = ({
           onSaveEdit={handleSaveEdit}
           onCancelEdit={handleCancelEdit}
           onCancelReply={handleCancelReply}
-          onFileSelect={(file) => {
-            if (file && file.type.startsWith('image/')) {
-              selectedFileUrlRef.current = URL.createObjectURL(file);
+          onFileSelect={(e) => {
+            const file = e?.target?.files?.[0];
+            if (file) {
+              if (file.type.startsWith('image/')) {
+                if (selectedFileUrlRef.current) {
+                  URL.revokeObjectURL(selectedFileUrlRef.current);
+                }
+                selectedFileUrlRef.current = URL.createObjectURL(file);
+              }
+              setSelectedFile(file);
             }
-            setSelectedFile(file);
+            if (e?.target) {
+              e.target.value = '';
+            }
           }}
           onRemoveFile={() => {
             if (selectedFileUrlRef.current) {

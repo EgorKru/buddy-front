@@ -1,10 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { SCROLL_RESTORE_TIMEOUT, INITIALIZATION_CHECK_DELAY, INITIALIZATION_CHECK_RETRY_DELAY } from '../constants/chat';
 
-/**
- * Хук для инициализации чата
- * Обрабатывает логику загрузки чата, проверку аутентификации, инициализацию состояния
- */
 export const useChatInitialization = ({
   chatId,
   router,
@@ -25,13 +21,11 @@ export const useChatInitialization = ({
 }) => {
   const [scrollButtonReady, setScrollButtonReady] = useState(false);
   
-  // Refs для отслеживания загрузки
   const loadedChatIdRef = useRef(null);
   const loadedMessagesRef = useRef(false);
   const loadedPinnedRef = useRef(false);
 
   useEffect(() => {
-    // Проверка аутентификации
     if (!isAuthenticated()) {
       router.push('/login');
       return;
@@ -41,12 +35,9 @@ export const useChatInitialization = ({
       const chatIdStr = String(chatId);
       const isNewChat = loadedChatIdRef.current !== chatIdStr;
 
-      // Telegram Web: при переходе между чатами (включая возврат) всегда скроллим вниз
       if (isNewChat) {
-        // Очищаем выбранный файл при смене чата
         clearSelectedFile();
 
-        // Сбрасываем состояние скролла
         scrollPositionSavedRef.current = false;
         userScrolledToBottomRef.current = false;
         restoreAttemptsRef.current = 0;
@@ -54,21 +45,16 @@ export const useChatInitialization = ({
         loadedPinnedRef.current = false;
         loadedChatIdRef.current = chatIdStr;
 
-        // Всегда скроллим вниз при переходе между чатами (без восстановления позиции)
         shouldRestorePositionRef.current = false;
 
         if (!chat) {
-          // Обновляем список чатов если чата нет
           refreshChats();
         }
 
-        // Инициализируем состояние загрузки
         isLoadingInitialRef.current = true;
         lastScrollTopRef.current = 0;
         isUserScrollingUpRef.current = false;
 
-        // Загружаем только если еще не загружали для этого чата
-        // Используем новый endpoint для полной загрузки состояния
         if (!loadedMessagesRef.current) {
           loadedMessagesRef.current = true;
           loadChatStateFull(chatId).finally(() => {
@@ -82,7 +68,6 @@ export const useChatInitialization = ({
           loadPinnedMessages();
         }
       } else {
-        // Возврат в уже открытый чат - всегда скроллим вниз
         scrollPositionSavedRef.current = false;
         userScrolledToBottomRef.current = false;
         shouldRestorePositionRef.current = false;
@@ -92,7 +77,6 @@ export const useChatInitialization = ({
       }
     }
 
-    // Проверка готовности sidebar для правильного позиционирования кнопки скролла
     if (typeof window !== 'undefined') {
       const checkReady = () => {
         const sidebarWidth = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width');
@@ -105,9 +89,7 @@ export const useChatInitialization = ({
       setTimeout(checkReady, INITIALIZATION_CHECK_RETRY_DELAY);
     }
 
-    // Очистка при размонтировании
     return () => {
-      clearSelectedFile();
     };
   }, [
     chatId,

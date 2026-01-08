@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { getCurrentUser } from '@/utils/api';
 import { useChat } from '@/components/chat/hooks/useChat';
@@ -368,6 +368,33 @@ const ChatContainer = ({ chatId }) => {
     cancelRecording
   });
 
+  const audioBlobRef = useRef(audioBlob);
+  const previewBlobRef = useRef(previewBlob);
+  useEffect(() => {
+    audioBlobRef.current = audioBlob;
+  }, [audioBlob]);
+  useEffect(() => {
+    previewBlobRef.current = previewBlob;
+  }, [previewBlob]);
+
+  const handleVoiceSendAndStop = useCallback(async () => {
+    if (isRecording) {
+      handleStopRecording();
+      let attempts = 0;
+      const maxAttempts = 30;
+      while (attempts < maxAttempts && (!audioBlobRef.current || audioBlobRef.current.size === 0)) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
+      }
+    }
+    const currentBlob = audioBlobRef.current || previewBlobRef.current || audioBlob || previewBlob;
+    if (currentBlob && currentBlob.size > 0) {
+      await handleVoiceSendSimple(currentBlob);
+    } else {
+      await handleVoiceSendSimple();
+    }
+  }, [isRecording, audioBlob, previewBlob, handleStopRecording, handleVoiceSendSimple]);
+
   useEffect(() => {
     scrollStateRef.current = { hasMore, loadingMore, oldestMessageId };
   }, [hasMore, loadingMore, oldestMessageId, scrollStateRef]);
@@ -478,7 +505,7 @@ const ChatContainer = ({ chatId }) => {
       handleKeyDown={handleKeyDown}
       pauseRecording={handlePauseRecording}
       resumeRecording={handleResumeRecording}
-      handleVoiceSendSimple={handleVoiceSendSimple}
+      handleVoiceSendSimple={handleVoiceSendAndStop}
       cancelRecording={cancelRecording}
       handlePlayPreview={handlePlayPreview}
       recordingTime={recordingTime}

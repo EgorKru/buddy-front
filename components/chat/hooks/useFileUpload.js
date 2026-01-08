@@ -1,8 +1,5 @@
 import { useState, useRef } from 'react';
 
-/**
- * Хук для управления загрузкой файлов
- */
 export const useFileUpload = () => {
   const [uploadingFile, setUploadingFile] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);

@@ -287,10 +287,17 @@ export const useChatRealtime = (chatId) => {
           const cid = String(chatId);
           const messageIds = messageIdsByChatId?.[cid] || [];
           
-          const optimisticMessages = messageIds
+          let optimisticMessages = messageIds
             .map(id => messagesById?.[String(id)])
-            .filter(msg => msg && msg.isOptimistic && msg.tempId && msg.type === dto.type)
-            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            .filter(msg => msg && msg.isOptimistic && msg.tempId && msg.type === dto.type);
+          
+          if (dto.type === 'FILE' || dto.type === 'IMAGE') {
+            if (dto.fileUrl) {
+              optimisticMessages = optimisticMessages.filter(msg => msg.fileUrl === dto.fileUrl);
+            }
+          }
+          
+          optimisticMessages.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
           
           if (optimisticMessages.length > 0) {
             const latestOptimistic = optimisticMessages[0];

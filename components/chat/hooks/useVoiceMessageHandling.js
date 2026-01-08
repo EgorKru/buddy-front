@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { chatAPI } from '@/utils/api';
 import { MESSAGE_STATUS } from '@/utils/messageQueue';
 import { NEW_MESSAGE_ID_REMOVE_DELAY, CHECK_BOTTOM_DEFAULT_THRESHOLD } from '../constants/chat';
@@ -25,8 +25,14 @@ export const useVoiceMessageHandling = ({
   voiceError,
   cancelRecording
 }) => {
-  const handleVoiceSendSimple = useCallback(async () => {
-    if (!audioBlob || !user || sending) return;
+  const audioBlobRef = useRef(audioBlob);
+  useEffect(() => {
+    audioBlobRef.current = audioBlob;
+  }, [audioBlob]);
+
+  const handleVoiceSendSimple = useCallback(async (blobToSend = null) => {
+    const currentBlob = blobToSend || audioBlobRef.current || audioBlob;
+    if (!currentBlob || !user || sending) return;
 
     if (messagesContainerRef?.current) {
       scrollHeightBeforeMessageRef.current = messagesContainerRef.current.scrollHeight;
@@ -41,12 +47,12 @@ export const useVoiceMessageHandling = ({
 
       try {
         const duration = recordingTime > 0 ? recordingTime : null;
-        const uploadResponse = await chatAPI.uploadVoiceFile(chatId, audioBlob, duration);
+        const uploadResponse = await chatAPI.uploadVoiceFile(chatId, currentBlob, duration);
         fileUrl = uploadResponse?.fileUrl;
         finalDuration = uploadResponse?.duration || duration;
       } catch (uploadError) {
-        const base64 = await convertToBase64(audioBlob);
-        const mimeType = audioBlob.type || 'audio/webm';
+        const base64 = await convertToBase64(currentBlob);
+        const mimeType = currentBlob.type || 'audio/webm';
         const duration = recordingTime > 0 ? recordingTime : null;
         
         const result = await sendMessageHook(null, 'VOICE', null, base64, mimeType, duration);
@@ -140,14 +146,16 @@ export const useVoiceMessageHandling = ({
   }, [cancelRecording, resetVoice, sentAudioBlobRef]);
 
   useEffect(() => {
-    if (audioBlob && !isRecording && sentAudioBlobRef.current !== audioBlob && !isLocked) {
-      if (!sending) {
+    if (!isRecording && !isLocked && !sending && audioBlob && audioBlob.size > 0) {
+      if (sentAudioBlobRef.current !== audioBlob) {
         sentAudioBlobRef.current = audioBlob;
+        const blobToSend = audioBlob;
+        
         const timeoutId = setTimeout(() => {
-          if (audioBlob && !sending && !isLocked) {
+          if (blobToSend && blobToSend.size > 0 && !sending && !isLocked && !isRecording) {
             handleVoiceSend();
           }
-        }, 100);
+        }, 150);
         
         return () => clearTimeout(timeoutId);
       }

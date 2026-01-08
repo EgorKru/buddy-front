@@ -263,6 +263,7 @@ export const useChat = (chatId) => {
     // Отправка сообщений
     ...messageSending,
     prepareScrollForSending: messageSending.prepareScrollForSending,
+    sendMessageHook,
     sending,
     syncQueue,
     
