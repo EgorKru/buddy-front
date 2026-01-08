@@ -519,6 +519,22 @@ export const chatAPI = {
     });
   },
 
+  forwardMessage: async (fromChatId, toChatId, messageIds, comment = null) => {
+    if (!Array.isArray(messageIds)) {
+      messageIds = [messageIds];
+    }
+    
+    const queryString = new URLSearchParams({ fromChatId }).toString();
+    const body = { messageIds };
+    if (comment) {
+      body.comment = comment;
+    }
+    return apiRequest(`/chats/${toChatId}/forward?${queryString}`, {
+      method: 'POST',
+      body,
+    });
+  },
+
   forwardMessages: async (toChatId, fromChatId, messageIds, comment = null) => {
     const queryString = new URLSearchParams({ fromChatId }).toString();
     const body = { messageIds };

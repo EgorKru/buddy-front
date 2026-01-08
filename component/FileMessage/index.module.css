@@ -6,6 +6,17 @@
   margin: 0.25rem 0;
 }
 
+.fileMessage.embedded {
+  margin: 0;
+}
+
+.fileContainer.embeddedContainer {
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  padding: 0;
+}
+
 .ownMessage {
   align-items: flex-end;
 }

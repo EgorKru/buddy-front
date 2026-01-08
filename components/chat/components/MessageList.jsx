@@ -28,7 +28,8 @@ export default function MessageList({
   loadedMessageIdsRef,
   setImageModal,
   setFileViewerModal,
-  handleNavigateToMessage
+  handleNavigateToMessage,
+  chats
 }) {
   const visibleMessages = (() => {
     // Если активен режим поиска, показываем только найденные сообщения
@@ -96,6 +97,7 @@ export default function MessageList({
                   setImageModal={setImageModal}
                   setFileViewerModal={setFileViewerModal}
                   handleNavigateToMessage={handleNavigateToMessage}
+                  chats={chats}
                 />
               );
             })}

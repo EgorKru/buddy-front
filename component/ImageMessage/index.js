@@ -201,9 +201,11 @@ export default function ImageMessage({ fileUrl, content, messageTime, isOwn, sta
     );
   }
 
+  const isEmbedded = !messageTime;
+  
   return (
-    <div className={`${styles.imageMessage} ${isOwn ? styles.ownMessage : ''}`} ref={containerRef}>
-      <div className={styles.imageContainer}>
+    <div className={`${styles.imageMessage} ${isOwn ? styles.ownMessage : ''} ${isEmbedded ? styles.embedded : ''}`} ref={containerRef}>
+      <div className={`${styles.imageContainer} ${isEmbedded ? styles.embeddedContainer : ''}`}>
         {loading && shouldLoad && (
           <div className={styles.loadingOverlay}>
             <div className={styles.spinner} />
@@ -246,15 +248,17 @@ export default function ImageMessage({ fileUrl, content, messageTime, isOwn, sta
           {content}
         </div>
       )}
-      <div className={styles.imageMeta}>
-        {isPinned && (
-          <span className={styles.pinnedIcon} title="Закреплено">📌</span>
-        )}
-        <span className={styles.messageTime}>{messageTime}</span>
-        {statusIcon && (
-          <span className={styles.statusIcon}>{statusIcon}</span>
-        )}
-      </div>
+      {messageTime && (
+        <div className={styles.imageMeta}>
+          {isPinned && (
+            <span className={styles.pinnedIcon} title="Закреплено">📌</span>
+          )}
+          <span className={styles.messageTime}>{messageTime}</span>
+          {statusIcon && (
+            <span className={styles.statusIcon}>{statusIcon}</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

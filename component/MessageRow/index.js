@@ -38,7 +38,8 @@ const MessageRow = React.memo(({
   loadedMessageIdsRef, 
   setImageModal,
   setFileViewerModal,
-  handleNavigateToMessage 
+  handleNavigateToMessage,
+  chats
 }) => {
   const showDate = useMemo(() => {
     return shouldShowDate(index, msg, visibleMessages);
@@ -178,36 +179,108 @@ const MessageRow = React.memo(({
               isPinned={isPinned}
             />
           ) : msg.type === 'IMAGE' && msg.fileUrl ? (
-            <ImageMessage
-              fileUrl={msg.fileUrl}
-              content={msg.content}
-              messageTime={formatChatTime(msg.createdAt)}
-              isOwn={isOwn}
-              statusIcon={statusIcon}
-              isPinned={isPinned}
-              onImageClick={(imageUrl, fileUrl) => {
-                setImageModal({ imageUrl, fileUrl });
-              }}
-            />
+            <div className={`${styles.messageText} ${msg.isOptimistic ? styles.messagePending : ''} ${msg.status === MESSAGE_STATUS.FAILED ? styles.messageFailed : ''}`}>
+              {msg.forwardedFrom && (
+                <ForwardedMessage 
+                  forwardedFrom={msg.forwardedFrom}
+                  senderId={msg.senderId}
+                  chats={chats}
+                  user={user}
+                />
+              )}
+              {msg.content && msg.content.trim() && (
+                <div className={styles.messageTextContentWrapper}>
+                  <div className={styles.messageTextContent}>{msg.content}</div>
+                </div>
+              )}
+              <ImageMessage
+                fileUrl={msg.fileUrl}
+                content={null}
+                messageTime={null}
+                isOwn={isOwn}
+                statusIcon={null}
+                isPinned={false}
+                onImageClick={(imageUrl, fileUrl) => {
+                  setImageModal({ imageUrl, fileUrl });
+                }}
+              />
+              <div className={styles.messageTextMeta}>
+                {isPinned && (
+                  <Pin size={12} className={styles.messagePinnedIcon} title="Закреплено" />
+                )}
+                <span className={styles.messageTime}>
+                  {formatChatTime(msg.createdAt)}
+                </span>
+                {msg.edited && (
+                  <span className={styles.messageEdited} title={msg.editedAt ? `Отредактировано ${formatChatTime(msg.editedAt)}` : 'Отредактировано'}>
+                    (ред.)
+                  </span>
+                )}
+                {statusIcon && (
+                  <span title={readMeta?.readCount
+                    ? (readMeta.totalOthers > 1 ? `Прочитали ${readMeta.readCount}/${readMeta.totalOthers}` : 'Прочитано')
+                    : 'Отправлено'}>
+                    {statusIcon}
+                  </span>
+                )}
+              </div>
+            </div>
           ) : msg.type === 'FILE' && msg.fileUrl ? (
-            <FileMessage
-              fileUrl={msg.fileUrl}
-              content={msg.content}
-              fileSize={msg.fileSize}
-              mimeType={msg.mimeType}
-              messageTime={formatChatTime(msg.createdAt)}
-              fileName={msg.fileName}
-              setFileViewerModal={setFileViewerModal}
-              isOwn={isOwn}
-              statusIcon={statusIcon}
-              isPinned={isPinned}
-            />
+            <div className={`${styles.messageText} ${msg.isOptimistic ? styles.messagePending : ''} ${msg.status === MESSAGE_STATUS.FAILED ? styles.messageFailed : ''}`}>
+              {msg.forwardedFrom && (
+                <ForwardedMessage 
+                  forwardedFrom={msg.forwardedFrom}
+                  senderId={msg.senderId}
+                  chats={chats}
+                  user={user}
+                />
+              )}
+              {msg.content && msg.content.trim() && (
+                <div className={styles.messageTextContentWrapper}>
+                  <div className={styles.messageTextContent}>{msg.content}</div>
+                </div>
+              )}
+              <FileMessage
+                fileUrl={msg.fileUrl}
+                content={null}
+                fileSize={msg.fileSize}
+                mimeType={msg.mimeType}
+                messageTime={null}
+                fileName={msg.fileName}
+                setFileViewerModal={setFileViewerModal}
+                isOwn={isOwn}
+                statusIcon={null}
+                isPinned={false}
+              />
+              <div className={styles.messageTextMeta}>
+                {isPinned && (
+                  <Pin size={12} className={styles.messagePinnedIcon} title="Закреплено" />
+                )}
+                <span className={styles.messageTime}>
+                  {formatChatTime(msg.createdAt)}
+                </span>
+                {msg.edited && (
+                  <span className={styles.messageEdited} title={msg.editedAt ? `Отредактировано ${formatChatTime(msg.editedAt)}` : 'Отредактировано'}>
+                    (ред.)
+                  </span>
+                )}
+                {statusIcon && (
+                  <span title={readMeta?.readCount
+                    ? (readMeta.totalOthers > 1 ? `Прочитали ${readMeta.readCount}/${readMeta.totalOthers}` : 'Прочитано')
+                    : 'Отправлено'}>
+                    {statusIcon}
+                  </span>
+                )}
+              </div>
+            </div>
           ) : (
             <div className={`${styles.messageText} ${msg.isOptimistic ? styles.messagePending : ''} ${msg.status === MESSAGE_STATUS.FAILED ? styles.messageFailed : ''}`}>
               {msg.forwardedFrom && (
                 <ForwardedMessage 
                   forwardedFrom={msg.forwardedFrom}
                   senderId={msg.senderId}
+                  chats={chats}
+                  user={user}
                 />
               )}
               {msg.replyTo && (

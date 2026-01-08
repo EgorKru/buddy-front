@@ -329,23 +329,38 @@ export const useMessageActions = ({
   const handleForwardMessage = useCallback((message) => {
     if (!message?.id) return;
     setContextMenu(null);
-    setForwardModal({ message });
+    setForwardModal({ 
+      message,
+      selectedChatId: null,
+      comment: ''
+    });
   }, [setContextMenu]);
 
   /**
    * Подтверждение пересылки
    */
-  const handleConfirmForward = useCallback(async (targetChatIds) => {
-    if (!forwardModal?.message || !targetChatIds || targetChatIds.length === 0) return;
+  const handleConfirmForward = useCallback(async () => {
+    if (!forwardModal || !forwardModal.selectedChatId) return;
     
     try {
-      await chatAPI.forwardMessage(forwardModal.message.id, targetChatIds);
+      const toChatId = forwardModal.selectedChatId;
+      const comment = forwardModal.comment || null;
+      
+      if (forwardModal.message) {
+        const messageId = forwardModal.message.id;
+        await chatAPI.forwardMessage(chatId, toChatId, [messageId], comment);
+      } else if (forwardModal.messageIds && forwardModal.messageIds.length > 0) {
+        await chatAPI.forwardMessage(chatId, toChatId, forwardModal.messageIds, comment);
+      } else {
+        throw new Error('Нет сообщений для пересылки');
+      }
+      
       setForwardModal(null);
     } catch (error) {
       console.error('Error forwarding message:', error);
       alert('Не удалось переслать сообщение');
     }
-  }, [forwardModal]);
+  }, [forwardModal, chatId]);
 
   return {
     // Состояние

@@ -105,9 +105,11 @@ export default function FileMessage({
     }
   };
 
+  const isEmbedded = !messageTime;
+  
   return (
-    <div className={`${styles.fileMessage} ${isOwn ? styles.ownMessage : ''}`}>
-      <div className={styles.fileContainer} onClick={handleClick}>
+    <div className={`${styles.fileMessage} ${isOwn ? styles.ownMessage : ''} ${isEmbedded ? styles.embedded : ''}`}>
+      <div className={`${styles.fileContainer} ${isEmbedded ? styles.embeddedContainer : ''}`} onClick={handleClick}>
         <div className={styles.fileIconWrapper}>
           <div className={styles.fileIconContainer}>
             <div className={styles.fileIconDocument}>
@@ -145,15 +147,17 @@ export default function FileMessage({
               <Download size={20} />
             )}
           </button>
-          <div className={styles.fileMeta}>
-            {isPinned && (
-              <span className={styles.pinnedIcon} title="Закреплено">📌</span>
-            )}
-            <span className={styles.messageTime}>{messageTime}</span>
-            {statusIcon && (
-              <span className={styles.statusIcon}>{statusIcon}</span>
-            )}
-          </div>
+          {messageTime && (
+            <div className={styles.fileMeta}>
+              {isPinned && (
+                <span className={styles.pinnedIcon} title="Закреплено">📌</span>
+              )}
+              <span className={styles.messageTime}>{messageTime}</span>
+              {statusIcon && (
+                <span className={styles.statusIcon}>{statusIcon}</span>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
