@@ -42,26 +42,79 @@ export default function ImageMessage({ fileUrl, content, messageTime, isOwn, sta
       return;
     }
 
-    const url = chatAPI.getImageFileUrl(fileUrl);
-    setImageUrl(url);
     setLoading(true);
     setError(null);
     setImageLoaded(false);
+    setImageUrl(null);
 
-    const img = new Image();
-    img.onload = () => {
-      setImageLoaded(true);
-      setLoading(false);
+    let blobUrl = null;
+    let cancelled = false;
+
+    const loadImage = async () => {
+      try {
+        const url = chatAPI.getImageFileUrl(fileUrl);
+        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+
+        const headers = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch(url, { headers });
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              window.location.href = '/login';
+            }
+            throw new Error('Unauthorized');
+          }
+          throw new Error(`Failed to load image: ${response.status}`);
+        }
+
+        if (cancelled) return;
+
+        const blob = await response.blob();
+        if (cancelled) {
+          URL.revokeObjectURL(blobUrl);
+          return;
+        }
+
+        blobUrl = URL.createObjectURL(blob);
+        setImageUrl(blobUrl);
+
+        const img = new Image();
+        img.onload = () => {
+          if (!cancelled) {
+            setImageLoaded(true);
+            setLoading(false);
+          }
+        };
+        img.onerror = () => {
+          if (!cancelled) {
+            setError('Не удалось загрузить изображение');
+            setLoading(false);
+          }
+        };
+        img.src = blobUrl;
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Error loading image:', err);
+          setError('Не удалось загрузить изображение');
+          setLoading(false);
+        }
+      }
     };
-    img.onerror = () => {
-      setError('Не удалось загрузить изображение');
-      setLoading(false);
-    };
-    img.src = url;
+
+    loadImage();
 
     return () => {
-      img.onload = null;
-      img.onerror = null;
+      cancelled = true;
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
+      }
     };
   }, [fileUrl, shouldLoad]);
 
@@ -72,16 +125,45 @@ export default function ImageMessage({ fileUrl, content, messageTime, isOwn, sta
     }
   };
 
-  const handleDownload = (e) => {
+  const handleDownload = async (e) => {
     e.stopPropagation();
-    if (fileUrl) {
-      const downloadUrl = chatAPI.getImageFileUrl(fileUrl, true);
+    if (!fileUrl) return;
+
+    try {
+      const url = chatAPI.getImageFileUrl(fileUrl, true);
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+
+      const headers = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(url, { headers });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+          }
+          throw new Error('Unauthorized');
+        }
+        throw new Error(`Failed to download image: ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = downloadUrl;
+      link.href = blobUrl;
       link.download = '';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Error downloading image:', error);
+      alert('Не удалось скачать изображение');
     }
   };
 

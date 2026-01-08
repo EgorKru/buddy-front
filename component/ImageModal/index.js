@@ -38,15 +38,44 @@ export default function ImageModal({ imageUrl, fileUrl, onClose }) {
     };
   }, [onClose]);
 
-  const handleDownload = () => {
-    if (fileUrl) {
-      const downloadUrl = chatAPI.getImageFileUrl(fileUrl, true);
+  const handleDownload = async () => {
+    if (!fileUrl) return;
+
+    try {
+      const url = chatAPI.getImageFileUrl(fileUrl, true);
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+
+      const headers = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(url, { headers });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+          }
+          throw new Error('Unauthorized');
+        }
+        throw new Error(`Failed to download image: ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = downloadUrl;
+      link.href = blobUrl;
       link.download = '';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Error downloading image:', error);
+      alert('Не удалось скачать изображение');
     }
   };
 
