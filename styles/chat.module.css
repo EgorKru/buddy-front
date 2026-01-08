@@ -1890,6 +1890,19 @@
   justify-content: center;
 }
 
+.recordingTime {
+  position: absolute;
+  right: 60px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.75rem;
+  color: #666;
+  font-weight: 500;
+  pointer-events: none;
+  z-index: 2;
+  white-space: nowrap;
+}
+
 .voiceWaves {
   position: absolute;
   display: flex;
