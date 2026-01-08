@@ -356,6 +356,8 @@ export const useMessageActions = ({
     
     // Setters
     setEditingContent,
+    setReplyingToMessageId,
+    setReplyingToMessage,
     
     // Обработчики
     handleCopyMessage,

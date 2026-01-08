@@ -244,12 +244,6 @@ const ChatContainer = ({ chatId }) => {
     const fileToSend = selectedFile;
     
     setNewMessage('');
-    if (messageActions.setReplyingToMessageId) {
-      messageActions.setReplyingToMessageId(null);
-    }
-    if (messageActions.setReplyingToMessage) {
-      messageActions.setReplyingToMessage(null);
-    }
 
     prepareScrollForSending();
 
@@ -258,6 +252,12 @@ const ChatContainer = ({ chatId }) => {
       try {
         await sendFileMessage(fileToSend, messageText, replyToId);
         clearSelectedFile();
+        if (messageActions.setReplyingToMessageId) {
+          messageActions.setReplyingToMessageId(null);
+        }
+        if (messageActions.setReplyingToMessage) {
+          messageActions.setReplyingToMessage(null);
+        }
       } catch (error) {
         console.error('Error uploading and sending file:', error);
         alert(`Не удалось отправить файл: ${error.message || 'Неизвестная ошибка'}`);
@@ -273,6 +273,12 @@ const ChatContainer = ({ chatId }) => {
 
     if (messageText) {
       await sendTextMessage(messageText, replyToId);
+      if (messageActions.setReplyingToMessageId) {
+        messageActions.setReplyingToMessageId(null);
+      }
+      if (messageActions.setReplyingToMessage) {
+        messageActions.setReplyingToMessage(null);
+      }
     }
   }, [
     editingMessageId,

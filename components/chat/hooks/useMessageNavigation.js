@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { chatAPI } from '@/utils/api';
 import { MESSAGE_STATUS } from '@/utils/messageQueue';
+import { NAVIGATION_TIMEOUT, MESSAGE_PAGE_SIZE } from '../constants/chat';
 import styles from '@/styles/chat.module.css';
 
 /**
