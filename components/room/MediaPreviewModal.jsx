@@ -1,0 +1,209 @@
+import { useEffect, useRef, useState } from 'react';
+import { X, Video, VideoOff, Mic, MicOff, Settings, ChevronDown, Loader2 } from 'lucide-react';
+import { useMediaDevices } from '@/hooks/useMediaDevices';
+import styles from './MediaPreviewModal.module.css';
+
+export default function MediaPreviewModal({ 
+  isOpen, 
+  onClose, 
+  onConfirm, 
+  title = 'Настройка камеры и микрофона',
+  confirmText = 'Присоединиться',
+  isCreating = false,
+}) {
+  const videoRef = useRef(null);
+  const [showSettings, setShowSettings] = useState(false);
+  
+  const {
+    devices,
+    selectedCamera,
+    selectedMicrophone,
+    localStream,
+    audioEnabled,
+    videoEnabled,
+    isLoading,
+    error,
+    permissionGranted,
+    startPreview,
+    stopPreview,
+    toggleAudio,
+    toggleVideo,
+    switchCamera,
+    switchMicrophone,
+    getStream,
+    setError,
+  } = useMediaDevices();
+
+  useEffect(() => {
+    if (isOpen && !localStream && !isLoading) {
+      startPreview(false, true).catch(() => {});
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (videoRef.current && localStream) {
+      videoRef.current.srcObject = localStream;
+    }
+  }, [localStream]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      stopPreview();
+      setShowSettings(false);
+    }
+  }, [isOpen, stopPreview]);
+
+  const handleConfirm = () => {
+    const stream = getStream();
+    onConfirm({
+      stream,
+      audioEnabled,
+      videoEnabled,
+    });
+  };
+
+  const handleClose = () => {
+    stopPreview();
+    onClose();
+  };
+
+  const handleRetry = () => {
+    setError(null);
+    startPreview(true, true).catch(() => {});
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className={styles.overlay} onClick={handleClose}>
+      <div className={styles.modal} onClick={e => e.stopPropagation()}>
+        <div className={styles.header}>
+          <h2 className={styles.title}>{title}</h2>
+          <button className={styles.closeButton} onClick={handleClose}>
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className={styles.content}>
+          <div className={styles.videoContainer}>
+            {isLoading ? (
+              <div className={styles.loadingState}>
+                <Loader2 className={styles.spinner} size={48} />
+                <p>Запрос доступа к камере...</p>
+              </div>
+            ) : error ? (
+              <div className={styles.errorState}>
+                <VideoOff size={48} />
+                <p className={styles.errorText}>{error}</p>
+                <button className={styles.retryButton} onClick={handleRetry}>
+                  Попробовать снова
+                </button>
+              </div>
+            ) : !videoEnabled ? (
+              <div className={styles.cameraOff}>
+                <VideoOff size={64} />
+                <p>Камера выключена</p>
+              </div>
+            ) : (
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className={styles.video}
+              />
+            )}
+          </div>
+
+          <div className={styles.controls}>
+            <button
+              className={`${styles.controlButton} ${!audioEnabled ? styles.disabled : ''}`}
+              onClick={toggleAudio}
+              disabled={!permissionGranted}
+            >
+              {audioEnabled ? <Mic size={24} /> : <MicOff size={24} />}
+              <span>{audioEnabled ? 'Микрофон вкл' : 'Микрофон выкл'}</span>
+            </button>
+
+            <button
+              className={`${styles.controlButton} ${!videoEnabled ? styles.disabled : ''}`}
+              onClick={toggleVideo}
+              disabled={!permissionGranted}
+            >
+              {videoEnabled ? <Video size={24} /> : <VideoOff size={24} />}
+              <span>{videoEnabled ? 'Камера вкл' : 'Камера выкл'}</span>
+            </button>
+
+            <button
+              className={`${styles.controlButton} ${styles.settingsButton}`}
+              onClick={() => setShowSettings(!showSettings)}
+              disabled={!permissionGranted}
+            >
+              <Settings size={24} />
+              <span>Настройки</span>
+              <ChevronDown 
+                size={16} 
+                className={`${styles.chevron} ${showSettings ? styles.chevronOpen : ''}`} 
+              />
+            </button>
+          </div>
+
+          {showSettings && permissionGranted && (
+            <div className={styles.settingsPanel}>
+              <div className={styles.settingGroup}>
+                <label className={styles.settingLabel}>Камера</label>
+                <select
+                  className={styles.select}
+                  value={selectedCamera}
+                  onChange={(e) => switchCamera(e.target.value)}
+                >
+                  {devices.cameras.map(device => (
+                    <option key={device.deviceId} value={device.deviceId}>
+                      {device.label || `Камера ${devices.cameras.indexOf(device) + 1}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className={styles.settingGroup}>
+                <label className={styles.settingLabel}>Микрофон</label>
+                <select
+                  className={styles.select}
+                  value={selectedMicrophone}
+                  onChange={(e) => switchMicrophone(e.target.value)}
+                >
+                  {devices.microphones.map(device => (
+                    <option key={device.deviceId} value={device.deviceId}>
+                      {device.label || `Микрофон ${devices.microphones.indexOf(device) + 1}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className={styles.footer}>
+          <button className={styles.cancelButton} onClick={handleClose}>
+            Отмена
+          </button>
+          <button 
+            className={styles.confirmButton} 
+            onClick={handleConfirm}
+            disabled={isCreating}
+          >
+            {isCreating ? (
+              <>
+                <Loader2 className={styles.buttonSpinner} size={18} />
+                Создание...
+              </>
+            ) : (
+              confirmText
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+

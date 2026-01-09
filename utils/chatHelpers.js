@@ -27,7 +27,7 @@ export const getLastMessagePreview = (chat) => {
   if (!lastMessage) return '';
 
   if (lastMessage.type === 'VOICE' && !lastMessage.content) {
-    return 'Голосовое сообщение';
+    return '🎤 Голосовое сообщение';
   }
 
   if ((lastMessage.type === 'FILE' || lastMessage.type === 'IMAGE') && !lastMessage.content) {
@@ -35,7 +35,8 @@ export const getLastMessagePreview = (chat) => {
       const fileName = lastMessage.fileName.length > 40 
         ? `${lastMessage.fileName.substring(0, 40)}...` 
         : lastMessage.fileName;
-      return fileName;
+      const icon = lastMessage.type === 'IMAGE' ? '📷' : '📎';
+      return `${icon} ${fileName}`;
     }
     
     if (lastMessage.fileUrl) {
@@ -45,13 +46,13 @@ export const getLastMessagePreview = (chat) => {
       if (match) {
         const extension = match[1];
         return lastMessage.type === 'IMAGE' 
-          ? `Изображение.${extension}` 
-          : `Файл.${extension}`;
+          ? `📷 Изображение.${extension}` 
+          : `📎 Файл.${extension}`;
       }
-      return lastMessage.type === 'IMAGE' ? 'Изображение' : 'Файл';
+      return lastMessage.type === 'IMAGE' ? '📷 Изображение' : '📎 Файл';
     }
     
-    return lastMessage.type === 'IMAGE' ? 'Изображение' : 'Файл';
+    return lastMessage.type === 'IMAGE' ? '📷 Изображение' : '📎 Файл';
   }
 
   if (!lastMessage.content) {

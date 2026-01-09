@@ -14,7 +14,10 @@ import styles from "@/styles/room.module.css";
 
 const Room = () => {
   const router = useRouter();
-  const { roomId } = router.query;
+  const { roomId, audio, video } = router.query;
+  
+  const initialAudio = audio !== '0';
+  const initialVideo = video !== '0';
   
   const {
     room,
@@ -47,12 +50,15 @@ const Room = () => {
   useEffect(() => {
     if (roomId && !isInRoom && !error && !isJoining) {
       setIsJoining(true);
-      joinRoom(roomId)
+      joinRoom(roomId, true, initialAudio, initialVideo)
+        .then(() => {
+          setIsJoining(false);
+        })
         .catch(() => {
           setIsJoining(false);
         });
     }
-  }, [roomId, isInRoom, error, isJoining, joinRoom]);
+  }, [roomId, isInRoom, error, isJoining, joinRoom, initialAudio, initialVideo]);
 
   const handleRetry = async () => {
     clearError();
@@ -150,9 +156,9 @@ const Room = () => {
       } else {
         await leaveRoom();
       }
-      router.push('/chats');
+      router.push('/');
     } catch (error) {
-      router.push('/chats');
+      router.push('/');
     }
   };
 
@@ -195,15 +201,15 @@ const Room = () => {
   const participantCount = participants.length || Object.keys(players).length || 1;
   const isSingleParticipant = participantCount <= 1;
 
-  if (error && !localStream) {
+  if (error && !localStream && !isInRoom) {
     return (
       <div className={styles.roomContainer}>
         <TopBar roomId={roomId} />
         <div className={styles.singleParticipantContainer}>
           <div style={{ textAlign: 'center', padding: '40px', color: 'rgb(255, 100, 100)' }}>
-            <h2 style={{ marginBottom: '16px', fontSize: '24px' }}>Ошибка доступа к камере/микрофону</h2>
+            <h2 style={{ marginBottom: '16px', fontSize: '24px' }}>Ошибка подключения к комнате</h2>
             <p style={{ marginBottom: '8px', color: 'rgb(180, 180, 190)' }}>{error}</p>
-            <p style={{ color: 'rgb(150, 150, 160)' }}>Пожалуйста, разрешите доступ к камере и микрофону в настройках браузера</p>
+            <p style={{ color: 'rgb(150, 150, 160)' }}>Проверьте ID комнаты и попробуйте снова</p>
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '20px' }}>
               <button 
                 onClick={handleRetry}

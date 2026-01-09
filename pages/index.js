@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import styles from '@/styles/home.module.css'
 import { isAuthenticated, getCurrentUser, authAPI, roomAPI } from '@/utils/api';
 import ChatSidebar from '@/component/ChatSidebar';
+import MediaPreviewModal from '@/components/room/MediaPreviewModal';
 
 export default function Home() {
   const router = useRouter()
@@ -12,6 +13,7 @@ export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [inputError, setInputError] = useState('')
+  const [showPreview, setShowPreview] = useState(false)
   const roomInputRef = useRef(null)
 
   useEffect(() => {
@@ -39,13 +41,21 @@ export default function Home() {
     }
   }, [user]);
 
-  const createAndJoin = async () => {
+  const openCreatePreview = () => {
+    setShowPreview(true);
+  };
+
+  const handleCreateRoom = async ({ stream, audioEnabled, videoEnabled }) => {
     setIsCreating(true);
     setInputError('');
     try {
       const newRoom = await roomAPI.createRoom(null, null, 'PUBLIC');
       if (newRoom && newRoom.roomId) {
-        router.push(`/room/${newRoom.roomId}`);
+        const params = new URLSearchParams({
+          audio: audioEnabled ? '1' : '0',
+          video: videoEnabled ? '1' : '0',
+        });
+        router.push(`/room/${newRoom.roomId}?${params}`);
       } else {
         throw new Error('Не удалось получить ID комнаты');
       }
@@ -53,7 +63,7 @@ export default function Home() {
       setInputError(error.message || 'Ошибка при создании комнаты');
       setIsCreating(false);
     }
-  }
+  };
 
   const joinRoom = () => {
     const trimmedRoomId = roomId.trim().toUpperCase();
@@ -168,26 +178,14 @@ export default function Home() {
         <div className={styles.content}>
           <div className={styles.createSection}>
             <button 
-              onClick={createAndJoin} 
+              onClick={openCreatePreview} 
               className={styles.createButton}
-              disabled={isCreating}
             >
-              {isCreating ? (
-                <>
-                  <svg className={styles.spinner} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" strokeLinecap="round"/>
-                  </svg>
-                  Создание...
-                </>
-              ) : (
-                <>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                  </svg>
-                  Создать новую комнату
-                </>
-              )}
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              Создать новую комнату
             </button>
             <p className={styles.createHint}>
               Создайте комнату и поделитесь ссылкой с друзьями
@@ -244,6 +242,15 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      <MediaPreviewModal
+        isOpen={showPreview}
+        onClose={() => setShowPreview(false)}
+        onConfirm={handleCreateRoom}
+        title="Настройка перед встречей"
+        confirmText="Создать встречу"
+        isCreating={isCreating}
+      />
     </div>
   )
 }

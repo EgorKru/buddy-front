@@ -418,7 +418,7 @@ export const useRoomProtocol = (roomId = null) => {
     }
   }, [subscribeToRoomEvents]);
 
-  const joinRoom = useCallback(async (roomIdToJoin, requestMedia = true) => {
+  const joinRoom = useCallback(async (roomIdToJoin, requestMedia = true, initialAudio = true, initialVideo = true) => {
     try {
       setError(null);
       const roomData = await roomAPI.joinRoom(roomIdToJoin);
@@ -428,15 +428,6 @@ export const useRoomProtocol = (roomId = null) => {
       setIsInRoom(true);
       subscribeToRoomEvents();
       
-      if (requestMedia) {
-        try {
-          await startLocalStream(true, true);
-        } catch (streamError) {
-          setError(streamError.message);
-          throw streamError;
-        }
-      }
-      
       if (roomData.participants && roomData.participants.length > 0) {
         const currentUser = JSON.parse(localStorage.getItem('user'));
         roomData.participants.forEach(participant => {
@@ -444,6 +435,20 @@ export const useRoomProtocol = (roomId = null) => {
             sendOffer(participant.userId);
           }
         });
+      }
+      
+      if (requestMedia) {
+        try {
+          await startLocalStream(initialAudio, initialVideo);
+          if (!initialAudio) {
+            setAudioEnabled(false);
+          }
+          if (!initialVideo) {
+            setVideoEnabled(false);
+          }
+        } catch (streamError) {
+          setError(streamError.message);
+        }
       }
     } catch (error) {
       setError(error.message || 'Ошибка при присоединении к комнате');
