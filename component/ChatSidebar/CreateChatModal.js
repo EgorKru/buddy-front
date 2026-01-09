@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import Image from 'next/image';
-import { X, Loader2, UserPlus } from 'lucide-react';
+import { X, Loader2, Search, UserPlus, Users } from 'lucide-react';
 import { useCreateChat } from '@/hooks/useCreateChat';
 import styles from '@/component/ChatSidebar/index.module.css';
 
@@ -40,70 +40,72 @@ export default function CreateChatModal({ isOpen, onClose, onSuccess }) {
             <X size={20} />
           </button>
         </div>
+
         <form onSubmit={handleCreateChat} className={styles.modalForm}>
           <div className={styles.formGroup}>
-            <label>Тип чата</label>
-            <select
-              value={createChat.chatType}
-              onChange={(e) => createChat.setChatType(e.target.value)}
-              className={styles.select}
-            >
-              <option value="DIRECT">Прямой чат</option>
-              <option value="GROUP">Групповой чат</option>
-            </select>
+            <div className={styles.chatTypeSelector}>
+              <button
+                type="button"
+                onClick={() => createChat.setChatType('DIRECT')}
+                className={`${styles.chatTypeButton} ${createChat.chatType === 'DIRECT' ? styles.chatTypeButtonActive : ''}`}
+              >
+                <Users size={18} />
+                Прямой чат
+              </button>
+              <button
+                type="button"
+                onClick={() => createChat.setChatType('GROUP')}
+                className={`${styles.chatTypeButton} ${createChat.chatType === 'GROUP' ? styles.chatTypeButtonActive : ''}`}
+              >
+                <UserPlus size={18} />
+                Групповой чат
+              </button>
+            </div>
           </div>
 
           {createChat.chatType === 'GROUP' && (
             <div className={styles.formGroup}>
-              <label>Название группы *</label>
               <input
                 type="text"
                 id="chat-create-group-name"
                 name="chatName"
                 value={createChat.chatName}
                 onChange={(e) => createChat.setChatName(e.target.value)}
-                placeholder="Введите название группы"
+                placeholder="Название группы"
                 className={styles.input}
                 required
+                autoFocus={createChat.chatType === 'GROUP'}
               />
             </div>
           )}
 
           <div className={styles.formGroup}>
-            <label htmlFor="chat-create-participants">
-              {createChat.chatType === 'DIRECT' 
-                ? 'Поиск пользователя *' 
-                : 'Поиск участников *'}
-            </label>
-            <div style={{ position: 'relative' }}>
-              <input
-                ref={createChat.searchInputRef}
-                type="text"
-                id="chat-create-participants"
-                name="participants"
-                value={createChat.participantUsernames}
-                onChange={createChat.handleSearchInputChange}
-                onFocus={() => {
-                  if (createChat.searchResults.length > 0) {
-                    createChat.setShowSearchResults(true);
-                  }
-                }}
-                placeholder={createChat.chatType === 'DIRECT' 
-                  ? 'Введите username или email...' 
-                  : 'Введите username или email участников...'}
-                className={styles.input}
-              />
-              {createChat.searching && (
-                <div style={{ 
-                  position: 'absolute', 
-                  right: '10px', 
-                  top: '50%', 
-                  transform: 'translateY(-50%)',
-                  color: '#666'
-                }}>
-                  <Loader2 size={16} className={styles.spinner} />
-                </div>
-              )}
+            <div className={styles.searchWrapper}>
+              <div className={styles.searchInputContainer}>
+                <Search size={18} className={styles.searchIcon} />
+                <input
+                  ref={createChat.searchInputRef}
+                  type="text"
+                  id="chat-create-participants"
+                  name="participants"
+                  value={createChat.participantUsernames}
+                  onChange={createChat.handleSearchInputChange}
+                  onFocus={() => {
+                    if (createChat.searchResults.length > 0) {
+                      createChat.setShowSearchResults(true);
+                    }
+                  }}
+                  placeholder={createChat.chatType === 'DIRECT' 
+                    ? 'Поиск пользователя...' 
+                    : 'Поиск участников...'}
+                  className={styles.searchInput}
+                  autoFocus={createChat.chatType === 'DIRECT'}
+                />
+                {createChat.searching && (
+                  <Loader2 size={16} className={styles.searchLoader} />
+                )}
+              </div>
+
               {createChat.showSearchResults && createChat.searchResults.length > 0 && (
                 <div className={styles.searchResults}>
                   {createChat.searchResults.map((user) => (
@@ -114,10 +116,10 @@ export default function CreateChatModal({ isOpen, onClose, onSuccess }) {
                     >
                       <div className={styles.searchResultAvatar}>
                         {user.avatarUrl ? (
-                          <Image src={user.avatarUrl} alt="" width={32} height={32} unoptimized />
+                          <Image src={user.avatarUrl} alt="" width={40} height={40} unoptimized />
                         ) : (
                           <div className={styles.searchResultAvatarPlaceholder}>
-                            {user.displayName?.[0] || user.username?.[0] || '?'}
+                            {(user.displayName || user.username)?.[0]?.toUpperCase() || '?'}
                           </div>
                         )}
                       </div>
@@ -128,36 +130,49 @@ export default function CreateChatModal({ isOpen, onClose, onSuccess }) {
                         <div className={styles.searchResultUsername}>
                           @{user.username}
                           {user.email && (
-                            <span style={{ marginLeft: '8px', color: '#888', fontSize: '12px' }}>
-                              • {user.email}
-                            </span>
+                            <span className={styles.searchResultEmail}> • {user.email}</span>
                           )}
                         </div>
                       </div>
-                      <UserPlus size={16} className={styles.addIcon} />
+                      <UserPlus size={18} className={styles.addIcon} />
                     </div>
                   ))}
                 </div>
               )}
+
+              {createChat.showSearchResults && createChat.searchResults.length === 0 && createChat.participantUsernames.length >= 2 && !createChat.searching && (
+                <div className={styles.searchResults}>
+                  <div className={styles.searchResultEmpty}>
+                    Пользователи не найдены
+                  </div>
+                </div>
+              )}
             </div>
-            <small className={styles.hint}>
-              {createChat.chatType === 'DIRECT'
-                ? 'Начните вводить username или email пользователя и выберите из результатов'
-                : 'Начните вводить username или email и выберите участников из результатов'}
-            </small>
           </div>
 
           {createChat.selectedParticipants.length > 0 && (
-            <div className={styles.formGroup}>
-              <label>Выбранные участники:</label>
+            <div className={styles.selectedParticipantsSection}>
+              <div className={styles.selectedParticipantsLabel}>
+                Выбрано: {createChat.selectedParticipants.length}
+              </div>
               <div className={styles.selectedParticipants}>
                 {createChat.selectedParticipants.map((participant) => (
                   <div key={participant.id} className={styles.participantTag}>
-                    <span>{participant.displayName || participant.username}</span>
+                    <div className={styles.participantTagAvatar}>
+                      {participant.avatarUrl ? (
+                        <Image src={participant.avatarUrl} alt="" width={24} height={24} unoptimized />
+                      ) : (
+                        <span>{(participant.displayName || participant.username)?.[0]?.toUpperCase() || '?'}</span>
+                      )}
+                    </div>
+                    <span className={styles.participantTagName}>
+                      {participant.displayName || participant.username}
+                    </span>
                     <button
                       type="button"
                       onClick={() => createChat.handleRemoveParticipant(participant.id)}
                       className={styles.removeParticipantButton}
+                      aria-label="Удалить"
                     >
                       <X size={14} />
                     </button>
@@ -183,7 +198,7 @@ export default function CreateChatModal({ isOpen, onClose, onSuccess }) {
             <button
               type="submit"
               className={styles.submitButton}
-              disabled={createChat.creating}
+              disabled={createChat.creating || (createChat.chatType === 'DIRECT' && createChat.selectedParticipants.length !== 1) || (createChat.chatType === 'GROUP' && (createChat.selectedParticipants.length === 0 || !createChat.chatName.trim()))}
             >
               {createChat.creating ? 'Создание...' : 'Создать'}
             </button>
@@ -193,4 +208,3 @@ export default function CreateChatModal({ isOpen, onClose, onSuccess }) {
     </div>
   );
 }
-

@@ -343,14 +343,59 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  min-width: 0;
+}
+
+.lastMessageSender {
+  color: #111827;
+  font-weight: 500;
+  flex-shrink: 0;
+  margin-right: 4px;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .lastMessageText {
   color: #6b7280;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 @media (max-width: 480px) {
+  .lastMessage {
+    font-size: 11px;
+  }
+  
   .lastMessageText {
+    font-size: 11px;
+  }
+  
+  .lastMessageSender {
+    font-size: 11px;
+    max-width: 100px;
+  }
+}
+
+.participantCount {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-top: 2px;
+  margin-bottom: 2px;
+}
+
+@media (max-width: 480px) {
+  .participantCount {
     font-size: 11px;
   }
 }
@@ -497,64 +542,139 @@
 }
 
 .modalForm {
-  padding: 24px;
+  padding: 20px 24px 24px;
 }
 
 @media (max-width: 768px) {
   .modalForm {
-    padding: 20px;
+    padding: 16px 20px 20px;
   }
 }
 
 .formGroup {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
-.formGroup label {
-  display: block;
-  margin-bottom: 8px;
+.formGroup:last-of-type {
+  margin-bottom: 0;
+}
+
+.chatTypeSelector {
+  display: flex;
+  gap: 8px;
+  background: #f3f4f6;
+  border-radius: 10px;
+  padding: 4px;
+}
+
+.chatTypeButton {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chatTypeButton:hover {
+  background: rgba(255, 255, 255, 0.8);
   color: #374151;
 }
 
-.formGroup .hint {
-  display: block;
-  margin-top: 6px;
-  font-size: 12px;
-  color: #6b7280;
+.chatTypeButtonActive {
+  background: #ffffff;
+  color: #111827;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-.input,
-.select {
+.chatTypeButton svg {
+  flex-shrink: 0;
+}
+
+.input {
   width: 100%;
   padding: 12px 16px;
-  border: 1px solid rgb(50, 50, 60);
-  border-radius: 12px;
-  background: rgb(40, 40, 45);
-  color: rgb(255, 255, 255);
-  font-size: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 15px;
   font-family: inherit;
   outline: none;
   transition: all 0.2s ease;
 }
 
 @media (max-width: 768px) {
-  .input,
-  .select {
+  .input {
     padding: 10px 14px;
-    font-size: 16px; /* Предотвращает зум на iOS */
+    font-size: 16px;
   }
 }
 
-.input:focus,
-.select:focus {
-  border-color: rgb(102, 126, 234);
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+.input:focus {
+  border-color: #6b6b6b;
+  background: #fafafa;
 }
 
 .input::placeholder {
-  color: rgb(120, 120, 130);
+  color: #9ca3af;
+}
+
+.searchWrapper {
+  position: relative;
+}
+
+.searchInputContainer {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 14px;
+  color: #9ca3af;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 12px 16px 12px 44px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f9fafb;
+  color: #111827;
+  font-size: 15px;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.searchInput:focus {
+  background: #ffffff;
+  border-color: #6b6b6b;
+  box-shadow: 0 0 0 2px rgba(107, 107, 107, 0.1);
+}
+
+.searchInput::placeholder {
+  color: #9ca3af;
+}
+
+.searchLoader {
+  position: absolute;
+  right: 14px;
+  color: #9ca3af;
+  animation: spin 1s linear infinite;
+  pointer-events: none;
 }
 
 .error {
@@ -569,66 +689,77 @@
 
 .modalActions {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   justify-content: flex-end;
-  margin-top: 24px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #e5e7eb;
   flex-wrap: wrap;
 }
 
 @media (max-width: 768px) {
   .modalActions {
     gap: 8px;
-    margin-top: 20px;
+    margin-top: 16px;
+    padding-top: 16px;
   }
 }
 
 .cancelButton,
 .submitButton {
-  padding: 12px 24px;
-  border-radius: 12px;
-  font-size: 16px;
-  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
   border: none;
   touch-action: manipulation;
+  min-height: 40px;
 }
 
 @media (max-width: 768px) {
   .cancelButton,
   .submitButton {
-    padding: 10px 20px;
-    font-size: 15px;
+    padding: 10px 16px;
+    font-size: 14px;
     flex: 1;
     min-width: 0;
   }
 }
 
 .cancelButton {
-  background: #ffffff;
+  background: #f3f4f6;
   color: #374151;
-  border: 1px solid #d1d5db;
 }
 
 .cancelButton:hover:not(:disabled) {
-  background: #f9fafb;
-  border-color: #9ca3af;
+  background: #e5e7eb;
+}
+
+.cancelButton:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .submitButton {
   background: #6b6b6b;
   color: white;
+  font-weight: 600;
 }
 
 .submitButton:hover:not(:disabled) {
   background: #5a5a5a;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.submitButton:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .cancelButton:disabled,
 .submitButton:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  transform: none !important;
 }
 
 .searchResults {
@@ -636,14 +767,27 @@
   top: 100%;
   left: 0;
   right: 0;
-  margin-top: 4px;
+  margin-top: 6px;
   background: #ffffff;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  max-height: 300px;
+  border-radius: 12px;
+  max-height: 320px;
   overflow-y: auto;
-  z-index: 10;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  overflow-x: hidden;
+  z-index: 100;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .searchResultItem {
@@ -652,7 +796,7 @@
   gap: 12px;
   padding: 12px 16px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.15s ease;
   border-bottom: 1px solid #f3f4f6;
 }
 
@@ -664,13 +808,24 @@
   background: #f9fafb;
 }
 
+.searchResultItem:active {
+  background: #f3f4f6;
+}
+
+.searchResultEmpty {
+  padding: 20px 16px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 14px;
+}
+
 .searchResultAvatar {
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   flex-shrink: 0;
   overflow: hidden;
-  background: #6b6b6b;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -690,66 +845,147 @@
   justify-content: center;
   color: white;
   font-weight: 600;
-  font-size: 16px;
+  font-size: 18px;
 }
 
 .searchResultInfo {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
 }
 
 .searchResultName {
   font-weight: 500;
-  font-size: 14px;
+  font-size: 15px;
   color: #111827;
-  margin-bottom: 2px;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .searchResultUsername {
-  font-size: 12px;
+  font-size: 13px;
   color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.searchResultEmail {
+  color: #9ca3af;
+  font-size: 12px;
 }
 
 .addIcon {
   color: #6b6b6b;
   flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.searchResultItem:hover .addIcon {
+  color: #111827;
+  transform: scale(1.1);
+}
+
+.selectedParticipantsSection {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.selectedParticipantsLabel {
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+  margin-bottom: 12px;
 }
 
 .selectedParticipants {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 8px;
 }
 
 .participantTag {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px;
+  padding: 6px 10px 6px 6px;
   background: #f3f4f6;
   border: 1px solid #e5e7eb;
   border-radius: 20px;
   font-size: 14px;
   color: #374151;
+  transition: all 0.2s ease;
+  animation: slideInTag 0.2s ease-out;
+}
+
+@keyframes slideInTag {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.participantTag:hover {
+  background: #e5e7eb;
+  border-color: #d1d5db;
+}
+
+.participantTagAvatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.participantTagAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.participantTagName {
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .removeParticipantButton {
   background: transparent;
   border: none;
   cursor: pointer;
-  color: #6b7280;
-  padding: 2px;
-  border-radius: 4px;
+  color: #9ca3af;
+  padding: 4px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
 }
 
 .removeParticipantButton:hover {
-  background: #e5e7eb;
-  color: #111827;
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.removeParticipantButton:active {
+  transform: scale(0.9);
 }
 
 .spinner {

@@ -1,5 +1,5 @@
 import Image from 'next/image';
-import { MessageCircle, CheckCheck } from 'lucide-react';
+import { MessageCircle, CheckCheck, Users } from 'lucide-react';
 import { getChatName, getChatAvatar, getLastMessagePreview, getLastMessageReadMeta, getOtherParticipantOnline } from '@/utils/chatHelpers';
 import { formatChatListTime } from '@/utils/dateHelpers';
 import styles from '@/component/ChatSidebar/index.module.css';
@@ -28,6 +28,14 @@ export default function ChatListItem({ chat, user, currentChatId, readAtByChatId
     );
   };
 
+  const getSenderName = () => {
+    if (!chat.lastMessage) return null;
+    if (chat.type !== 'GROUP') return null;
+    if (Number(chat.lastMessage.senderId) === Number(user?.id)) return null;
+    
+    return chat.lastMessage.senderDisplayName || chat.lastMessage.senderUsername || 'Неизвестный';
+  };
+
   return (
     <div
       className={`${styles.chatItem} ${currentChatId === String(chat.id) ? styles.active : ''}`}
@@ -43,6 +51,8 @@ export default function ChatListItem({ chat, user, currentChatId, readAtByChatId
               height={32}
               unoptimized
             />
+          ) : chat.type === 'GROUP' ? (
+            <Users size={20} />
           ) : (
             <MessageCircle size={20} />
           )}
@@ -60,8 +70,18 @@ export default function ChatListItem({ chat, user, currentChatId, readAtByChatId
             </span>
           )}
         </div>
+        {chat.type === 'GROUP' && chat.participants && chat.participants.length > 0 && (
+          <div className={styles.participantCount}>
+            {chat.participants.length} {chat.participants.length === 1 ? 'участник' : chat.participants.length < 5 ? 'участника' : 'участников'}
+          </div>
+        )}
         {chat.lastMessage && (
           <div className={styles.lastMessage}>
+            {getSenderName() && (
+              <span className={styles.lastMessageSender}>
+                {getSenderName()}:
+              </span>
+            )}
             <span className={styles.lastMessageText}>
               {getReadStatusIcon()}
               {getLastMessagePreview(chat)}
