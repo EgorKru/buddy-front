@@ -164,6 +164,13 @@
   min-width: 0;
 }
 
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
 .searchWrapper {
   position: relative;
   display: flex;

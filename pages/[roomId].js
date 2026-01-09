@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
-
-import { useSocket } from "@/context/socket";
-import usePeer from "@/hooks/usePeer";
-import useMediaStream from "@/hooks/useMediaStream";
-import usePlayer from "@/hooks/usePlayer";
+import { useRouter } from "next/router";
+import { useRoomProtocol } from "@/hooks/useRoomProtocol";
+import { getCurrentUser } from "@/utils/api";
 
 import Player from "@/component/Player";
 import Bottom from "@/component/Bottom";
@@ -13,207 +11,225 @@ import TopBar from "@/component/TopBar";
 import SingleParticipantInfo from "@/component/SingleParticipantInfo";
 
 import styles from "@/styles/room.module.css";
-import { useRouter } from "next/router";
-import { MessageCircle } from "lucide-react";
-import { getCurrentUser } from "@/utils/api";
 
 const Room = () => {
-  const socket = useSocket();
-  const { roomId } = useRouter().query;
-  const { peer, myId } = usePeer();
-  const { stream, error: streamError } = useMediaStream();
+  const router = useRouter();
+  const { roomId } = router.query;
+  
   const {
-    players,
-    setPlayers,
-    playerHighlighted,
-    nonHighlightedPlayers,
+    room,
+    participants,
+    localStream,
+    remoteStreams,
+    audioEnabled,
+    videoEnabled,
+    isInRoom,
+    error,
     toggleAudio,
     toggleVideo,
-    leaveRoom
-  } = usePlayer(myId, roomId, peer);
+    leaveRoom,
+    endRoom,
+    startLocalStream,
+    joinRoom,
+    clearError,
+  } = useRoomProtocol(roomId);
 
-  const [users, setUsers] = useState({})
-  const [chatOpen, setChatOpen] = useState(false)
-  const [meetingStarted, setMeetingStarted] = useState(false)
-  const [playerNames, setPlayerNames] = useState({})
+  const [players, setPlayers] = useState({});
+  const [playerNames, setPlayerNames] = useState({});
+  const [chatOpen, setChatOpen] = useState(false);
+  const [meetingStarted, setMeetingStarted] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
   
   const currentUser = getCurrentUser();
+  const currentUserId = currentUser?.id?.toString() || 'local';
   const currentUserName = currentUser?.displayName || currentUser?.username || "Вы";
 
   useEffect(() => {
-    if (!socket || !peer || !stream) return;
-    const handleUserConnected = (newUser) => {
-      const call = peer.call(newUser, stream);
-
-      call.on("stream", (incomingStream) => {
-        setPlayers((prev) => ({
-          ...prev,
-          [newUser]: {
-            url: incomingStream,
-            muted: true,
-            playing: true,
-          },
-        }));
-
-        setPlayerNames((prev) => ({
-          ...prev,
-          [newUser]: `Участник ${newUser.substring(0, 6)}`,
-        }));
-
-        setUsers((prev) => ({
-          ...prev,
-          [newUser]: call
-        }))
-      });
-
-      call.on("error", (err) => {
-        return;
-      });
-    };
-    socket.on("user-connected", handleUserConnected);
-
-    return () => {
-      socket.off("user-connected", handleUserConnected);
-    };
-  }, [peer, setPlayers, socket, stream]);
-
-  useEffect(() => {
-    if (!socket) return;
-    const handleToggleAudio = (userId) => {
-      setPlayers((prev) => {
-        if (!prev[userId]) return prev;
-        return {
-          ...prev,
-          [userId]: {
-            ...prev[userId],
-            muted: !prev[userId].muted
-          }
-        };
-      });
-    };
-
-    const handleToggleVideo = (userId) => {
-      setPlayers((prev) => {
-        if (!prev[userId]) return prev;
-        return {
-          ...prev,
-          [userId]: {
-            ...prev[userId],
-            playing: !prev[userId].playing
-          }
-        };
-      });
-    };
-
-    const handleUserLeave = (userId) => {
-      setUsers((prev) => {
-        if (prev[userId]) {
-          try {
-            prev[userId].close();
-          } catch (e) {}
-          const newUsers = { ...prev };
-          delete newUsers[userId];
-          return newUsers;
-        }
-        return prev;
-      });
-      setPlayers((prev) => {
-        const newPlayers = { ...prev };
-        delete newPlayers[userId];
-        return newPlayers;
-      });
+    if (roomId && !isInRoom && !error && !isJoining) {
+      setIsJoining(true);
+      joinRoom(roomId)
+        .catch(() => {
+          setIsJoining(false);
+        });
     }
-    socket.on("user-toggle-audio", handleToggleAudio);
-    socket.on("user-toggle-video", handleToggleVideo);
-    socket.on("user-leave", handleUserLeave);
-    return () => {
-      socket.off("user-toggle-audio", handleToggleAudio);
-      socket.off("user-toggle-video", handleToggleVideo);
-      socket.off("user-leave", handleUserLeave);
-    };
-  }, [setPlayers, socket]);
+  }, [roomId, isInRoom, error, isJoining, joinRoom]);
+
+  const handleRetry = async () => {
+    clearError();
+    setIsJoining(false);
+    if (roomId) {
+      try {
+        await joinRoom(roomId);
+      } catch (err) {
+        setIsJoining(false);
+      }
+    }
+  };
 
   useEffect(() => {
-    if (!peer || !stream) return;
-    
-    const handleCall = (call) => {
-      const { peer: callerId } = call;
-      call.answer(stream);
+    if (localStream) {
+      const streamUrl = URL.createObjectURL(localStream);
+      setPlayers(prev => ({
+        ...prev,
+        [currentUserId]: {
+          url: streamUrl,
+          muted: !audioEnabled,
+          playing: videoEnabled,
+        },
+      }));
+      setPlayerNames(prev => ({
+        ...prev,
+        [currentUserId]: currentUserName,
+      }));
 
-      call.on("stream", (incomingStream) => {
-        setPlayers((prev) => ({
-          ...prev,
-          [callerId]: {
-            url: incomingStream,
-            muted: true,
-            playing: true,
-          },
-        }));
-
-        setPlayerNames((prev) => ({
-          ...prev,
-          [callerId]: `Участник ${callerId.substring(0, 6)}`,
-        }));
-
-        setUsers((prev) => ({
-          ...prev,
-          [callerId]: call
-        }))
-      });
-
-      call.on("error", (err) => {
-        return;
-      });
-    };
-
-    peer.on("call", handleCall);
-
-    return () => {
-      peer.off("call", handleCall);
-    };
-  }, [peer, setPlayers, stream]);
+      return () => {
+        URL.revokeObjectURL(streamUrl);
+      };
+    }
+  }, [localStream, audioEnabled, videoEnabled, currentUserId, currentUserName]);
 
   useEffect(() => {
-    if (!stream || !myId) return;
-    setPlayers((prev) => ({
-      ...prev,
-      [myId]: {
-        url: stream,
+    const newStreams = { ...players };
+    const newNames = { ...playerNames };
+
+    remoteStreams.forEach((stream, userId) => {
+      const streamUrl = URL.createObjectURL(stream);
+      const userIdStr = userId.toString();
+      newStreams[userIdStr] = {
+        url: streamUrl,
         muted: true,
         playing: true,
-      },
-    }));
-    setPlayerNames((prev) => ({
-      ...prev,
-      [myId]: currentUserName,
-    }));
-  }, [myId, setPlayers, stream, currentUserName]);
+      };
+      
+      const participant = participants.find(p => p.userId === userId);
+      newNames[userIdStr] = participant?.displayName || participant?.username || `Участник ${userIdStr.substring(0, 6)}`;
+    });
+
+    setPlayers(newStreams);
+    setPlayerNames(newNames);
+
+    return () => {
+      Object.values(newStreams).forEach(player => {
+        if (player.url && player.url.startsWith('blob:')) {
+          URL.revokeObjectURL(player.url);
+        }
+      });
+    };
+  }, [remoteStreams, participants]);
 
   useEffect(() => {
-    return () => {
-      Object.values(users).forEach(call => {
-        try {
-          call.close();
-        } catch (e) {}
-      });
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
+    participants.forEach(participant => {
+      const userIdStr = participant.userId?.toString();
+      if (userIdStr && !playerNames[userIdStr]) {
+        setPlayerNames(prev => ({
+          ...prev,
+          [userIdStr]: participant.displayName || participant.username || `Участник ${userIdStr.substring(0, 6)}`,
+        }));
       }
-    };
-  }, [users, stream]);
+    });
+  }, [participants]);
 
-  const participantCount = Object.keys(players).length;
+  const handleLeaveRoom = async () => {
+    try {
+      const participantCount = participants.length || Object.keys(players).length || 0;
+      if (participantCount <= 1) {
+        await endRoom();
+      } else {
+        await leaveRoom();
+      }
+      router.push('/chats');
+    } catch (error) {
+      router.push('/chats');
+    }
+  };
+
+  const handleToggleAudio = async () => {
+    await toggleAudio();
+    setPlayers(prev => {
+      if (!prev[currentUserId]) return prev;
+      return {
+        ...prev,
+        [currentUserId]: {
+          ...prev[currentUserId],
+          muted: !prev[currentUserId].muted,
+        },
+      };
+    });
+  };
+
+  const handleToggleVideo = async () => {
+    await toggleVideo();
+    setPlayers(prev => {
+      if (!prev[currentUserId]) return prev;
+      return {
+        ...prev,
+        [currentUserId]: {
+          ...prev[currentUserId],
+          playing: !prev[currentUserId].playing,
+        },
+      };
+    });
+  };
+
+  const playerHighlighted = players[currentUserId];
+  const nonHighlightedPlayers = Object.keys(players).reduce((acc, playerId) => {
+    if (playerId !== currentUserId) {
+      acc[playerId] = players[playerId];
+    }
+    return acc;
+  }, {});
+
+  const participantCount = participants.length || Object.keys(players).length || 1;
   const isSingleParticipant = participantCount <= 1;
 
-  if (streamError && !stream) {
+  if (error && !localStream) {
     return (
       <div className={styles.roomContainer}>
         <TopBar roomId={roomId} />
         <div className={styles.singleParticipantContainer}>
           <div style={{ textAlign: 'center', padding: '40px', color: 'rgb(255, 100, 100)' }}>
             <h2 style={{ marginBottom: '16px', fontSize: '24px' }}>Ошибка доступа к камере/микрофону</h2>
-            <p style={{ marginBottom: '8px', color: 'rgb(180, 180, 190)' }}>{streamError}</p>
+            <p style={{ marginBottom: '8px', color: 'rgb(180, 180, 190)' }}>{error}</p>
             <p style={{ color: 'rgb(150, 150, 160)' }}>Пожалуйста, разрешите доступ к камере и микрофону в настройках браузера</p>
+            <button 
+              onClick={handleRetry}
+              style={{
+                marginTop: '20px',
+                padding: '10px 20px',
+                background: 'rgb(102, 126, 234)',
+                border: 'none',
+                borderRadius: '8px',
+                color: 'white',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => e.target.style.background = 'rgb(90, 110, 220)'}
+              onMouseLeave={(e) => e.target.style.background = 'rgb(102, 126, 234)'}
+            >
+              Попробовать снова
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if ((!isInRoom && !error) || isJoining) {
+    return (
+      <div className={styles.roomContainer}>
+        <TopBar roomId={roomId} />
+        <div className={styles.singleParticipantContainer}>
+          <div style={{ textAlign: 'center', padding: '40px', color: 'rgb(180, 180, 190)' }}>
+            <div style={{ 
+              width: '48px', 
+              height: '48px', 
+              border: '4px solid rgb(102, 126, 234)',
+              borderTopColor: 'transparent',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite',
+              margin: '0 auto 20px'
+            }}></div>
+            <p>Подключение к комнате...</p>
           </div>
         </div>
       </div>
@@ -234,8 +250,8 @@ const Room = () => {
                   muted={playerHighlighted.muted}
                   playing={playerHighlighted.playing}
                   isActive
-                  playerId={myId}
-                  playerName={playerNames[myId]}
+                  playerId={currentUserId}
+                  playerName={playerNames[currentUserId]}
                 />
               </div>
             )}
@@ -254,8 +270,8 @@ const Room = () => {
                 muted={playerHighlighted.muted}
                 playing={playerHighlighted.playing}
                 isActive
-                playerId={myId}
-                playerName={playerNames[myId]}
+                playerId={currentUserId}
+                playerName={playerNames[currentUserId]}
               />
             )}
             {!playerHighlighted && isSingleParticipant && (
@@ -267,13 +283,13 @@ const Room = () => {
           </div>
           <div className={styles.inActivePlayerContainer}>
             {Object.keys(nonHighlightedPlayers).map((playerId) => {
-              const { url, muted, playing } = nonHighlightedPlayers[playerId];
+              const player = nonHighlightedPlayers[playerId];
               return (
                 <Player
                   key={playerId}
-                  url={url}
-                  muted={muted}
-                  playing={playing}
+                  url={player.url}
+                  muted={player.muted}
+                  playing={player.playing}
                   isActive={false}
                   playerId={playerId}
                   playerName={playerNames[playerId]}
@@ -286,7 +302,6 @@ const Room = () => {
       
       <CopySection roomId={roomId}/>
       
-      
       <ChatPanel 
         roomId={roomId} 
         isOpen={chatOpen} 
@@ -294,11 +309,11 @@ const Room = () => {
       />
       
       <Bottom
-        muted={playerHighlighted?.muted}
-        playing={playerHighlighted?.playing}
-        toggleAudio={toggleAudio}
-        toggleVideo={toggleVideo}
-        leaveRoom={leaveRoom}
+        muted={!audioEnabled}
+        playing={videoEnabled}
+        toggleAudio={handleToggleAudio}
+        toggleVideo={handleToggleVideo}
+        leaveRoom={handleLeaveRoom}
         participantCount={participantCount}
         onChatToggle={() => setChatOpen(!chatOpen)}
       />

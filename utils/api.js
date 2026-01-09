@@ -94,6 +94,57 @@ export const authAPI = {
   },
 };
 
+export const roomAPI = {
+  createRoom: async (title, chatId, type = 'PUBLIC', customRoomId = null) => {
+    return apiRequest('/rooms', {
+      method: 'POST',
+      body: {
+        ...(title && { title }),
+        ...(chatId && { chatId }),
+        type,
+        ...(customRoomId && { customRoomId }),
+      },
+    });
+  },
+
+  joinRoom: async (roomId) => {
+    return apiRequest('/rooms/join', {
+      method: 'POST',
+      body: { roomId },
+    });
+  },
+
+  leaveRoom: async (roomId) => {
+    return apiRequest(`/rooms/${roomId}/leave`, {
+      method: 'POST',
+    });
+  },
+
+  endRoom: async (roomId) => {
+    return apiRequest(`/rooms/${roomId}/end`, {
+      method: 'POST',
+    });
+  },
+
+  getRoom: async (roomId) => {
+    return apiRequest(`/rooms/${roomId}`);
+  },
+
+  getActiveRooms: async () => {
+    return apiRequest('/rooms/active');
+  },
+
+  updateMediaState: async (roomId, audioEnabled, videoEnabled) => {
+    const params = new URLSearchParams({
+      audioEnabled: String(audioEnabled),
+      videoEnabled: String(videoEnabled),
+    });
+    return apiRequest(`/rooms/${roomId}/media?${params}`, {
+      method: 'PUT',
+    });
+  },
+};
+
 export const chatAPI = {
   getChats: async () => {
     return apiRequest('/chats');
@@ -536,30 +587,6 @@ export const userAPI = {
     const searchQuery = query.trim();
     const url = `/users/search?query=${encodeURIComponent(searchQuery)}`;
     return apiRequest(url);
-  },
-};
-
-export const roomAPI = {
-  createRoom: async () => {
-    return apiRequest('/rooms', {
-      method: 'POST',
-    });
-  },
-
-  getRoom: async (roomId) => {
-    return apiRequest(`/rooms/${roomId}`);
-  },
-
-  joinRoom: async (roomId) => {
-    return apiRequest(`/rooms/${roomId}/join`, {
-      method: 'POST',
-    });
-  },
-
-  leaveRoom: async (roomId) => {
-    return apiRequest(`/rooms/${roomId}/leave`, {
-      method: 'POST',
-    });
   },
 };
 

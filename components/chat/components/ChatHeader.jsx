@@ -2,6 +2,7 @@ import { ArrowLeft, Search, Loader2, X } from 'lucide-react';
 import { useRouter } from 'next/router';
 import { getChatName } from '@/utils/chatHelpers';
 import { getOnlineStatus } from '@/utils/dateHelpers';
+import RoomControls from '@/components/room/RoomControls';
 import styles from '@/styles/chat.module.css';
 
 export default function ChatHeader({
@@ -60,43 +61,48 @@ export default function ChatHeader({
         )}
       </div>
       
-      <div className={styles.searchWrapper}>
-        {!searchOpen ? (
-          <button
-            onClick={onOpenSearch}
-            className={styles.searchToggleButton}
-            title="Поиск сообщений"
-          >
-            <Search size={20} />
-          </button>
-        ) : (
-          <div className={styles.searchExpanded}>
-            <form onSubmit={onSearchSubmit} className={styles.searchFormInline}>
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={searchText}
-                onChange={(e) => onSearchTextChange(e.target.value)}
-                placeholder="Поиск сообщений..."
-                className={styles.searchInputInline}
-                autoFocus
-              />
-              {isSearching && (
-                <div className={styles.searchLoadingInline}>
-                  <Loader2 size={16} className={styles.spinner} />
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={onCloseSearch}
-                className={styles.searchCloseButtonInline}
-                title="Закрыть"
-              >
-                <X size={18} />
-              </button>
-            </form>
-          </div>
+      <div className={styles.headerActions}>
+        {chat && chat.id && (
+          <RoomControls chatId={chat.id} chatType={chat.type} />
         )}
+        <div className={styles.searchWrapper}>
+          {!searchOpen ? (
+            <button
+              onClick={onOpenSearch}
+              className={styles.searchToggleButton}
+              title="Поиск сообщений"
+            >
+              <Search size={20} />
+            </button>
+          ) : (
+            <div className={styles.searchExpanded}>
+              <form onSubmit={onSearchSubmit} className={styles.searchFormInline}>
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchText}
+                  onChange={(e) => onSearchTextChange(e.target.value)}
+                  placeholder="Поиск сообщений..."
+                  className={styles.searchInputInline}
+                  autoFocus
+                />
+                {isSearching && (
+                  <div className={styles.searchLoadingInline}>
+                    <Loader2 size={16} className={styles.spinner} />
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={onCloseSearch}
+                  className={styles.searchCloseButtonInline}
+                  title="Закрыть"
+                >
+                  <X size={18} />
+                </button>
+              </form>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
