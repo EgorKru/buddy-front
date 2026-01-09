@@ -210,10 +210,10 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
   width: 100%;
-  max-width: 600px;
+  max-width: 540px;
   margin: 0 auto;
   background: rgb(30, 30, 35);
   border: 1px solid rgb(50, 50, 60);
@@ -223,6 +223,7 @@
     0 20px 60px rgba(0, 0, 0, 0.4),
     0 0 0 1px rgba(255, 255, 255, 0.05);
   animation: slideUp 0.5s ease-out 0.2s both;
+  gap: 32px;
 }
 
 @media (max-width: 768px) {
@@ -230,6 +231,7 @@
     padding: 32px 24px;
     border-radius: 16px;
     margin: 0 16px;
+    gap: 24px;
   }
 }
 
@@ -237,6 +239,7 @@
   .content {
     padding: 24px 16px;
     margin: 0 8px;
+    gap: 20px;
   }
 }
 
@@ -251,32 +254,153 @@
   }
 }
 
-.enterRoom {
+.createSection {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.createButton {
+  width: 100%;
+  padding: 18px 24px;
+  background: linear-gradient(135deg, rgb(102, 126, 234) 0%, rgb(88, 110, 220) 100%);
+  border: none;
+  border-radius: 14px;
+  color: rgb(255, 255, 255);
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  touch-action: manipulation;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-shadow: 
+    0 4px 16px rgba(102, 126, 234, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+.createButton::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.createButton:hover::before {
+  left: 100%;
+}
+
+@media (max-width: 768px) {
+  .createButton {
+    padding: 16px 20px;
+    font-size: 16px;
+  }
+}
+
+.createButton:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 24px rgba(102, 126, 234, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.1);
+  background: linear-gradient(135deg, rgb(110, 130, 240) 0%, rgb(95, 115, 230) 100%);
+}
+
+.createButton:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.createButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.createHint {
+  text-align: center;
+  color: rgb(150, 150, 160);
+  font-size: 13px;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.separator {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 8px 0;
+}
+
+.separator::before,
+.separator::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgb(50, 50, 60);
+}
+
+.separator span {
+  color: rgb(120, 120, 130);
+  font-size: 13px;
+  text-transform: lowercase;
+  font-weight: 500;
+}
+
+.joinSection {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: rgb(200, 200, 210);
+  text-align: center;
+  letter-spacing: 0.3px;
+}
+
+.enterRoom {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   width: 100%;
-  margin-bottom: 32px;
+}
+
+.inputWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.inputIcon {
+  position: absolute;
+  left: 16px;
+  color: rgb(120, 120, 130);
+  pointer-events: none;
+  transition: color 0.3s ease;
+  z-index: 1;
 }
 
 .enterRoom input {
   width: 100%;
-  padding: 16px 20px;
+  padding: 16px 20px 16px 46px;
   background: rgb(25, 25, 30);
-  border: 1px solid rgb(50, 50, 60);
+  border: 1.5px solid rgb(50, 50, 60);
   border-radius: 12px;
-  font-size: 16px;
+  font-size: 15px;
   color: rgb(255, 255, 255);
   font-family: inherit;
   transition: all 0.3s ease;
   box-sizing: border-box;
-}
-
-@media (max-width: 768px) {
-  .enterRoom input {
-    padding: 14px 18px;
-    font-size: 16px; /* Предотвращает зум на iOS */
-  }
 }
 
 .enterRoom input::placeholder {
@@ -288,6 +412,10 @@
   background: rgb(28, 28, 33);
 }
 
+.inputWrapper:focus-within .inputIcon {
+  color: rgb(102, 126, 234);
+}
+
 .enterRoom input:focus {
   outline: none;
   border-color: rgb(102, 126, 234);
@@ -297,57 +425,50 @@
     0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-.enterRoom button {
-  padding: 16px 24px;
-  background: linear-gradient(135deg, rgb(102, 126, 234) 0%, rgb(88, 110, 220) 100%);
-  color: white;
-  border: none;
-  border-radius: 12px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
-  touch-action: manipulation;
+.inputWrapperError input {
+  border-color: rgb(239, 68, 68) !important;
+  background: rgba(239, 68, 68, 0.05) !important;
+}
+
+.inputWrapperError .inputIcon {
+  color: rgb(239, 68, 68) !important;
+}
+
+.inputWrapperError input:focus {
+  border-color: rgb(239, 68, 68) !important;
+  box-shadow: 
+    0 0 0 3px rgba(239, 68, 68, 0.1),
+    0 4px 12px rgba(0, 0, 0, 0.3) !important;
 }
 
 @media (max-width: 768px) {
-  .enterRoom button {
-    padding: 14px 20px;
-    font-size: 15px;
+  .enterRoom input {
+    padding: 14px 18px 14px 44px;
+    font-size: 16px;
+  }
+  
+  .inputIcon {
+    left: 14px;
   }
 }
 
-.enterRoom button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.5);
-  background: linear-gradient(135deg, rgb(110, 130, 240) 0%, rgb(95, 115, 230) 100%);
-}
-
-.enterRoom button:active {
-  transform: translateY(0);
-}
-
-.separatorText {
-  text-align: center;
-  margin: 32px 0;
-  color: rgb(150, 150, 160);
-  font-size: 14px;
-  position: relative;
+.errorMessage {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 8px;
+  color: rgb(239, 68, 68);
+  font-size: 13px;
+  padding: 8px 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 8px;
+  border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
-.separatorText::before,
-.separatorText::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: rgb(50, 50, 60);
+.errorMessage svg {
+  flex-shrink: 0;
 }
 
-.createButton {
+.joinButton {
   width: 100%;
   padding: 16px 24px;
   background: rgb(40, 40, 45);
@@ -359,22 +480,44 @@
   cursor: pointer;
   transition: all 0.3s ease;
   touch-action: manipulation;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 @media (max-width: 768px) {
-  .createButton {
+  .joinButton {
     padding: 14px 20px;
     font-size: 15px;
   }
 }
 
-.createButton:hover {
+.joinButton:hover:not(:disabled) {
   background: rgb(50, 50, 60);
   border-color: rgb(60, 60, 70);
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
 }
 
-.createButton:active {
+.joinButton:active:not(:disabled) {
   transform: translateY(0);
+}
+
+.joinButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }

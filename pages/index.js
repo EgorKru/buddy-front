@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { useRouter } from 'next/router'
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 import styles from '@/styles/home.module.css'
 import { isAuthenticated, getCurrentUser, authAPI } from '@/utils/api';
@@ -11,6 +11,9 @@ export default function Home() {
   const [roomId, setRoomId] = useState('')
   const [user, setUser] = useState(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [isCreating, setIsCreating] = useState(false)
+  const [inputError, setInputError] = useState('')
+  const roomInputRef = useRef(null)
 
   useEffect(() => {
     const checkAuth = () => {
@@ -28,23 +31,53 @@ export default function Home() {
     checkAuth();
   }, [router]);
 
-  const createAndJoin = () => {
-    const roomId = uuidv4()
-    router.push(`/${roomId}`)
+  useEffect(() => {
+    if (user && roomInputRef.current) {
+      const timer = setTimeout(() => {
+        roomInputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [user]);
+
+  const createAndJoin = async () => {
+    setIsCreating(true);
+    await new Promise(resolve => setTimeout(resolve, 300));
+    const newRoomId = uuidv4();
+    router.push(`/${newRoomId}`);
   }
 
   const joinRoom = () => {
     const trimmedRoomId = roomId.trim();
-    if (trimmedRoomId) {
-      router.push(`/${trimmedRoomId}`)
-    } else {
-      alert("Пожалуйста, введите корректный ID комнаты")
+    setInputError('');
+    
+    if (!trimmedRoomId) {
+      setInputError('Введите ID комнаты');
+      roomInputRef.current?.focus();
+      return;
     }
+
+    if (trimmedRoomId.length < 36) {
+      setInputError('ID комнаты должен содержать 36 символов');
+      roomInputRef.current?.focus();
+      return;
+    }
+
+    router.push(`/${trimmedRoomId}`);
   }
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
       joinRoom();
+    } else {
+      setInputError('');
+    }
+  }
+
+  const handleInputChange = (e) => {
+    setRoomId(e.target.value);
+    if (inputError) {
+      setInputError('');
     }
   }
 
@@ -125,21 +158,82 @@ export default function Home() {
         </div>
         
         <div className={styles.content}>
-          <div className={styles.enterRoom}>
-            <input 
-              id="room-id"
-              name="roomId"
-              placeholder='Введите ID комнаты' 
-              value={roomId} 
-              onChange={(e) => setRoomId(e?.target?.value)}
-              onKeyDown={handleKeyDown}
-            />
-            <button onClick={joinRoom}>Войти в комнату</button>
+          <div className={styles.createSection}>
+            <button 
+              onClick={createAndJoin} 
+              className={styles.createButton}
+              disabled={isCreating}
+            >
+              {isCreating ? (
+                <>
+                  <svg className={styles.spinner} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" strokeLinecap="round"/>
+                  </svg>
+                  Создание...
+                </>
+              ) : (
+                <>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                  Создать новую комнату
+                </>
+              )}
+            </button>
+            <p className={styles.createHint}>
+              Создайте комнату и поделитесь ссылкой с друзьями
+            </p>
           </div>
-          <span className={styles.separatorText}>ИЛИ</span>
-          <button onClick={createAndJoin} className={styles.createButton}>
-            Создать новую комнату
-          </button>
+
+          <div className={styles.separator}>
+            <span>или</span>
+          </div>
+
+          <div className={styles.joinSection}>
+            <h2 className={styles.sectionTitle}>Войти в существующую комнату</h2>
+            <div className={styles.enterRoom}>
+              <div className={`${styles.inputWrapper} ${inputError ? styles.inputWrapperError : ''}`}>
+                <svg className={styles.inputIcon} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+                <input 
+                  ref={roomInputRef}
+                  id="room-id"
+                  name="roomId"
+                  type="text"
+                  placeholder="Вставьте ID комнаты" 
+                  value={roomId} 
+                  onChange={handleInputChange}
+                  onKeyDown={handleKeyDown}
+                  autoComplete="off"
+                />
+              </div>
+              {inputError && (
+                <div className={styles.errorMessage}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                  </svg>
+                  {inputError}
+                </div>
+              )}
+              <button 
+                onClick={joinRoom} 
+                className={styles.joinButton}
+                disabled={!roomId.trim() || isCreating}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                  <polyline points="10 17 15 12 10 7"></polyline>
+                  <line x1="15" y1="12" x2="3" y2="12"></line>
+                </svg>
+                Войти
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

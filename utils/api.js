@@ -565,12 +565,12 @@ export const chatAPI = {
 };
 
 export const userAPI = {
-  searchUsers: async (username) => {
-    if (!username || username.trim().length === 0) {
+  searchUsers: async (query) => {
+    if (!query || query.trim().length === 0) {
       return [];
     }
-    const query = username.trim();
-    const url = `/users/search?username=${encodeURIComponent(query)}`;
+    const searchQuery = query.trim();
+    const url = `/users/search?query=${encodeURIComponent(searchQuery)}`;
     return apiRequest(url);
   },
 };

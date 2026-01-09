@@ -89,8 +89,8 @@ export default function CreateChatModal({ isOpen, onClose, onSuccess }) {
                   }
                 }}
                 placeholder={createChat.chatType === 'DIRECT' 
-                  ? 'Введите username для поиска...' 
-                  : 'Введите username для поиска участников...'}
+                  ? 'Введите username или email...' 
+                  : 'Введите username или email участников...'}
                 className={styles.input}
               />
               {createChat.searching && (
@@ -127,6 +127,11 @@ export default function CreateChatModal({ isOpen, onClose, onSuccess }) {
                         </div>
                         <div className={styles.searchResultUsername}>
                           @{user.username}
+                          {user.email && (
+                            <span style={{ marginLeft: '8px', color: '#888', fontSize: '12px' }}>
+                              • {user.email}
+                            </span>
+                          )}
                         </div>
                       </div>
                       <UserPlus size={16} className={styles.addIcon} />
@@ -137,8 +142,8 @@ export default function CreateChatModal({ isOpen, onClose, onSuccess }) {
             </div>
             <small className={styles.hint}>
               {createChat.chatType === 'DIRECT'
-                ? 'Начните вводить username пользователя и выберите из результатов'
-                : 'Начните вводить username и выберите участников из результатов'}
+                ? 'Начните вводить username или email пользователя и выберите из результатов'
+                : 'Начните вводить username или email и выберите участников из результатов'}
             </small>
           </div>
 
