@@ -161,17 +161,30 @@
   position: relative;
   margin: 16px;
   background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  border: none !important;
+  border-width: 0 !important;
+  border-style: none !important;
   border-radius: 8px;
   padding: 10px 14px;
   flex-shrink: 0;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease;
+  box-shadow: none !important;
+  outline: none !important;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .searchContainer:focus-within {
   background: #ffffff;
-  border-color: #9ca3af;
-  box-shadow: 0 0 0 3px rgba(107, 107, 107, 0.1);
+  box-shadow: none !important;
+  outline: none !important;
+  border: none !important;
+}
+
+.searchContainer:not(:focus-within) {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
 }
 
 @media (max-width: 768px) {
@@ -183,7 +196,7 @@
 
 .searchIcon {
   position: absolute;
-  left: 14px;
+  left: 24px;
   top: 50%;
   transform: translateY(-50%);
   color: #9ca3af;
@@ -192,13 +205,30 @@
 
 .searchInput {
   width: 100%;
-  padding: 0 0 0 28px;
-  border: none;
-  outline: none;
+  padding: 0 0 0 38px;
+  border: none !important;
+  border-width: 0 !important;
+  border-style: none !important;
+  outline: none !important;
   font-size: 14px;
   background: transparent;
   color: #111827;
   font-family: inherit;
+  box-shadow: none !important;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.searchInput:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+.searchInput:not(:focus) {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
 }
 
 .searchInput::placeholder {
@@ -472,16 +502,19 @@
   border-radius: 12px;
   width: 100%;
   max-width: 500px;
-  max-height: 90vh;
-  overflow-y: auto;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   animation: slideUp 0.2s ease-out;
+  overflow: hidden;
+  position: relative;
 }
 
 @media (max-width: 768px) {
   .modal {
     max-width: 95vw;
-    max-height: 95vh;
+    max-height: 90vh;
     border-radius: 16px;
     margin: 0 8px;
   }
@@ -502,8 +535,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 24px;
+  padding: 16px 20px;
   border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
 }
 
 .modalHeader h2 {
@@ -542,29 +576,39 @@
 }
 
 .modalForm {
-  padding: 20px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.modalTopSection {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #ffffff;
 }
 
 @media (max-width: 768px) {
-  .modalForm {
-    padding: 16px 20px 20px;
+  .modalTopSection {
+    padding: 12px 16px 10px;
   }
 }
 
-.formGroup {
-  margin-bottom: 16px;
-}
-
-.formGroup:last-of-type {
-  margin-bottom: 0;
+.groupNameInput {
+  margin-top: 0;
 }
 
 .chatTypeSelector {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   background: #f3f4f6;
   border-radius: 10px;
-  padding: 4px;
+  padding: 3px;
 }
 
 .chatTypeButton {
@@ -572,12 +616,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 10px 16px;
+  gap: 6px;
+  padding: 8px 14px;
   border: none;
   background: transparent;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: #6b7280;
   cursor: pointer;
@@ -601,12 +645,12 @@
 
 .input {
   width: 100%;
-  padding: 12px 16px;
+  padding: 10px 14px;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
   background: #ffffff;
   color: #111827;
-  font-size: 15px;
+  font-size: 14px;
   font-family: inherit;
   outline: none;
   transition: all 0.2s ease;
@@ -628,14 +672,11 @@
   color: #9ca3af;
 }
 
-.searchWrapper {
-  position: relative;
-}
-
 .searchInputContainer {
   position: relative;
   display: flex;
   align-items: center;
+  width: 100%;
 }
 
 .searchIcon {
@@ -648,12 +689,12 @@
 
 .searchInput {
   width: 100%;
-  padding: 12px 16px 12px 44px;
+  padding: 10px 14px 10px 42px;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
   background: #f9fafb;
   color: #111827;
-  font-size: 15px;
+  font-size: 14px;
   font-family: inherit;
   outline: none;
   transition: all 0.2s ease;
@@ -691,31 +732,31 @@
   display: flex;
   gap: 10px;
   justify-content: flex-end;
-  margin-top: 20px;
-  padding-top: 20px;
+  padding: 12px 20px;
   border-top: 1px solid #e5e7eb;
   flex-wrap: wrap;
+  flex-shrink: 0;
+  background: #ffffff;
 }
 
 @media (max-width: 768px) {
   .modalActions {
     gap: 8px;
-    margin-top: 16px;
-    padding-top: 16px;
+    padding: 10px 16px;
   }
 }
 
 .cancelButton,
 .submitButton {
-  padding: 10px 20px;
+  padding: 9px 18px;
   border-radius: 8px;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
   border: none;
   touch-action: manipulation;
-  min-height: 40px;
+  min-height: 38px;
 }
 
 @media (max-width: 768px) {
@@ -725,6 +766,7 @@
     font-size: 14px;
     flex: 1;
     min-width: 0;
+    min-height: 40px;
   }
 }
 
@@ -762,21 +804,34 @@
   transform: none !important;
 }
 
-.searchResults {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  margin-top: 6px;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  max-height: 320px;
+.searchResultsContainer {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  z-index: 100;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-  animation: slideDown 0.2s ease-out;
+  background: #ffffff;
+}
+
+.searchResultsContainer::-webkit-scrollbar {
+  width: 6px;
+}
+
+.searchResultsContainer::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.searchResultsContainer::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.searchResultsContainer::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+.searchResultsList {
+  display: flex;
+  flex-direction: column;
 }
 
 @keyframes slideDown {
@@ -794,7 +849,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
+  padding: 12px 20px;
   cursor: pointer;
   transition: background-color 0.15s ease;
   border-bottom: 1px solid #f3f4f6;
@@ -813,15 +868,15 @@
 }
 
 .searchResultEmpty {
-  padding: 20px 16px;
+  padding: 40px 20px;
   text-align: center;
   color: #9ca3af;
   font-size: 14px;
 }
 
 .searchResultAvatar {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   flex-shrink: 0;
   overflow: hidden;
@@ -845,7 +900,7 @@
   justify-content: center;
   color: white;
   font-weight: 600;
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .searchResultInfo {
@@ -856,16 +911,16 @@
 
 .searchResultName {
   font-weight: 500;
-  font-size: 15px;
+  font-size: 14px;
   color: #111827;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .searchResultUsername {
-  font-size: 13px;
+  font-size: 12px;
   color: #6b7280;
   white-space: nowrap;
   overflow: hidden;
@@ -874,49 +929,58 @@
 
 .searchResultEmail {
   color: #9ca3af;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .addIcon {
-  color: #6b6b6b;
+  color: #9ca3af;
   flex-shrink: 0;
   transition: all 0.2s ease;
 }
 
 .searchResultItem:hover .addIcon {
-  color: #111827;
-  transform: scale(1.1);
+  color: #6b6b6b;
+  transform: scale(1.05);
 }
 
-.selectedParticipantsSection {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid #e5e7eb;
-}
-
-.selectedParticipantsLabel {
-  font-size: 13px;
-  font-weight: 500;
-  color: #6b7280;
-  margin-bottom: 12px;
-}
-
-.selectedParticipants {
+.selectedParticipantsCompact {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
+  padding: 4px 0;
+  max-height: 80px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
-.participantTag {
+.selectedParticipantsCompact::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.selectedParticipantsCompact::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.selectedParticipantsCompact::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 2px;
+}
+
+.selectedParticipantsCompact::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+.participantTagCompact {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 10px 6px 6px;
-  background: #f3f4f6;
-  border: 1px solid #e5e7eb;
-  border-radius: 20px;
-  font-size: 14px;
-  color: #374151;
+  gap: 6px;
+  padding: 4px 8px 4px 4px;
+  background: #e8f4fd;
+  border: 1px solid #bee3f8;
+  border-radius: 16px;
+  font-size: 13px;
+  color: #2c5282;
   transition: all 0.2s ease;
   animation: slideInTag 0.2s ease-out;
 }
@@ -932,14 +996,14 @@
   }
 }
 
-.participantTag:hover {
-  background: #e5e7eb;
-  border-color: #d1d5db;
+.participantTagCompact:hover {
+  background: #bee3f8;
+  border-color: #90cdf4;
 }
 
 .participantTagAvatar {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   flex-shrink: 0;
   overflow: hidden;
@@ -949,7 +1013,7 @@
   justify-content: center;
   color: white;
   font-weight: 600;
-  font-size: 11px;
+  font-size: 10px;
 }
 
 .participantTagAvatar img {
@@ -961,27 +1025,33 @@
 .participantTagName {
   font-weight: 500;
   white-space: nowrap;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .removeParticipantButton {
   background: transparent;
   border: none;
   cursor: pointer;
-  color: #9ca3af;
-  padding: 4px;
+  color: #6b7280;
+  padding: 2px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
+  margin-left: 4px;
+  opacity: 0.7;
 }
 
 .removeParticipantButton:hover {
-  background: rgba(239, 68, 68, 0.1);
+  background: rgba(239, 68, 68, 0.15);
   color: #ef4444;
+  opacity: 1;
 }
 
 .removeParticipantButton:active {
@@ -1010,4 +1080,5 @@
   color: rgb(34, 197, 94);
   flex-shrink: 0;
 }
+
 

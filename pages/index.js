@@ -93,10 +93,10 @@ export default function Home() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'rgb(18, 18, 20)',
-        color: 'rgb(255, 255, 255)',
-        fontSize: '18px',
-        fontWeight: '500'
+        background: '#ffffff',
+        color: '#6b7280',
+        fontSize: '16px',
+        fontWeight: '400'
       }}>
         <div style={{
           display: 'flex',
@@ -107,8 +107,8 @@ export default function Home() {
           <div style={{
             width: '40px',
             height: '40px',
-            border: '4px solid rgb(50, 50, 60)',
-            borderTopColor: 'rgb(102, 126, 234)',
+            border: '4px solid #e5e7eb',
+            borderTopColor: '#6b6b6b',
             borderRadius: '50%',
             animation: 'spin 1s linear infinite'
           }}></div>

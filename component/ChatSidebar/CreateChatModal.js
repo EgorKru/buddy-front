@@ -42,7 +42,7 @@ export default function CreateChatModal({ isOpen, onClose, onSuccess }) {
         </div>
 
         <form onSubmit={handleCreateChat} className={styles.modalForm}>
-          <div className={styles.formGroup}>
+          <div className={styles.modalTopSection}>
             <div className={styles.chatTypeSelector}>
               <button
                 type="button"
@@ -61,103 +61,52 @@ export default function CreateChatModal({ isOpen, onClose, onSuccess }) {
                 Групповой чат
               </button>
             </div>
-          </div>
 
-          {createChat.chatType === 'GROUP' && (
-            <div className={styles.formGroup}>
-              <input
-                type="text"
-                id="chat-create-group-name"
-                name="chatName"
-                value={createChat.chatName}
-                onChange={(e) => createChat.setChatName(e.target.value)}
-                placeholder="Название группы"
-                className={styles.input}
-                required
-                autoFocus={createChat.chatType === 'GROUP'}
-              />
-            </div>
-          )}
-
-          <div className={styles.formGroup}>
-            <div className={styles.searchWrapper}>
-              <div className={styles.searchInputContainer}>
-                <Search size={18} className={styles.searchIcon} />
+            {createChat.chatType === 'GROUP' && (
+              <div className={styles.groupNameInput}>
                 <input
-                  ref={createChat.searchInputRef}
                   type="text"
-                  id="chat-create-participants"
-                  name="participants"
-                  value={createChat.participantUsernames}
-                  onChange={createChat.handleSearchInputChange}
-                  onFocus={() => {
-                    if (createChat.searchResults.length > 0) {
-                      createChat.setShowSearchResults(true);
-                    }
-                  }}
-                  placeholder={createChat.chatType === 'DIRECT' 
-                    ? 'Поиск пользователя...' 
-                    : 'Поиск участников...'}
-                  className={styles.searchInput}
-                  autoFocus={createChat.chatType === 'DIRECT'}
+                  id="chat-create-group-name"
+                  name="chatName"
+                  value={createChat.chatName}
+                  onChange={(e) => createChat.setChatName(e.target.value)}
+                  placeholder="Название группы"
+                  className={styles.input}
+                  required
+                  autoFocus={createChat.chatType === 'GROUP'}
                 />
-                {createChat.searching && (
-                  <Loader2 size={16} className={styles.searchLoader} />
-                )}
               </div>
+            )}
 
-              {createChat.showSearchResults && createChat.searchResults.length > 0 && (
-                <div className={styles.searchResults}>
-                  {createChat.searchResults.map((user) => (
-                    <div
-                      key={user.id}
-                      className={styles.searchResultItem}
-                      onClick={() => createChat.handleSelectParticipant(user)}
-                    >
-                      <div className={styles.searchResultAvatar}>
-                        {user.avatarUrl ? (
-                          <Image src={user.avatarUrl} alt="" width={40} height={40} unoptimized />
-                        ) : (
-                          <div className={styles.searchResultAvatarPlaceholder}>
-                            {(user.displayName || user.username)?.[0]?.toUpperCase() || '?'}
-                          </div>
-                        )}
-                      </div>
-                      <div className={styles.searchResultInfo}>
-                        <div className={styles.searchResultName}>
-                          {user.displayName || user.username}
-                        </div>
-                        <div className={styles.searchResultUsername}>
-                          @{user.username}
-                          {user.email && (
-                            <span className={styles.searchResultEmail}> • {user.email}</span>
-                          )}
-                        </div>
-                      </div>
-                      <UserPlus size={18} className={styles.addIcon} />
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {createChat.showSearchResults && createChat.searchResults.length === 0 && createChat.participantUsernames.length >= 2 && !createChat.searching && (
-                <div className={styles.searchResults}>
-                  <div className={styles.searchResultEmpty}>
-                    Пользователи не найдены
-                  </div>
-                </div>
+            <div className={styles.searchInputContainer}>
+              <Search size={18} className={styles.searchIcon} />
+              <input
+                ref={createChat.searchInputRef}
+                type="text"
+                id="chat-create-participants"
+                name="participants"
+                value={createChat.participantUsernames}
+                onChange={createChat.handleSearchInputChange}
+                onFocus={() => {
+                  if (createChat.searchResults.length > 0) {
+                    createChat.setShowSearchResults(true);
+                  }
+                }}
+                placeholder={createChat.chatType === 'DIRECT' 
+                  ? 'Поиск пользователя...' 
+                  : 'Поиск участников...'}
+                className={styles.searchInput}
+                autoFocus={createChat.chatType === 'DIRECT'}
+              />
+              {createChat.searching && (
+                <Loader2 size={16} className={styles.searchLoader} />
               )}
             </div>
-          </div>
 
-          {createChat.selectedParticipants.length > 0 && (
-            <div className={styles.selectedParticipantsSection}>
-              <div className={styles.selectedParticipantsLabel}>
-                Выбрано: {createChat.selectedParticipants.length}
-              </div>
-              <div className={styles.selectedParticipants}>
+            {createChat.selectedParticipants.length > 0 && (
+              <div className={styles.selectedParticipantsCompact}>
                 {createChat.selectedParticipants.map((participant) => (
-                  <div key={participant.id} className={styles.participantTag}>
+                  <div key={participant.id} className={styles.participantTagCompact}>
                     <div className={styles.participantTagAvatar}>
                       {participant.avatarUrl ? (
                         <Image src={participant.avatarUrl} alt="" width={24} height={24} unoptimized />
@@ -174,13 +123,61 @@ export default function CreateChatModal({ isOpen, onClose, onSuccess }) {
                       className={styles.removeParticipantButton}
                       aria-label="Удалить"
                     >
-                      <X size={14} />
+                      <X size={12} />
                     </button>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
+
+          <div className={styles.searchResultsContainer}>
+            {createChat.showSearchResults && createChat.searchResults.length > 0 && (
+              <div className={styles.searchResultsList}>
+                {createChat.searchResults.map((user) => (
+                  <div
+                    key={user.id}
+                    className={styles.searchResultItem}
+                    onClick={() => createChat.handleSelectParticipant(user)}
+                  >
+                    <div className={styles.searchResultAvatar}>
+                      {user.avatarUrl ? (
+                        <Image src={user.avatarUrl} alt="" width={40} height={40} unoptimized />
+                      ) : (
+                        <div className={styles.searchResultAvatarPlaceholder}>
+                          {(user.displayName || user.username)?.[0]?.toUpperCase() || '?'}
+                        </div>
+                      )}
+                    </div>
+                    <div className={styles.searchResultInfo}>
+                      <div className={styles.searchResultName}>
+                        {user.displayName || user.username}
+                      </div>
+                      <div className={styles.searchResultUsername}>
+                        @{user.username}
+                        {user.email && (
+                          <span className={styles.searchResultEmail}> • {user.email}</span>
+                        )}
+                      </div>
+                    </div>
+                    <UserPlus size={18} className={styles.addIcon} />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {createChat.showSearchResults && createChat.searchResults.length === 0 && createChat.participantUsernames.length >= 2 && !createChat.searching && (
+              <div className={styles.searchResultEmpty}>
+                Пользователи не найдены
+              </div>
+            )}
+
+            {!createChat.showSearchResults && createChat.participantUsernames.length === 0 && (
+              <div className={styles.searchResultEmpty}>
+                Начните вводить имя или email пользователя
+              </div>
+            )}
+          </div>
 
           {createChat.createError && (
             <div className={styles.error}>{createChat.createError}</div>
