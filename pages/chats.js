@@ -192,8 +192,17 @@ export default function Chats() {
                       )}
                     </span>
                     <span className={styles.lastMessageText}>
-                      {chat.lastMessage.content.substring(0, 50)}
-                      {chat.lastMessage.content.length > 50 ? '...' : ''}
+                      {chat.lastMessage.content ? (
+                        <>
+                          {chat.lastMessage.content.substring(0, 50)}
+                          {chat.lastMessage.content.length > 50 ? '...' : ''}
+                        </>
+                      ) : (
+                        chat.lastMessage.type === 'IMAGE' ? '📷 Изображение' :
+                        chat.lastMessage.type === 'FILE' ? '📎 Файл' :
+                        chat.lastMessage.type === 'VOICE' ? '🎤 Голосовое сообщение' :
+                        'Сообщение'
+                      )}
                     </span>
                   </div>
                 )}

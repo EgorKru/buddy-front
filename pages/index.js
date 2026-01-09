@@ -1,9 +1,8 @@
-import { v4 as uuidv4 } from 'uuid';
 import { useRouter } from 'next/router'
 import { useEffect, useState, useRef } from 'react';
 
 import styles from '@/styles/home.module.css'
-import { isAuthenticated, getCurrentUser, authAPI } from '@/utils/api';
+import { isAuthenticated, getCurrentUser, authAPI, roomAPI } from '@/utils/api';
 import ChatSidebar from '@/component/ChatSidebar';
 
 export default function Home() {
@@ -42,13 +41,22 @@ export default function Home() {
 
   const createAndJoin = async () => {
     setIsCreating(true);
-    await new Promise(resolve => setTimeout(resolve, 300));
-    const newRoomId = uuidv4();
-    router.push(`/${newRoomId}`);
+    setInputError('');
+    try {
+      const newRoom = await roomAPI.createRoom(null, null, 'PUBLIC');
+      if (newRoom && newRoom.roomId) {
+        router.push(`/room/${newRoom.roomId}`);
+      } else {
+        throw new Error('Не удалось получить ID комнаты');
+      }
+    } catch (error) {
+      setInputError(error.message || 'Ошибка при создании комнаты');
+      setIsCreating(false);
+    }
   }
 
   const joinRoom = () => {
-    const trimmedRoomId = roomId.trim();
+    const trimmedRoomId = roomId.trim().toUpperCase();
     setInputError('');
     
     if (!trimmedRoomId) {
@@ -57,13 +65,13 @@ export default function Home() {
       return;
     }
 
-    if (trimmedRoomId.length < 36) {
-      setInputError('ID комнаты должен содержать 36 символов');
+    if (trimmedRoomId.length < 6 || trimmedRoomId.length > 12) {
+      setInputError('ID комнаты должен содержать 6-12 символов');
       roomInputRef.current?.focus();
       return;
     }
 
-    router.push(`/${trimmedRoomId}`);
+    router.push(`/room/${trimmedRoomId}`);
   }
 
   const handleKeyDown = (e) => {

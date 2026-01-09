@@ -59,7 +59,20 @@ const Room = () => {
     setIsJoining(false);
     if (roomId) {
       try {
-        await joinRoom(roomId);
+        await joinRoom(roomId, true);
+      } catch (err) {
+        setIsJoining(false);
+      }
+    }
+  };
+
+  const handleJoinWithoutMedia = async () => {
+    clearError();
+    setIsJoining(false);
+    if (roomId) {
+      try {
+        await joinRoom(roomId, false);
+        setIsJoining(false);
       } catch (err) {
         setIsJoining(false);
       }
@@ -191,23 +204,46 @@ const Room = () => {
             <h2 style={{ marginBottom: '16px', fontSize: '24px' }}>Ошибка доступа к камере/микрофону</h2>
             <p style={{ marginBottom: '8px', color: 'rgb(180, 180, 190)' }}>{error}</p>
             <p style={{ color: 'rgb(150, 150, 160)' }}>Пожалуйста, разрешите доступ к камере и микрофону в настройках браузера</p>
-            <button 
-              onClick={handleRetry}
-              style={{
-                marginTop: '20px',
-                padding: '10px 20px',
-                background: 'rgb(102, 126, 234)',
-                border: 'none',
-                borderRadius: '8px',
-                color: 'white',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => e.target.style.background = 'rgb(90, 110, 220)'}
-              onMouseLeave={(e) => e.target.style.background = 'rgb(102, 126, 234)'}
-            >
-              Попробовать снова
-            </button>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '20px' }}>
+              <button 
+                onClick={handleRetry}
+                style={{
+                  padding: '10px 20px',
+                  background: 'rgb(102, 126, 234)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: 'white',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => e.target.style.background = 'rgb(90, 110, 220)'}
+                onMouseLeave={(e) => e.target.style.background = 'rgb(102, 126, 234)'}
+              >
+                Попробовать снова
+              </button>
+              <button 
+                onClick={handleJoinWithoutMedia}
+                style={{
+                  padding: '10px 20px',
+                  background: 'rgb(50, 50, 60)',
+                  border: '1px solid rgb(70, 70, 80)',
+                  borderRadius: '8px',
+                  color: 'white',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = 'rgb(60, 60, 70)';
+                  e.target.style.borderColor = 'rgb(80, 80, 90)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = 'rgb(50, 50, 60)';
+                  e.target.style.borderColor = 'rgb(70, 70, 80)';
+                }}
+              >
+                Присоединиться без камеры
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -322,3 +358,4 @@ const Room = () => {
 };
 
 export default Room;
+

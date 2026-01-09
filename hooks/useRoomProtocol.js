@@ -299,11 +299,11 @@ export const useRoomProtocol = (roomId = null) => {
       throw new Error('Медиа устройства недоступны. Убедитесь, что вы используете HTTPS или localhost.');
     }
 
-    const timeout = 10000;
+    const timeout = 30000;
     let timeoutId;
 
     try {
-      const getUserMediaPromise = navigator.mediaDevices.getUserMedia({
+      const constraints = {
         audio: audio ? {
           echoCancellation: true,
           noiseSuppression: true,
@@ -314,7 +314,9 @@ export const useRoomProtocol = (roomId = null) => {
           height: { ideal: 720 },
           facingMode: 'user',
         } : false,
-      });
+      };
+
+      const getUserMediaPromise = navigator.mediaDevices.getUserMedia(constraints);
 
       const timeoutPromise = new Promise((_, reject) => {
         timeoutId = setTimeout(() => {
@@ -416,7 +418,7 @@ export const useRoomProtocol = (roomId = null) => {
     }
   }, [subscribeToRoomEvents]);
 
-  const joinRoom = useCallback(async (roomIdToJoin) => {
+  const joinRoom = useCallback(async (roomIdToJoin, requestMedia = true) => {
     try {
       setError(null);
       const roomData = await roomAPI.joinRoom(roomIdToJoin);
@@ -426,11 +428,13 @@ export const useRoomProtocol = (roomId = null) => {
       setIsInRoom(true);
       subscribeToRoomEvents();
       
-      try {
-        await startLocalStream(true, true);
-      } catch (streamError) {
-        setError(streamError.message);
-        throw streamError;
+      if (requestMedia) {
+        try {
+          await startLocalStream(true, true);
+        } catch (streamError) {
+          setError(streamError.message);
+          throw streamError;
+        }
       }
       
       if (roomData.participants && roomData.participants.length > 0) {

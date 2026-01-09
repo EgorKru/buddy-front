@@ -17,7 +17,20 @@ export default function RoomControls({ chatId, chatType }) {
       const type = chatType === 'GROUP' ? 'PRIVATE' : 'PUBLIC';
       const newRoom = await createRoom(null, chatId, type);
       
-      router.push(`/room/${newRoom.roomId}`);
+      if (!newRoom) {
+        throw new Error('Не удалось создать комнату: пустой ответ от сервера');
+      }
+      
+      const roomIdToUse = newRoom.roomId;
+      if (!roomIdToUse) {
+        throw new Error(`Не удалось получить roomId из ответа сервера. Ответ: ${JSON.stringify(newRoom)}`);
+      }
+      
+      if (typeof roomIdToUse !== 'string') {
+        throw new Error(`roomId должен быть строкой, получен: ${typeof roomIdToUse}. Значение: ${roomIdToUse}`);
+      }
+      
+      router.push(`/room/${roomIdToUse}`);
     } catch (error) {
       alert(`Ошибка при создании комнаты: ${error.message}`);
       setIsCreatingRoom(false);
