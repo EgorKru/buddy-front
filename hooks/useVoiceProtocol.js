@@ -99,9 +99,6 @@ export const useVoiceProtocol = (chatId) => {
     if (!client || !connected || !client.connected || !client.active) {
       return;
     }
-    if (typeof window !== 'undefined') {
-      console.log('[Voice Protocol] Sending final message with fileUrl:', fileUrl);
-    }
     try {
       client.publish({
         destination: '/app/chat.sendMessage',
@@ -116,20 +113,7 @@ export const useVoiceProtocol = (chatId) => {
 
   const handleSignalResponse = useCallback((response) => {
     if (!response?.type) {
-      if (typeof window !== 'undefined') {
-        console.warn('[Voice Protocol] Response missing type:', response);
-      }
       return;
-    }
-    if (typeof window !== 'undefined') {
-      console.log('[Voice Protocol] Processing signal response:', response.type, { 
-        relaySessionId: response.relaySessionId, 
-        remoteEndpoint: response.remoteEndpoint, 
-        hasSdp: !!response.sdp,
-        fileUrl: response.fileUrl,
-        messageId: response.messageId,
-        currentState: sessionState
-      });
     }
     switch (response.type) {
       case VOICE_SIGNAL_TYPES.OFFER:
@@ -201,33 +185,14 @@ export const useVoiceProtocol = (chatId) => {
 
     try {
       const subscription = client.subscribe('/user/queue/voice-signal', (message) => {
-        if (typeof window !== 'undefined') {
-          console.log('[Voice Protocol] Raw message received from /user/queue/voice-signal:', {
-            body: message.body,
-            headers: message.headers,
-            command: message.command
-          });
-        }
         const response = safeJsonParse(message.body);
         if (!response) {
-          if (typeof window !== 'undefined') {
-            console.warn('[Voice Protocol] Failed to parse response:', message.body);
-          }
           return;
-        }
-        if (typeof window !== 'undefined') {
-          console.log('[Voice Protocol] Parsed response:', response);
         }
         handleSignalResponse(response);
       });
       signalSubscriptionRef.current = subscription;
-      if (typeof window !== 'undefined') {
-        console.log('[Voice Protocol] Subscribed to /user/queue/voice-signal, subscription ID:', subscription.id);
-      }
     } catch (e) {
-      if (typeof window !== 'undefined') {
-        console.error('[Voice Protocol] Failed to subscribe:', e);
-      }
     }
 
     return () => {
@@ -266,22 +231,10 @@ export const useVoiceProtocol = (chatId) => {
           localEndpoint: offer.localEndpoint,
           ...codecParams,
         };
-        if (typeof window !== 'undefined') {
-          console.log('[Voice Protocol] Sending INITIATE with WebRTC SDP:', { 
-            type: payload.type, 
-            chatId: payload.chatId, 
-            hasSdp: !!payload.sdp,
-            localEndpoint: payload.localEndpoint,
-            destination: '/app/voice.signal'
-          });
-        }
         client.publish({
           destination: '/app/voice.signal',
           body: JSON.stringify(payload),
         });
-        if (typeof window !== 'undefined') {
-          console.log('[Voice Protocol] INITIATE published, waiting for response...');
-        }
         return;
       } catch (error) {}
     }
@@ -291,9 +244,6 @@ export const useVoiceProtocol = (chatId) => {
       chatId: parseInt(chatId),
       ...codecParams,
     };
-    if (typeof window !== 'undefined') {
-      console.log('[Voice Protocol] Sending INITIATE without WebRTC (fallback):', { type: payload.type, chatId: payload.chatId });
-    }
     client.publish({
       destination: '/app/voice.signal',
       body: JSON.stringify(payload),
@@ -368,16 +318,9 @@ export const useVoiceProtocol = (chatId) => {
 
     if (dataChannelRef.current && dataChannelRef.current.readyState === 'open') {
       if (webrtcPeerRef.current) {
-        if (typeof window !== 'undefined') {
-          console.log('[Voice Protocol] Sending audio via WebRTC DataChannel');
-        }
         webrtcPeerRef.current.sendAudioData(audioData);
         return;
       }
-    }
-
-    if (typeof window !== 'undefined') {
-      console.log('[Voice Protocol] Sending audio via WebSocket fallback');
     }
 
     if (!client || !connected || !client.connected || !client.active) {

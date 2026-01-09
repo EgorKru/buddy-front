@@ -39,14 +39,6 @@ export const useMessageSending = ({
         }, NEW_MESSAGE_ID_REMOVE_DELAY);
       }
       addOptimistic(chatId, result.optimisticMessage);
-    } else if (result?.success) {
-      if (typeof window !== 'undefined') {
-        console.log('[Chat] Message sent via WebSocket, waiting for server confirmation');
-      }
-    } else {
-      if (typeof window !== 'undefined') {
-        console.error('[Chat] Unexpected result from sendMessageHook:', result);
-      }
     }
 
     return result;
@@ -65,15 +57,6 @@ export const useMessageSending = ({
         throw new Error('Не удалось загрузить файл: fileUrl не получен от сервера');
       }
 
-      if (typeof window !== 'undefined') {
-        console.log('[Chat] Upload successful, sending message:', {
-          fileUrl: uploadResponse.fileUrl,
-          type: isImage ? 'IMAGE' : 'FILE',
-          content: content || '(пусто)',
-          chatId
-        });
-      }
-
       const fileSize = uploadResponse.fileSize || file.size;
       const mimeType = uploadResponse.mimeType || file.type;
       const fileName = file.name;
@@ -90,10 +73,6 @@ export const useMessageSending = ({
         fileSize,
         mimeType
       );
-
-      if (typeof window !== 'undefined') {
-        console.log('[Chat] sendMessageHook result:', result);
-      }
 
       if (typeof window !== 'undefined' && uploadResponse.fileUrl) {
         const fileMetadata = {
@@ -132,19 +111,10 @@ export const useMessageSending = ({
           }, 500);
         }
         addOptimistic(chatId, result.optimisticMessage);
-      } else if (result?.success) {
-        if (typeof window !== 'undefined') {
-          console.log('[Chat] Message sent via WebSocket, waiting for server confirmation');
-        }
-      } else {
-        if (typeof window !== 'undefined') {
-          console.error('[Chat] Unexpected result from sendMessageHook:', result);
-        }
       }
 
       return { result, uploadResponse };
     } catch (error) {
-      console.error('Error uploading and sending file:', error);
       throw error;
     }
   }, [chatId, user, sendMessageHook, addOptimistic, newMessageIdsRef]);

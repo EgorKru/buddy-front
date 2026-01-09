@@ -16,27 +16,19 @@ function registerServiceWorker() {
       navigator.serviceWorker
         .register('/sw.js')
         .then((registration) => {
-          console.log('[SW] Service Worker registered:', registration.scope);
-          
-          // Проверяем обновления (как в Telegram Web)
           registration.addEventListener('updatefound', () => {
             const newWorker = registration.installing;
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                // Новый Service Worker доступен
-                console.log('[SW] New Service Worker available');
               }
             });
           });
         })
         .catch((error) => {
-          console.error('[SW] Service Worker registration failed:', error);
         });
       
-      // Обработка сообщений от Service Worker (как в Telegram Web)
       navigator.serviceWorker.addEventListener('message', (event) => {
         if (event.data && event.data.type === 'SW_READY') {
-          console.log('[SW] Service Worker ready');
         }
       });
     });

@@ -150,18 +150,6 @@ export const useMessageSender = (chatId, onMessageSent) => {
         client.active &&
         (connected || client.state === STOMP_CONNECTED_STATE);
 
-      if (typeof window !== 'undefined') {
-        console.log('[MessageSender] WebSocket status:', {
-          hasClient: !!client,
-          connected: client?.connected,
-          active: client?.active,
-          connectedState: connected,
-          clientState: client?.state,
-          isWebSocketReady,
-          type,
-          fileUrl: type === 'IMAGE' || type === 'FILE' ? fileUrl : null
-        });
-      }
 
       if (isWebSocketReady) {
         try {
@@ -178,9 +166,6 @@ export const useMessageSender = (chatId, onMessageSent) => {
               if (duration !== null && duration !== undefined) {
                 payload.duration = duration;
               }
-              if (typeof window !== 'undefined') {
-                console.log('[MessageSender] Sending VOICE message with fileUrl:', { chatId, fileUrl, duration });
-              }
             } else if (voiceData) {
               // Способ 3: отправка с Base64 (fallback)
               payload.voiceData = voiceData;
@@ -189,18 +174,12 @@ export const useMessageSender = (chatId, onMessageSent) => {
               if (duration !== null && duration !== undefined) {
                 payload.duration = duration;
               }
-              if (typeof window !== 'undefined') {
-                console.log('[MessageSender] Sending VOICE message with Base64 (fallback):', { chatId, mimeType: payload.voiceMimeType, duration });
-              }
             } else {
               throw new Error('Neither fileUrl nor voiceData provided for VOICE message');
             }
           } else if (type === 'IMAGE' || type === 'FILE') {
             // Для IMAGE и FILE всегда используем fileUrl
             if (!fileUrl) {
-              if (typeof window !== 'undefined') {
-                console.error(`[MessageSender] fileUrl is missing for ${type} message:`, { chatId, type, content, fileUrl });
-              }
               throw new Error(`fileUrl is required for ${type} message`);
             }
             payload.fileUrl = fileUrl;
@@ -216,9 +195,6 @@ export const useMessageSender = (chatId, onMessageSent) => {
             if (content && content.trim()) {
               payload.content = content.trim();
             }
-            if (typeof window !== 'undefined') {
-              console.log(`[MessageSender] Sending ${type} message with fileUrl:`, { chatId, fileUrl, fileName, fileSize, mimeType, content: content || '(пусто)' });
-            }
           } else {
             payload.content = messageContent;
           }
@@ -227,43 +203,11 @@ export const useMessageSender = (chatId, onMessageSent) => {
             payload.replyToMessageId = replyToMessageId;
           }
 
-          if (typeof window !== 'undefined') {
-            console.log('[MessageSender] Publishing to /app/chat.sendMessage:', payload);
-            // Дополнительная проверка для IMAGE/FILE
-            if ((type === 'IMAGE' || type === 'FILE') && !payload.fileUrl) {
-              console.error('[MessageSender] ERROR: fileUrl missing in payload!', { type, payload, originalFileUrl: fileUrl });
-              throw new Error(`fileUrl is missing in payload for ${type} message`);
-            }
-            // Проверка сериализации JSON
-            const serializedBody = JSON.stringify(payload);
-            const parsedBody = JSON.parse(serializedBody);
-            if ((type === 'IMAGE' || type === 'FILE') && !parsedBody.fileUrl) {
-              console.error('[MessageSender] ERROR: fileUrl lost during JSON serialization!', { 
-                type, 
-                originalPayload: payload, 
-                serializedBody, 
-                parsedBody 
-              });
-            } else if ((type === 'IMAGE' || type === 'FILE')) {
-              console.log('[MessageSender] JSON serialization check passed:', { 
-                type, 
-                fileUrl: parsedBody.fileUrl,
-                serializedBodyLength: serializedBody.length 
-              });
-            }
+          if ((type === 'IMAGE' || type === 'FILE') && !payload.fileUrl) {
+            throw new Error(`fileUrl is missing in payload for ${type} message`);
           }
 
           const serializedPayload = JSON.stringify(payload);
-          if (typeof window !== 'undefined') {
-            console.log('[MessageSender] Final payload to send:', {
-              destination: '/app/chat.sendMessage',
-              payload: payload,
-              serializedBody: serializedPayload,
-              bodyLength: serializedPayload.length,
-              hasFileUrl: !!(payload.fileUrl),
-              fileUrlValue: payload.fileUrl
-            });
-          }
           client.publish({
             destination: '/app/chat.sendMessage',
             body: serializedPayload,
@@ -271,9 +215,6 @@ export const useMessageSender = (chatId, onMessageSent) => {
           setSending(false);
           return { success: true, tempId: optimisticMessage.tempId, optimisticMessage, serverMessage: null };
         } catch (wsError) {
-          if (typeof window !== 'undefined') {
-            console.error('[MessageSender] WebSocket publish error:', wsError);
-          }
           if (type === 'VOICE' || type === 'IMAGE' || type === 'FILE') {
             setSending(false);
             throw new Error(`Failed to send ${type} message via WebSocket. Please ensure WebSocket is connected.`);
@@ -321,9 +262,6 @@ export const useMessageSender = (chatId, onMessageSent) => {
       
       if (message.type === 'VOICE' || message.type === 'IMAGE' || message.type === 'FILE') {
         if (!message.fileUrl) {
-          if (typeof window !== 'undefined') {
-            console.error('[MessageSender] syncQueue: fileUrl missing for', message.type, message);
-          }
           return null;
         }
         if (client.connected && client.active) {
@@ -339,18 +277,12 @@ export const useMessageSender = (chatId, onMessageSent) => {
             if (message.content && message.content.trim()) {
               payload.content = message.content.trim();
             }
-            if (typeof window !== 'undefined') {
-              console.log('[MessageSender] syncQueue: Publishing FILE/IMAGE/VOICE message:', payload);
-            }
             client.publish({
               destination: '/app/chat.sendMessage',
               body: JSON.stringify(payload),
             });
             return { success: true };
           } catch (error) {
-            if (typeof window !== 'undefined') {
-              console.error('[MessageSender] syncQueue: WebSocket publish error:', error);
-            }
           }
         }
         return null;
@@ -368,9 +300,6 @@ export const useMessageSender = (chatId, onMessageSent) => {
           });
           return { success: true };
         } catch (error) {
-          if (typeof window !== 'undefined') {
-            console.error('[MessageSender] syncQueue: WebSocket publish error:', error);
-          }
         }
       }
 

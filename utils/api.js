@@ -198,10 +198,6 @@ export const chatAPI = {
 
     const uploadUrl = getApiUrl(`/chats/${chatId}/files/voice`);
     
-    if (typeof window !== 'undefined') {
-      console.log('[API] Uploading voice file:', { chatId, url: uploadUrl, blobSize: audioBlob.size, blobType: audioBlob.type, duration });
-    }
-
     const response = await fetch(uploadUrl, {
       method: 'POST',
       headers,
@@ -219,18 +215,10 @@ export const chatAPI = {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: 'Upload failed' }));
-      if (typeof window !== 'undefined') {
-        console.error('[API] Voice upload failed:', { status: response.status, error });
-      }
       throw new Error(error.message || `Upload failed with status ${response.status}`);
     }
 
     const result = await response.json();
-    
-    if (typeof window !== 'undefined') {
-      console.log('[API] Voice upload successful:', result);
-    }
-    
     return result;
   },
 
@@ -246,10 +234,6 @@ export const chatAPI = {
 
     const uploadUrl = getApiUrl(`/chats/${chatId}/files/image`);
     
-    if (typeof window !== 'undefined') {
-      console.log('[API] Uploading image file:', { chatId, url: uploadUrl, fileName: imageFile.name, fileSize: imageFile.size, fileType: imageFile.type });
-    }
-
     if (onProgress && typeof window !== 'undefined' && typeof XMLHttpRequest !== 'undefined') {
       return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
@@ -320,18 +304,10 @@ export const chatAPI = {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: 'Upload failed' }));
-      if (typeof window !== 'undefined') {
-        console.error('[API] Image upload failed:', { status: response.status, error });
-      }
       throw new Error(error.message || `Upload failed with status ${response.status}`);
     }
 
     const result = await response.json();
-    
-    if (typeof window !== 'undefined') {
-      console.log('[API] Image upload successful:', result);
-    }
-    
     return result;
   },
 
@@ -347,10 +323,6 @@ export const chatAPI = {
 
     const uploadUrl = getApiUrl(`/chats/${chatId}/files/file`);
     
-    if (typeof window !== 'undefined') {
-      console.log('[API] Uploading file:', { chatId, url: uploadUrl, fileName: file.name, fileSize: file.size, fileType: file.type });
-    }
-
     if (onProgress && typeof window !== 'undefined' && typeof XMLHttpRequest !== 'undefined') {
       return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
@@ -421,18 +393,10 @@ export const chatAPI = {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: 'Upload failed' }));
-      if (typeof window !== 'undefined') {
-        console.error('[API] File upload failed:', { status: response.status, error });
-      }
       throw new Error(error.message || `Upload failed with status ${response.status}`);
     }
 
     const result = await response.json();
-    
-    if (typeof window !== 'undefined') {
-      console.log('[API] File upload successful:', result);
-    }
-    
     return result;
   },
 

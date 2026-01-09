@@ -42,7 +42,6 @@ export const useCreateChat = () => {
         setShowSearchResults(false);
       }
     } catch (error) {
-      console.error('Error searching users:', error);
       setSearchResults([]);
       setShowSearchResults(false);
       

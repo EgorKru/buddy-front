@@ -111,9 +111,6 @@ export const useVoiceMessageHandling = ({
       resetVoice();
       sentAudioBlobRef.current = null;
     } catch (error) {
-      if (typeof window !== 'undefined') {
-        console.error('[Voice] Error sending voice message:', error);
-      }
       resetVoice();
       sentAudioBlobRef.current = null;
     }
@@ -131,7 +128,6 @@ export const useVoiceMessageHandling = ({
     try {
       await handleVoiceSendSimple();
     } catch (error) {
-      console.error('[Voice] Failed to send voice message:', error);
       resetVoice();
       sentAudioBlobRef.current = null;
     }
