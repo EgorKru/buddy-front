@@ -1,30 +1,66 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useStomp } from '@/context/socket';
 import { safeJsonParse, safeUnsubscribe } from '@/utils/safe';
-import { roomAPI } from '@/utils/api';
 
-const ROOM_SIGNAL_TYPES = {
+// Signal Types (отправляемые команды)
+const SIGNAL_TYPES = {
+  // Управление комнатой
+  ROOM_CREATE: 'ROOM_CREATE',
+  ROOM_JOIN: 'ROOM_JOIN',
+  ROOM_LEAVE: 'ROOM_LEAVE',
+  ROOM_END: 'ROOM_END',
+  
+  // WebRTC
   ROOM_OFFER: 'ROOM_OFFER',
   ROOM_ANSWER: 'ROOM_ANSWER',
   ROOM_ICE_CANDIDATE: 'ROOM_ICE_CANDIDATE',
+  
+  // Медиа (своё)
   ROOM_MUTE_AUDIO: 'ROOM_MUTE_AUDIO',
   ROOM_UNMUTE_AUDIO: 'ROOM_UNMUTE_AUDIO',
   ROOM_MUTE_VIDEO: 'ROOM_MUTE_VIDEO',
   ROOM_UNMUTE_VIDEO: 'ROOM_UNMUTE_VIDEO',
+  
+  // Интерактив
+  ROOM_RAISE_HAND: 'ROOM_RAISE_HAND',
+  ROOM_LOWER_HAND: 'ROOM_LOWER_HAND',
+  ROOM_START_SCREEN_SHARE: 'ROOM_START_SCREEN_SHARE',
+  ROOM_STOP_SCREEN_SHARE: 'ROOM_STOP_SCREEN_SHARE',
+  
+  // Управление участниками (host/co-host)
+  ROOM_PROMOTE_CO_HOST: 'ROOM_PROMOTE_CO_HOST',
+  ROOM_DEMOTE_TO_PARTICIPANT: 'ROOM_DEMOTE_TO_PARTICIPANT',
+  ROOM_MUTE_PARTICIPANT: 'ROOM_MUTE_PARTICIPANT',
+  ROOM_KICK_PARTICIPANT: 'ROOM_KICK_PARTICIPANT',
 };
 
-const ROOM_EVENT_TYPES = {
+// Event Types (входящие события)
+const EVENT_TYPES = {
+  // Комната
+  ROOM_CREATED: 'ROOM_CREATED',
   ROOM_STARTED: 'ROOM_STARTED',
   ROOM_JOINED: 'ROOM_JOINED',
   ROOM_LEFT: 'ROOM_LEFT',
   ROOM_ENDED: 'ROOM_ENDED',
-  ROOM_PARTICIPANT_UPDATED: 'ROOM_PARTICIPANT_UPDATED',
-  ROOM_HAND_RAISED: 'ROOM_HAND_RAISED',
-  ROOM_SCREEN_SHARE_STARTED: 'ROOM_SCREEN_SHARE_STARTED',
-  ROOM_SCREEN_SHARE_STOPPED: 'ROOM_SCREEN_SHARE_STOPPED',
-  ROOM_PARTICIPANT_MUTED: 'ROOM_PARTICIPANT_MUTED',
-  ROOM_PARTICIPANT_KICKED: 'ROOM_PARTICIPANT_KICKED',
-  ROOM_PARTICIPANT_PROMOTED: 'ROOM_PARTICIPANT_PROMOTED',
+  
+  // Медиа участников
+  PARTICIPANT_AUDIO_CHANGED: 'PARTICIPANT_AUDIO_CHANGED',
+  PARTICIPANT_VIDEO_CHANGED: 'PARTICIPANT_VIDEO_CHANGED',
+  PARTICIPANT_HAND_RAISED: 'PARTICIPANT_HAND_RAISED',
+  PARTICIPANT_HAND_LOWERED: 'PARTICIPANT_HAND_LOWERED',
+  PARTICIPANT_SCREEN_SHARE_STARTED: 'PARTICIPANT_SCREEN_SHARE_STARTED',
+  PARTICIPANT_SCREEN_SHARE_STOPPED: 'PARTICIPANT_SCREEN_SHARE_STOPPED',
+  
+  // Роли
+  PARTICIPANT_PROMOTED: 'PARTICIPANT_PROMOTED',
+  PARTICIPANT_DEMOTED: 'PARTICIPANT_DEMOTED',
+  PARTICIPANT_MUTED_BY_HOST: 'PARTICIPANT_MUTED_BY_HOST',
+  PARTICIPANT_KICKED: 'PARTICIPANT_KICKED',
+  
+  // WebRTC
+  WEBRTC_OFFER: 'WEBRTC_OFFER',
+  WEBRTC_ANSWER: 'WEBRTC_ANSWER',
+  WEBRTC_ICE_CANDIDATE: 'WEBRTC_ICE_CANDIDATE',
 };
 
 // Статусы комнаты
@@ -43,101 +79,118 @@ export const PARTICIPANT_ROLE = {
 
 const STUN_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
 ];
 
-export const useRoomProtocol = (roomId = null) => {
+export const useRoomProtocol = (initialRoomId = null) => {
   const isBrowser = typeof window !== 'undefined';
   
   const { client, connected } = useStomp();
+  
+  // Состояние комнаты
   const [room, setRoom] = useState(null);
   const [participants, setParticipants] = useState([]);
+  const [isInRoom, setIsInRoom] = useState(false);
+  const [error, setError] = useState(null);
+  
+  // Медиа стримы
   const [localStream, setLocalStream] = useState(null);
   const [remoteStreams, setRemoteStreams] = useState(new Map());
   const [screenStream, setScreenStream] = useState(null);
+  
+  // Состояние медиа
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [videoEnabled, setVideoEnabled] = useState(true);
-  const [isInRoom, setIsInRoom] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [handRaised, setHandRaised] = useState(false);
-  const [myRole, setMyRole] = useState(PARTICIPANT_ROLE.PARTICIPANT);
-  const [error, setError] = useState(null);
   
+  // Роль
+  const [myRole, setMyRole] = useState(PARTICIPANT_ROLE.PARTICIPANT);
+  
+  // Refs
   const peerConnectionsRef = useRef(new Map());
-  const roomEventSubscriptionRef = useRef(null);
-  const roomSignalSubscriptionRef = useRef(null);
-  const userSignalSubscriptionRef = useRef(null);
+  const roomSubscriptionRef = useRef(null);
+  const userQueueSubscriptionRef = useRef(null);
   const localStreamRef = useRef(null);
   const screenStreamRef = useRef(null);
-  const roomIdRef = useRef(roomId);
+  const roomIdRef = useRef(initialRoomId);
+  const pendingCallbacksRef = useRef(new Map());
+  
+  // Seq/Pts для Gap Recovery
+  const lastSeqRef = useRef(0);
+  const eventQueueRef = useRef([]);
+  const isRecoveringRef = useRef(false);
 
-  useEffect(() => {
-    roomIdRef.current = roomId;
-  }, [roomId]);
-
-  const cleanup = useCallback(() => {
-    peerConnectionsRef.current.forEach((pc) => {
-      pc.close();
-    });
-    peerConnectionsRef.current.clear();
-    
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(track => track.stop());
-      localStreamRef.current = null;
-    }
-    
-    if (screenStreamRef.current) {
-      screenStreamRef.current.getTracks().forEach(track => track.stop());
-      screenStreamRef.current = null;
-    }
-    
-    setLocalStream(null);
-    setScreenStream(null);
-    setRemoteStreams(new Map());
-    setIsInRoom(false);
-    setIsScreenSharing(false);
-    setHandRaised(false);
-    setMyRole(PARTICIPANT_ROLE.PARTICIPANT);
-    setRoom(null);
-    setParticipants([]);
-    setError(null);
-    
-    safeUnsubscribe(roomEventSubscriptionRef);
-    safeUnsubscribe(roomSignalSubscriptionRef);
-    safeUnsubscribe(userSignalSubscriptionRef);
-  }, []);
-
-  const createPeerConnection = useCallback((userId) => {
-    if (!isBrowser || !window.RTCPeerConnection) {
+  // Текущий пользователь
+  const getCurrentUser = useCallback(() => {
+    if (!isBrowser) return null;
+    try {
+      return JSON.parse(localStorage.getItem('user'));
+    } catch {
       return null;
     }
+  }, [isBrowser]);
 
-    const pc = new RTCPeerConnection({
-      iceServers: STUN_SERVERS,
+  const currentUser = getCurrentUser();
+  const myUserId = currentUser?.id;
+
+  // Обновляем roomId ref
+  useEffect(() => {
+    roomIdRef.current = initialRoomId;
+  }, [initialRoomId]);
+
+  // Отправка сигнала через WebSocket
+  const sendSignal = useCallback((signal, callback) => {
+    if (!client || !connected) {
+      console.error('WebSocket not connected');
+      return;
+    }
+    
+    // Генерируем ID для отслеживания ответа
+    const signalId = Date.now().toString();
+    if (callback) {
+      pendingCallbacksRef.current.set(signalId, callback);
+    }
+    
+    client.publish({
+      destination: '/app/room.signal',
+      body: JSON.stringify({ ...signal, signalId }),
     });
+  }, [client, connected]);
 
+  // Создание PeerConnection
+  const createPeerConnection = useCallback((userId) => {
+    if (!isBrowser || !window.RTCPeerConnection) return null;
+
+    const existingPc = peerConnectionsRef.current.get(userId);
+    if (existingPc) {
+      existingPc.close();
+    }
+
+    const pc = new RTCPeerConnection({ iceServers: STUN_SERVERS });
+
+    // Добавляем локальные треки
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => {
         pc.addTrack(track, localStreamRef.current);
       });
     }
 
+    // ICE кандидаты
     pc.onicecandidate = (event) => {
-      if (event.candidate && client && connected && roomIdRef.current) {
-        const currentUser = JSON.parse(localStorage.getItem('user'));
-        client.publish({
-          destination: '/app/room.signal',
-          body: JSON.stringify({
-            type: ROOM_SIGNAL_TYPES.ROOM_ICE_CANDIDATE,
-            roomId: roomIdRef.current,
-            targetUserId: userId,
-            iceCandidate: event.candidate.candidate,
-            iceCandidateSdpMid: event.candidate.sdpMid,
-            iceCandidateSdpMLineIndex: event.candidate.sdpMLineIndex,
-          }),
+      if (event.candidate && roomIdRef.current) {
+        sendSignal({
+          type: SIGNAL_TYPES.ROOM_ICE_CANDIDATE,
+          roomId: roomIdRef.current,
+          targetUserId: userId,
+          iceCandidate: event.candidate.candidate,
+          iceCandidateSdpMid: event.candidate.sdpMid,
+          iceCandidateSdpMLineIndex: event.candidate.sdpMLineIndex,
         });
       }
     };
 
+    // Получение удалённых треков
     pc.ontrack = (event) => {
       const stream = event.streams[0];
       if (stream) {
@@ -149,6 +202,7 @@ export const useRoomProtocol = (roomId = null) => {
       }
     };
 
+    // Состояние соединения
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
         pc.close();
@@ -161,87 +215,11 @@ export const useRoomProtocol = (roomId = null) => {
       }
     };
 
+    peerConnectionsRef.current.set(userId, pc);
     return pc;
-  }, [client, connected]);
+  }, [isBrowser, sendSignal]);
 
-  const handleRoomSignal = useCallback((message) => {
-    const signal = safeJsonParse(message.body);
-    if (!signal || !roomIdRef.current || signal.roomId !== roomIdRef.current) return;
-
-    const currentUser = JSON.parse(localStorage.getItem('user'));
-    const userId = signal.targetUserId || signal.userId;
-    
-    if (userId === currentUser?.id) return;
-
-    switch (signal.type) {
-      case ROOM_SIGNAL_TYPES.ROOM_OFFER:
-        handleOffer(signal, userId);
-        break;
-      case ROOM_SIGNAL_TYPES.ROOM_ANSWER:
-        handleAnswer(signal, userId);
-        break;
-      case ROOM_SIGNAL_TYPES.ROOM_ICE_CANDIDATE:
-        handleIceCandidate(signal, userId);
-        break;
-      default:
-        break;
-    }
-  }, []);
-
-  const handleOffer = useCallback(async (signal, userId) => {
-    const pc = createPeerConnection(userId);
-    if (!pc) return;
-
-    try {
-      await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp: signal.sdp }));
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-
-      if (client && connected && roomIdRef.current) {
-        client.publish({
-          destination: '/app/room.signal',
-          body: JSON.stringify({
-            type: ROOM_SIGNAL_TYPES.ROOM_ANSWER,
-            roomId: roomIdRef.current,
-            targetUserId: userId,
-            sdp: answer.sdp,
-          }),
-        });
-      }
-
-      peerConnectionsRef.current.set(userId, pc);
-    } catch (error) {
-      pc.close();
-      peerConnectionsRef.current.delete(userId);
-    }
-  }, [client, connected, createPeerConnection]);
-
-  const handleAnswer = useCallback(async (signal, userId) => {
-    const pc = peerConnectionsRef.current.get(userId);
-    if (!pc) return;
-
-    try {
-      await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: signal.sdp }));
-    } catch (error) {
-      pc.close();
-      peerConnectionsRef.current.delete(userId);
-    }
-  }, []);
-
-  const handleIceCandidate = useCallback(async (signal, userId) => {
-    const pc = peerConnectionsRef.current.get(userId);
-    if (!pc) return;
-
-    try {
-      await pc.addIceCandidate(new RTCIceCandidate({
-        candidate: signal.iceCandidate,
-        sdpMid: signal.iceCandidateSdpMid,
-        sdpMLineIndex: signal.iceCandidateSdpMLineIndex,
-      }));
-    } catch (error) {
-    }
-  }, []);
-
+  // Отправка offer
   const sendOffer = useCallback(async (userId) => {
     const pc = createPeerConnection(userId);
     if (!pc) return;
@@ -250,214 +228,434 @@ export const useRoomProtocol = (roomId = null) => {
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
-      if (client && connected && roomIdRef.current) {
-        client.publish({
-          destination: '/app/room.signal',
-          body: JSON.stringify({
-            type: ROOM_SIGNAL_TYPES.ROOM_OFFER,
-            roomId: roomIdRef.current,
-            targetUserId: userId,
-            sdp: offer.sdp,
-          }),
-        });
-      }
-
-      peerConnectionsRef.current.set(userId, pc);
-    } catch (error) {
+      sendSignal({
+        type: SIGNAL_TYPES.ROOM_OFFER,
+        roomId: roomIdRef.current,
+        targetUserId: userId,
+        sdp: offer.sdp,
+      });
+    } catch (err) {
+      console.error('Error creating offer:', err);
       pc.close();
       peerConnectionsRef.current.delete(userId);
     }
-  }, [client, connected, createPeerConnection]);
+  }, [createPeerConnection, sendSignal]);
 
-  const handleRoomEvent = useCallback((message) => {
-    const event = safeJsonParse(message.body);
-    if (!event) return;
+  // Обработка входящего offer
+  const handleOffer = useCallback(async (fromUserId, sdp) => {
+    const pc = createPeerConnection(fromUserId);
+    if (!pc) return;
+
+    try {
+      await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp }));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+
+      sendSignal({
+        type: SIGNAL_TYPES.ROOM_ANSWER,
+        roomId: roomIdRef.current,
+        targetUserId: fromUserId,
+        sdp: answer.sdp,
+      });
+    } catch (err) {
+      console.error('Error handling offer:', err);
+      pc.close();
+      peerConnectionsRef.current.delete(fromUserId);
+    }
+  }, [createPeerConnection, sendSignal]);
+
+  // Обработка входящего answer
+  const handleAnswer = useCallback(async (fromUserId, sdp) => {
+    const pc = peerConnectionsRef.current.get(fromUserId);
+    if (!pc) return;
+
+    try {
+      await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp }));
+    } catch (err) {
+      console.error('Error handling answer:', err);
+    }
+  }, []);
+
+  // Обработка ICE кандидата
+  const handleIceCandidate = useCallback(async (fromUserId, candidate) => {
+    const pc = peerConnectionsRef.current.get(fromUserId);
+    if (!pc) return;
+
+    try {
+      await pc.addIceCandidate(new RTCIceCandidate(candidate));
+    } catch (err) {
+      console.error('Error adding ICE candidate:', err);
+    }
+  }, []);
+
+  // Закрытие peer connection
+  const closePeerConnection = useCallback((userId) => {
+    const pc = peerConnectionsRef.current.get(userId);
+    if (pc) {
+      pc.close();
+      peerConnectionsRef.current.delete(userId);
+    }
+    setRemoteStreams(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(userId);
+      return newMap;
+    });
+  }, []);
+
+  // Refs для избежания циклических зависимостей
+  const processEventRef = useRef(null);
+  const cleanupRef = useRef(null);
+  
+  // Gap Recovery: очередь событий с ключом по seq
+  const eventQueueMapRef = useRef(new Map());
+
+  // Запрос состояния комнаты (Gap Recovery)
+  const requestRoomState = useCallback(() => {
+    if (!client || !connected || !roomIdRef.current || isRecoveringRef.current) return;
     
-    // Проверяем roomId в разных местах события
-    const eventRoomId = event.room?.roomId || event.roomId;
-    if (!roomIdRef.current || (eventRoomId && eventRoomId !== roomIdRef.current)) return;
+    isRecoveringRef.current = true;
+    sendSignal({
+      type: 'ROOM_GET_STATE',
+      roomId: roomIdRef.current,
+    }, (response) => {
+      isRecoveringRef.current = false;
+      if (response.room) {
+        setRoom(response.room);
+        setParticipants(response.room.participants || []);
+        lastSeqRef.current = response.seq || 0;
+        
+        // Обрабатываем очередь событий по порядку
+        while (eventQueueMapRef.current.has(lastSeqRef.current + 1)) {
+          const nextEvent = eventQueueMapRef.current.get(lastSeqRef.current + 1);
+          eventQueueMapRef.current.delete(lastSeqRef.current + 1);
+          if (processEventRef.current) {
+            processEventRef.current(nextEvent);
+          }
+          lastSeqRef.current++;
+        }
+      }
+    });
+  }, [client, connected, sendSignal]);
 
-    const currentUser = JSON.parse(localStorage.getItem('user'));
+  // Обработка одного события
+  const processEvent = useCallback((event) => {
+    const eventRoomId = event.room?.roomId || event.roomId;
+    if (roomIdRef.current && eventRoomId && eventRoomId !== roomIdRef.current) return;
 
     switch (event.eventType) {
-      case ROOM_EVENT_TYPES.ROOM_STARTED:
+      // === Комната ===
+      case EVENT_TYPES.ROOM_CREATED:
+      case EVENT_TYPES.ROOM_STARTED:
         setRoom(event.room);
-        setParticipants(event.room.participants || []);
+        setParticipants(event.room?.participants || []);
         break;
-        
-      case ROOM_EVENT_TYPES.ROOM_JOINED:
-        setParticipants(prev => {
-          const newParticipants = [...prev];
-          if (event.participant && !newParticipants.find(p => p.id === event.participant.id)) {
-            newParticipants.push(event.participant);
-            if (event.participant.userId !== currentUser?.id && isInRoom) {
-              setTimeout(() => sendOffer(event.participant.userId), 100);
-            }
-          }
-          return newParticipants;
-        });
-        // Обновляем статус комнаты если он изменился
+
+      case EVENT_TYPES.ROOM_JOINED:
         if (event.room) {
           setRoom(event.room);
+          setParticipants(event.room.participants || []);
+        }
+        if (event.participant) {
+          setParticipants(prev => {
+            if (prev.find(p => p.user?.id === event.participant.user?.id)) return prev;
+            return [...prev, event.participant];
+          });
+          // Устанавливаем WebRTC соединение с новым участником
+          const newUserId = event.participant.user?.id;
+          if (newUserId && newUserId !== myUserId && isInRoom) {
+            setTimeout(() => sendOffer(newUserId), 100);
+          }
         }
         break;
-        
-      case ROOM_EVENT_TYPES.ROOM_LEFT:
-        setParticipants(prev => prev.filter(p => p.userId !== event.userId && p.id !== event.userId));
-        const pc = peerConnectionsRef.current.get(event.userId);
-        if (pc) {
-          pc.close();
-          peerConnectionsRef.current.delete(event.userId);
-        }
-        setRemoteStreams(prev => {
-          const newMap = new Map(prev);
-          newMap.delete(event.userId);
-          return newMap;
-        });
+
+      case EVENT_TYPES.ROOM_LEFT:
+        const leftUserId = event.participant?.user?.id || event.userId;
+        setParticipants(prev => prev.filter(p => p.user?.id !== leftUserId));
+        closePeerConnection(leftUserId);
         break;
-        
-      case ROOM_EVENT_TYPES.ROOM_ENDED:
-        cleanup();
+
+      case EVENT_TYPES.ROOM_ENDED:
+        if (cleanupRef.current) cleanupRef.current();
         break;
-        
-      case ROOM_EVENT_TYPES.ROOM_PARTICIPANT_UPDATED:
+
+      // === Медиа участников ===
+      case EVENT_TYPES.PARTICIPANT_AUDIO_CHANGED:
         setParticipants(prev => prev.map(p => 
-          p.id === event.participant.id ? event.participant : p
+          p.user?.id === event.userId ? { ...p, audioEnabled: event.enabled } : p
         ));
-        // Обновляем свою роль если это мы
-        if (event.participant.userId === currentUser?.id) {
-          setMyRole(event.participant.role || PARTICIPANT_ROLE.PARTICIPANT);
-          setHandRaised(event.participant.handRaised || false);
-          setIsScreenSharing(event.participant.screenSharing || false);
-        }
         break;
-        
-      case ROOM_EVENT_TYPES.ROOM_HAND_RAISED:
+
+      case EVENT_TYPES.PARTICIPANT_VIDEO_CHANGED:
         setParticipants(prev => prev.map(p => 
-          p.userId === event.userId ? { ...p, handRaised: event.raised } : p
+          p.user?.id === event.userId ? { ...p, videoEnabled: event.enabled } : p
         ));
-        if (event.userId === currentUser?.id) {
-          setHandRaised(event.raised);
-        }
         break;
-        
-      case ROOM_EVENT_TYPES.ROOM_SCREEN_SHARE_STARTED:
+
+      case EVENT_TYPES.PARTICIPANT_HAND_RAISED:
         setParticipants(prev => prev.map(p => 
-          p.userId === event.userId ? { ...p, screenSharing: true } : p
+          p.user?.id === event.userId ? { ...p, handRaised: true } : p
         ));
-        if (event.userId === currentUser?.id) {
-          setIsScreenSharing(true);
-        }
+        if (event.userId === myUserId) setHandRaised(true);
         break;
-        
-      case ROOM_EVENT_TYPES.ROOM_SCREEN_SHARE_STOPPED:
+
+      case EVENT_TYPES.PARTICIPANT_HAND_LOWERED:
         setParticipants(prev => prev.map(p => 
-          p.userId === event.userId ? { ...p, screenSharing: false } : p
+          p.user?.id === event.userId ? { ...p, handRaised: false } : p
         ));
-        if (event.userId === currentUser?.id) {
-          setIsScreenSharing(false);
-        }
+        if (event.userId === myUserId) setHandRaised(false);
         break;
-        
-      case ROOM_EVENT_TYPES.ROOM_PARTICIPANT_MUTED:
-        // Если замутили нас — выключаем аудио
-        if (event.userId === currentUser?.id && localStreamRef.current) {
+
+      case EVENT_TYPES.PARTICIPANT_SCREEN_SHARE_STARTED:
+        setParticipants(prev => prev.map(p => 
+          p.user?.id === event.userId ? { ...p, screenSharing: true } : p
+        ));
+        if (event.userId === myUserId) setIsScreenSharing(true);
+        break;
+
+      case EVENT_TYPES.PARTICIPANT_SCREEN_SHARE_STOPPED:
+        setParticipants(prev => prev.map(p => 
+          p.user?.id === event.userId ? { ...p, screenSharing: false } : p
+        ));
+        if (event.userId === myUserId) setIsScreenSharing(false);
+        break;
+
+      // === Роли ===
+      case EVENT_TYPES.PARTICIPANT_PROMOTED:
+        setParticipants(prev => prev.map(p => 
+          p.user?.id === event.targetUserId ? { ...p, role: PARTICIPANT_ROLE.CO_HOST } : p
+        ));
+        if (event.targetUserId === myUserId) setMyRole(PARTICIPANT_ROLE.CO_HOST);
+        break;
+
+      case EVENT_TYPES.PARTICIPANT_DEMOTED:
+        setParticipants(prev => prev.map(p => 
+          p.user?.id === event.targetUserId ? { ...p, role: PARTICIPANT_ROLE.PARTICIPANT } : p
+        ));
+        if (event.targetUserId === myUserId) setMyRole(PARTICIPANT_ROLE.PARTICIPANT);
+        break;
+
+      case EVENT_TYPES.PARTICIPANT_MUTED_BY_HOST:
+        if (event.targetUserId === myUserId && localStreamRef.current) {
           localStreamRef.current.getAudioTracks().forEach(track => {
             track.enabled = false;
           });
           setAudioEnabled(false);
         }
         setParticipants(prev => prev.map(p => 
-          p.userId === event.userId ? { ...p, audioEnabled: false } : p
+          p.user?.id === event.targetUserId ? { ...p, audioEnabled: false } : p
         ));
         break;
-        
-      case ROOM_EVENT_TYPES.ROOM_PARTICIPANT_KICKED:
-        // Если кикнули нас — выходим
-        if (event.userId === currentUser?.id) {
-          cleanup();
+
+      case EVENT_TYPES.PARTICIPANT_KICKED:
+        if (event.targetUserId === myUserId) {
+          if (cleanupRef.current) cleanupRef.current();
           setError('Вас удалили из комнаты');
         } else {
-          setParticipants(prev => prev.filter(p => p.userId !== event.userId));
-          const kickedPc = peerConnectionsRef.current.get(event.userId);
-          if (kickedPc) {
-            kickedPc.close();
-            peerConnectionsRef.current.delete(event.userId);
-          }
-          setRemoteStreams(prev => {
-            const newMap = new Map(prev);
-            newMap.delete(event.userId);
-            return newMap;
+          setParticipants(prev => prev.filter(p => p.user?.id !== event.targetUserId));
+          closePeerConnection(event.targetUserId);
+        }
+        break;
+
+      // === WebRTC ===
+      case EVENT_TYPES.WEBRTC_OFFER:
+        if (event.targetUserId === myUserId) {
+          handleOffer(event.fromUserId, event.sdp);
+        }
+        break;
+
+      case EVENT_TYPES.WEBRTC_ANSWER:
+        if (event.targetUserId === myUserId) {
+          handleAnswer(event.fromUserId, event.sdp);
+        }
+        break;
+
+      case EVENT_TYPES.WEBRTC_ICE_CANDIDATE:
+        if (event.targetUserId === myUserId) {
+          handleIceCandidate(event.fromUserId, {
+            candidate: event.iceCandidate,
+            sdpMid: event.iceCandidateSdpMid,
+            sdpMLineIndex: event.iceCandidateSdpMLineIndex,
           });
         }
         break;
-        
-      case ROOM_EVENT_TYPES.ROOM_PARTICIPANT_PROMOTED:
-        setParticipants(prev => prev.map(p => 
-          p.userId === event.userId ? { ...p, role: PARTICIPANT_ROLE.CO_HOST } : p
-        ));
-        if (event.userId === currentUser?.id) {
-          setMyRole(PARTICIPANT_ROLE.CO_HOST);
-        }
-        break;
-        
+
       default:
         break;
     }
-  }, [cleanup, isInRoom, sendOffer]);
+  }, [myUserId, isInRoom, sendOffer, closePeerConnection, handleOffer, handleAnswer, handleIceCandidate]);
 
-  const subscribeToRoomEvents = useCallback(() => {
-    if (!client || !connected || !roomIdRef.current) return;
+  // Обработка очереди событий после получения события в правильном порядке
+  const processQueuedEvents = useCallback(() => {
+    while (eventQueueMapRef.current.has(lastSeqRef.current + 1)) {
+      const nextEvent = eventQueueMapRef.current.get(lastSeqRef.current + 1);
+      eventQueueMapRef.current.delete(lastSeqRef.current + 1);
+      if (processEventRef.current) {
+        processEventRef.current(nextEvent);
+      }
+      lastSeqRef.current++;
+    }
+  }, []);
 
-    const eventTopic = `/topic/room/${roomIdRef.current}`;
-    const signalTopic = `/topic/room/${roomIdRef.current}/signal`;
+  // Обработка событий комнаты с Gap Recovery
+  const handleRoomEvent = useCallback((message) => {
+    const event = safeJsonParse(message.body);
+    if (!event) return;
 
-    roomEventSubscriptionRef.current = client.subscribe(eventTopic, handleRoomEvent);
-    roomSignalSubscriptionRef.current = client.subscribe(signalTopic, handleRoomSignal);
-    userSignalSubscriptionRef.current = client.subscribe('/user/queue/room-signal', handleRoomSignal);
-  }, [client, connected, handleRoomEvent, handleRoomSignal]);
+    // Проверяем roomId
+    const eventRoomId = event.room?.roomId || event.roomId;
+    if (roomIdRef.current && eventRoomId && eventRoomId !== roomIdRef.current) return;
 
-  const startLocalStream = useCallback(async (audio = true, video = true) => {
-    if (!isBrowser || !navigator.mediaDevices) {
-      throw new Error('Медиа устройства недоступны. Убедитесь, что вы используете HTTPS или localhost.');
+    // Gap Recovery: проверяем seq
+    const eventSeq = event.seq;
+    if (eventSeq) {
+      if (eventSeq === lastSeqRef.current + 1) {
+        // В порядке — обрабатываем
+        processEvent(event);
+        lastSeqRef.current = eventSeq;
+        
+        // Проверяем очередь на следующие события
+        processQueuedEvents();
+      } else if (eventSeq > lastSeqRef.current + 1) {
+        // Пропуск — кладем в очередь и запрашиваем состояние
+        eventQueueMapRef.current.set(eventSeq, event);
+        requestRoomState();
+      }
+      // eventSeq <= lastSeqRef.current — дубликат, игнорируем
+    } else {
+      // Без seq — просто обрабатываем (WebRTC сигналы)
+      processEvent(event);
+    }
+  }, [processEvent, requestRoomState, processQueuedEvents]);
+
+  // Обработка ответов на команды (user queue)
+  const handleUserQueueMessage = useCallback((message) => {
+    const response = safeJsonParse(message.body);
+    if (!response) return;
+
+    // Обработка callback если есть
+    if (response.signalId && pendingCallbacksRef.current.has(response.signalId)) {
+      const callback = pendingCallbacksRef.current.get(response.signalId);
+      pendingCallbacksRef.current.delete(response.signalId);
+      callback(response);
     }
 
-    const timeout = 30000;
-    let timeoutId;
+    // Обработка ответа
+    if (response.success === false && response.errorMessage) {
+      setError(response.errorMessage);
+      return;
+    }
+
+    if (response.room) {
+      setRoom(response.room);
+      setParticipants(response.room.participants || []);
+      
+      // Определяем свою роль
+      const myParticipant = response.room.participants?.find(p => p.user?.id === myUserId);
+      if (myParticipant) {
+        setMyRole(myParticipant.role || PARTICIPANT_ROLE.PARTICIPANT);
+        setHandRaised(myParticipant.handRaised || false);
+        setIsScreenSharing(myParticipant.screenSharing || false);
+      }
+    }
+  }, [myUserId]);
+
+  // Cleanup
+  const cleanup = useCallback(() => {
+    // Закрываем все peer connections
+    peerConnectionsRef.current.forEach((pc) => pc.close());
+    peerConnectionsRef.current.clear();
+    
+    // Останавливаем стримы
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => track.stop());
+      localStreamRef.current = null;
+    }
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach(track => track.stop());
+      screenStreamRef.current = null;
+    }
+    
+    // Отписки
+    safeUnsubscribe(roomSubscriptionRef);
+    safeUnsubscribe(userQueueSubscriptionRef);
+    
+    // Сброс состояния
+    setLocalStream(null);
+    setScreenStream(null);
+    setRemoteStreams(new Map());
+    setIsInRoom(false);
+    setIsScreenSharing(false);
+    setHandRaised(false);
+    setMyRole(PARTICIPANT_ROLE.PARTICIPANT);
+    setRoom(null);
+    setParticipants([]);
+    setError(null);
+    roomIdRef.current = null;
+    
+    // Сброс seq/pts
+    lastSeqRef.current = 0;
+    eventQueueRef.current = [];
+    eventQueueMapRef.current.clear();
+    isRecoveringRef.current = false;
+  }, []);
+
+  // Обновляем refs при изменении функций
+  useEffect(() => {
+    cleanupRef.current = cleanup;
+  }, [cleanup]);
+
+  useEffect(() => {
+    processEventRef.current = processEvent;
+  }, [processEvent]);
+
+  // Подписка на user queue (для ответов на команды)
+  const ensureUserQueueSubscription = useCallback(() => {
+    if (!client || !connected) return false;
+    
+    if (!userQueueSubscriptionRef.current) {
+      userQueueSubscriptionRef.current = client.subscribe(
+        '/user/queue/room-signal',
+        handleUserQueueMessage
+      );
+    }
+    return true;
+  }, [client, connected, handleUserQueueMessage]);
+
+  // Подписка на события комнаты
+  const subscribeToRoom = useCallback((roomId) => {
+    if (!client || !connected || !roomId) return;
+
+    // Подписка на события комнаты
+    if (roomSubscriptionRef.current) {
+      safeUnsubscribe(roomSubscriptionRef);
+    }
+    roomSubscriptionRef.current = client.subscribe(
+      `/topic/room/${roomId}`,
+      handleRoomEvent
+    );
+
+    // Подписка на личные ответы (если ещё не подписаны)
+    ensureUserQueueSubscription();
+  }, [client, connected, handleRoomEvent, ensureUserQueueSubscription]);
+
+  // Запуск локального стрима
+  const startLocalStream = useCallback(async (audio = true, video = true) => {
+    if (!isBrowser || !navigator.mediaDevices) {
+      throw new Error('Медиа устройства недоступны');
+    }
 
     try {
-      const constraints = {
-        audio: audio ? {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        } : false,
-        video: video ? {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          facingMode: 'user',
-        } : false,
-      };
-
-      const getUserMediaPromise = navigator.mediaDevices.getUserMedia(constraints);
-
-      const timeoutPromise = new Promise((_, reject) => {
-        timeoutId = setTimeout(() => {
-          reject(new Error('Timeout starting video source'));
-        }, timeout);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: audio ? { echoCancellation: true, noiseSuppression: true } : false,
+        video: video ? { width: { ideal: 1280 }, height: { ideal: 720 } } : false,
       });
-
-      const stream = await Promise.race([getUserMediaPromise, timeoutPromise]);
-      
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
 
       localStreamRef.current = stream;
       setLocalStream(stream);
       setAudioEnabled(audio);
       setVideoEnabled(video);
 
+      // Добавляем треки в существующие соединения
       peerConnectionsRef.current.forEach((pc) => {
         stream.getTracks().forEach(track => {
           pc.addTrack(track, stream);
@@ -465,297 +663,284 @@ export const useRoomProtocol = (roomId = null) => {
       });
 
       return stream;
-    } catch (error) {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-
+    } catch (err) {
       let errorMessage = 'Ошибка доступа к камере/микрофону';
-      
-      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
-        errorMessage = 'Доступ к камере/микрофону запрещен. Пожалуйста, разрешите доступ в настройках браузера.';
-      } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
-        errorMessage = 'Камера или микрофон не найдены. Убедитесь, что устройства подключены.';
-      } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
-        errorMessage = 'Не удалось получить доступ к камере/микрофону. Возможно, устройство используется другим приложением.';
-      } else if (error.message === 'Timeout starting video source') {
-        errorMessage = 'Таймаут при запуске камеры. Пожалуйста, проверьте настройки браузера и разрешите доступ к камере и микрофону.';
-      } else if (error.message) {
-        errorMessage = `Ошибка доступа к медиа устройствам: ${error.message}`;
+      if (err.name === 'NotAllowedError') {
+        errorMessage = 'Доступ запрещён. Разрешите доступ в настройках браузера.';
+      } else if (err.name === 'NotFoundError') {
+        errorMessage = 'Камера или микрофон не найдены.';
       }
-
-      const errorObj = new Error(errorMessage);
-      setError(errorMessage);
-      throw errorObj;
-    }
-  }, []);
-
-  const stopLocalStream = useCallback(() => {
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(track => track.stop());
-      localStreamRef.current = null;
-      setLocalStream(null);
-    }
-  }, []);
-
-  const toggleAudio = useCallback(async () => {
-    if (localStreamRef.current) {
-      localStreamRef.current.getAudioTracks().forEach(track => {
-        track.enabled = !track.enabled;
-      });
-      const newAudioEnabled = !audioEnabled;
-      setAudioEnabled(newAudioEnabled);
-      
-      if (roomIdRef.current) {
-        await roomAPI.updateMediaState(roomIdRef.current, newAudioEnabled, videoEnabled);
-      }
-    }
-  }, [audioEnabled, videoEnabled]);
-
-  const toggleVideo = useCallback(async () => {
-    if (localStreamRef.current) {
-      localStreamRef.current.getVideoTracks().forEach(track => {
-        track.enabled = !track.enabled;
-      });
-      const newVideoEnabled = !videoEnabled;
-      setVideoEnabled(newVideoEnabled);
-      
-      if (roomIdRef.current) {
-        await roomAPI.updateMediaState(roomIdRef.current, audioEnabled, newVideoEnabled);
-      }
-    }
-  }, [audioEnabled, videoEnabled]);
-
-  const createRoom = useCallback(async (title, chatId, type = 'PUBLIC', options = {}) => {
-    try {
-      setError(null);
-      const newRoom = await roomAPI.createRoom(title, chatId, type, options);
-      setRoom(newRoom);
-      roomIdRef.current = newRoom.roomId;
-      
-      // Создатель комнаты — HOST
-      setMyRole(PARTICIPANT_ROLE.HOST);
-      
-      subscribeToRoomEvents();
-      return newRoom;
-    } catch (error) {
-      const errorMessage = error.message || 'Ошибка при создании комнаты';
       setError(errorMessage);
       throw new Error(errorMessage);
     }
-  }, [subscribeToRoomEvents]);
+  }, [isBrowser]);
 
-  const joinRoom = useCallback(async (roomIdToJoin, requestMedia = true, initialAudio = true, initialVideo = true) => {
+  // === API методы ===
+
+  // Создать комнату (через REST API) — обёртка для удобства
+  const createRoom = useCallback(async (options = {}) => {
     try {
-      setError(null);
-      const roomData = await roomAPI.joinRoom(roomIdToJoin);
-      roomIdRef.current = roomIdToJoin;
-      setRoom(roomData);
-      setParticipants(roomData.participants || []);
-      setIsInRoom(true);
-      subscribeToRoomEvents();
-      
-      // Определяем свою роль из ответа
-      const currentUser = JSON.parse(localStorage.getItem('user'));
-      const myParticipant = roomData.participants?.find(p => p.userId === currentUser?.id);
-      if (myParticipant) {
-        setMyRole(myParticipant.role || PARTICIPANT_ROLE.PARTICIPANT);
-        setHandRaised(myParticipant.handRaised || false);
-        setIsScreenSharing(myParticipant.screenSharing || false);
-      }
-      
-      if (roomData.participants && roomData.participants.length > 0) {
-        roomData.participants.forEach(participant => {
-          if (participant.userId !== currentUser?.id) {
-            sendOffer(participant.userId);
-          }
-        });
-      }
-      
-      if (requestMedia) {
-        try {
-          await startLocalStream(initialAudio, initialVideo);
-          if (!initialAudio) {
-            setAudioEnabled(false);
-          }
-          if (!initialVideo) {
-            setVideoEnabled(false);
-          }
-        } catch (streamError) {
-          setError(streamError.message);
+      const { roomAPI } = await import('@/utils/api');
+      const roomData = await roomAPI.createRoom(
+        options.title || null,
+        options.chatId || null,
+        options.type || 'PUBLIC',
+        {
+          maxParticipants: options.maxParticipants,
+          waitingRoom: options.waitingRoom,
+          screenShareEnabled: options.screenShareEnabled,
         }
-      }
-    } catch (error) {
-      setError(error.message || 'Ошибка при присоединении к комнате');
-      throw error;
-    }
-  }, [subscribeToRoomEvents, startLocalStream, sendOffer]);
-
-  const leaveRoom = useCallback(async () => {
-    if (roomIdRef.current) {
-      try {
-        await roomAPI.leaveRoom(roomIdRef.current);
-      } catch (error) {
-      }
-    }
-    cleanup();
-  }, [cleanup]);
-
-  const endRoom = useCallback(async () => {
-    if (roomIdRef.current) {
-      try {
-        await roomAPI.endRoom(roomIdRef.current);
-      } catch (error) {
-      }
-    }
-    cleanup();
-  }, [cleanup]);
-
-  // Поднять/опустить руку
-  const raiseHand = useCallback(async (raised = true) => {
-    if (!roomIdRef.current) return;
-    try {
-      await roomAPI.raiseHand(roomIdRef.current, raised);
-      setHandRaised(raised);
-    } catch (error) {
-      setError(error.message || 'Ошибка при изменении статуса руки');
+      );
+      return roomData;
+    } catch (err) {
+      throw new Error(err.message || 'Ошибка создания комнаты');
     }
   }, []);
 
-  // Начать демонстрацию экрана
+  // Войти в комнату (через REST API + WebSocket подписка)
+  const joinRoom = useCallback(async (roomId, requestMedia = true, initialAudio = true, initialVideo = true) => {
+    try {
+      // Сбрасываем seq для новой комнаты
+      lastSeqRef.current = 0;
+      eventQueueRef.current = [];
+      eventQueueMapRef.current.clear();
+      roomIdRef.current = roomId;
+      
+      // 1. Подписываемся на WebSocket события комнаты
+      ensureUserQueueSubscription();
+      subscribeToRoom(roomId);
+      
+      // 2. Входим в комнату через REST API
+      const { roomAPI } = await import('@/utils/api');
+      const roomData = await roomAPI.joinRoom(roomId);
+      
+      if (!roomData) {
+        throw new Error('Не удалось получить данные комнаты');
+      }
+      
+      setRoom(roomData);
+      setParticipants(roomData.participants || []);
+      setIsInRoom(true);
+      
+      // Определяем роль
+      const myParticipant = roomData.participants?.find(p => p.user?.id === myUserId);
+      if (myParticipant) {
+        setMyRole(myParticipant.role || PARTICIPANT_ROLE.PARTICIPANT);
+      }
+      
+      // Устанавливаем WebRTC соединения с другими участниками
+      roomData.participants?.forEach(p => {
+        if (p.user?.id !== myUserId && p.isActive !== false) {
+          sendOffer(p.user.id);
+        }
+      });
+      
+      // 3. Запрашиваем медиа
+      if (requestMedia) {
+        try {
+          await startLocalStream(initialAudio, initialVideo);
+        } catch (err) {
+          setError(err.message);
+          // Не бросаем ошибку — пользователь уже в комнате
+        }
+      }
+      
+      return roomData;
+    } catch (err) {
+      setError(err.message || 'Ошибка входа в комнату');
+      throw err;
+    }
+  }, [subscribeToRoom, myUserId, sendOffer, startLocalStream, ensureUserQueueSubscription]);
+
+  // Выйти из комнаты (через REST API)
+  const leaveRoom = useCallback(async () => {
+    if (roomIdRef.current) {
+      try {
+        const { roomAPI } = await import('@/utils/api');
+        await roomAPI.leaveRoom(roomIdRef.current);
+      } catch (err) {
+        console.error('Error leaving room:', err);
+      }
+    }
+    cleanup();
+  }, [cleanup]);
+
+  // Завершить комнату (через REST API)
+  const endRoom = useCallback(async () => {
+    if (roomIdRef.current) {
+      try {
+        const { roomAPI } = await import('@/utils/api');
+        await roomAPI.endRoom(roomIdRef.current);
+      } catch (err) {
+        console.error('Error ending room:', err);
+      }
+    }
+    cleanup();
+  }, [cleanup]);
+
+  // Переключить аудио
+  const toggleAudio = useCallback(() => {
+    if (!localStreamRef.current) return;
+    
+    const newEnabled = !audioEnabled;
+    localStreamRef.current.getAudioTracks().forEach(track => {
+      track.enabled = newEnabled;
+    });
+    setAudioEnabled(newEnabled);
+    
+    if (roomIdRef.current) {
+      sendSignal({
+        type: newEnabled ? SIGNAL_TYPES.ROOM_UNMUTE_AUDIO : SIGNAL_TYPES.ROOM_MUTE_AUDIO,
+        roomId: roomIdRef.current,
+      });
+    }
+  }, [audioEnabled, sendSignal]);
+
+  // Переключить видео
+  const toggleVideo = useCallback(() => {
+    if (!localStreamRef.current) return;
+    
+    const newEnabled = !videoEnabled;
+    localStreamRef.current.getVideoTracks().forEach(track => {
+      track.enabled = newEnabled;
+    });
+    setVideoEnabled(newEnabled);
+    
+    if (roomIdRef.current) {
+      sendSignal({
+        type: newEnabled ? SIGNAL_TYPES.ROOM_UNMUTE_VIDEO : SIGNAL_TYPES.ROOM_MUTE_VIDEO,
+        roomId: roomIdRef.current,
+      });
+    }
+  }, [videoEnabled, sendSignal]);
+
+  // Поднять руку
+  const raiseHand = useCallback(() => {
+    if (!roomIdRef.current) return;
+    sendSignal({
+      type: handRaised ? SIGNAL_TYPES.ROOM_LOWER_HAND : SIGNAL_TYPES.ROOM_RAISE_HAND,
+      roomId: roomIdRef.current,
+    });
+  }, [handRaised, sendSignal]);
+
+  // Демонстрация экрана
   const startScreenShare = useCallback(async () => {
     if (!isBrowser || !navigator.mediaDevices?.getDisplayMedia) {
-      setError('Демонстрация экрана не поддерживается в этом браузере');
+      setError('Демонстрация экрана не поддерживается');
       return;
     }
 
     try {
-      // Сначала уведомляем сервер
-      await roomAPI.startScreenShare(roomIdRef.current);
-      
-      // Получаем стрим экрана
       const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: {
-          cursor: 'always',
-        },
+        video: { cursor: 'always' },
         audio: false,
       });
 
       screenStreamRef.current = stream;
       setScreenStream(stream);
-      setIsScreenSharing(true);
+      
+      // Уведомляем сервер
+      sendSignal({
+        type: SIGNAL_TYPES.ROOM_START_SCREEN_SHARE,
+        roomId: roomIdRef.current,
+      });
 
-      // Обработка остановки демонстрации через кнопку браузера
+      // При остановке через браузер
       stream.getVideoTracks()[0].onended = () => {
         stopScreenShare();
       };
 
-      // Добавляем трек во все peer connections
+      // Добавляем в peer connections
       peerConnectionsRef.current.forEach((pc) => {
-        stream.getTracks().forEach(track => {
-          pc.addTrack(track, stream);
-        });
+        stream.getTracks().forEach(track => pc.addTrack(track, stream));
       });
-
-    } catch (error) {
-      if (error.name !== 'NotAllowedError') {
-        setError(error.message || 'Ошибка при запуске демонстрации экрана');
+    } catch (err) {
+      if (err.name !== 'NotAllowedError') {
+        setError('Ошибка демонстрации экрана');
       }
-      // Если пользователь отменил — уведомляем сервер
-      try {
-        await roomAPI.stopScreenShare(roomIdRef.current);
-      } catch {}
     }
-  }, []);
+  }, [isBrowser, sendSignal]);
 
-  // Остановить демонстрацию экрана
-  const stopScreenShare = useCallback(async () => {
+  const stopScreenShare = useCallback(() => {
     if (screenStreamRef.current) {
       screenStreamRef.current.getTracks().forEach(track => track.stop());
       screenStreamRef.current = null;
     }
     setScreenStream(null);
     setIsScreenSharing(false);
-
+    
     if (roomIdRef.current) {
-      try {
-        await roomAPI.stopScreenShare(roomIdRef.current);
-      } catch {}
+      sendSignal({
+        type: SIGNAL_TYPES.ROOM_STOP_SCREEN_SHARE,
+        roomId: roomIdRef.current,
+      });
     }
-  }, []);
+  }, [sendSignal]);
 
-  // Назначить со-ведущим (только для HOST/CO_HOST)
-  const promoteParticipant = useCallback(async (participantId) => {
+  // Управление участниками (host/co-host)
+  const promoteParticipant = useCallback((targetUserId) => {
     if (!roomIdRef.current) return;
-    if (myRole !== PARTICIPANT_ROLE.HOST && myRole !== PARTICIPANT_ROLE.CO_HOST) {
-      setError('Недостаточно прав для этого действия');
-      return;
-    }
-    try {
-      await roomAPI.promoteParticipant(roomIdRef.current, participantId);
-    } catch (error) {
-      setError(error.message || 'Ошибка при назначении со-ведущего');
-    }
-  }, [myRole]);
+    sendSignal({
+      type: SIGNAL_TYPES.ROOM_PROMOTE_CO_HOST,
+      roomId: roomIdRef.current,
+      targetUserId,
+    });
+  }, [sendSignal]);
 
-  // Замутить участника (только для HOST/CO_HOST)
-  const muteParticipant = useCallback(async (participantId) => {
+  const demoteParticipant = useCallback((targetUserId) => {
     if (!roomIdRef.current) return;
-    if (myRole !== PARTICIPANT_ROLE.HOST && myRole !== PARTICIPANT_ROLE.CO_HOST) {
-      setError('Недостаточно прав для этого действия');
-      return;
-    }
-    try {
-      await roomAPI.muteParticipant(roomIdRef.current, participantId);
-    } catch (error) {
-      setError(error.message || 'Ошибка при отключении микрофона участника');
-    }
-  }, [myRole]);
+    sendSignal({
+      type: SIGNAL_TYPES.ROOM_DEMOTE_TO_PARTICIPANT,
+      roomId: roomIdRef.current,
+      targetUserId,
+    });
+  }, [sendSignal]);
 
-  // Удалить участника из комнаты (только для HOST/CO_HOST)
-  const kickParticipant = useCallback(async (participantId) => {
+  const muteParticipant = useCallback((targetUserId) => {
     if (!roomIdRef.current) return;
-    if (myRole !== PARTICIPANT_ROLE.HOST && myRole !== PARTICIPANT_ROLE.CO_HOST) {
-      setError('Недостаточно прав для этого действия');
-      return;
-    }
-    try {
-      await roomAPI.kickParticipant(roomIdRef.current, participantId);
-    } catch (error) {
-      setError(error.message || 'Ошибка при удалении участника');
-    }
-  }, [myRole]);
+    sendSignal({
+      type: SIGNAL_TYPES.ROOM_MUTE_PARTICIPANT,
+      roomId: roomIdRef.current,
+      targetUserId,
+    });
+  }, [sendSignal]);
 
-  // Проверка, является ли текущий пользователь хостом или со-хостом
+  const kickParticipant = useCallback((targetUserId) => {
+    if (!roomIdRef.current) return;
+    sendSignal({
+      type: SIGNAL_TYPES.ROOM_KICK_PARTICIPANT,
+      roomId: roomIdRef.current,
+      targetUserId,
+    });
+  }, [sendSignal]);
+
+  // Cleanup при размонтировании
+  useEffect(() => {
+    return () => cleanup();
+  }, [cleanup]);
+
+  // Права
   const isHost = myRole === PARTICIPANT_ROLE.HOST;
   const isCoHost = myRole === PARTICIPANT_ROLE.CO_HOST;
   const canManageParticipants = isHost || isCoHost;
 
-  useEffect(() => {
-    return () => {
-      cleanup();
-    };
-  }, [cleanup]);
-
   return {
-    // Состояние комнаты
+    // Состояние
     room,
     participants,
     isInRoom,
     error,
     
-    // Медиа стримы
+    // Медиа
     localStream,
     remoteStreams,
     screenStream,
-    
-    // Состояние медиа
     audioEnabled,
     videoEnabled,
     isScreenSharing,
     handRaised,
     
-    // Роль и права
+    // Роль
     myRole,
     isHost,
     isCoHost,
@@ -767,27 +952,24 @@ export const useRoomProtocol = (roomId = null) => {
     leaveRoom,
     endRoom,
     
-    // Управление медиа
+    // Медиа
     startLocalStream,
-    stopLocalStream,
     toggleAudio,
     toggleVideo,
     
-    // Демонстрация экрана
+    // Интерактив
+    raiseHand,
     startScreenShare,
     stopScreenShare,
     
-    // Взаимодействие
-    raiseHand,
-    
-    // Управление участниками (для хоста/со-хоста)
+    // Управление участниками
     promoteParticipant,
+    demoteParticipant,
     muteParticipant,
     kickParticipant,
     
-    // Вспомогательные
+    // Утилиты
     sendOffer,
     clearError: () => setError(null),
   };
 };
-

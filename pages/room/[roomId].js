@@ -157,8 +157,12 @@ const Room = () => {
       const newNames = { ...prev };
       remoteStreams.forEach((_, odUserId) => {
         const userIdStr = odUserId.toString();
-        const participant = participants.find(p => p.userId === odUserId || p.userId === parseInt(odUserId));
-        newNames[userIdStr] = participant?.displayName || participant?.username || `Участник ${userIdStr.substring(0, 6)}`;
+        // Новая структура: participant.user.id
+        const participant = participants.find(p => 
+          p.user?.id === odUserId || p.user?.id === parseInt(odUserId)
+        );
+        const user = participant?.user;
+        newNames[userIdStr] = user?.displayName || user?.username || `Участник ${userIdStr.substring(0, 6)}`;
       });
       return newNames;
     });
@@ -166,23 +170,25 @@ const Room = () => {
 
   useEffect(() => {
     participants.forEach(participant => {
-      const userIdStr = participant.userId?.toString();
+      // Новая структура: participant.user.id
+      const userIdStr = participant.user?.id?.toString();
       if (userIdStr && !playerNames[userIdStr]) {
+        const user = participant.user;
         setPlayerNames(prev => ({
           ...prev,
-          [userIdStr]: participant.displayName || participant.username || `Участник ${userIdStr.substring(0, 6)}`,
+          [userIdStr]: user?.displayName || user?.username || `Участник ${userIdStr.substring(0, 6)}`,
         }));
       }
     });
   }, [participants]);
 
-  const handleLeaveRoom = async () => {
+  const handleLeaveRoom = () => {
     try {
       const participantCount = participants.length || Object.keys(players).length || 0;
       if (participantCount <= 1) {
-        await endRoom();
+        endRoom();
       } else {
-        await leaveRoom();
+        leaveRoom();
       }
       router.push('/');
     } catch (error) {
