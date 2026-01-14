@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import { useRoomProtocol } from "@/hooks/useRoomProtocol";
 import { getCurrentUser } from "@/utils/api";
@@ -6,9 +6,6 @@ import { getCurrentUser } from "@/utils/api";
 import Player from "@/component/Player";
 import Bottom from "@/component/Bottom";
 import CopySection from "@/component/CopySection";
-import ChatPanel from "@/component/ChatPanel";
-import TopBar from "@/component/TopBar";
-import SingleParticipantInfo from "@/component/SingleParticipantInfo";
 
 import styles from "@/styles/room.module.css";
 
@@ -20,7 +17,6 @@ const Room = () => {
   const initialVideo = video !== '0';
   
   const {
-    room,
     participants,
     localStream,
     remoteStreams,
@@ -32,23 +28,43 @@ const Room = () => {
     toggleVideo,
     leaveRoom,
     endRoom,
-    startLocalStream,
     joinRoom,
     clearError,
   } = useRoomProtocol(roomId);
 
   const [players, setPlayers] = useState({});
   const [playerNames, setPlayerNames] = useState({});
-  const [chatOpen, setChatOpen] = useState(false);
-  const [meetingStarted, setMeetingStarted] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
+  const [meetingTime, setMeetingTime] = useState(0);
+  const hasJoinedRef = useRef(false);
   
   const currentUser = getCurrentUser();
   const currentUserId = currentUser?.id?.toString() || 'local';
   const currentUserName = currentUser?.displayName || currentUser?.username || "Вы";
 
+  // Таймер встречи
   useEffect(() => {
-    if (roomId && !isInRoom && !error && !isJoining) {
+    if (!isInRoom) return;
+    const interval = setInterval(() => {
+      setMeetingTime(prev => prev + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isInRoom]);
+
+  const formatTime = (seconds) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (h > 0) {
+      return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  // Подключение к комнате — только один раз
+  useEffect(() => {
+    if (roomId && !hasJoinedRef.current && !isInRoom && !error) {
+      hasJoinedRef.current = true;
       setIsJoining(true);
       joinRoom(roomId, true, initialAudio, initialVideo)
         .then(() => {
@@ -56,43 +72,51 @@ const Room = () => {
         })
         .catch(() => {
           setIsJoining(false);
+          hasJoinedRef.current = false; // Разрешаем повторную попытку при ошибке
         });
     }
-  }, [roomId, isInRoom, error, isJoining, joinRoom, initialAudio, initialVideo]);
+  }, [roomId]);
 
   const handleRetry = async () => {
     clearError();
-    setIsJoining(false);
+    hasJoinedRef.current = false;
+    setIsJoining(true);
     if (roomId) {
       try {
+        hasJoinedRef.current = true;
         await joinRoom(roomId, true);
+        setIsJoining(false);
       } catch (err) {
         setIsJoining(false);
+        hasJoinedRef.current = false;
       }
     }
   };
 
   const handleJoinWithoutMedia = async () => {
     clearError();
-    setIsJoining(false);
+    hasJoinedRef.current = false;
+    setIsJoining(true);
     if (roomId) {
       try {
+        hasJoinedRef.current = true;
         await joinRoom(roomId, false);
         setIsJoining(false);
       } catch (err) {
         setIsJoining(false);
+        hasJoinedRef.current = false;
       }
     }
   };
 
+  // Обновляем локальный плеер
   useEffect(() => {
     if (localStream) {
-      const streamUrl = URL.createObjectURL(localStream);
       setPlayers(prev => ({
         ...prev,
         [currentUserId]: {
-          url: streamUrl,
-          muted: !audioEnabled,
+          stream: localStream,
+          muted: true, // Локальный всегда muted чтобы не слышать себя
           playing: videoEnabled,
         },
       }));
@@ -100,41 +124,45 @@ const Room = () => {
         ...prev,
         [currentUserId]: currentUserName,
       }));
-
-      return () => {
-        URL.revokeObjectURL(streamUrl);
-      };
     }
-  }, [localStream, audioEnabled, videoEnabled, currentUserId, currentUserName]);
+  }, [localStream, videoEnabled, currentUserId, currentUserName]);
 
+  // Обновляем удалённые плееры
   useEffect(() => {
-    const newStreams = { ...players };
-    const newNames = { ...playerNames };
-
-    remoteStreams.forEach((stream, userId) => {
-      const streamUrl = URL.createObjectURL(stream);
-      const userIdStr = userId.toString();
-      newStreams[userIdStr] = {
-        url: streamUrl,
-        muted: true,
-        playing: true,
-      };
+    setPlayers(prev => {
+      const newPlayers = { ...prev };
       
-      const participant = participants.find(p => p.userId === userId);
-      newNames[userIdStr] = participant?.displayName || participant?.username || `Участник ${userIdStr.substring(0, 6)}`;
-    });
-
-    setPlayers(newStreams);
-    setPlayerNames(newNames);
-
-    return () => {
-      Object.values(newStreams).forEach(player => {
-        if (player.url && player.url.startsWith('blob:')) {
-          URL.revokeObjectURL(player.url);
+      // Добавляем/обновляем удалённые стримы
+      remoteStreams.forEach((stream, odUserId) => {
+        const userIdStr = odUserId.toString();
+        newPlayers[userIdStr] = {
+          stream: stream,
+          muted: false, // Удалённые не muted
+          playing: true,
+        };
+      });
+      
+      // Удаляем плееры для отключившихся участников
+      Object.keys(newPlayers).forEach(id => {
+        if (id !== currentUserId && !remoteStreams.has(parseInt(id)) && !remoteStreams.has(id)) {
+          delete newPlayers[id];
         }
       });
-    };
-  }, [remoteStreams, participants]);
+      
+      return newPlayers;
+    });
+
+    // Обновляем имена участников
+    setPlayerNames(prev => {
+      const newNames = { ...prev };
+      remoteStreams.forEach((_, odUserId) => {
+        const userIdStr = odUserId.toString();
+        const participant = participants.find(p => p.userId === odUserId || p.userId === parseInt(odUserId));
+        newNames[userIdStr] = participant?.displayName || participant?.username || `Участник ${userIdStr.substring(0, 6)}`;
+      });
+      return newNames;
+    });
+  }, [remoteStreams, participants, currentUserId]);
 
   useEffect(() => {
     participants.forEach(participant => {
@@ -199,55 +227,24 @@ const Room = () => {
   }, {});
 
   const participantCount = participants.length || Object.keys(players).length || 1;
-  const isSingleParticipant = participantCount <= 1;
 
+  // Экран ошибки
   if (error && !localStream && !isInRoom) {
     return (
       <div className={styles.roomContainer}>
-        <TopBar roomId={roomId} />
-        <div className={styles.singleParticipantContainer}>
-          <div style={{ textAlign: 'center', padding: '40px', color: 'rgb(255, 100, 100)' }}>
-            <h2 style={{ marginBottom: '16px', fontSize: '24px' }}>Ошибка подключения к комнате</h2>
-            <p style={{ marginBottom: '8px', color: 'rgb(180, 180, 190)' }}>{error}</p>
-            <p style={{ color: 'rgb(150, 150, 160)' }}>Проверьте ID комнаты и попробуйте снова</p>
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '20px' }}>
-              <button 
-                onClick={handleRetry}
-                style={{
-                  padding: '10px 20px',
-                  background: 'rgb(102, 126, 234)',
-                  border: 'none',
-                  borderRadius: '8px',
-                  color: 'white',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseEnter={(e) => e.target.style.background = 'rgb(90, 110, 220)'}
-                onMouseLeave={(e) => e.target.style.background = 'rgb(102, 126, 234)'}
-              >
+        <div className={styles.topBar}>
+          <div className={styles.logo}>Pager Meet</div>
+        </div>
+        <div className={styles.centerContent}>
+          <div className={styles.errorBox}>
+            <h2>Ошибка подключения</h2>
+            <p>{error}</p>
+            <div className={styles.errorActions}>
+              <button onClick={handleRetry} className={styles.primaryButton}>
                 Попробовать снова
               </button>
-              <button 
-                onClick={handleJoinWithoutMedia}
-                style={{
-                  padding: '10px 20px',
-                  background: 'rgb(50, 50, 60)',
-                  border: '1px solid rgb(70, 70, 80)',
-                  borderRadius: '8px',
-                  color: 'white',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.background = 'rgb(60, 60, 70)';
-                  e.target.style.borderColor = 'rgb(80, 80, 90)';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.background = 'rgb(50, 50, 60)';
-                  e.target.style.borderColor = 'rgb(70, 70, 80)';
-                }}
-              >
-                Присоединиться без камеры
+              <button onClick={handleJoinWithoutMedia} className={styles.secondaryButton}>
+                Войти без камеры
               </button>
             </div>
           </div>
@@ -256,23 +253,16 @@ const Room = () => {
     );
   }
 
+  // Экран загрузки
   if ((!isInRoom && !error) || isJoining) {
     return (
       <div className={styles.roomContainer}>
-        <TopBar roomId={roomId} />
-        <div className={styles.singleParticipantContainer}>
-          <div style={{ textAlign: 'center', padding: '40px', color: 'rgb(180, 180, 190)' }}>
-            <div style={{ 
-              width: '48px', 
-              height: '48px', 
-              border: '4px solid rgb(102, 126, 234)',
-              borderTopColor: 'transparent',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite',
-              margin: '0 auto 20px'
-            }}></div>
-            <p>Подключение к комнате...</p>
-          </div>
+        <div className={styles.topBar}>
+          <div className={styles.logo}>Pager Meet</div>
+        </div>
+        <div className={styles.centerContent}>
+          <div className={styles.loader}></div>
+          <p className={styles.loadingText}>Подключение к комнате...</p>
         </div>
       </div>
     );
@@ -280,76 +270,55 @@ const Room = () => {
 
   return (
     <div className={styles.roomContainer}>
-      <TopBar roomId={roomId} onStart={() => setMeetingStarted(true)} />
+      {/* Верхняя панель */}
+      <div className={styles.topBar}>
+        <div className={styles.logo}>Pager Meet</div>
+        <div className={styles.meetingInfo}>
+          <span className={styles.timer}>{formatTime(meetingTime)}</span>
+          <span className={styles.roomCode}>{roomId}</span>
+        </div>
+      </div>
       
-      {isSingleParticipant && !meetingStarted ? (
-        <div className={styles.singleParticipantContainer}>
-          <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
-            {playerHighlighted && (
-              <div style={{ flex: 1, marginBottom: '24px' }}>
-                <Player
-                  url={playerHighlighted.url}
-                  muted={playerHighlighted.muted}
-                  playing={playerHighlighted.playing}
-                  isActive
-                  playerId={currentUserId}
-                  playerName={playerNames[currentUserId]}
-                />
-              </div>
-            )}
-            <SingleParticipantInfo 
-              roomId={roomId}
-              onSettingsClick={() => {}}
+      {/* Видео контейнер */}
+      <div className={styles.videoGrid}>
+        {/* Локальный плеер */}
+        {playerHighlighted && (
+          <div className={Object.keys(nonHighlightedPlayers).length > 0 ? styles.videoItem : styles.videoItemFull}>
+            <Player
+              stream={playerHighlighted.stream}
+              muted={playerHighlighted.muted}
+              playing={playerHighlighted.playing}
+              isActive
+              playerId={currentUserId}
+              playerName={playerNames[currentUserId]}
             />
           </div>
-        </div>
-      ) : (
-        <>
-          <div className={styles.activePlayerContainer}>
-            {playerHighlighted && (
+        )}
+        
+        {/* Удалённые плееры */}
+        {Object.keys(nonHighlightedPlayers).map((playerId) => {
+          const player = nonHighlightedPlayers[playerId];
+          return (
+            <div key={playerId} className={styles.videoItem}>
               <Player
-                url={playerHighlighted.url}
-                muted={playerHighlighted.muted}
-                playing={playerHighlighted.playing}
-                isActive
-                playerId={currentUserId}
-                playerName={playerNames[currentUserId]}
+                stream={player.stream}
+                muted={player.muted}
+                playing={player.playing}
+                isActive={false}
+                playerId={playerId}
+                playerName={playerNames[playerId]}
               />
-            )}
-            {!playerHighlighted && isSingleParticipant && (
-              <SingleParticipantInfo 
-                roomId={roomId}
-                onSettingsClick={() => {}}
-              />
-            )}
-          </div>
-          <div className={styles.inActivePlayerContainer}>
-            {Object.keys(nonHighlightedPlayers).map((playerId) => {
-              const player = nonHighlightedPlayers[playerId];
-              return (
-                <Player
-                  key={playerId}
-                  url={player.url}
-                  muted={player.muted}
-                  playing={player.playing}
-                  isActive={false}
-                  playerId={playerId}
-                  playerName={playerNames[playerId]}
-                />
-              );
-            })}
-          </div>
-        </>
-      )}
+            </div>
+          );
+        })}
+        
+        {/* Если один участник — показываем CopySection */}
+        {participantCount <= 1 && (
+          <CopySection roomId={roomId} />
+        )}
+      </div>
       
-      <CopySection roomId={roomId}/>
-      
-      <ChatPanel 
-        roomId={roomId} 
-        isOpen={chatOpen} 
-        onClose={() => setChatOpen(false)} 
-      />
-      
+      {/* Нижняя панель управления */}
       <Bottom
         muted={!audioEnabled}
         playing={videoEnabled}
@@ -357,7 +326,6 @@ const Room = () => {
         toggleVideo={handleToggleVideo}
         leaveRoom={handleLeaveRoom}
         participantCount={participantCount}
-        onChatToggle={() => setChatOpen(!chatOpen)}
       />
     </div>
   );

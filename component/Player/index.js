@@ -1,12 +1,19 @@
-import ReactPlayer from "react-player";
+import { useEffect, useRef } from "react";
 import cx from "classnames";
 import { Mic, MicOff } from "lucide-react";
 
 import styles from "@/component/Player/index.module.css";
 
 const Player = (props) => {
-  const { url, muted, playing, isActive, playerId, playerName } = props;
+  const { stream, muted, playing, isActive, playerId, playerName } = props;
+  const videoRef = useRef(null);
   
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
+    }
+  }, [stream]);
+
   const getInitials = (name) => {
     if (!name) return "?";
     const parts = name.trim().split(" ");
@@ -27,13 +34,13 @@ const Player = (props) => {
         [styles.notPlaying]: !playing,
       })}
     >
-      {playing ? (
-        <ReactPlayer
-          url={url}
+      {playing && stream ? (
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
           muted={muted}
-          playing={playing}
-          width="100%"
-          height="100%"
+          className={styles.video}
         />
       ) : (
         <div className={styles.avatarContainer}>

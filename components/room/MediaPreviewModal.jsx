@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, Video, VideoOff, Mic, MicOff, Settings, ChevronDown, Loader2 } from 'lucide-react';
+import { X, Video, VideoOff, Mic, MicOff, Settings, ChevronDown, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { useMediaDevices } from '@/hooks/useMediaDevices';
 import styles from './MediaPreviewModal.module.css';
 
@@ -24,6 +24,8 @@ export default function MediaPreviewModal({
     isLoading,
     error,
     permissionGranted,
+    audioLevel,
+    isMicWorking,
     startPreview,
     stopPreview,
     toggleAudio,
@@ -114,6 +116,38 @@ export default function MediaPreviewModal({
               />
             )}
           </div>
+
+          {/* Проверка микрофона */}
+          {permissionGranted && audioEnabled && (
+            <div className={styles.micTest}>
+              <div className={styles.micTestHeader}>
+                <span className={styles.micTestLabel}>Проверка микрофона</span>
+                {isMicWorking ? (
+                  <span className={styles.micTestStatus}>
+                    <CheckCircle size={16} className={styles.micTestOk} />
+                    Микрофон работает
+                  </span>
+                ) : (
+                  <span className={styles.micTestStatus}>
+                    <AlertCircle size={16} className={styles.micTestWaiting} />
+                    Скажите что-нибудь...
+                  </span>
+                )}
+              </div>
+              <div className={styles.audioLevelContainer}>
+                <div className={styles.audioLevelBars}>
+                  {[...Array(20)].map((_, i) => (
+                    <div
+                      key={i}
+                      className={`${styles.audioLevelBar} ${
+                        i < Math.floor(audioLevel / 5) ? styles.audioLevelBarActive : ''
+                      } ${i >= 16 ? styles.audioLevelBarHigh : ''}`}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className={styles.controls}>
             <button

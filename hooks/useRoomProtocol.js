@@ -19,6 +19,26 @@ const ROOM_EVENT_TYPES = {
   ROOM_LEFT: 'ROOM_LEFT',
   ROOM_ENDED: 'ROOM_ENDED',
   ROOM_PARTICIPANT_UPDATED: 'ROOM_PARTICIPANT_UPDATED',
+  ROOM_HAND_RAISED: 'ROOM_HAND_RAISED',
+  ROOM_SCREEN_SHARE_STARTED: 'ROOM_SCREEN_SHARE_STARTED',
+  ROOM_SCREEN_SHARE_STOPPED: 'ROOM_SCREEN_SHARE_STOPPED',
+  ROOM_PARTICIPANT_MUTED: 'ROOM_PARTICIPANT_MUTED',
+  ROOM_PARTICIPANT_KICKED: 'ROOM_PARTICIPANT_KICKED',
+  ROOM_PARTICIPANT_PROMOTED: 'ROOM_PARTICIPANT_PROMOTED',
+};
+
+// Статусы комнаты
+export const ROOM_STATUS = {
+  WAITING: 'WAITING',
+  ACTIVE: 'ACTIVE',
+  ENDED: 'ENDED',
+};
+
+// Роли участников
+export const PARTICIPANT_ROLE = {
+  HOST: 'HOST',
+  CO_HOST: 'CO_HOST',
+  PARTICIPANT: 'PARTICIPANT',
 };
 
 const STUN_SERVERS = [
@@ -33,9 +53,13 @@ export const useRoomProtocol = (roomId = null) => {
   const [participants, setParticipants] = useState([]);
   const [localStream, setLocalStream] = useState(null);
   const [remoteStreams, setRemoteStreams] = useState(new Map());
+  const [screenStream, setScreenStream] = useState(null);
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [isInRoom, setIsInRoom] = useState(false);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [handRaised, setHandRaised] = useState(false);
+  const [myRole, setMyRole] = useState(PARTICIPANT_ROLE.PARTICIPANT);
   const [error, setError] = useState(null);
   
   const peerConnectionsRef = useRef(new Map());
@@ -43,6 +67,7 @@ export const useRoomProtocol = (roomId = null) => {
   const roomSignalSubscriptionRef = useRef(null);
   const userSignalSubscriptionRef = useRef(null);
   const localStreamRef = useRef(null);
+  const screenStreamRef = useRef(null);
   const roomIdRef = useRef(roomId);
 
   useEffect(() => {
@@ -60,9 +85,18 @@ export const useRoomProtocol = (roomId = null) => {
       localStreamRef.current = null;
     }
     
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach(track => track.stop());
+      screenStreamRef.current = null;
+    }
+    
     setLocalStream(null);
+    setScreenStream(null);
     setRemoteStreams(new Map());
     setIsInRoom(false);
+    setIsScreenSharing(false);
+    setHandRaised(false);
+    setMyRole(PARTICIPANT_ROLE.PARTICIPANT);
     setRoom(null);
     setParticipants([]);
     setError(null);
@@ -237,28 +271,39 @@ export const useRoomProtocol = (roomId = null) => {
 
   const handleRoomEvent = useCallback((message) => {
     const event = safeJsonParse(message.body);
-    if (!event || !roomIdRef.current || event.room?.roomId !== roomIdRef.current) return;
+    if (!event) return;
+    
+    // Проверяем roomId в разных местах события
+    const eventRoomId = event.room?.roomId || event.roomId;
+    if (!roomIdRef.current || (eventRoomId && eventRoomId !== roomIdRef.current)) return;
+
+    const currentUser = JSON.parse(localStorage.getItem('user'));
 
     switch (event.eventType) {
       case ROOM_EVENT_TYPES.ROOM_STARTED:
         setRoom(event.room);
         setParticipants(event.room.participants || []);
         break;
+        
       case ROOM_EVENT_TYPES.ROOM_JOINED:
         setParticipants(prev => {
           const newParticipants = [...prev];
           if (event.participant && !newParticipants.find(p => p.id === event.participant.id)) {
             newParticipants.push(event.participant);
-            const currentUser = JSON.parse(localStorage.getItem('user'));
             if (event.participant.userId !== currentUser?.id && isInRoom) {
               setTimeout(() => sendOffer(event.participant.userId), 100);
             }
           }
           return newParticipants;
         });
+        // Обновляем статус комнаты если он изменился
+        if (event.room) {
+          setRoom(event.room);
+        }
         break;
+        
       case ROOM_EVENT_TYPES.ROOM_LEFT:
-        setParticipants(prev => prev.filter(p => p.id !== event.userId));
+        setParticipants(prev => prev.filter(p => p.userId !== event.userId && p.id !== event.userId));
         const pc = peerConnectionsRef.current.get(event.userId);
         if (pc) {
           pc.close();
@@ -270,14 +315,92 @@ export const useRoomProtocol = (roomId = null) => {
           return newMap;
         });
         break;
+        
       case ROOM_EVENT_TYPES.ROOM_ENDED:
         cleanup();
         break;
+        
       case ROOM_EVENT_TYPES.ROOM_PARTICIPANT_UPDATED:
         setParticipants(prev => prev.map(p => 
           p.id === event.participant.id ? event.participant : p
         ));
+        // Обновляем свою роль если это мы
+        if (event.participant.userId === currentUser?.id) {
+          setMyRole(event.participant.role || PARTICIPANT_ROLE.PARTICIPANT);
+          setHandRaised(event.participant.handRaised || false);
+          setIsScreenSharing(event.participant.screenSharing || false);
+        }
         break;
+        
+      case ROOM_EVENT_TYPES.ROOM_HAND_RAISED:
+        setParticipants(prev => prev.map(p => 
+          p.userId === event.userId ? { ...p, handRaised: event.raised } : p
+        ));
+        if (event.userId === currentUser?.id) {
+          setHandRaised(event.raised);
+        }
+        break;
+        
+      case ROOM_EVENT_TYPES.ROOM_SCREEN_SHARE_STARTED:
+        setParticipants(prev => prev.map(p => 
+          p.userId === event.userId ? { ...p, screenSharing: true } : p
+        ));
+        if (event.userId === currentUser?.id) {
+          setIsScreenSharing(true);
+        }
+        break;
+        
+      case ROOM_EVENT_TYPES.ROOM_SCREEN_SHARE_STOPPED:
+        setParticipants(prev => prev.map(p => 
+          p.userId === event.userId ? { ...p, screenSharing: false } : p
+        ));
+        if (event.userId === currentUser?.id) {
+          setIsScreenSharing(false);
+        }
+        break;
+        
+      case ROOM_EVENT_TYPES.ROOM_PARTICIPANT_MUTED:
+        // Если замутили нас — выключаем аудио
+        if (event.userId === currentUser?.id && localStreamRef.current) {
+          localStreamRef.current.getAudioTracks().forEach(track => {
+            track.enabled = false;
+          });
+          setAudioEnabled(false);
+        }
+        setParticipants(prev => prev.map(p => 
+          p.userId === event.userId ? { ...p, audioEnabled: false } : p
+        ));
+        break;
+        
+      case ROOM_EVENT_TYPES.ROOM_PARTICIPANT_KICKED:
+        // Если кикнули нас — выходим
+        if (event.userId === currentUser?.id) {
+          cleanup();
+          setError('Вас удалили из комнаты');
+        } else {
+          setParticipants(prev => prev.filter(p => p.userId !== event.userId));
+          const kickedPc = peerConnectionsRef.current.get(event.userId);
+          if (kickedPc) {
+            kickedPc.close();
+            peerConnectionsRef.current.delete(event.userId);
+          }
+          setRemoteStreams(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(event.userId);
+            return newMap;
+          });
+        }
+        break;
+        
+      case ROOM_EVENT_TYPES.ROOM_PARTICIPANT_PROMOTED:
+        setParticipants(prev => prev.map(p => 
+          p.userId === event.userId ? { ...p, role: PARTICIPANT_ROLE.CO_HOST } : p
+        ));
+        if (event.userId === currentUser?.id) {
+          setMyRole(PARTICIPANT_ROLE.CO_HOST);
+        }
+        break;
+        
       default:
         break;
     }
@@ -403,12 +526,16 @@ export const useRoomProtocol = (roomId = null) => {
     }
   }, [audioEnabled, videoEnabled]);
 
-  const createRoom = useCallback(async (title, chatId, type = 'PUBLIC', customRoomId = null) => {
+  const createRoom = useCallback(async (title, chatId, type = 'PUBLIC', options = {}) => {
     try {
       setError(null);
-      const newRoom = await roomAPI.createRoom(title, chatId, type, customRoomId);
+      const newRoom = await roomAPI.createRoom(title, chatId, type, options);
       setRoom(newRoom);
       roomIdRef.current = newRoom.roomId;
+      
+      // Создатель комнаты — HOST
+      setMyRole(PARTICIPANT_ROLE.HOST);
+      
       subscribeToRoomEvents();
       return newRoom;
     } catch (error) {
@@ -428,8 +555,16 @@ export const useRoomProtocol = (roomId = null) => {
       setIsInRoom(true);
       subscribeToRoomEvents();
       
+      // Определяем свою роль из ответа
+      const currentUser = JSON.parse(localStorage.getItem('user'));
+      const myParticipant = roomData.participants?.find(p => p.userId === currentUser?.id);
+      if (myParticipant) {
+        setMyRole(myParticipant.role || PARTICIPANT_ROLE.PARTICIPANT);
+        setHandRaised(myParticipant.handRaised || false);
+        setIsScreenSharing(myParticipant.screenSharing || false);
+      }
+      
       if (roomData.participants && roomData.participants.length > 0) {
-        const currentUser = JSON.parse(localStorage.getItem('user'));
         roomData.participants.forEach(participant => {
           if (participant.userId !== currentUser?.id) {
             sendOffer(participant.userId);
@@ -476,6 +611,126 @@ export const useRoomProtocol = (roomId = null) => {
     cleanup();
   }, [cleanup]);
 
+  // Поднять/опустить руку
+  const raiseHand = useCallback(async (raised = true) => {
+    if (!roomIdRef.current) return;
+    try {
+      await roomAPI.raiseHand(roomIdRef.current, raised);
+      setHandRaised(raised);
+    } catch (error) {
+      setError(error.message || 'Ошибка при изменении статуса руки');
+    }
+  }, []);
+
+  // Начать демонстрацию экрана
+  const startScreenShare = useCallback(async () => {
+    if (!isBrowser || !navigator.mediaDevices?.getDisplayMedia) {
+      setError('Демонстрация экрана не поддерживается в этом браузере');
+      return;
+    }
+
+    try {
+      // Сначала уведомляем сервер
+      await roomAPI.startScreenShare(roomIdRef.current);
+      
+      // Получаем стрим экрана
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          cursor: 'always',
+        },
+        audio: false,
+      });
+
+      screenStreamRef.current = stream;
+      setScreenStream(stream);
+      setIsScreenSharing(true);
+
+      // Обработка остановки демонстрации через кнопку браузера
+      stream.getVideoTracks()[0].onended = () => {
+        stopScreenShare();
+      };
+
+      // Добавляем трек во все peer connections
+      peerConnectionsRef.current.forEach((pc) => {
+        stream.getTracks().forEach(track => {
+          pc.addTrack(track, stream);
+        });
+      });
+
+    } catch (error) {
+      if (error.name !== 'NotAllowedError') {
+        setError(error.message || 'Ошибка при запуске демонстрации экрана');
+      }
+      // Если пользователь отменил — уведомляем сервер
+      try {
+        await roomAPI.stopScreenShare(roomIdRef.current);
+      } catch {}
+    }
+  }, []);
+
+  // Остановить демонстрацию экрана
+  const stopScreenShare = useCallback(async () => {
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach(track => track.stop());
+      screenStreamRef.current = null;
+    }
+    setScreenStream(null);
+    setIsScreenSharing(false);
+
+    if (roomIdRef.current) {
+      try {
+        await roomAPI.stopScreenShare(roomIdRef.current);
+      } catch {}
+    }
+  }, []);
+
+  // Назначить со-ведущим (только для HOST/CO_HOST)
+  const promoteParticipant = useCallback(async (participantId) => {
+    if (!roomIdRef.current) return;
+    if (myRole !== PARTICIPANT_ROLE.HOST && myRole !== PARTICIPANT_ROLE.CO_HOST) {
+      setError('Недостаточно прав для этого действия');
+      return;
+    }
+    try {
+      await roomAPI.promoteParticipant(roomIdRef.current, participantId);
+    } catch (error) {
+      setError(error.message || 'Ошибка при назначении со-ведущего');
+    }
+  }, [myRole]);
+
+  // Замутить участника (только для HOST/CO_HOST)
+  const muteParticipant = useCallback(async (participantId) => {
+    if (!roomIdRef.current) return;
+    if (myRole !== PARTICIPANT_ROLE.HOST && myRole !== PARTICIPANT_ROLE.CO_HOST) {
+      setError('Недостаточно прав для этого действия');
+      return;
+    }
+    try {
+      await roomAPI.muteParticipant(roomIdRef.current, participantId);
+    } catch (error) {
+      setError(error.message || 'Ошибка при отключении микрофона участника');
+    }
+  }, [myRole]);
+
+  // Удалить участника из комнаты (только для HOST/CO_HOST)
+  const kickParticipant = useCallback(async (participantId) => {
+    if (!roomIdRef.current) return;
+    if (myRole !== PARTICIPANT_ROLE.HOST && myRole !== PARTICIPANT_ROLE.CO_HOST) {
+      setError('Недостаточно прав для этого действия');
+      return;
+    }
+    try {
+      await roomAPI.kickParticipant(roomIdRef.current, participantId);
+    } catch (error) {
+      setError(error.message || 'Ошибка при удалении участника');
+    }
+  }, [myRole]);
+
+  // Проверка, является ли текущий пользователь хостом или со-хостом
+  const isHost = myRole === PARTICIPANT_ROLE.HOST;
+  const isCoHost = myRole === PARTICIPANT_ROLE.CO_HOST;
+  const canManageParticipants = isHost || isCoHost;
+
   useEffect(() => {
     return () => {
       cleanup();
@@ -483,22 +738,54 @@ export const useRoomProtocol = (roomId = null) => {
   }, [cleanup]);
 
   return {
+    // Состояние комнаты
     room,
     participants,
-    localStream,
-    remoteStreams,
-    audioEnabled,
-    videoEnabled,
     isInRoom,
     error,
+    
+    // Медиа стримы
+    localStream,
+    remoteStreams,
+    screenStream,
+    
+    // Состояние медиа
+    audioEnabled,
+    videoEnabled,
+    isScreenSharing,
+    handRaised,
+    
+    // Роль и права
+    myRole,
+    isHost,
+    isCoHost,
+    canManageParticipants,
+    
+    // Управление комнатой
     createRoom,
     joinRoom,
     leaveRoom,
     endRoom,
+    
+    // Управление медиа
     startLocalStream,
     stopLocalStream,
     toggleAudio,
     toggleVideo,
+    
+    // Демонстрация экрана
+    startScreenShare,
+    stopScreenShare,
+    
+    // Взаимодействие
+    raiseHand,
+    
+    // Управление участниками (для хоста/со-хоста)
+    promoteParticipant,
+    muteParticipant,
+    kickParticipant,
+    
+    // Вспомогательные
     sendOffer,
     clearError: () => setError(null),
   };

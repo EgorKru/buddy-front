@@ -10,8 +10,13 @@ export function useMediaDevices() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [permissionGranted, setPermissionGranted] = useState(false);
+  const [audioLevel, setAudioLevel] = useState(0);
+  const [isMicWorking, setIsMicWorking] = useState(false);
   
   const streamRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const animationFrameRef = useRef(null);
 
   const getDevices = useCallback(async () => {
     try {
@@ -190,13 +195,96 @@ export function useMediaDevices() {
     return streamRef.current;
   }, []);
 
+  // Анализ уровня звука микрофона
+  const startAudioAnalysis = useCallback((stream) => {
+    try {
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+      
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      audioContextRef.current = audioContext;
+      
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.8;
+      analyserRef.current = analyser;
+      
+      const source = audioContext.createMediaStreamSource(stream);
+      source.connect(analyser);
+      
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      let peakDetected = false;
+      
+      const checkAudioLevel = () => {
+        if (!analyserRef.current) return;
+        
+        analyserRef.current.getByteFrequencyData(dataArray);
+        
+        // Вычисляем средний уровень громкости
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+          sum += dataArray[i];
+        }
+        const average = sum / dataArray.length;
+        
+        // Нормализуем до 0-100
+        const normalizedLevel = Math.min(100, (average / 128) * 100);
+        setAudioLevel(normalizedLevel);
+        
+        // Если уровень выше порога, значит микрофон работает
+        if (normalizedLevel > 5 && !peakDetected) {
+          peakDetected = true;
+          setIsMicWorking(true);
+        }
+        
+        animationFrameRef.current = requestAnimationFrame(checkAudioLevel);
+      };
+      
+      checkAudioLevel();
+    } catch (err) {
+      console.error('Ошибка анализа аудио:', err);
+    }
+  }, []);
+
+  const stopAudioAnalysis = useCallback(() => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+    analyserRef.current = null;
+    setAudioLevel(0);
+    setIsMicWorking(false);
+  }, []);
+
+  // Запускаем анализ при получении стрима
+  useEffect(() => {
+    if (localStream && audioEnabled) {
+      const audioTracks = localStream.getAudioTracks();
+      if (audioTracks.length > 0) {
+        startAudioAnalysis(localStream);
+      }
+    } else {
+      stopAudioAnalysis();
+    }
+    
+    return () => {
+      stopAudioAnalysis();
+    };
+  }, [localStream, audioEnabled, startAudioAnalysis, stopAudioAnalysis]);
+
   useEffect(() => {
     return () => {
+      stopAudioAnalysis();
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
     };
-  }, []);
+  }, [stopAudioAnalysis]);
 
   return {
     devices,
@@ -208,6 +296,8 @@ export function useMediaDevices() {
     isLoading,
     error,
     permissionGranted,
+    audioLevel,
+    isMicWorking,
     startPreview,
     stopPreview,
     toggleAudio,

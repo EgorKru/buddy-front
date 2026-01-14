@@ -148,6 +148,76 @@
   font-size: 14px;
 }
 
+/* Проверка микрофона */
+.micTest {
+  background: rgb(25, 27, 35);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.micTestHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.micTestLabel {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
+}
+
+.micTestStatus {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.micTestOk {
+  color: rgb(100, 220, 120);
+}
+
+.micTestWaiting {
+  color: rgb(255, 180, 80);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.audioLevelContainer {
+  width: 100%;
+}
+
+.audioLevelBars {
+  display: flex;
+  gap: 3px;
+  height: 24px;
+  align-items: flex-end;
+}
+
+.audioLevelBar {
+  flex: 1;
+  height: 100%;
+  background: rgb(45, 48, 58);
+  border-radius: 2px;
+  transition: background 0.1s;
+}
+
+.audioLevelBarActive {
+  background: rgb(100, 220, 120);
+}
+
+.audioLevelBarActive.audioLevelBarHigh {
+  background: rgb(255, 100, 100);
+}
+
 .controls {
   display: flex;
   gap: 12px;

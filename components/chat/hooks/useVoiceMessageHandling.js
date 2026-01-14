@@ -141,22 +141,8 @@ export const useVoiceMessageHandling = ({
     sentAudioBlobRef.current = null;
   }, [cancelRecording, resetVoice, sentAudioBlobRef]);
 
-  useEffect(() => {
-    if (!isRecording && !isLocked && !sending && audioBlob && audioBlob.size > 0) {
-      if (sentAudioBlobRef.current !== audioBlob) {
-        sentAudioBlobRef.current = audioBlob;
-        const blobToSend = audioBlob;
-        
-        const timeoutId = setTimeout(() => {
-          if (blobToSend && blobToSend.size > 0 && !sending && !isLocked && !isRecording) {
-            handleVoiceSend();
-          }
-        }, 150);
-        
-        return () => clearTimeout(timeoutId);
-      }
-    }
-  }, [audioBlob, isRecording, sending, isLocked, handleVoiceSend, sentAudioBlobRef]);
+  // Автоматическая отправка убрана — отправка происходит через onStopRecording в ChatPresenter
+  // Это предотвращает двойную отправку голосовых сообщений
 
   return { handleVoiceSendSimple, handleVoiceSend, handleVoiceCancel };
 };
