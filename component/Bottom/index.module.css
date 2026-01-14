@@ -34,6 +34,31 @@
   font-size: 14px;
 }
 
+.participantButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 24px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.participantButton:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: scale(1.02);
+}
+
+.participantButton:active {
+  transform: scale(0.98);
+}
+
 .icon {
   display: flex;
   align-items: center;
@@ -79,4 +104,36 @@
 .leaveButton:hover {
   background: rgb(240, 20, 60) !important;
   box-shadow: 0 0 25px rgba(217, 4, 41, 0.7) !important;
+}
+
+/* Поднятая рука */
+.handRaised {
+  background: rgb(255, 193, 7) !important;
+  border-color: rgb(255, 213, 79) !important;
+  color: rgb(30, 30, 35) !important;
+  box-shadow: 0 0 20px rgba(255, 193, 7, 0.5);
+  animation: handPulse 1.5s ease-in-out infinite;
+}
+
+.handRaised:hover {
+  background: rgb(255, 213, 79) !important;
+  box-shadow: 0 0 25px rgba(255, 193, 7, 0.7);
+}
+
+@keyframes handPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+
+/* Демонстрация экрана */
+.screenSharing {
+  background: rgb(76, 217, 100) !important;
+  border-color: rgb(100, 240, 130) !important;
+  color: rgb(30, 30, 35) !important;
+  box-shadow: 0 0 20px rgba(76, 217, 100, 0.5);
+}
+
+.screenSharing:hover {
+  background: rgb(100, 240, 130) !important;
+  box-shadow: 0 0 25px rgba(76, 217, 100, 0.7);
 }

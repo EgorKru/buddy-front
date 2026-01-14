@@ -338,9 +338,13 @@ export const useRoomProtocol = (initialRoomId = null) => {
   }, [client, connected, sendSignal]);
 
   // Обработка одного события
+  // Формат бэкенда: fromUserId вместо userId, participant объект содержит все данные
   const processEvent = useCallback((event) => {
     const eventRoomId = event.room?.roomId || event.roomId;
     if (roomIdRef.current && eventRoomId && eventRoomId !== roomIdRef.current) return;
+
+    // Универсальный userId: fromUserId (новый формат) или userId (старый)
+    const eventUserId = event.fromUserId || event.userId;
 
     switch (event.eventType) {
       // === Комната ===
@@ -351,17 +355,26 @@ export const useRoomProtocol = (initialRoomId = null) => {
         break;
 
       case EVENT_TYPES.ROOM_JOINED:
+        // Обновляем комнату если пришла
         if (event.room) {
           setRoom(event.room);
-          setParticipants(event.room.participants || []);
+          // Можно взять participants из room, но лучше добавить participant отдельно
+          // чтобы не потерять локальные изменения
         }
+        // Добавляем нового участника
         if (event.participant) {
           setParticipants(prev => {
-            if (prev.find(p => p.user?.id === event.participant.user?.id)) return prev;
+            const existingIdx = prev.findIndex(p => p.user?.id === event.participant.user?.id);
+            if (existingIdx >= 0) {
+              // Обновляем существующего
+              const updated = [...prev];
+              updated[existingIdx] = event.participant;
+              return updated;
+            }
             return [...prev, event.participant];
           });
           // Устанавливаем WebRTC соединение с новым участником
-          const newUserId = event.participant.user?.id;
+          const newUserId = event.participant.user?.id || eventUserId;
           if (newUserId && newUserId !== myUserId && isInRoom) {
             setTimeout(() => sendOffer(newUserId), 100);
           }
@@ -369,9 +382,16 @@ export const useRoomProtocol = (initialRoomId = null) => {
         break;
 
       case EVENT_TYPES.ROOM_LEFT:
-        const leftUserId = event.participant?.user?.id || event.userId;
-        setParticipants(prev => prev.filter(p => p.user?.id !== leftUserId));
-        closePeerConnection(leftUserId);
+        // fromUserId — кто вышел
+        const leftUserId = eventUserId || event.participant?.user?.id;
+        if (leftUserId) {
+          setParticipants(prev => prev.filter(p => p.user?.id !== leftUserId));
+          closePeerConnection(leftUserId);
+        }
+        // Обновляем room если пришла
+        if (event.room) {
+          setRoom(event.room);
+        }
         break;
 
       case EVENT_TYPES.ROOM_ENDED:
@@ -379,58 +399,109 @@ export const useRoomProtocol = (initialRoomId = null) => {
         break;
 
       // === Медиа участников ===
+      // Формат: fromUserId — чей статус, participant.audioEnabled/videoEnabled — новые значения
       case EVENT_TYPES.PARTICIPANT_AUDIO_CHANGED:
-        setParticipants(prev => prev.map(p => 
-          p.user?.id === event.userId ? { ...p, audioEnabled: event.enabled } : p
-        ));
+        if (event.participant) {
+          // Обновляем весь participant объект
+          setParticipants(prev => prev.map(p => 
+            p.user?.id === eventUserId ? { ...p, ...event.participant } : p
+          ));
+        } else {
+          // Fallback на старый формат
+          setParticipants(prev => prev.map(p => 
+            p.user?.id === eventUserId ? { ...p, audioEnabled: event.enabled } : p
+          ));
+        }
         break;
 
       case EVENT_TYPES.PARTICIPANT_VIDEO_CHANGED:
-        setParticipants(prev => prev.map(p => 
-          p.user?.id === event.userId ? { ...p, videoEnabled: event.enabled } : p
-        ));
+        if (event.participant) {
+          setParticipants(prev => prev.map(p => 
+            p.user?.id === eventUserId ? { ...p, ...event.participant } : p
+          ));
+        } else {
+          setParticipants(prev => prev.map(p => 
+            p.user?.id === eventUserId ? { ...p, videoEnabled: event.enabled } : p
+          ));
+        }
         break;
 
       case EVENT_TYPES.PARTICIPANT_HAND_RAISED:
-        setParticipants(prev => prev.map(p => 
-          p.user?.id === event.userId ? { ...p, handRaised: true } : p
-        ));
-        if (event.userId === myUserId) setHandRaised(true);
+        if (event.participant) {
+          setParticipants(prev => prev.map(p => 
+            p.user?.id === eventUserId ? { ...p, ...event.participant } : p
+          ));
+        } else {
+          setParticipants(prev => prev.map(p => 
+            p.user?.id === eventUserId ? { ...p, handRaised: true } : p
+          ));
+        }
+        if (eventUserId === myUserId) setHandRaised(true);
         break;
 
       case EVENT_TYPES.PARTICIPANT_HAND_LOWERED:
-        setParticipants(prev => prev.map(p => 
-          p.user?.id === event.userId ? { ...p, handRaised: false } : p
-        ));
-        if (event.userId === myUserId) setHandRaised(false);
+        if (event.participant) {
+          setParticipants(prev => prev.map(p => 
+            p.user?.id === eventUserId ? { ...p, ...event.participant } : p
+          ));
+        } else {
+          setParticipants(prev => prev.map(p => 
+            p.user?.id === eventUserId ? { ...p, handRaised: false } : p
+          ));
+        }
+        if (eventUserId === myUserId) setHandRaised(false);
         break;
 
       case EVENT_TYPES.PARTICIPANT_SCREEN_SHARE_STARTED:
-        setParticipants(prev => prev.map(p => 
-          p.user?.id === event.userId ? { ...p, screenSharing: true } : p
-        ));
-        if (event.userId === myUserId) setIsScreenSharing(true);
+        if (event.participant) {
+          setParticipants(prev => prev.map(p => 
+            p.user?.id === eventUserId ? { ...p, ...event.participant } : p
+          ));
+        } else {
+          setParticipants(prev => prev.map(p => 
+            p.user?.id === eventUserId ? { ...p, screenSharing: true } : p
+          ));
+        }
+        if (eventUserId === myUserId) setIsScreenSharing(true);
         break;
 
       case EVENT_TYPES.PARTICIPANT_SCREEN_SHARE_STOPPED:
-        setParticipants(prev => prev.map(p => 
-          p.user?.id === event.userId ? { ...p, screenSharing: false } : p
-        ));
-        if (event.userId === myUserId) setIsScreenSharing(false);
+        if (event.participant) {
+          setParticipants(prev => prev.map(p => 
+            p.user?.id === eventUserId ? { ...p, ...event.participant } : p
+          ));
+        } else {
+          setParticipants(prev => prev.map(p => 
+            p.user?.id === eventUserId ? { ...p, screenSharing: false } : p
+          ));
+        }
+        if (eventUserId === myUserId) setIsScreenSharing(false);
         break;
 
       // === Роли ===
       case EVENT_TYPES.PARTICIPANT_PROMOTED:
-        setParticipants(prev => prev.map(p => 
-          p.user?.id === event.targetUserId ? { ...p, role: PARTICIPANT_ROLE.CO_HOST } : p
-        ));
+        if (event.participant) {
+          setParticipants(prev => prev.map(p => 
+            p.user?.id === event.targetUserId ? { ...p, ...event.participant } : p
+          ));
+        } else {
+          setParticipants(prev => prev.map(p => 
+            p.user?.id === event.targetUserId ? { ...p, role: PARTICIPANT_ROLE.CO_HOST } : p
+          ));
+        }
         if (event.targetUserId === myUserId) setMyRole(PARTICIPANT_ROLE.CO_HOST);
         break;
 
       case EVENT_TYPES.PARTICIPANT_DEMOTED:
-        setParticipants(prev => prev.map(p => 
-          p.user?.id === event.targetUserId ? { ...p, role: PARTICIPANT_ROLE.PARTICIPANT } : p
-        ));
+        if (event.participant) {
+          setParticipants(prev => prev.map(p => 
+            p.user?.id === event.targetUserId ? { ...p, ...event.participant } : p
+          ));
+        } else {
+          setParticipants(prev => prev.map(p => 
+            p.user?.id === event.targetUserId ? { ...p, role: PARTICIPANT_ROLE.PARTICIPANT } : p
+          ));
+        }
         if (event.targetUserId === myUserId) setMyRole(PARTICIPANT_ROLE.PARTICIPANT);
         break;
 
@@ -441,9 +512,15 @@ export const useRoomProtocol = (initialRoomId = null) => {
           });
           setAudioEnabled(false);
         }
-        setParticipants(prev => prev.map(p => 
-          p.user?.id === event.targetUserId ? { ...p, audioEnabled: false } : p
-        ));
+        if (event.participant) {
+          setParticipants(prev => prev.map(p => 
+            p.user?.id === event.targetUserId ? { ...p, ...event.participant } : p
+          ));
+        } else {
+          setParticipants(prev => prev.map(p => 
+            p.user?.id === event.targetUserId ? { ...p, audioEnabled: false } : p
+          ));
+        }
         break;
 
       case EVENT_TYPES.PARTICIPANT_KICKED:
@@ -814,16 +891,22 @@ export const useRoomProtocol = (initialRoomId = null) => {
     }
   }, [videoEnabled, sendSignal]);
 
-  // Поднять руку
+  // Поднять руку (оптимистичное обновление)
   const raiseHand = useCallback(() => {
     if (!roomIdRef.current) return;
+    
+    const newHandRaised = !handRaised;
+    // Мгновенно обновляем UI
+    setHandRaised(newHandRaised);
+    
+    // Отправляем сигнал серверу
     sendSignal({
-      type: handRaised ? SIGNAL_TYPES.ROOM_LOWER_HAND : SIGNAL_TYPES.ROOM_RAISE_HAND,
+      type: newHandRaised ? SIGNAL_TYPES.ROOM_RAISE_HAND : SIGNAL_TYPES.ROOM_LOWER_HAND,
       roomId: roomIdRef.current,
     });
   }, [handRaised, sendSignal]);
 
-  // Демонстрация экрана
+  // Демонстрация экрана (оптимистичное обновление)
   const startScreenShare = useCallback(async () => {
     if (!isBrowser || !navigator.mediaDevices?.getDisplayMedia) {
       setError('Демонстрация экрана не поддерживается');
@@ -838,6 +921,8 @@ export const useRoomProtocol = (initialRoomId = null) => {
 
       screenStreamRef.current = stream;
       setScreenStream(stream);
+      // Мгновенно обновляем UI
+      setIsScreenSharing(true);
       
       // Уведомляем сервер
       sendSignal({
@@ -850,7 +935,7 @@ export const useRoomProtocol = (initialRoomId = null) => {
         stopScreenShare();
       };
 
-      // Добавляем в peer connections
+      // Добавляем в peer connections для передачи другим участникам
       peerConnectionsRef.current.forEach((pc) => {
         stream.getTracks().forEach(track => pc.addTrack(track, stream));
       });

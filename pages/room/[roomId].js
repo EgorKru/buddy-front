@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/router";
 import { useRoomProtocol } from "@/hooks/useRoomProtocol";
 import { getCurrentUser } from "@/utils/api";
@@ -6,6 +6,8 @@ import { getCurrentUser } from "@/utils/api";
 import Player from "@/component/Player";
 import Bottom from "@/component/Bottom";
 import CopySection from "@/component/CopySection";
+import ParticipantsModal from "@/component/ParticipantsModal";
+import RoomToast from "@/component/RoomToast";
 
 import styles from "@/styles/room.module.css";
 
@@ -30,17 +32,72 @@ const Room = () => {
     endRoom,
     joinRoom,
     clearError,
+    // Новые функции
+    handRaised,
+    raiseHand,
+    isScreenSharing,
+    screenStream,
+    startScreenShare,
+    stopScreenShare,
+    myRole,
+    isHost,
+    isCoHost,
+    promoteParticipant,
+    demoteParticipant,
+    muteParticipant,
+    kickParticipant,
   } = useRoomProtocol(roomId);
 
   const [players, setPlayers] = useState({});
   const [playerNames, setPlayerNames] = useState({});
   const [isJoining, setIsJoining] = useState(false);
   const [meetingTime, setMeetingTime] = useState(0);
+  const [showParticipants, setShowParticipants] = useState(false);
+  const [toastNotifications, setToastNotifications] = useState([]);
   const hasJoinedRef = useRef(false);
+  const prevParticipantsRef = useRef([]);
   
   const currentUser = getCurrentUser();
-  const currentUserId = currentUser?.id?.toString() || 'local';
+  const currentUserId = currentUser?.id || null;
+  const currentUserIdStr = currentUserId?.toString() || 'local';
   const currentUserName = currentUser?.displayName || currentUser?.username || "Вы";
+
+  // Отслеживаем вход/выход участников для тостов
+  useEffect(() => {
+    if (!isInRoom) return;
+    
+    const prevIds = new Set(prevParticipantsRef.current.map(p => p.user?.id));
+    const currentIds = new Set(participants.map(p => p.user?.id));
+    
+    // Новые участники (кроме себя)
+    participants.forEach(p => {
+      const userId = p.user?.id;
+      if (userId && !prevIds.has(userId) && userId !== currentUserId) {
+        const userName = p.user?.displayName || p.user?.username || `Участник ${userId}`;
+        addToast('join', userName, userId);
+      }
+    });
+    
+    // Ушедшие участники
+    prevParticipantsRef.current.forEach(p => {
+      const userId = p.user?.id;
+      if (userId && !currentIds.has(userId) && userId !== currentUserId) {
+        const userName = p.user?.displayName || p.user?.username || `Участник ${userId}`;
+        addToast('leave', userName, userId);
+      }
+    });
+    
+    prevParticipantsRef.current = [...participants];
+  }, [participants, isInRoom, currentUserId]);
+
+  const addToast = useCallback((type, userName, odUserId) => {
+    const id = `${type}-${odUserId}-${Date.now()}`;
+    setToastNotifications(prev => [...prev, { id, type, userName }]);
+  }, []);
+
+  const dismissToast = useCallback((id) => {
+    setToastNotifications(prev => prev.filter(n => n.id !== id));
+  }, []);
 
   // Таймер встречи
   useEffect(() => {
@@ -109,23 +166,38 @@ const Room = () => {
     }
   };
 
-  // Обновляем локальный плеер
+  // Обновляем локальный плеер при изменении stream
   useEffect(() => {
     if (localStream) {
       setPlayers(prev => ({
         ...prev,
-        [currentUserId]: {
+        [currentUserIdStr]: {
           stream: localStream,
           muted: true, // Локальный всегда muted чтобы не слышать себя
           playing: videoEnabled,
+          isLocal: true,
         },
       }));
       setPlayerNames(prev => ({
         ...prev,
-        [currentUserId]: currentUserName,
+        [currentUserIdStr]: currentUserName,
       }));
     }
-  }, [localStream, videoEnabled, currentUserId, currentUserName]);
+  }, [localStream, currentUserIdStr, currentUserName]);
+
+  // Обновляем состояние видео при переключении камеры
+  useEffect(() => {
+    setPlayers(prev => {
+      if (!prev[currentUserIdStr]) return prev;
+      return {
+        ...prev,
+        [currentUserIdStr]: {
+          ...prev[currentUserIdStr],
+          playing: videoEnabled,
+        },
+      };
+    });
+  }, [videoEnabled, currentUserIdStr]);
 
   // Обновляем удалённые плееры
   useEffect(() => {
@@ -139,12 +211,13 @@ const Room = () => {
           stream: stream,
           muted: false, // Удалённые не muted
           playing: true,
+          isLocal: false,
         };
       });
       
       // Удаляем плееры для отключившихся участников
       Object.keys(newPlayers).forEach(id => {
-        if (id !== currentUserId && !remoteStreams.has(parseInt(id)) && !remoteStreams.has(id)) {
+        if (id !== currentUserIdStr && !remoteStreams.has(parseInt(id)) && !remoteStreams.has(id)) {
           delete newPlayers[id];
         }
       });
@@ -166,7 +239,7 @@ const Room = () => {
       });
       return newNames;
     });
-  }, [remoteStreams, participants, currentUserId]);
+  }, [remoteStreams, participants, currentUserIdStr]);
 
   useEffect(() => {
     participants.forEach(participant => {
@@ -198,35 +271,19 @@ const Room = () => {
 
   const handleToggleAudio = async () => {
     await toggleAudio();
-    setPlayers(prev => {
-      if (!prev[currentUserId]) return prev;
-      return {
-        ...prev,
-        [currentUserId]: {
-          ...prev[currentUserId],
-          muted: !prev[currentUserId].muted,
-        },
-      };
-    });
+    // audioEnabled обновится в useRoomProtocol, 
+    // Player получит новое значение через проп
   };
 
   const handleToggleVideo = async () => {
     await toggleVideo();
-    setPlayers(prev => {
-      if (!prev[currentUserId]) return prev;
-      return {
-        ...prev,
-        [currentUserId]: {
-          ...prev[currentUserId],
-          playing: !prev[currentUserId].playing,
-        },
-      };
-    });
+    // videoEnabled обновится в useRoomProtocol,
+    // useEffect синхронизирует players[].playing
   };
 
-  const playerHighlighted = players[currentUserId];
+  const playerHighlighted = players[currentUserIdStr];
   const nonHighlightedPlayers = Object.keys(players).reduce((acc, playerId) => {
-    if (playerId !== currentUserId) {
+    if (playerId !== currentUserIdStr) {
       acc[playerId] = players[playerId];
     }
     return acc;
@@ -276,6 +333,12 @@ const Room = () => {
 
   return (
     <div className={styles.roomContainer}>
+      {/* Тост-уведомления */}
+      <RoomToast 
+        notifications={toastNotifications} 
+        onDismiss={dismissToast} 
+      />
+
       {/* Верхняя панель */}
       <div className={styles.topBar}>
         <div className={styles.logo}>Pager Meet</div>
@@ -287,16 +350,34 @@ const Room = () => {
       
       {/* Видео контейнер */}
       <div className={styles.videoGrid}>
+        {/* Превью своей демонстрации экрана */}
+        {isScreenSharing && screenStream && (
+          <div className={styles.screenSharePreview}>
+            <video
+              autoPlay
+              playsInline
+              muted
+              ref={(el) => { if (el) el.srcObject = screenStream; }}
+              className={styles.screenShareVideo}
+            />
+            <div className={styles.screenShareLabel}>Ваша демонстрация</div>
+          </div>
+        )}
+        
         {/* Локальный плеер */}
         {playerHighlighted && (
           <div className={Object.keys(nonHighlightedPlayers).length > 0 ? styles.videoItem : styles.videoItemFull}>
             <Player
               stream={playerHighlighted.stream}
-              muted={playerHighlighted.muted}
+              muted={true}  // Локальный всегда muted чтобы не слышать себя
               playing={playerHighlighted.playing}
               isActive
-              playerId={currentUserId}
-              playerName={playerNames[currentUserId]}
+              isLocal
+              audioEnabled={audioEnabled}  // Реальное состояние микрофона
+              playerId={currentUserIdStr}
+              playerName={playerNames[currentUserIdStr]}
+              handRaised={handRaised}
+              isScreenSharing={isScreenSharing}
             />
           </div>
         )}
@@ -304,15 +385,23 @@ const Room = () => {
         {/* Удалённые плееры */}
         {Object.keys(nonHighlightedPlayers).map((playerId) => {
           const player = nonHighlightedPlayers[playerId];
+          // Находим участника чтобы получить его состояние
+          const participant = participants.find(p => 
+            p.user?.id?.toString() === playerId
+          );
           return (
             <div key={playerId} className={styles.videoItem}>
               <Player
                 stream={player.stream}
-                muted={player.muted}
+                muted={false}  // Удалённых слышим
                 playing={player.playing}
                 isActive={false}
+                isLocal={false}
+                audioEnabled={participant?.audioEnabled !== false}  // Состояние микрофона участника
                 playerId={playerId}
                 playerName={playerNames[playerId]}
+                handRaised={participant?.handRaised}
+                isScreenSharing={participant?.screenSharing}
               />
             </div>
           );
@@ -332,6 +421,25 @@ const Room = () => {
         toggleVideo={handleToggleVideo}
         leaveRoom={handleLeaveRoom}
         participantCount={participantCount}
+        onParticipantsClick={() => setShowParticipants(true)}
+        handRaised={handRaised}
+        onRaiseHand={raiseHand}
+        isScreenSharing={isScreenSharing}
+        onToggleScreenShare={isScreenSharing ? stopScreenShare : startScreenShare}
+      />
+
+      {/* Модалка участников */}
+      <ParticipantsModal
+        isOpen={showParticipants}
+        onClose={() => setShowParticipants(false)}
+        participants={participants}
+        currentUserId={currentUserId}
+        isHost={isHost}
+        isCoHost={isCoHost}
+        onPromote={promoteParticipant}
+        onDemote={demoteParticipant}
+        onMute={muteParticipant}
+        onKick={kickParticipant}
       />
     </div>
   );

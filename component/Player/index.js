@@ -1,18 +1,114 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import cx from "classnames";
-import { Mic, MicOff } from "lucide-react";
+import { Mic, MicOff, Hand, Monitor } from "lucide-react";
 
 import styles from "@/component/Player/index.module.css";
 
 const Player = (props) => {
-  const { stream, muted, playing, isActive, playerId, playerName } = props;
+  const { 
+    stream, 
+    muted,           // Для video элемента (локальный всегда muted чтобы не слышать себя)
+    playing, 
+    isActive, 
+    playerId, 
+    playerName, 
+    isLocal,
+    audioEnabled = true,  // Реальное состояние микрофона (включён/выключен)
+    handRaised = false,   // Поднята ли рука
+    isScreenSharing = false  // Демонстрирует ли экран
+  } = props;
   const videoRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const animationFrameRef = useRef(null);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  
+  // Для локального: audioEnabled показывает включён ли микрофон
+  // Для удалённых: muted показывает слышим ли мы их (всегда false)
+  const isMicOn = isLocal ? audioEnabled : !muted;
   
   useEffect(() => {
     if (videoRef.current && stream) {
       videoRef.current.srcObject = stream;
     }
   }, [stream]);
+
+  // Voice Activity Detection — работает для всех участников
+  useEffect(() => {
+    if (!stream) {
+      setIsSpeaking(false);
+      return;
+    }
+
+    const audioTracks = stream.getAudioTracks();
+    if (audioTracks.length === 0) {
+      setIsSpeaking(false);
+      return;
+    }
+
+    // Если микрофон выключен — не показываем индикатор
+    if (!isMicOn) {
+      setIsSpeaking(false);
+      return;
+    }
+
+    try {
+      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      analyserRef.current = audioContextRef.current.createAnalyser();
+      analyserRef.current.fftSize = 256;
+      analyserRef.current.smoothingTimeConstant = 0.3;
+      
+      const source = audioContextRef.current.createMediaStreamSource(stream);
+      source.connect(analyserRef.current);
+      
+      const bufferLength = analyserRef.current.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      
+      let speakingTimeout = null;
+      const SPEAKING_THRESHOLD = 12; // Порог громкости (чуть ниже для лучшей чувствительности)
+      const SPEAKING_DELAY = 250; // Задержка перед выключением индикатора
+      
+      const checkAudioLevel = () => {
+        if (!analyserRef.current) return;
+        
+        analyserRef.current.getByteFrequencyData(dataArray);
+        
+        // Считаем среднюю громкость
+        let sum = 0;
+        for (let i = 0; i < bufferLength; i++) {
+          sum += dataArray[i];
+        }
+        const average = sum / bufferLength;
+        
+        if (average > SPEAKING_THRESHOLD) {
+          setIsSpeaking(true);
+          if (speakingTimeout) {
+            clearTimeout(speakingTimeout);
+            speakingTimeout = null;
+          }
+        } else if (!speakingTimeout) {
+          speakingTimeout = setTimeout(() => {
+            setIsSpeaking(false);
+            speakingTimeout = null;
+          }, SPEAKING_DELAY);
+        }
+        
+        animationFrameRef.current = requestAnimationFrame(checkAudioLevel);
+      };
+      
+      checkAudioLevel();
+      
+      return () => {
+        if (speakingTimeout) clearTimeout(speakingTimeout);
+        if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+        if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+          audioContextRef.current.close();
+        }
+      };
+    } catch (err) {
+      console.error('Error setting up audio analysis:', err);
+    }
+  }, [stream, isMicOn]);
 
   const getInitials = (name) => {
     if (!name) return "?";
@@ -32,6 +128,7 @@ const Player = (props) => {
         [styles.notActive]: !isActive,
         [styles.active]: isActive,
         [styles.notPlaying]: !playing,
+        [styles.speaking]: isSpeaking && isMicOn,
       })}
     >
       {playing && stream ? (
@@ -39,12 +136,12 @@ const Player = (props) => {
           ref={videoRef}
           autoPlay
           playsInline
-          muted={muted}
+          muted={isLocal || muted}
           className={styles.video}
         />
       ) : (
         <div className={styles.avatarContainer}>
-          <div className={styles.avatar} style={{ fontSize: isActive ? '120px' : '60px' }}>
+          <div className={cx(styles.avatar, { [styles.avatarSpeaking]: isSpeaking && isMicOn })} style={{ fontSize: isActive ? '120px' : '60px' }}>
             {initials}
           </div>
         </div>
@@ -52,14 +149,30 @@ const Player = (props) => {
 
       <div className={styles.nameLabel}>
         {displayName}
+        {isSpeaking && isMicOn && <span className={styles.speakingIndicator}>🔊</span>}
       </div>
 
+      {/* Индикатор поднятой руки */}
+      {handRaised && (
+        <div className={styles.handRaisedBadge}>
+          <Hand size={20} />
+        </div>
+      )}
+
+      {/* Индикатор демонстрации экрана */}
+      {isScreenSharing && (
+        <div className={styles.screenShareBadge}>
+          <Monitor size={16} />
+          <span>Демонстрация</span>
+        </div>
+      )}
+
       {!isActive && (
-        <div className={styles.micIcon}>
-          {muted ? (
-            <MicOff size={18} />
-          ) : (
+        <div className={cx(styles.micIcon, { [styles.micSpeaking]: isSpeaking && isMicOn })}>
+          {isMicOn ? (
             <Mic size={18} />
+          ) : (
+            <MicOff size={18} />
           )}
         </div>
       )}

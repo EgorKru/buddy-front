@@ -147,6 +147,42 @@
   overflow: auto;
 }
 
+/* Превью демонстрации экрана */
+.screenSharePreview {
+  position: relative;
+  grid-column: 1 / -1;
+  min-height: 300px;
+  max-height: 60vh;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgb(20, 20, 25);
+  border: 2px solid rgb(76, 217, 100);
+  box-shadow: 0 0 30px rgba(76, 217, 100, 0.3);
+}
+
+.screenShareVideo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: rgb(15, 15, 18);
+}
+
+.screenShareLabel {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: rgba(76, 217, 100, 0.9);
+  border-radius: 8px;
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(76, 217, 100, 0.4);
+}
+
 .videoItem {
   min-height: 200px;
   border-radius: 12px;

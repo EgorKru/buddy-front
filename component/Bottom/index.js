@@ -1,10 +1,22 @@
 import cx from "classnames";
-import { Mic, Video, PhoneOff, MicOff, VideoOff, Users } from "lucide-react";
+import { Mic, Video, PhoneOff, MicOff, VideoOff, Users, Hand, Monitor, MonitorOff } from "lucide-react";
 
 import styles from "@/component/Bottom/index.module.css";
 
 const Bottom = (props) => {
-  const { muted, playing, toggleAudio, toggleVideo, leaveRoom, participantCount } = props;
+  const { 
+    muted, 
+    playing, 
+    toggleAudio, 
+    toggleVideo, 
+    leaveRoom, 
+    participantCount, 
+    onParticipantsClick,
+    handRaised,
+    onRaiseHand,
+    isScreenSharing,
+    onToggleScreenShare,
+  } = props;
 
   const isMuted = muted ?? true;
   const isPlaying = playing ?? true;
@@ -12,10 +24,14 @@ const Bottom = (props) => {
   return (
     <div className={styles.bottomMenu}>
       <div className={styles.leftSection}>
-        <div className={styles.participantInfo}>
+        <button 
+          className={styles.participantButton}
+          onClick={onParticipantsClick}
+          title="Показать участников"
+        >
           <Users size={18} />
           <span>{participantCount || 1}</span>
-        </div>
+        </button>
       </div>
       
       <div className={styles.centerSection}>
@@ -53,6 +69,25 @@ const Bottom = (props) => {
             <VideoOff size={22} />
           </button>
         )}
+        
+        {/* Поднять руку */}
+        <button
+          className={cx(styles.icon, { [styles.handRaised]: handRaised })}
+          title={handRaised ? "Опустить руку" : "Поднять руку"}
+          onClick={onRaiseHand || (() => {})}
+        >
+          <Hand size={22} />
+        </button>
+        
+        {/* Демонстрация экрана */}
+        <button
+          className={cx(styles.icon, { [styles.screenSharing]: isScreenSharing })}
+          title={isScreenSharing ? "Остановить демонстрацию" : "Показать экран"}
+          onClick={onToggleScreenShare || (() => {})}
+        >
+          {isScreenSharing ? <MonitorOff size={22} /> : <Monitor size={22} />}
+        </button>
+        
         <button
           className={cx(styles.icon, styles.leaveButton)}
           title="Покинуть встречу"
