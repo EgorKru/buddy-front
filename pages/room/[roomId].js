@@ -207,10 +207,15 @@ const Room = () => {
       // Добавляем/обновляем удалённые стримы
       remoteStreams.forEach((stream, odUserId) => {
         const userIdStr = odUserId.toString();
+        // Проверяем, есть ли активные видео треки
+        const hasVideoTracks = stream && stream.getVideoTracks().length > 0;
+        const hasActiveVideoTracks = hasVideoTracks && 
+          stream.getVideoTracks().some(track => track.readyState === 'live' && track.enabled);
+        
         newPlayers[userIdStr] = {
           stream: stream,
           muted: false, // Удалённые не muted
-          playing: true,
+          playing: hasActiveVideoTracks, // playing = true только если есть активные видео треки
           isLocal: false,
         };
       });
@@ -225,33 +230,44 @@ const Room = () => {
       return newPlayers;
     });
 
-    // Обновляем имена участников
+    // Обновляем имена участников для всех участников (не только тех, у кого есть stream)
     setPlayerNames(prev => {
       const newNames = { ...prev };
-      remoteStreams.forEach((_, odUserId) => {
-        const userIdStr = odUserId.toString();
-        // Новая структура: participant.user.id
-        const participant = participants.find(p => 
-          p.user?.id === odUserId || p.user?.id === parseInt(odUserId)
-        );
-        const user = participant?.user;
-        newNames[userIdStr] = user?.displayName || user?.username || `Участник ${userIdStr.substring(0, 6)}`;
+      // Обновляем имена для всех участников
+      participants.forEach(participant => {
+        const participantId = participant.user?.id;
+        if (!participantId) return;
+        const userIdStr = participantId.toString();
+        const user = participant.user;
+        const displayName = user?.displayName || user?.username || `Участник ${userIdStr.substring(0, 6)}`;
+        newNames[userIdStr] = displayName;
       });
       return newNames;
     });
   }, [remoteStreams, participants, currentUserIdStr]);
 
+  // Обновляем имена всех участников сразу при изменении списка participants
   useEffect(() => {
-    participants.forEach(participant => {
-      // Новая структура: participant.user.id
-      const userIdStr = participant.user?.id?.toString();
-      if (userIdStr && !playerNames[userIdStr]) {
-        const user = participant.user;
-        setPlayerNames(prev => ({
-          ...prev,
-          [userIdStr]: user?.displayName || user?.username || `Участник ${userIdStr.substring(0, 6)}`,
-        }));
-      }
+    if (!participants || participants.length === 0) return;
+    
+    setPlayerNames(prev => {
+      const newNames = { ...prev };
+      let hasChanges = false;
+      
+      participants.forEach(participant => {
+        const userIdStr = participant.user?.id?.toString();
+        if (userIdStr) {
+          const user = participant.user;
+          const displayName = user?.displayName || user?.username || `Участник ${userIdStr.substring(0, 6)}`;
+          // Обновляем имя, даже если оно уже есть (на случай изменения)
+          if (newNames[userIdStr] !== displayName) {
+            newNames[userIdStr] = displayName;
+            hasChanges = true;
+          }
+        }
+      });
+      
+      return hasChanges ? newNames : prev;
     });
   }, [participants]);
 
@@ -382,30 +398,53 @@ const Room = () => {
           </div>
         )}
         
-        {/* Удалённые плееры */}
-        {Object.keys(nonHighlightedPlayers).map((playerId) => {
-          const player = nonHighlightedPlayers[playerId];
-          // Находим участника чтобы получить его состояние
-          const participant = participants.find(p => 
-            p.user?.id?.toString() === playerId
-          );
-          return (
-            <div key={playerId} className={styles.videoItem}>
-              <Player
-                stream={player.stream}
-                muted={false}  // Удалённых слышим
-                playing={player.playing}
-                isActive={false}
-                isLocal={false}
-                audioEnabled={participant?.audioEnabled !== false}  // Состояние микрофона участника
-                playerId={playerId}
-                playerName={playerNames[playerId]}
-                handRaised={participant?.handRaised}
-                isScreenSharing={participant?.screenSharing}
-              />
-            </div>
-          );
-        })}
+        {/* Удалённые плееры - показываем ВСЕХ участников, не только тех у кого есть stream */}
+        {participants
+          .filter(p => {
+            // Исключаем текущего пользователя (он показывается отдельно)
+            const participantId = p.user?.id;
+            return participantId && participantId.toString() !== currentUserIdStr && participantId !== currentUserId;
+          })
+          .map((participant) => {
+            const participantId = participant.user?.id;
+            const participantIdStr = participantId?.toString();
+            
+            // Находим stream для этого участника (если есть)
+            const player = nonHighlightedPlayers[participantIdStr] || 
+                          (participantId && nonHighlightedPlayers[participantId]);
+            
+            // Получаем имя участника
+            const participantName = participant?.user?.displayName || 
+                                    participant?.user?.username || 
+                                    (player && playerNames[participantIdStr]) || 
+                                    `Участник ${participantIdStr?.substring(0, 6) || ''}`;
+            
+            // Определяем screen sharing: проверяем и participant.screenSharing, и наличие screen sharing треков
+            const hasScreenShareTracks = player?.stream && 
+              player.stream.getVideoTracks().some(track => 
+                track.readyState === 'live' && 
+                (track.label?.toLowerCase().includes('screen') || 
+                 track.label?.toLowerCase().includes('display'))
+              );
+            const isParticipantScreenSharing = participant?.screenSharing === true || hasScreenShareTracks;
+            
+            return (
+              <div key={participantIdStr || participant.id} className={styles.videoItem}>
+                <Player
+                  stream={player?.stream || null}
+                  muted={false}  // Удалённых слышим
+                  playing={player?.playing || false}
+                  isActive={false}
+                  isLocal={false}
+                  audioEnabled={participant?.audioEnabled !== false}  // Состояние микрофона участника
+                  playerId={participantIdStr}
+                  playerName={participantName}
+                  handRaised={participant?.handRaised === true}
+                  isScreenSharing={isParticipantScreenSharing}
+                />
+              </div>
+            );
+          })}
         
         {/* Если один участник — показываем CopySection */}
         {participantCount <= 1 && (

@@ -175,6 +175,13 @@ export const useRoomProtocol = (initialRoomId = null) => {
         pc.addTrack(track, localStreamRef.current);
       });
     }
+    
+    // Добавляем screen sharing треки, если они есть
+    if (screenStreamRef.current) {
+      screenStreamRef.current.getTracks().forEach(track => {
+        pc.addTrack(track, screenStreamRef.current);
+      });
+    }
 
     // ICE кандидаты
     pc.onicecandidate = (event) => {
@@ -196,7 +203,58 @@ export const useRoomProtocol = (initialRoomId = null) => {
       if (stream) {
         setRemoteStreams(prev => {
           const newMap = new Map(prev);
-          newMap.set(userId, stream);
+          const existingStream = newMap.get(userId);
+          
+          // Если стрим уже существует, объединяем треки
+          if (existingStream) {
+            // Проверяем, изменились ли треки
+            const existingTrackIds = new Set(
+              Array.from(existingStream.getTracks())
+                .filter(t => t.readyState === 'live')
+                .map(t => t.id)
+            );
+            const newTrackIds = new Set(
+              Array.from(stream.getTracks())
+                .filter(t => t.readyState === 'live')
+                .map(t => t.id)
+            );
+            
+            // Если треки не изменились, не обновляем (предотвращаем мерцание)
+            const tracksChanged = 
+              existingTrackIds.size !== newTrackIds.size ||
+              Array.from(newTrackIds).some(id => !existingTrackIds.has(id));
+            
+            if (tracksChanged) {
+              // Создаем новый стрим с объединенными треками
+              const combinedStream = new MediaStream();
+              
+              // Добавляем все треки из существующего стрима
+              existingStream.getTracks().forEach(track => {
+                if (track.readyState === 'live') {
+                  combinedStream.addTrack(track);
+                }
+              });
+              
+              // Добавляем треки из нового стрима
+              stream.getTracks().forEach(track => {
+                if (track.readyState === 'live') {
+                  // Проверяем, нет ли уже такого трека (по kind и id)
+                  const existingTrack = Array.from(combinedStream.getTracks()).find(
+                    t => t.kind === track.kind && t.id === track.id
+                  );
+                  if (!existingTrack) {
+                    combinedStream.addTrack(track);
+                  }
+                }
+              });
+              
+              newMap.set(userId, combinedStream);
+            }
+            // Если треки не изменились, оставляем существующий стрим
+          } else {
+            newMap.set(userId, stream);
+          }
+          
           return newMap;
         });
       }

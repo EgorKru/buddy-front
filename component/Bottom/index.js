@@ -39,7 +39,8 @@ const Bottom = (props) => {
           <button
             className={cx(styles.icon, styles.active)}
             title="Включить микрофон"
-            onClick={toggleAudio || (() => {})}
+            onClick={toggleAudio}
+            type="button"
           >
             <MicOff size={22} />
           </button>
@@ -47,7 +48,8 @@ const Bottom = (props) => {
           <button
             className={styles.icon}
             title="Выключить микрофон"
-            onClick={toggleAudio || (() => {})}
+            onClick={toggleAudio}
+            type="button"
           >
             <Mic size={22} />
           </button>
@@ -56,7 +58,8 @@ const Bottom = (props) => {
           <button
             className={styles.icon}
             title="Выключить камеру"
-            onClick={toggleVideo || (() => {})}
+            onClick={toggleVideo}
+            type="button"
           >
             <Video size={22} />
           </button>
@@ -64,7 +67,8 @@ const Bottom = (props) => {
           <button
             className={cx(styles.icon, styles.active)}
             title="Включить камеру"
-            onClick={toggleVideo || (() => {})}
+            onClick={toggleVideo}
+            type="button"
           >
             <VideoOff size={22} />
           </button>
@@ -74,7 +78,8 @@ const Bottom = (props) => {
         <button
           className={cx(styles.icon, { [styles.handRaised]: handRaised })}
           title={handRaised ? "Опустить руку" : "Поднять руку"}
-          onClick={onRaiseHand || (() => {})}
+          onClick={onRaiseHand}
+          type="button"
         >
           <Hand size={22} />
         </button>
@@ -83,7 +88,8 @@ const Bottom = (props) => {
         <button
           className={cx(styles.icon, { [styles.screenSharing]: isScreenSharing })}
           title={isScreenSharing ? "Остановить демонстрацию" : "Показать экран"}
-          onClick={onToggleScreenShare || (() => {})}
+          onClick={onToggleScreenShare}
+          type="button"
         >
           {isScreenSharing ? <MonitorOff size={22} /> : <Monitor size={22} />}
         </button>
@@ -91,7 +97,8 @@ const Bottom = (props) => {
         <button
           className={cx(styles.icon, styles.leaveButton)}
           title="Покинуть встречу"
-          onClick={leaveRoom || (() => {})}
+          onClick={leaveRoom}
+          type="button"
         >
           <PhoneOff size={22} />
         </button>

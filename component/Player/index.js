@@ -29,7 +29,15 @@ const Player = (props) => {
   
   useEffect(() => {
     if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
+      // Предотвращаем мерцание: обновляем только если stream действительно изменился
+      if (videoRef.current.srcObject !== stream) {
+        videoRef.current.srcObject = stream;
+      }
+    } else if (videoRef.current && !stream) {
+      // Очищаем только если stream действительно удален
+      if (videoRef.current.srcObject) {
+        videoRef.current.srcObject = null;
+      }
     }
   }, [stream]);
 
@@ -121,17 +129,27 @@ const Player = (props) => {
 
   const displayName = playerName || `Участник ${playerId?.substring(0, 6) || ""}`;
   const initials = getInitials(displayName);
+  
+  // Определяем, есть ли видео треки в стриме
+  const hasVideoTracks = stream && stream.getVideoTracks().length > 0;
+  const hasActiveVideoTracks = hasVideoTracks && 
+    stream.getVideoTracks().some(track => track.readyState === 'live' && track.enabled);
+  
+  // Показываем видео, если есть активные видео треки и playing = true
+  // Или если есть screen sharing (всегда показываем видео для screen sharing)
+  // Но не показываем видео, если stream пустой или нет треков
+  const shouldShowVideo = stream && ((playing && hasActiveVideoTracks) || isScreenSharing);
 
   return (
     <div
       className={cx(styles.playerContainer, {
         [styles.notActive]: !isActive,
         [styles.active]: isActive,
-        [styles.notPlaying]: !playing,
+        [styles.notPlaying]: !shouldShowVideo,
         [styles.speaking]: isSpeaking && isMicOn,
       })}
     >
-      {playing && stream ? (
+      {shouldShowVideo && stream ? (
         <video
           ref={videoRef}
           autoPlay

@@ -142,9 +142,11 @@
   display: grid;
   gap: 12px;
   padding: 16px;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  grid-auto-rows: 1fr;
+  /* Адаптивная сетка: автоматически подстраивается под количество участников */
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-auto-rows: minmax(200px, auto);
   overflow: auto;
+  align-content: start;
 }
 
 /* Превью демонстрации экрана */
@@ -185,9 +187,11 @@
 
 .videoItem {
   min-height: 200px;
+  aspect-ratio: 16 / 9;
   border-radius: 12px;
   overflow: hidden;
   background: rgb(25, 25, 30);
+  position: relative;
 }
 
 .videoItemFull {
