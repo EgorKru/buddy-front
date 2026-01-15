@@ -36,12 +36,14 @@ export default function MediaPreviewModal({
     setError,
   } = useMediaDevices();
 
+  // НЕ запрашиваем доступ при открытии модального окна
+  // Доступ будет запрошен только когда пользователь явно включит микрофон или камеру
   useEffect(() => {
-    if (isOpen && !localStream && !isLoading) {
-      // Запрашиваем доступ к устройствам, но с выключенными треками по умолчанию
-      startPreview(false, false).catch(() => {});
+    if (!isOpen) {
+      stopPreview();
+      setShowSettings(false);
     }
-  }, [isOpen]);
+  }, [isOpen, stopPreview]);
 
   useEffect(() => {
     if (videoRef.current && localStream) {

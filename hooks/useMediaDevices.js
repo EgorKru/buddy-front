@@ -109,18 +109,61 @@ export function useMediaDevices() {
     setLocalStream(null);
   }, []);
 
-  const toggleAudio = useCallback(() => {
-    if (localStream) {
-      const audioTracks = localStream.getAudioTracks();
+  const toggleAudio = useCallback(async () => {
+    if (!localStream) {
+      // Если стрима нет, запрашиваем доступ при включении
+      if (!audioEnabled) {
+        try {
+          await startPreview(videoEnabled, true);
+        } catch (err) {
+          // Ошибка уже обработана в startPreview
+        }
+      }
+      return;
+    }
+    
+    const audioTracks = localStream.getAudioTracks();
+    if (audioTracks.length > 0) {
       audioTracks.forEach(track => {
         track.enabled = !track.enabled;
       });
       setAudioEnabled(prev => !prev);
+    } else if (!audioEnabled) {
+      // Если треков нет, но хотим включить - запрашиваем доступ
+      try {
+        const audioStream = await navigator.mediaDevices.getUserMedia({
+          video: false,
+          audio: {
+            deviceId: selectedMicrophone ? { exact: selectedMicrophone } : undefined,
+            echoCancellation: true,
+            noiseSuppression: true,
+          },
+        });
+        
+        const audioTrack = audioStream.getAudioTracks()[0];
+        if (audioTrack) {
+          localStream.addTrack(audioTrack);
+          setAudioEnabled(true);
+          setLocalStream(new MediaStream(localStream.getTracks()));
+        }
+      } catch (err) {
+        setError('Не удалось включить микрофон');
+      }
     }
-  }, [localStream]);
+  }, [localStream, audioEnabled, videoEnabled, selectedMicrophone, startPreview]);
 
   const toggleVideo = useCallback(async () => {
-    if (!localStream) return;
+    if (!localStream) {
+      // Если стрима нет, запрашиваем доступ при включении
+      if (!videoEnabled) {
+        try {
+          await startPreview(true, audioEnabled);
+        } catch (err) {
+          // Ошибка уже обработана в startPreview
+        }
+      }
+      return;
+    }
     
     const videoTracks = localStream.getVideoTracks();
     
@@ -131,7 +174,8 @@ export function useMediaDevices() {
       setVideoEnabled(prev => !prev);
       // Обновляем стрим, чтобы React перерендерил компонент
       setLocalStream(new MediaStream(localStream.getTracks()));
-    } else {
+    } else if (!videoEnabled) {
+      // Если треков нет, но хотим включить - запрашиваем доступ
       try {
         const videoStream = await navigator.mediaDevices.getUserMedia({
           video: {
@@ -154,7 +198,7 @@ export function useMediaDevices() {
         setError('Не удалось включить камеру');
       }
     }
-  }, [localStream, selectedCamera]);
+  }, [localStream, videoEnabled, audioEnabled, selectedCamera, startPreview]);
 
   const switchCamera = useCallback(async (deviceId) => {
     setSelectedCamera(deviceId);
