@@ -38,15 +38,21 @@ export default function MediaPreviewModal({
 
   useEffect(() => {
     if (isOpen && !localStream && !isLoading) {
-      startPreview(false, true).catch(() => {});
+      // Запрашиваем и видео, и аудио сразу, чтобы камера была доступна
+      startPreview(true, true).catch(() => {});
     }
   }, [isOpen]);
 
   useEffect(() => {
     if (videoRef.current && localStream) {
-      videoRef.current.srcObject = localStream;
+      const videoTracks = localStream.getVideoTracks();
+      if (videoTracks.length > 0 && videoTracks[0].enabled) {
+        videoRef.current.srcObject = localStream;
+      } else {
+        videoRef.current.srcObject = null;
+      }
     }
-  }, [localStream]);
+  }, [localStream, videoEnabled]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -101,7 +107,7 @@ export default function MediaPreviewModal({
                   Попробовать снова
                 </button>
               </div>
-            ) : !videoEnabled ? (
+            ) : !videoEnabled || !localStream || !localStream.getVideoTracks().length || !localStream.getVideoTracks()[0].enabled ? (
               <div className={styles.cameraOff}>
                 <VideoOff size={64} />
                 <p>Камера выключена</p>

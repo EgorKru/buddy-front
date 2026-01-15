@@ -118,6 +118,8 @@ export function useMediaDevices() {
         track.enabled = !track.enabled;
       });
       setVideoEnabled(prev => !prev);
+      // Обновляем стрим, чтобы React перерендерил компонент
+      setLocalStream(new MediaStream(localStream.getTracks()));
     } else {
       try {
         const videoStream = await navigator.mediaDevices.getUserMedia({
@@ -134,6 +136,8 @@ export function useMediaDevices() {
         if (videoTrack) {
           localStream.addTrack(videoTrack);
           setVideoEnabled(true);
+          // Обновляем стрим, чтобы React перерендерил компонент
+          setLocalStream(new MediaStream(localStream.getTracks()));
         }
       } catch (err) {
         setError('Не удалось включить камеру');
