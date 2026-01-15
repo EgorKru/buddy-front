@@ -44,19 +44,25 @@ const CallView = ({
     }
   }, [remoteStream, isMinimized]);
 
-  // Удалённый аудиопоток (для аудио-звонков)
+  // Удалённый аудиопоток (для всех звонков - и аудио, и видео)
   useEffect(() => {
     if (remoteAudioRef.current && remoteStream) {
       // Создаем новый стрим только с аудио-треками
       const audioTracks = remoteStream.getAudioTracks();
+      console.log('[CallView] Remote stream audio tracks:', audioTracks.length);
       if (audioTracks.length > 0) {
         const audioStream = new MediaStream(audioTracks);
         remoteAudioRef.current.srcObject = audioStream;
         // Воспроизводим аудио
         remoteAudioRef.current.play().catch(err => {
-          console.error('Error playing remote audio:', err);
+          console.error('[CallView] Error playing remote audio:', err);
         });
+        console.log('[CallView] Remote audio element set up');
+      } else {
+        console.warn('[CallView] No audio tracks in remote stream');
       }
+    } else if (remoteStream && !remoteAudioRef.current) {
+      console.warn('[CallView] Remote stream exists but audio ref is not ready');
     }
   }, [remoteStream]);
 
@@ -296,8 +302,8 @@ const CallView = ({
           </div>
         </div>
 
-        {/* Скрытый аудио-элемент для удаленного потока (для аудио-звонков) */}
-        {!isVideo && remoteStream && (
+        {/* Скрытый аудио-элемент для удаленного потока (для всех звонков) */}
+        {remoteStream && (
           <audio
             ref={remoteAudioRef}
             autoPlay
@@ -380,5 +386,7 @@ const CallView = ({
     </div>
   );
 };
+
+CallView.displayName = 'CallView';
 
 export default CallView;

@@ -67,4 +67,6 @@ const GlobalCallHandler = () => {
   );
 };
 
+GlobalCallHandler.displayName = 'GlobalCallHandler';
+
 export default GlobalCallHandler;

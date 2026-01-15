@@ -306,4 +306,6 @@ const OutgoingCallModal = ({
   );
 };
 
+OutgoingCallModal.displayName = 'OutgoingCallModal';
+
 export default OutgoingCallModal;

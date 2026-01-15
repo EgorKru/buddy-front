@@ -80,4 +80,6 @@ const CallTypeModal = ({
   );
 };
 
+CallTypeModal.displayName = 'CallTypeModal';
+
 export default CallTypeModal;

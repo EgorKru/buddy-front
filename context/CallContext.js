@@ -13,6 +13,8 @@ export const CallProvider = ({ children }) => {
   );
 };
 
+CallProvider.displayName = 'CallProvider';
+
 // Пустой объект-заглушка для SSR и случаев вне провайдера
 const noopCall = {
   call: null,

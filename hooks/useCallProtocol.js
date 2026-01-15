@@ -310,6 +310,10 @@ export const useCallProtocol = () => {
         break;
 
       case EVENT_TYPES.CALL_ACCEPTED:
+        console.log('[CALL_ACCEPTED] Event:', event);
+        console.log('[CALL_ACCEPTED] Call object:', event.call);
+        console.log('[CALL_ACCEPTED] acceptedAt:', event.call?.acceptedAt);
+        console.log('[CALL_ACCEPTED] startedAt:', event.call?.startedAt);
         setCall(event.call);
         setIncomingCall(null);
         setIsRinging(false);  // Ответили — убираем экран ожидания

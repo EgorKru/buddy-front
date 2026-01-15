@@ -107,4 +107,6 @@ const IncomingCallModal = ({ call, onAccept, onReject, onBusy }) => {
   );
 };
 
+IncomingCallModal.displayName = 'IncomingCallModal';
+
 export default IncomingCallModal;
