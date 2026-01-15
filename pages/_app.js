@@ -6,7 +6,9 @@ import Head from "next/head";
 import { StompProvider } from "@/context/socket";
 import { MessagingProvider } from "@/context/messaging";
 import { VoicePlayerProvider } from "@/context/voicePlayer";
+import { CallProvider } from "@/context/CallContext";
 import GlobalNotifications from "@/component/GlobalNotifications";
+import GlobalCallHandler from "@/component/GlobalCallHandler";
 import { isAuthenticated } from "@/utils/api";
 
 // Telegram Web подход: регистрация Service Worker для кеширования
@@ -60,8 +62,11 @@ export default function App({ Component, pageProps }) {
         <StompProvider>
           <MessagingProvider>
             <VoicePlayerProvider>
-              <Component {...pageProps} />
-              <GlobalNotifications />
+              <CallProvider>
+                <Component {...pageProps} />
+                <GlobalNotifications />
+                <GlobalCallHandler />
+              </CallProvider>
             </VoicePlayerProvider>
           </MessagingProvider>
         </StompProvider>

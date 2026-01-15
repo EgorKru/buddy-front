@@ -5,9 +5,7 @@ import { formatChatListTime } from '@/utils/dateHelpers';
 import styles from '@/component/ChatSidebar/index.module.css';
 
 export default function ChatListItem({ chat, user, currentChatId, readAtByChatIdByUserId, onChatClick }) {
-  const handleClick = () => {
-    onChatClick(chat.id);
-  };
+  // Убрали handleClick, так как навигация теперь через Link
 
   const getReadStatusIcon = () => {
     if (Number(chat.lastMessage.senderId) !== Number(user?.id)) return null;
@@ -39,7 +37,6 @@ export default function ChatListItem({ chat, user, currentChatId, readAtByChatId
   return (
     <div
       className={`${styles.chatItem} ${currentChatId === String(chat.id) ? styles.active : ''}`}
-      onClick={handleClick}
     >
       <div className={styles.chatAvatarWrapper}>
         <div className={styles.chatAvatar}>

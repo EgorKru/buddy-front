@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import Image from 'next/image';
 import { MessageCircle, Search, ArrowLeft, Plus, X, Loader2, Check, CheckCheck, UserPlus } from 'lucide-react';
 import { getCurrentUser, isAuthenticated } from '@/utils/api';
@@ -152,10 +153,13 @@ export default function Chats() {
           </div>
         ) : (
           filteredChats.map((chat) => (
-            <div
+            <Link
               key={chat.id}
+              href={`/chat/${chat.id}`}
+              style={{ textDecoration: 'none', color: 'inherit' }}
+            >
+            <div
               className={styles.chatItem}
-              onClick={() => router.push(`/chat/${chat.id}`)}
             >
               <div className={styles.chatAvatar}>
                 {getChatAvatar(chat, user) ? (
@@ -211,6 +215,7 @@ export default function Chats() {
                 )}
               </div>
             </div>
+            </Link>
           ))
         )}
       </div>

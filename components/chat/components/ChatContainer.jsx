@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { getCurrentUser } from '@/utils/api';
 import { useChat } from '@/components/chat/hooks/useChat';
@@ -12,11 +12,41 @@ import { useScrollHandlers } from '@/components/chat/hooks/useScrollHandlers';
 import { useChatModals } from '@/components/chat/hooks/useChatModals';
 import { useChatContextMenu } from '@/components/chat/hooks/useChatContextMenu';
 import { useChatSelection } from '@/components/chat/hooks/useChatSelection';
+import { useCall } from '@/context/CallContext';
+import CallTypeModal from '@/component/CallTypeModal';
 import ChatPresenter from './ChatPresenter';
 
 const ChatContainer = ({ chatId }) => {
   const router = useRouter();
   const user = getCurrentUser();
+  
+  // Звонки
+  const callContext = useCall();
+  const { initiateCall } = callContext;
+  const [showCallTypeModal, setShowCallTypeModal] = useState(false);
+  const [pendingCallTarget, setPendingCallTarget] = useState(null);
+  
+  const handleOpenCallModal = useCallback((targetUserId, chatIdForCall, targetUserInfo) => {
+    if (!targetUserId) {
+      console.error('[handleOpenCallModal] No targetUserId');
+      return;
+    }
+    setPendingCallTarget({ targetUserId, chatIdForCall, targetUserInfo });
+    setShowCallTypeModal(true);
+  }, []);
+  
+  const handleSelectCallType = useCallback((callType) => {
+    if (!pendingCallTarget) return;
+    
+    const { targetUserId, chatIdForCall, targetUserInfo } = pendingCallTarget;
+    
+    if (typeof initiateCall === 'function') {
+      initiateCall(targetUserId, callType, chatIdForCall, targetUserInfo);
+    }
+    
+    setPendingCallTarget(null);
+    setShowCallTypeModal(false);
+  }, [pendingCallTarget, initiateCall]);
   
   const {
     imageModal,
@@ -437,6 +467,7 @@ const ChatContainer = ({ chatId }) => {
   });
 
   return (
+    <>
     <ChatPresenter
       chat={chat}
       messages={messages}
@@ -542,7 +573,21 @@ const ChatContainer = ({ chatId }) => {
       handlePinMessage={handlePinMessage}
       handleForwardMessage={handleForwardMessage}
       handleSelectMessage={handleSelectMessage}
+      onStartCall={handleOpenCallModal}
     />
+    
+    {/* Модалка выбора типа звонка */}
+    <CallTypeModal
+      isOpen={showCallTypeModal}
+      onClose={() => {
+        setShowCallTypeModal(false);
+        setPendingCallTarget(null);
+      }}
+      targetUser={pendingCallTarget?.targetUserInfo}
+      onSelectAudio={() => handleSelectCallType('AUDIO')}
+      onSelectVideo={() => handleSelectCallType('VIDEO')}
+    />
+    </>
   );
 };
 

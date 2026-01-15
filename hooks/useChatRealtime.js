@@ -277,6 +277,27 @@ export const useChatRealtime = (chatId) => {
 
         const dto = data;
         
+        // Обработка системных сообщений (включая сообщения о звонках)
+        if (dto.type === 'SYSTEM') {
+          if (Number(dto.chatId) !== Number(chatId)) return;
+          
+          const isVisible = typeof document !== 'undefined' && document.visibilityState === 'visible';
+          upsertMessage(
+            { ...dto, status: MESSAGE_STATUS.SENT, isOptimistic: false },
+            { unreadDelta: isVisible ? 0 : undefined }
+          );
+          
+          if (isVisible) {
+            if (markReadTimeoutRef.current) {
+              clearTimeout(markReadTimeoutRef.current);
+            }
+            markReadTimeoutRef.current = setTimeout(() => {
+              markChatAsRead(chatId);
+            }, 1000);
+          }
+          return;
+        }
+        
         const processMessage = () => {
           if (Number(dto.chatId) !== Number(chatId)) return;
 

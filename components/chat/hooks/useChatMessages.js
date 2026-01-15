@@ -14,7 +14,8 @@ export const useChatMessages = ({
   localPtsRef,
   localSeqRef
 }) => {
-  const [loading, setLoading] = useState(!!chatId);
+  // Не показываем loading при первой загрузке, чтобы не было "дерганий"
+  const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [oldestMessageId, setOldestMessageId] = useState(null);
@@ -38,7 +39,8 @@ export const useChatMessages = ({
     abortControllerRef.current = new AbortController();
     
     try {
-      setLoading(true);
+      // Не устанавливаем loading, чтобы UI не блокировался
+      // setLoading(true);
       isLoadingInitialRef.current = true;
       
       const state = await chatAPI.getChatStateFull(chatId, INITIAL_MESSAGES_LIMIT);
@@ -93,7 +95,8 @@ export const useChatMessages = ({
       }
       console.error('[Load Chat State Full] Error:', error);
     } finally {
-      setLoading(false);
+      // Не устанавливаем loading, чтобы UI не блокировался
+      // setLoading(false);
       isLoadingInitialRef.current = false;
       if (abortControllerRef.current) {
         abortControllerRef.current = null;

@@ -1,4 +1,4 @@
-import { ArrowLeft, Search, Loader2, X } from 'lucide-react';
+import { ArrowLeft, Search, Loader2, X, Phone } from 'lucide-react';
 import { useRouter } from 'next/router';
 import { getChatName } from '@/utils/chatHelpers';
 import { getOnlineStatus } from '@/utils/dateHelpers';
@@ -16,9 +16,43 @@ export default function ChatHeader({
   onCloseSearch,
   onSearchSubmit,
   onSearchTextChange,
-  onMenuClick
+  onMenuClick,
+  onStartCall,  // (callType: 'AUDIO' | 'VIDEO') => void
 }) {
   const router = useRouter();
+  
+  // Показывать кнопки звонка только для приватных чатов
+  const canCall = chat?.type === 'DIRECT';
+  
+  // Получаем данные собеседника для звонка
+  const getCallTarget = () => {
+    if (!chat?.participants || !user?.id) {
+      console.log('[getCallTarget] No participants or user:', { hasParticipants: !!chat?.participants, hasUser: !!user?.id });
+      return null;
+    }
+    
+    // Пробуем найти собеседника (может быть структура participant.id или participant.user.id)
+    const other = chat.participants.find(p => {
+      const participantId = p.user?.id || p.id;
+      return Number(participantId) !== Number(user.id);
+    });
+    
+    if (!other) {
+      console.log('[getCallTarget] Other participant not found. Participants:', chat.participants);
+      return null;
+    }
+    
+    // Поддерживаем обе структуры: participant.user.* и participant.*
+    const targetUser = other.user || other;
+    const result = {
+      id: targetUser.id || other.id || other.userId,
+      username: targetUser.username || other.username,
+      displayName: targetUser.displayName || other.displayName,
+    };
+    
+    console.log('[getCallTarget] Found target:', result);
+    return result;
+  };
 
   const getDisplayChatName = () => {
     if (!chat) return 'Загрузка...';
@@ -62,6 +96,22 @@ export default function ChatHeader({
       </div>
       
       <div className={styles.headerActions}>
+        {/* Кнопка звонка для приватных чатов */}
+        {canCall && (
+          <button
+            onClick={() => {
+              const target = getCallTarget();
+              if (target && onStartCall) {
+                onStartCall(target.id, chat?.id, target);
+              }
+            }}
+            className={styles.callButton}
+            title="Позвонить"
+          >
+            <Phone size={20} />
+          </button>
+        )}
+        
         {chat && chat.id && (
           <RoomControls chatId={chat.id} chatType={chat.type} />
         )}

@@ -171,6 +171,29 @@
   margin-left: auto;
 }
 
+.callButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.callButton:hover {
+  background: rgba(102, 126, 234, 0.1);
+  color: rgb(102, 126, 234);
+}
+
+.callButton:active {
+  transform: scale(0.95);
+}
+
 .searchWrapper {
   position: relative;
   display: flex;
@@ -1430,6 +1453,7 @@
   text-overflow: ellipsis;
   display: -webkit-box;
   -webkit-line-clamp: 1;
+  line-clamp: 1;
   -webkit-box-orient: vertical;
   line-height: 1.3;
 }
@@ -1534,6 +1558,7 @@
   text-overflow: ellipsis;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   line-height: 1.3;
 }
@@ -2636,6 +2661,62 @@
   justify-content: center;
   margin-right: 12px;
   flex-shrink: 0;
+}
+
+/* Системные сообщения о звонках */
+.systemCallMessage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  margin: 8px auto;
+  max-width: 80%;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 12px;
+  color: #666;
+  font-size: 14px;
+  font-style: italic;
+}
+
+.callIcon {
+  width: 16px;
+  height: 16px;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+.callText {
+  flex: 1;
+  text-align: center;
+}
+
+.callTime {
+  font-size: 12px;
+  color: #999;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.callBackButton {
+  margin-left: 8px;
+  padding: 4px 12px;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+}
+
+.callBackButton:hover {
+  background: #0056b3;
+}
+
+.callBackButton:active {
+  background: #004085;
 }
 
 .messageCheckbox input[type="checkbox"] {

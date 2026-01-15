@@ -7,6 +7,7 @@ import FileMessage from '@/component/FileMessage';
 import { Pin } from 'lucide-react';
 import ForwardedMessage from './ForwardedMessage';
 import ReplyMessage from './ReplyMessage';
+import SystemCallMessage from './SystemCallMessage';
 import {
   shouldShowDate,
   isSearchMatch as checkSearchMatch,
@@ -162,14 +163,32 @@ const MessageRow = React.memo(({
           </div>
         )}
         <div className={styles.messageContent}>
-          {!isOwn && (
-            <div className={styles.messageHeader}>
-              <span className={styles.senderName}>
-                {msg.senderDisplayName || msg.senderUsername}
-              </span>
-            </div>
-          )}
-          {msg.type === 'VOICE' && msg.fileUrl ? (
+          {/* Системные сообщения о звонках */}
+          {msg.type === 'SYSTEM' && msg.content && msg.content.includes('вызов') ? (
+            <>
+              {!isOwn && (
+                <div className={styles.messageHeader}>
+                  <span className={styles.senderName}>
+                    {msg.senderDisplayName || msg.senderUsername}
+                  </span>
+                </div>
+              )}
+              <SystemCallMessage 
+                message={msg} 
+                chatId={msg.chatId}
+                chats={chats}
+              />
+            </>
+          ) : (
+            <>
+              {!isOwn && (
+                <div className={styles.messageHeader}>
+                  <span className={styles.senderName}>
+                    {msg.senderDisplayName || msg.senderUsername}
+                  </span>
+                </div>
+              )}
+              {msg.type === 'VOICE' && msg.fileUrl ? (
             <VoiceMessagePlayer 
               fileUrl={msg.fileUrl} 
               duration={msg.duration}
@@ -315,6 +334,8 @@ const MessageRow = React.memo(({
                 </div>
               </div>
             </div>
+          )}
+            </>
           )}
         </div>
       </div>

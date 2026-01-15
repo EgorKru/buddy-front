@@ -1,0 +1,235 @@
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 48px 40px;
+  max-width: 360px;
+  width: 90%;
+}
+
+/* Пульсирующие кольца */
+.pulseRings {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -60%);
+  width: 200px;
+  height: 200px;
+}
+
+.ring1, .ring2, .ring3 {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 2px solid rgba(76, 217, 100, 0.3);
+  animation: pulse 2s ease-out infinite;
+}
+
+.ring1 {
+  width: 120px;
+  height: 120px;
+  animation-delay: 0s;
+}
+
+.ring2 {
+  width: 160px;
+  height: 160px;
+  animation-delay: 0.4s;
+}
+
+.ring3 {
+  width: 200px;
+  height: 200px;
+  animation-delay: 0.8s;
+}
+
+@keyframes pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(0.8);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.4);
+    opacity: 0;
+  }
+}
+
+/* Аватар */
+.avatarContainer {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 24px;
+}
+
+.avatar {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgb(102, 126, 234), rgb(140, 100, 200));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 36px;
+  font-weight: 600;
+  box-shadow: 
+    0 0 40px rgba(102, 126, 234, 0.5),
+    0 8px 32px rgba(0, 0, 0, 0.4);
+  animation: avatarPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes avatarPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+/* Информация */
+.info {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.callerName {
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 600;
+  color: white;
+}
+
+.callType {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+}
+
+.timer {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+}
+
+/* Кнопки действий */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  margin-bottom: 24px;
+}
+
+.acceptButton, .rejectButton {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: white;
+}
+
+.acceptButton {
+  background: linear-gradient(135deg, rgb(76, 217, 100), rgb(50, 180, 80));
+  box-shadow: 
+    0 4px 20px rgba(76, 217, 100, 0.5),
+    0 0 40px rgba(76, 217, 100, 0.3);
+  animation: acceptPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes acceptPulse {
+  0%, 100% { 
+    transform: scale(1);
+    box-shadow: 0 4px 20px rgba(76, 217, 100, 0.5), 0 0 40px rgba(76, 217, 100, 0.3);
+  }
+  50% { 
+    transform: scale(1.1);
+    box-shadow: 0 4px 30px rgba(76, 217, 100, 0.7), 0 0 60px rgba(76, 217, 100, 0.5);
+  }
+}
+
+.acceptButton:hover {
+  transform: scale(1.15);
+  box-shadow: 0 4px 30px rgba(76, 217, 100, 0.8), 0 0 80px rgba(76, 217, 100, 0.6);
+}
+
+.rejectButton {
+  background: linear-gradient(135deg, rgb(255, 69, 58), rgb(200, 50, 50));
+  box-shadow: 0 4px 20px rgba(255, 69, 58, 0.4);
+}
+
+.rejectButton:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 30px rgba(255, 69, 58, 0.6);
+}
+
+/* Кнопка "Занят" */
+.busyButton {
+  padding: 12px 24px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 24px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.busyButton:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: white;
+}
+
+/* Мобильная адаптация */
+@media (max-width: 480px) {
+  .modal {
+    padding: 40px 24px;
+  }
+  
+  .avatar {
+    width: 80px;
+    height: 80px;
+    font-size: 28px;
+  }
+  
+  .callerName {
+    font-size: 20px;
+  }
+  
+  .actions {
+    gap: 32px;
+  }
+  
+  .acceptButton, .rejectButton {
+    width: 64px;
+    height: 64px;
+  }
+}

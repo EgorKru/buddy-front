@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import { MessageCircle, Search, Plus, X } from 'lucide-react';
 import { getCurrentUser } from '@/utils/api';
 import { useChats, getChatTime } from '@/context/messaging';
@@ -100,8 +101,13 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
     );
   });
 
-  const handleChatClick = (chatId) => {
-    router.push(`/chat/${chatId}`);
+  const handleChatClick = (chatId, e) => {
+    // Предотвращаем стандартное поведение, если используется Link
+    if (e) {
+      e.preventDefault();
+    }
+    // Используем router.push с shallow: false для клиентской навигации
+    router.push(`/chat/${chatId}`, undefined, { shallow: false });
     if (onClose) onClose();
   };
 
@@ -195,14 +201,21 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
             </div>
           ) : (
             filteredChats.map((chat) => (
-              <ChatListItem
+              <Link
                 key={chat.id}
-                chat={chat}
-                user={user}
-                currentChatId={currentChatId}
-                readAtByChatIdByUserId={readAtByChatIdByUserId}
-                onChatClick={handleChatClick}
-              />
+                href={`/chat/${chat.id}`}
+                onClick={() => {
+                  if (onClose) onClose();
+                }}
+                style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
+              >
+                <ChatListItem
+                  chat={chat}
+                  user={user}
+                  currentChatId={currentChatId}
+                  readAtByChatIdByUserId={readAtByChatIdByUserId}
+                />
+              </Link>
             ))
           )}
         </div>
