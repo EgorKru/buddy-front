@@ -137,18 +137,61 @@ const CallView = ({
     
     if (acceptedAt) {
       // Парсим ISO-8601 дату (может быть с миллисекундами: "2026-01-14T20:30:45.123")
-      const startTime = new Date(acceptedAt).getTime();
+      // Бэкенд отправляет дату в UTC без 'Z', поэтому парсим как UTC
+      let startTime;
       
-      // Проверяем, что дата валидна и разумна (не в будущем и не слишком давно)
-      const now = Date.now();
-      if (!isNaN(startTime) && startTime > 0 && startTime <= now && startTime > now - 3600000) {
-        // Обновляем время начала, если оно изменилось (например, при обновлении call из события)
-        if (!callStartTimeRef.current || callStartTimeRef.current !== startTime) {
-          callStartTimeRef.current = startTime;
+      try {
+        // Парсим дату - если нет временной зоны, добавляем 'Z' для UTC
+        // Бэкенд отправляет дату в UTC, но без 'Z'
+        let dateString = String(acceptedAt).trim();
+        const now = Date.now();
+        const minValidTimestamp = now - 86400000 * 365; // 1 год назад
+        const maxValidTimestamp = now + 86400000 * 365; // 1 год вперед
+        
+        // Проверяем, является ли это уже числом (timestamp)
+        if (/^\d+$/.test(dateString)) {
+          // Это уже timestamp в миллисекундах
+          startTime = parseInt(dateString, 10);
+        } else {
+          // Это строка даты, нужно парсить
+          // Проверяем, что это похоже на ISO дату
+          if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(dateString)) {
+            throw new Error('Invalid date format');
+          }
+          
+          if (!dateString.includes('Z') && !dateString.includes('+') && !dateString.match(/[+-]\d{2}:\d{2}$/)) {
+            // Если нет временной зоны, добавляем 'Z' для UTC парсинга
+            dateString = dateString + 'Z';
+          }
+          
+          const parsedDate = new Date(dateString);
+          startTime = parsedDate.getTime();
+          
+          // Дополнительная проверка: если парсинг дал Invalid Date, выбрасываем ошибку
+          if (isNaN(startTime)) {
+            throw new Error('Invalid Date after parsing');
+          }
         }
-      } else {
-        console.warn('[CallView] Invalid acceptedAt/startedAt:', acceptedAt, 'parsed as:', startTime);
-        // Fallback на время когда звонок стал активным
+        
+        // Проверяем валидность: не NaN, положительное число, в разумных пределах
+        const isValid = !isNaN(startTime) && 
+                       startTime > 0 && 
+                       startTime >= minValidTimestamp && 
+                       startTime <= maxValidTimestamp;
+        
+        if (isValid) {
+          // Обновляем время начала, если оно изменилось
+          if (!callStartTimeRef.current || callStartTimeRef.current !== startTime) {
+            callStartTimeRef.current = startTime;
+          }
+        } else {
+          console.warn('[CallView] Invalid acceptedAt/startedAt:', acceptedAt, 'parsed as:', startTime, '(current time:', now, ', valid range:', minValidTimestamp, '-', maxValidTimestamp, ')');
+          if (!callStartTimeRef.current) {
+            callStartTimeRef.current = callBecameActiveTimeRef.current;
+          }
+        }
+      } catch (e) {
+        console.error('[CallView] Error parsing acceptedAt/startedAt:', acceptedAt, e);
         if (!callStartTimeRef.current) {
           callStartTimeRef.current = callBecameActiveTimeRef.current;
         }
