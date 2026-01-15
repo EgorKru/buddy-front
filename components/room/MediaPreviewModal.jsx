@@ -161,7 +161,7 @@ export default function MediaPreviewModal({
             <button
               className={`${styles.controlButton} ${!audioEnabled ? styles.disabled : ''}`}
               onClick={toggleAudio}
-              disabled={!permissionGranted}
+              type="button"
             >
               {audioEnabled ? <Mic size={24} /> : <MicOff size={24} />}
               <span>{audioEnabled ? 'Микрофон вкл' : 'Микрофон выкл'}</span>
@@ -170,7 +170,7 @@ export default function MediaPreviewModal({
             <button
               className={`${styles.controlButton} ${!videoEnabled ? styles.disabled : ''}`}
               onClick={toggleVideo}
-              disabled={!permissionGranted}
+              type="button"
             >
               {videoEnabled ? <Video size={24} /> : <VideoOff size={24} />}
               <span>{videoEnabled ? 'Камера вкл' : 'Камера выкл'}</span>
