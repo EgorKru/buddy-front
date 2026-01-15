@@ -1,7 +1,9 @@
 
-const CACHE_NAME = 'buddy-chat-v2';
-const IMAGE_CACHE_NAME = 'buddy-images-v2';
-const MEDIA_CACHE_NAME = 'buddy-media-v2';
+// Версионирование кеша для автоматической очистки при деплое
+const CACHE_VERSION = 'v3';
+const CACHE_NAME = `buddy-chat-${CACHE_VERSION}`;
+const IMAGE_CACHE_NAME = `buddy-images-${CACHE_VERSION}`;
+const MEDIA_CACHE_NAME = `buddy-media-${CACHE_VERSION}`;
 
 // Ресурсы для предзагрузки и кеширования
 const STATIC_RESOURCES = [
@@ -25,7 +27,15 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME && 
+          // Удаляем все старые версии кеша
+          if (!cacheName.startsWith('buddy-chat-') && 
+              !cacheName.startsWith('buddy-images-') && 
+              !cacheName.startsWith('buddy-media-')) {
+            return caches.delete(cacheName);
+          }
+          // Удаляем кеши старых версий
+          if (cacheName.startsWith('buddy-') && 
+              cacheName !== CACHE_NAME && 
               cacheName !== IMAGE_CACHE_NAME && 
               cacheName !== MEDIA_CACHE_NAME) {
             return caches.delete(cacheName);
@@ -39,6 +49,16 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
+  
+  // НЕ кешируем статические файлы Next.js - они уже имеют хеши и кешируются браузером
+  if (url.pathname.startsWith('/_next/static/')) {
+    return; // Пропускаем - пусть браузер обрабатывает сам
+  }
+  
+  // НЕ кешируем build manifest и SSG manifest
+  if (url.pathname.includes('/_buildManifest.js') || url.pathname.includes('/_ssgManifest.js')) {
+    return;
+  }
   
   // Кешируем изображения
   if (url.pathname.includes('/api/chats/') && 
