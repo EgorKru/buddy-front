@@ -21,6 +21,7 @@ const CallView = ({
   const minimizedRef = useRef(null);
   const [callDuration, setCallDuration] = useState(0);
   const callStartTimeRef = useRef(null); // Время начала звонка
+  const callBecameActiveTimeRef = useRef(null); // Время когда звонок стал активным (fallback)
   const [isMinimized, setIsMinimized] = useState(false);
   const [position, setPosition] = useState({ 
     x: typeof window !== 'undefined' ? window.innerWidth - 320 : 0, 
@@ -46,23 +47,67 @@ const CallView = ({
 
   // Удалённый аудиопоток (для всех звонков - и аудио, и видео)
   useEffect(() => {
-    if (remoteAudioRef.current && remoteStream) {
-      // Создаем новый стрим только с аудио-треками
-      const audioTracks = remoteStream.getAudioTracks();
-      console.log('[CallView] Remote stream audio tracks:', audioTracks.length);
-      if (audioTracks.length > 0) {
-        const audioStream = new MediaStream(audioTracks);
-        remoteAudioRef.current.srcObject = audioStream;
-        // Воспроизводим аудио
-        remoteAudioRef.current.play().catch(err => {
-          console.error('[CallView] Error playing remote audio:', err);
-        });
-        console.log('[CallView] Remote audio element set up');
-      } else {
-        console.warn('[CallView] No audio tracks in remote stream');
+    if (!remoteStream) {
+      // Очищаем аудио если стрима нет
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = null;
       }
-    } else if (remoteStream && !remoteAudioRef.current) {
-      console.warn('[CallView] Remote stream exists but audio ref is not ready');
+      return;
+    }
+
+    if (!remoteAudioRef.current) {
+      // Ждем пока ref будет готов
+      return;
+    }
+
+    // Получаем все треки из стрима
+    const allTracks = remoteStream.getTracks();
+    const audioTracks = remoteStream.getAudioTracks();
+    
+    console.log('[CallView] Remote stream - total tracks:', allTracks.length, 'audio tracks:', audioTracks.length);
+    
+    if (audioTracks.length > 0) {
+      // Создаем новый стрим только с аудио-треками
+      const audioStream = new MediaStream(audioTracks);
+      
+      // Убеждаемся что треки включены
+      audioTracks.forEach(track => {
+        if (!track.enabled) {
+          track.enabled = true;
+        }
+      });
+      
+      remoteAudioRef.current.srcObject = audioStream;
+      
+      // Убеждаемся что элемент не muted и volume = 1.0
+      remoteAudioRef.current.muted = false;
+      remoteAudioRef.current.volume = 1.0;
+      
+      // Воспроизводим аудио
+      const playPromise = remoteAudioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log('[CallView] Remote audio playing successfully');
+          })
+          .catch(err => {
+            console.error('[CallView] Error playing remote audio:', err);
+            // Пробуем еще раз через небольшую задержку
+            setTimeout(() => {
+              if (remoteAudioRef.current && remoteAudioRef.current.srcObject) {
+                remoteAudioRef.current.play().catch(e => {
+                  console.error('[CallView] Retry play failed:', e);
+                });
+              }
+            }, 500);
+          });
+      }
+    } else {
+      console.warn('[CallView] No audio tracks in remote stream');
+      // Очищаем srcObject если треков нет
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = null;
+      }
     }
   }, [remoteStream]);
 
@@ -77,8 +122,14 @@ const CallView = ({
   useEffect(() => {
     if (!call || !isCallActive) {
       callStartTimeRef.current = null;
+      callBecameActiveTimeRef.current = null;
       setCallDuration(0);
       return;
+    }
+
+    // Запоминаем время когда звонок стал активным (fallback)
+    if (!callBecameActiveTimeRef.current) {
+      callBecameActiveTimeRef.current = Date.now();
     }
 
     // Используем acceptedAt или startedAt из объекта call (приоритет acceptedAt)
@@ -88,25 +139,25 @@ const CallView = ({
       // Парсим ISO-8601 дату (может быть с миллисекундами: "2026-01-14T20:30:45.123")
       const startTime = new Date(acceptedAt).getTime();
       
-      // Проверяем, что дата валидна
-      if (!isNaN(startTime)) {
+      // Проверяем, что дата валидна и разумна (не в будущем и не слишком давно)
+      const now = Date.now();
+      if (!isNaN(startTime) && startTime > 0 && startTime <= now && startTime > now - 3600000) {
         // Обновляем время начала, если оно изменилось (например, при обновлении call из события)
         if (!callStartTimeRef.current || callStartTimeRef.current !== startTime) {
           callStartTimeRef.current = startTime;
         }
       } else {
-        console.warn('[CallView] Invalid acceptedAt/startedAt:', acceptedAt);
-        // Fallback на текущее время только если дата невалидна
+        console.warn('[CallView] Invalid acceptedAt/startedAt:', acceptedAt, 'parsed as:', startTime);
+        // Fallback на время когда звонок стал активным
         if (!callStartTimeRef.current) {
-          callStartTimeRef.current = Date.now();
+          callStartTimeRef.current = callBecameActiveTimeRef.current;
         }
       }
     } else {
-      // Если acceptedAt не пришел, используем текущее время (fallback)
-      // Это не должно происходить, но на всякий случай
+      // Если acceptedAt не пришел, используем время когда звонок стал активным
       if (!callStartTimeRef.current) {
-        console.warn('[CallView] No acceptedAt/startedAt in call object, using current time');
-        callStartTimeRef.current = Date.now();
+        console.warn('[CallView] No acceptedAt/startedAt in call object, using time when call became active');
+        callStartTimeRef.current = callBecameActiveTimeRef.current;
       }
     }
     

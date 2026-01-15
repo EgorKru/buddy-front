@@ -14,11 +14,8 @@ const STATIC_RESOURCES = [
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_RESOURCES);
-    })
-  );
+  // НЕ кешируем страницы при установке - они должны загружаться свежими
+  // Кешируем только статические ресурсы (изображения, медиа)
   self.skipWaiting();
 });
 
@@ -108,12 +105,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
+  // НЕ кешируем HTML страницы - они должны всегда загружаться свежими
+  // Это предотвращает проблемы с устаревшим контентом после логина
   if (STATIC_RESOURCES.some(resource => url.pathname === resource)) {
-    event.respondWith(
-      caches.match(event.request).then((response) => {
-        return response || fetch(event.request);
-      })
-    );
+    // Всегда загружаем страницы свежими, не из кеша
+    event.respondWith(fetch(event.request));
     return;
   }
   

@@ -130,8 +130,24 @@ export const useCallProtocol = () => {
     };
 
     pc.ontrack = (event) => {
+      console.log('[useCallProtocol] ontrack event received');
+      console.log('[useCallProtocol] event.streams:', event.streams);
+      console.log('[useCallProtocol] event.track:', event.track);
+      console.log('[useCallProtocol] event.track.kind:', event.track?.kind);
+      
       if (event.streams?.[0]) {
-        setRemoteStream(event.streams[0]);
+        const stream = event.streams[0];
+        console.log('[useCallProtocol] Setting remote stream from streams[0]');
+        console.log('[useCallProtocol] Stream tracks:', stream.getTracks().map(t => ({ kind: t.kind, enabled: t.enabled, id: t.id })));
+        setRemoteStream(stream);
+      } else if (event.track) {
+        // Если streams нет, но есть track - создаем стрим вручную
+        console.log('[useCallProtocol] No streams, creating stream from track');
+        const stream = new MediaStream([event.track]);
+        console.log('[useCallProtocol] Created stream from track, kind:', event.track.kind);
+        setRemoteStream(stream);
+      } else {
+        console.warn('[useCallProtocol] ontrack event has no streams and no track');
       }
     };
 
