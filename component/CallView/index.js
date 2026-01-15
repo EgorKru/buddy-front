@@ -12,12 +12,15 @@ const CallView = ({
   onToggleAudio,
   onToggleVideo,
   onEndCall,
+  isCallActive = true, // По умолчанию звонок активен
 }) => {
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
+  const remoteAudioRef = useRef(null); // Аудио-элемент для удаленного потока
   const minimizedRemoteVideoRef = useRef(null);
   const minimizedRef = useRef(null);
   const [callDuration, setCallDuration] = useState(0);
+  const callStartTimeRef = useRef(null); // Время начала звонка
   const [isMinimized, setIsMinimized] = useState(false);
   const [position, setPosition] = useState({ 
     x: typeof window !== 'undefined' ? window.innerWidth - 320 : 0, 
@@ -41,6 +44,22 @@ const CallView = ({
     }
   }, [remoteStream, isMinimized]);
 
+  // Удалённый аудиопоток (для аудио-звонков)
+  useEffect(() => {
+    if (remoteAudioRef.current && remoteStream) {
+      // Создаем новый стрим только с аудио-треками
+      const audioTracks = remoteStream.getAudioTracks();
+      if (audioTracks.length > 0) {
+        const audioStream = new MediaStream(audioTracks);
+        remoteAudioRef.current.srcObject = audioStream;
+        // Воспроизводим аудио
+        remoteAudioRef.current.play().catch(err => {
+          console.error('Error playing remote audio:', err);
+        });
+      }
+    }
+  }, [remoteStream]);
+
   // Удалённый видеопоток (для мини-окна)
   useEffect(() => {
     if (minimizedRemoteVideoRef.current && remoteStream && isMinimized) {
@@ -50,17 +69,50 @@ const CallView = ({
 
   // Таймер звонка
   useEffect(() => {
-    if (!call) return;
+    if (!call || !isCallActive) {
+      callStartTimeRef.current = null;
+      setCallDuration(0);
+      return;
+    }
 
-    const startTime = call.acceptedAt ? new Date(call.acceptedAt).getTime() : Date.now();
+    // Используем acceptedAt или startedAt из объекта call (приоритет acceptedAt)
+    const acceptedAt = call.acceptedAt || call.startedAt;
+    
+    if (acceptedAt) {
+      // Парсим ISO-8601 дату (может быть с миллисекундами: "2026-01-14T20:30:45.123")
+      const startTime = new Date(acceptedAt).getTime();
+      
+      // Проверяем, что дата валидна
+      if (!isNaN(startTime)) {
+        // Обновляем время начала, если оно изменилось (например, при обновлении call из события)
+        if (!callStartTimeRef.current || callStartTimeRef.current !== startTime) {
+          callStartTimeRef.current = startTime;
+        }
+      } else {
+        console.warn('[CallView] Invalid acceptedAt/startedAt:', acceptedAt);
+        // Fallback на текущее время только если дата невалидна
+        if (!callStartTimeRef.current) {
+          callStartTimeRef.current = Date.now();
+        }
+      }
+    } else {
+      // Если acceptedAt не пришел, используем текущее время (fallback)
+      // Это не должно происходить, но на всякий случай
+      if (!callStartTimeRef.current) {
+        console.warn('[CallView] No acceptedAt/startedAt in call object, using current time');
+        callStartTimeRef.current = Date.now();
+      }
+    }
     
     const interval = setInterval(() => {
-      const now = Date.now();
-      setCallDuration(Math.floor((now - startTime) / 1000));
+      if (callStartTimeRef.current) {
+        const now = Date.now();
+        setCallDuration(Math.floor((now - callStartTimeRef.current) / 1000));
+      }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [call]);
+  }, [call, isCallActive]);
 
   // Обработчики перетаскивания
   const handleMouseDown = (e) => {
@@ -243,6 +295,16 @@ const CallView = ({
             <span className={styles.headerTimer}>{formatDuration(callDuration)}</span>
           </div>
         </div>
+
+        {/* Скрытый аудио-элемент для удаленного потока (для аудио-звонков) */}
+        {!isVideo && remoteStream && (
+          <audio
+            ref={remoteAudioRef}
+            autoPlay
+            playsInline
+            style={{ display: 'none' }}
+          />
+        )}
 
         {/* Видео область */}
         <div className={styles.videoArea}>

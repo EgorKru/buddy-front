@@ -60,6 +60,7 @@ const GlobalCallHandler = () => {
           onToggleAudio={toggleAudio}
           onToggleVideo={toggleVideo}
           onEndCall={endCall}
+          isCallActive={isCallActive}
         />
       )}
     </>
