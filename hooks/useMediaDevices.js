@@ -5,8 +5,8 @@ export function useMediaDevices() {
   const [selectedCamera, setSelectedCamera] = useState('');
   const [selectedMicrophone, setSelectedMicrophone] = useState('');
   const [localStream, setLocalStream] = useState(null);
-  const [audioEnabled, setAudioEnabled] = useState(true);
-  const [videoEnabled, setVideoEnabled] = useState(true);
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [videoEnabled, setVideoEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [permissionGranted, setPermissionGranted] = useState(false);
@@ -41,7 +41,7 @@ export function useMediaDevices() {
     }
   }, [selectedCamera, selectedMicrophone]);
 
-  const startPreview = useCallback(async (video = false, audio = true) => {
+  const startPreview = useCallback(async (video = false, audio = false) => {
     setIsLoading(true);
     setError(null);
     
@@ -50,21 +50,32 @@ export function useMediaDevices() {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
 
+      // Запрашиваем доступ к устройствам (нужно для получения разрешения),
+      // но затем выключим треки если они не нужны
       const constraints = {
-        video: video ? {
+        video: {
           deviceId: selectedCamera ? { exact: selectedCamera } : undefined,
           width: { ideal: 1280 },
           height: { ideal: 720 },
           facingMode: 'user'
-        } : false,
-        audio: audio ? {
+        },
+        audio: {
           deviceId: selectedMicrophone ? { exact: selectedMicrophone } : undefined,
           echoCancellation: true,
           noiseSuppression: true,
-        } : false,
+        },
       };
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      
+      // Выключаем треки если они не нужны
+      stream.getVideoTracks().forEach(track => {
+        track.enabled = video;
+      });
+      stream.getAudioTracks().forEach(track => {
+        track.enabled = audio;
+      });
+      
       streamRef.current = stream;
       setLocalStream(stream);
       setPermissionGranted(true);

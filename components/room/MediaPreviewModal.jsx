@@ -38,8 +38,8 @@ export default function MediaPreviewModal({
 
   useEffect(() => {
     if (isOpen && !localStream && !isLoading) {
-      // Запрашиваем и видео, и аудио сразу, чтобы камера была доступна
-      startPreview(true, true).catch(() => {});
+      // Запрашиваем доступ к устройствам, но с выключенными треками по умолчанию
+      startPreview(false, false).catch(() => {});
     }
   }, [isOpen]);
 
@@ -77,7 +77,7 @@ export default function MediaPreviewModal({
 
   const handleRetry = () => {
     setError(null);
-    startPreview(true, true).catch(() => {});
+    startPreview(false, false).catch(() => {});
   };
 
   if (!isOpen) return null;

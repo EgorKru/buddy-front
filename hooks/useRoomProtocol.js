@@ -841,48 +841,66 @@ export const useRoomProtocol = (initialRoomId = null) => {
       eventQueueMapRef.current.clear();
       roomIdRef.current = roomId;
       
-      // 1. Подписываемся на WebSocket события комнаты
+      // 1. Подписываемся на WebSocket события комнаты (быстро)
       ensureUserQueueSubscription();
       subscribeToRoom(roomId);
       
-      // 2. Входим в комнату через REST API
-      const { roomAPI } = await import('@/utils/api');
-      const roomData = await roomAPI.joinRoom(roomId);
-      
-      if (!roomData) {
-        throw new Error('Не удалось получить данные комнаты');
-      }
-      
-      setRoom(roomData);
-      setParticipants(roomData.participants || []);
+      // 2. Устанавливаем isInRoom сразу после подписки, чтобы показать интерфейс раньше
+      // Данные участников придут через WebSocket события или REST API
       setIsInRoom(true);
       
-      // Определяем роль
-      const myParticipant = roomData.participants?.find(p => p.user?.id === myUserId);
-      if (myParticipant) {
-        setMyRole(myParticipant.role || PARTICIPANT_ROLE.PARTICIPANT);
-      }
+      // 3. Параллельно запускаем REST API и запрос медиа
+      const { roomAPI } = await import('@/utils/api');
       
-      // Устанавливаем WebRTC соединения с другими участниками
-      roomData.participants?.forEach(p => {
-        if (p.user?.id !== myUserId && p.isActive !== false) {
-          sendOffer(p.user.id);
-        }
-      });
-      
-      // 3. Запрашиваем медиа
-      if (requestMedia) {
-        try {
-          await startLocalStream(initialAudio, initialVideo);
-        } catch (err) {
+      // Запускаем REST API и запрос медиа параллельно для ускорения
+      const [roomData, mediaResult] = await Promise.allSettled([
+        roomAPI.joinRoom(roomId),
+        requestMedia ? startLocalStream(initialAudio, initialVideo).catch(err => {
           setError(err.message);
-          // Не бросаем ошибку — пользователь уже в комнате
+          return null; // Не бросаем ошибку — пользователь уже в комнате
+        }) : Promise.resolve(null)
+      ]);
+      
+      // Обрабатываем результат REST API
+      if (roomData.status === 'fulfilled' && roomData.value) {
+        const roomDataValue = roomData.value;
+        setRoom(roomDataValue);
+        
+        // Обновляем участников только если их еще нет (они могут прийти через WebSocket)
+        setParticipants(prev => {
+          if (prev.length === 0 && roomDataValue.participants) {
+            return roomDataValue.participants;
+          }
+          return prev;
+        });
+        
+        // Определяем роль
+        const myParticipant = roomDataValue.participants?.find(p => p.user?.id === myUserId);
+        if (myParticipant) {
+          setMyRole(myParticipant.role || PARTICIPANT_ROLE.PARTICIPANT);
         }
+        
+        // Устанавливаем WebRTC соединения с другими участниками
+        roomDataValue.participants?.forEach(p => {
+          if (p.user?.id !== myUserId && p.isActive !== false) {
+            sendOffer(p.user.id);
+          }
+        });
+        
+        return roomDataValue;
+      } else if (roomData.status === 'rejected') {
+        // Если REST API не удался, но WebSocket подписка работает,
+        // участники могут прийти через WebSocket события
+        const errorMsg = roomData.reason?.message || 'Не удалось получить данные комнаты';
+        console.warn('REST API joinRoom failed, but WebSocket subscription is active:', errorMsg);
+        // Не бросаем ошибку, так как WebSocket подписка уже работает
+        // Участники придут через ROOM_JOINED событие
       }
       
-      return roomData;
+      return null;
     } catch (err) {
       setError(err.message || 'Ошибка входа в комнату');
+      setIsInRoom(false); // Откатываем состояние при ошибке
       throw err;
     }
   }, [subscribeToRoom, myUserId, sendOffer, startLocalStream, ensureUserQueueSubscription]);
