@@ -115,6 +115,7 @@ export const useRoomProtocol = (initialRoomId = null) => {
   const screenStreamRef = useRef(null);
   const roomIdRef = useRef(initialRoomId);
   const pendingCallbacksRef = useRef(new Map());
+  const negotiationTimeoutRef = useRef(new Set()); // Для отслеживания переговоров
   
   // Seq/Pts для Gap Recovery
   const lastSeqRef = useRef(0);
@@ -197,6 +198,47 @@ export const useRoomProtocol = (initialRoomId = null) => {
       }
     };
 
+    // Обработка необходимости пересоздания offer/answer (например, при добавлении screen sharing)
+    // Это событие вызывается автоматически при добавлении треков через addTrack
+    pc.onnegotiationneeded = async () => {
+      // Пересоздаем offer только если соединение в стабильном состоянии
+      // и мы инициаторы соединения (создали offer первыми)
+      if (pc.signalingState !== 'stable' && pc.signalingState !== 'have-local-offer') {
+        return; // Избегаем гонки условий
+      }
+      
+      // Используем debounce для избежания множественных вызовов
+      const negotiationTimeout = `negotiation_${userId}`;
+      if (negotiationTimeoutRef.current?.has(negotiationTimeout)) {
+        return; // Уже обрабатывается
+      }
+      negotiationTimeoutRef.current?.set(negotiationTimeout, true);
+      
+      try {
+        // Небольшая задержка для избежания множественных вызовов (уменьшена до 50ms)
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        if (pc.signalingState === 'stable' || pc.signalingState === 'have-local-offer') {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          
+          sendSignal({
+            type: SIGNAL_TYPES.ROOM_OFFER,
+            roomId: roomIdRef.current,
+            targetUserId: userId,
+            sdp: offer.sdp,
+          });
+        }
+      } catch (err) {
+        console.error('Error creating renegotiation offer:', err);
+      } finally {
+        // Очищаем флаг через небольшую задержку
+        setTimeout(() => {
+          negotiationTimeoutRef.current?.delete(negotiationTimeout);
+        }, 200);
+      }
+    };
+
     // Получение удалённых треков
     pc.ontrack = (event) => {
       const stream = event.streams[0];
@@ -244,6 +286,20 @@ export const useRoomProtocol = (initialRoomId = null) => {
                   );
                   if (!existingTrack) {
                     combinedStream.addTrack(track);
+                  } else {
+                    // Если трек уже есть, но это screen sharing трек - заменяем его
+                    const isScreenShareTrack = track.label?.toLowerCase().includes('screen') || 
+                                             track.label?.toLowerCase().includes('display');
+                    if (isScreenShareTrack) {
+                      // Удаляем старый трек и добавляем новый
+                      const oldTrack = Array.from(combinedStream.getTracks()).find(
+                        t => t.kind === track.kind && t.id === track.id
+                      );
+                      if (oldTrack) {
+                        combinedStream.removeTrack(oldTrack);
+                      }
+                      combinedStream.addTrack(track);
+                    }
                   }
                 }
               });
@@ -431,10 +487,13 @@ export const useRoomProtocol = (initialRoomId = null) => {
             }
             return [...prev, event.participant];
           });
-          // Устанавливаем WebRTC соединение с новым участником
+          // Устанавливаем WebRTC соединение с новым участником (без задержки для быстроты)
           const newUserId = event.participant.user?.id || eventUserId;
           if (newUserId && newUserId !== myUserId && isInRoom) {
-            setTimeout(() => sendOffer(newUserId), 100);
+            // Используем requestAnimationFrame для неблокирующего выполнения
+            requestAnimationFrame(() => {
+              sendOffer(newUserId);
+            });
           }
         }
         break;
@@ -799,14 +858,11 @@ export const useRoomProtocol = (initialRoomId = null) => {
 
       return stream;
     } catch (err) {
-      let errorMessage = 'Ошибка доступа к камере/микрофону';
-      if (err.name === 'NotAllowedError') {
-        errorMessage = 'Доступ запрещён. Разрешите доступ в настройках браузера.';
-      } else if (err.name === 'NotFoundError') {
-        errorMessage = 'Камера или микрофон не найдены.';
-      }
-      setError(errorMessage);
-      throw new Error(errorMessage);
+      // Не блокируем вход в комнату из-за ошибки доступа к медиа
+      // Просто логируем ошибку и продолжаем без медиа
+      console.warn('Не удалось получить доступ к медиа устройствам:', err.message);
+      // Не устанавливаем ошибку и не бросаем исключение - пользователь может войти без медиа
+      return null;
     }
   }, [isBrowser]);
 
@@ -856,7 +912,8 @@ export const useRoomProtocol = (initialRoomId = null) => {
       const [roomData, mediaResult] = await Promise.allSettled([
         roomAPI.joinRoom(roomId),
         requestMedia ? startLocalStream(initialAudio, initialVideo).catch(err => {
-          setError(err.message);
+          // Не устанавливаем ошибку - пользователь может войти без медиа
+          console.warn('Не удалось получить медиа при входе в комнату:', err.message);
           return null; // Не бросаем ошибку — пользователь уже в комнате
         }) : Promise.resolve(null)
       ]);
@@ -880,10 +937,13 @@ export const useRoomProtocol = (initialRoomId = null) => {
           setMyRole(myParticipant.role || PARTICIPANT_ROLE.PARTICIPANT);
         }
         
-        // Устанавливаем WebRTC соединения с другими участниками
+        // Устанавливаем WebRTC соединения с другими участниками (без задержки)
         roomDataValue.participants?.forEach(p => {
           if (p.user?.id !== myUserId && p.isActive !== false) {
-            sendOffer(p.user.id);
+            // Используем requestAnimationFrame для неблокирующего выполнения
+            requestAnimationFrame(() => {
+              sendOffer(p.user.id);
+            });
           }
         });
         
@@ -899,9 +959,10 @@ export const useRoomProtocol = (initialRoomId = null) => {
       
       return null;
     } catch (err) {
-      setError(err.message || 'Ошибка входа в комнату');
+      // Не устанавливаем ошибку - просто логируем и откатываем состояние
+      console.error('Ошибка входа в комнату:', err.message);
       setIsInRoom(false); // Откатываем состояние при ошибке
-      throw err;
+      // Не бросаем ошибку - пусть пользователь попробует снова
     }
   }, [subscribeToRoom, myUserId, sendOffer, startLocalStream, ensureUserQueueSubscription]);
 
@@ -932,13 +993,62 @@ export const useRoomProtocol = (initialRoomId = null) => {
   }, [cleanup]);
 
   // Переключить аудио
-  const toggleAudio = useCallback(() => {
-    if (!localStreamRef.current) return;
-    
+  const toggleAudio = useCallback(async () => {
     const newEnabled = !audioEnabled;
-    localStreamRef.current.getAudioTracks().forEach(track => {
-      track.enabled = newEnabled;
-    });
+    
+    // Если стрима нет, но хотим включить - создаем стрим
+    if (!localStreamRef.current && newEnabled) {
+      try {
+        const stream = await startLocalStream(true, videoEnabled);
+        if (stream) {
+          setAudioEnabled(true);
+          if (roomIdRef.current) {
+            sendSignal({
+              type: SIGNAL_TYPES.ROOM_UNMUTE_AUDIO,
+              roomId: roomIdRef.current,
+            });
+          }
+        }
+      } catch (err) {
+        // Не показываем ошибку пользователю - просто логируем
+        console.warn('Не удалось включить микрофон:', err.message);
+      }
+      return;
+    }
+    
+    // Если стрима нет и хотим выключить - ничего не делаем
+    if (!localStreamRef.current) {
+      return;
+    }
+    
+    // Стрим есть - переключаем треки
+    const audioTracks = localStreamRef.current.getAudioTracks();
+    if (audioTracks.length > 0) {
+      audioTracks.forEach(track => {
+        track.enabled = newEnabled;
+      });
+    } else if (newEnabled) {
+      // Треков нет, но хотим включить - добавляем трек
+      try {
+        const audioStream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true },
+          video: false,
+        });
+        audioStream.getAudioTracks().forEach(track => {
+          localStreamRef.current.addTrack(track);
+        });
+        // Обновляем все peer connections
+        peerConnectionsRef.current.forEach((pc) => {
+          audioStream.getAudioTracks().forEach(track => {
+            pc.addTrack(track, localStreamRef.current);
+          });
+        });
+      } catch (err) {
+        console.warn('Не удалось включить микрофон');
+        return;
+      }
+    }
+    
     setAudioEnabled(newEnabled);
     
     if (roomIdRef.current) {
@@ -947,16 +1057,65 @@ export const useRoomProtocol = (initialRoomId = null) => {
         roomId: roomIdRef.current,
       });
     }
-  }, [audioEnabled, sendSignal]);
+  }, [audioEnabled, videoEnabled, sendSignal, startLocalStream]);
 
   // Переключить видео
-  const toggleVideo = useCallback(() => {
-    if (!localStreamRef.current) return;
-    
+  const toggleVideo = useCallback(async () => {
     const newEnabled = !videoEnabled;
-    localStreamRef.current.getVideoTracks().forEach(track => {
-      track.enabled = newEnabled;
-    });
+    
+    // Если стрима нет, но хотим включить - создаем стрим
+    if (!localStreamRef.current && newEnabled) {
+      try {
+        const stream = await startLocalStream(audioEnabled, true);
+        if (stream) {
+          setVideoEnabled(true);
+          if (roomIdRef.current) {
+            sendSignal({
+              type: SIGNAL_TYPES.ROOM_UNMUTE_VIDEO,
+              roomId: roomIdRef.current,
+            });
+          }
+        }
+      } catch (err) {
+        // Не показываем ошибку пользователю - просто логируем
+        console.warn('Не удалось включить камеру:', err.message);
+      }
+      return;
+    }
+    
+    // Если стрима нет и хотим выключить - ничего не делаем
+    if (!localStreamRef.current) {
+      return;
+    }
+    
+    // Стрим есть - переключаем треки
+    const videoTracks = localStreamRef.current.getVideoTracks();
+    if (videoTracks.length > 0) {
+      videoTracks.forEach(track => {
+        track.enabled = newEnabled;
+      });
+    } else if (newEnabled) {
+      // Треков нет, но хотим включить - добавляем трек
+      try {
+        const videoStream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false,
+        });
+        videoStream.getVideoTracks().forEach(track => {
+          localStreamRef.current.addTrack(track);
+        });
+        // Обновляем все peer connections
+        peerConnectionsRef.current.forEach((pc) => {
+          videoStream.getVideoTracks().forEach(track => {
+            pc.addTrack(track, localStreamRef.current);
+          });
+        });
+      } catch (err) {
+        console.warn('Не удалось включить камеру');
+        return;
+      }
+    }
+    
     setVideoEnabled(newEnabled);
     
     if (roomIdRef.current) {
@@ -965,7 +1124,7 @@ export const useRoomProtocol = (initialRoomId = null) => {
         roomId: roomIdRef.current,
       });
     }
-  }, [videoEnabled, sendSignal]);
+  }, [videoEnabled, audioEnabled, sendSignal, startLocalStream]);
 
   // Поднять руку (оптимистичное обновление)
   const raiseHand = useCallback(() => {
@@ -1012,8 +1171,17 @@ export const useRoomProtocol = (initialRoomId = null) => {
       };
 
       // Добавляем в peer connections для передачи другим участникам
+      // WebRTC автоматически вызовет onnegotiationneeded для пересоздания offer/answer
       peerConnectionsRef.current.forEach((pc) => {
-        stream.getTracks().forEach(track => pc.addTrack(track, stream));
+        if (pc.signalingState === 'stable' || pc.signalingState === 'have-local-offer') {
+          stream.getTracks().forEach(track => {
+            try {
+              pc.addTrack(track, stream);
+            } catch (err) {
+              console.error('Error adding screen share track to peer connection:', err);
+            }
+          });
+        }
       });
     } catch (err) {
       if (err.name !== 'NotAllowedError') {

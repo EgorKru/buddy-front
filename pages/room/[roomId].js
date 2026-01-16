@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/router";
 import { useRoomProtocol } from "@/hooks/useRoomProtocol";
 import { getCurrentUser } from "@/utils/api";
@@ -120,7 +120,7 @@ const Room = () => {
 
   // Подключение к комнате — только один раз
   useEffect(() => {
-    if (roomId && !hasJoinedRef.current && !isInRoom && !error) {
+    if (roomId && !hasJoinedRef.current && !isInRoom) {
       hasJoinedRef.current = true;
       setIsJoining(true);
       joinRoom(roomId, true, initialAudio, initialVideo)
@@ -168,22 +168,21 @@ const Room = () => {
 
   // Обновляем локальный плеер при изменении stream
   useEffect(() => {
-    if (localStream) {
-      setPlayers(prev => ({
-        ...prev,
-        [currentUserIdStr]: {
-          stream: localStream,
-          muted: true, // Локальный всегда muted чтобы не слышать себя
-          playing: videoEnabled,
-          isLocal: true,
-        },
-      }));
-      setPlayerNames(prev => ({
-        ...prev,
-        [currentUserIdStr]: currentUserName,
-      }));
-    }
-  }, [localStream, currentUserIdStr, currentUserName]);
+    // Всегда показываем локального участника, даже если нет стрима
+    setPlayers(prev => ({
+      ...prev,
+      [currentUserIdStr]: {
+        stream: localStream || null,
+        muted: true, // Локальный всегда muted чтобы не слышать себя
+        playing: localStream ? videoEnabled : false,
+        isLocal: true,
+      },
+    }));
+    setPlayerNames(prev => ({
+      ...prev,
+      [currentUserIdStr]: currentUserName,
+    }));
+  }, [localStream, videoEnabled, currentUserIdStr, currentUserName]);
 
   // Обновляем состояние видео при переключении камеры
   useEffect(() => {
@@ -207,15 +206,23 @@ const Room = () => {
       // Добавляем/обновляем удалённые стримы
       remoteStreams.forEach((stream, odUserId) => {
         const userIdStr = odUserId.toString();
-        // Проверяем, есть ли активные видео треки
+        // Проверяем, есть ли активные видео треки (включая screen sharing)
         const hasVideoTracks = stream && stream.getVideoTracks().length > 0;
-        const hasActiveVideoTracks = hasVideoTracks && 
-          stream.getVideoTracks().some(track => track.readyState === 'live' && track.enabled);
+        const videoTracks = hasVideoTracks ? stream.getVideoTracks() : [];
+        const hasActiveVideoTracks = videoTracks.some(track => 
+          track.readyState === 'live' && track.enabled
+        );
+        // Проверяем наличие screen sharing треков
+        const hasScreenShareTracks = videoTracks.some(track => 
+          track.readyState === 'live' && 
+          (track.label?.toLowerCase().includes('screen') || 
+           track.label?.toLowerCase().includes('display'))
+        );
         
         newPlayers[userIdStr] = {
           stream: stream,
           muted: false, // Удалённые не muted
-          playing: hasActiveVideoTracks, // playing = true только если есть активные видео треки
+          playing: hasActiveVideoTracks || hasScreenShareTracks, // playing = true если есть активные видео треки или screen sharing
           isLocal: false,
         };
       });
@@ -297,43 +304,26 @@ const Room = () => {
     // useEffect синхронизирует players[].playing
   };
 
-  const playerHighlighted = players[currentUserIdStr];
-  const nonHighlightedPlayers = Object.keys(players).reduce((acc, playerId) => {
-    if (playerId !== currentUserIdStr) {
-      acc[playerId] = players[playerId];
-    }
-    return acc;
-  }, {});
+  // Мемоизируем вычисления для производительности
+  const playerHighlighted = useMemo(() => players[currentUserIdStr], [players, currentUserIdStr]);
+  
+  const nonHighlightedPlayers = useMemo(() => {
+    return Object.keys(players).reduce((acc, playerId) => {
+      if (playerId !== currentUserIdStr) {
+        acc[playerId] = players[playerId];
+      }
+      return acc;
+    }, {});
+  }, [players, currentUserIdStr]);
 
-  const participantCount = participants.length || Object.keys(players).length || 1;
+  const participantCount = useMemo(() => {
+    return participants.length || Object.keys(players).length || 1;
+  }, [participants.length, players]);
 
-  // Экран ошибки
-  if (error && !localStream && !isInRoom) {
-    return (
-      <div className={styles.roomContainer}>
-        <div className={styles.topBar}>
-          <div className={styles.logo}>Pager Meet</div>
-        </div>
-        <div className={styles.centerContent}>
-          <div className={styles.errorBox}>
-            <h2>Ошибка подключения</h2>
-            <p>{error}</p>
-            <div className={styles.errorActions}>
-              <button onClick={handleRetry} className={styles.primaryButton}>
-                Попробовать снова
-              </button>
-              <button onClick={handleJoinWithoutMedia} className={styles.secondaryButton}>
-                Войти без камеры
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Убрали экран ошибки - пользователь может войти в комнату даже без медиа
 
   // Экран загрузки
-  if ((!isInRoom && !error) || isJoining) {
+  if (!isInRoom || isJoining) {
     return (
       <div className={styles.roomContainer}>
         <div className={styles.topBar}>
@@ -380,23 +370,21 @@ const Room = () => {
           </div>
         )}
         
-        {/* Локальный плеер */}
-        {playerHighlighted && (
-          <div className={Object.keys(nonHighlightedPlayers).length > 0 ? styles.videoItem : styles.videoItemFull}>
-            <Player
-              stream={playerHighlighted.stream}
-              muted={true}  // Локальный всегда muted чтобы не слышать себя
-              playing={playerHighlighted.playing}
-              isActive
-              isLocal
-              audioEnabled={audioEnabled}  // Реальное состояние микрофона
-              playerId={currentUserIdStr}
-              playerName={playerNames[currentUserIdStr]}
-              handRaised={handRaised}
-              isScreenSharing={isScreenSharing}
-            />
-          </div>
-        )}
+        {/* Локальный плеер - показываем всегда, даже если нет стрима */}
+        <div className={Object.keys(nonHighlightedPlayers).length > 0 ? styles.videoItem : styles.videoItemFull}>
+          <Player
+            stream={playerHighlighted?.stream || null}
+            muted={true}  // Локальный всегда muted чтобы не слышать себя
+            playing={playerHighlighted?.playing || false}
+            isActive
+            isLocal
+            audioEnabled={audioEnabled}  // Реальное состояние микрофона
+            playerId={currentUserIdStr}
+            playerName={playerNames[currentUserIdStr] || currentUserName}
+            handRaised={handRaised}
+            isScreenSharing={isScreenSharing}
+          />
+        </div>
         
         {/* Удалённые плееры - показываем ВСЕХ участников, не только тех у кого есть stream */}
         {participants

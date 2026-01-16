@@ -132,13 +132,21 @@ const Player = (props) => {
   
   // Определяем, есть ли видео треки в стриме
   const hasVideoTracks = stream && stream.getVideoTracks().length > 0;
-  const hasActiveVideoTracks = hasVideoTracks && 
-    stream.getVideoTracks().some(track => track.readyState === 'live' && track.enabled);
+  const videoTracks = hasVideoTracks ? stream.getVideoTracks() : [];
+  const hasActiveVideoTracks = videoTracks.some(track => 
+    track.readyState === 'live' && track.enabled
+  );
+  // Проверяем наличие screen sharing треков в стриме
+  const hasScreenShareTracksInStream = videoTracks.some(track => 
+    track.readyState === 'live' && 
+    (track.label?.toLowerCase().includes('screen') || 
+     track.label?.toLowerCase().includes('display'))
+  );
   
   // Показываем видео, если есть активные видео треки и playing = true
   // Или если есть screen sharing (всегда показываем видео для screen sharing)
   // Но не показываем видео, если stream пустой или нет треков
-  const shouldShowVideo = stream && ((playing && hasActiveVideoTracks) || isScreenSharing);
+  const shouldShowVideo = stream && ((playing && hasActiveVideoTracks) || isScreenSharing || hasScreenShareTracksInStream);
 
   return (
     <div
