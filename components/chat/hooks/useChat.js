@@ -128,6 +128,7 @@ export const useChat = (chatId, modals = {}) => {
   });
   
   const setContextMenuRef = useRef(null);
+  const onAutoSendRef = useRef(null);
   
   const messageActions = useMessageActions({
     chatId,
@@ -155,7 +156,13 @@ export const useChat = (chatId, modals = {}) => {
     setForwardModal
   });
   
-  const voiceRecording = useVoiceRecordingUI();
+  const voiceRecording = useVoiceRecordingUI({ 
+    onAutoSend: (blob) => {
+      if (onAutoSendRef.current) {
+        onAutoSendRef.current(blob);
+      }
+    }
+  });
   const fileUpload = useFileUpload();
   
   const bulkMessageActions = useBulkMessageActions({
@@ -287,6 +294,7 @@ export const useChat = (chatId, modals = {}) => {
     scrollStateRef,
     abortControllerRef,
     setContextMenuRef,
+    onAutoSendRef,
     scrollTimeoutRef,
     loadMoreTimeoutRef,
     isUserScrollingRef

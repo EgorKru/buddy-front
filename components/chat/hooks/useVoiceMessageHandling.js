@@ -23,7 +23,8 @@ export const useVoiceMessageHandling = ({
   isRecording,
   isLocked,
   voiceError,
-  cancelRecording
+  cancelRecording,
+  voiceRecording
 }) => {
   const audioBlobRef = useRef(audioBlob);
   useEffect(() => {
@@ -32,7 +33,20 @@ export const useVoiceMessageHandling = ({
 
   const handleVoiceSendSimple = useCallback(async (blobToSend = null) => {
     const currentBlob = blobToSend || audioBlobRef.current || audioBlob;
-    if (!currentBlob || !user || sending) return;
+    
+    if (!currentBlob) {
+      console.warn('No blob to send');
+      resetVoice();
+      return;
+    }
+    
+    if (currentBlob.size !== undefined && currentBlob.size === 0) {
+      console.warn('Attempting to send empty voice message blob');
+      resetVoice();
+      return;
+    }
+    
+    if (!user || sending) return;
 
     if (messagesContainerRef?.current) {
       scrollHeightBeforeMessageRef.current = messagesContainerRef.current.scrollHeight;
@@ -108,13 +122,19 @@ export const useVoiceMessageHandling = ({
         addOptimistic(chatId, result.optimisticMessage);
       }
 
+      if (voiceRecording?.isRecording) {
+        voiceRecording.handleStopRecording();
+      }
       resetVoice();
       sentAudioBlobRef.current = null;
     } catch (error) {
+      if (voiceRecording?.isRecording) {
+        voiceRecording.handleStopRecording();
+      }
       resetVoice();
       sentAudioBlobRef.current = null;
     }
-  }, [audioBlob, user, sending, recordingTime, convertToBase64, sendMessageHook, chatId, addOptimistic, resetVoice, checkIsAtBottom, scrollHeightBeforeMessageRef, wasAtBottomBeforeMessageRef, shouldAutoScrollRef, messagesContainerRef, newMessageIdsRef, sentAudioBlobRef]);
+  }, [audioBlob, user, sending, recordingTime, convertToBase64, sendMessageHook, chatId, addOptimistic, resetVoice, checkIsAtBottom, scrollHeightBeforeMessageRef, wasAtBottomBeforeMessageRef, shouldAutoScrollRef, messagesContainerRef, newMessageIdsRef, sentAudioBlobRef, voiceRecording]);
 
   const handleVoiceSend = useCallback(async () => {
     if (!audioBlob || !user) {

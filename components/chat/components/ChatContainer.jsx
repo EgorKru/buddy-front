@@ -135,6 +135,7 @@ const ChatContainer = ({ chatId }) => {
     loadedMessageIdsRef,
     scrollStateRef,
     setContextMenuRef,
+    onAutoSendRef,
     scrollTimeoutRef,
     loadMoreTimeoutRef,
     isUserScrollingRef,
@@ -356,23 +357,76 @@ const ChatContainer = ({ chatId }) => {
   });
 
   useEffect(() => {
-    if (audioPreviewRef.current && (previewBlob || audioBlob) && isRecording && isLocked && isPaused) {
-      if (audioPreviewRef.current.src && audioPreviewRef.current.src.startsWith('blob:')) {
-        URL.revokeObjectURL(audioPreviewRef.current.src);
-      }
-      const blob = previewBlob || audioBlob;
-      if (blob && blob.size > 0) {
-        const url = URL.createObjectURL(blob);
-        audioPreviewRef.current.src = url;
-        audioPreviewRef.current.load();
-      }
+    if (audioPreviewRef.current && isRecording && isLocked) {
+      const updateAudioSrc = () => {
+        if (!audioPreviewRef.current) return;
+        
+        // Создаем blob из текущих чанков для предпросмотра
+        const audioChunksRef = voiceRecording.audioChunksRef || { current: [] };
+        if (audioChunksRef.current && audioChunksRef.current.length > 0) {
+          try {
+            const previewBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+            if (previewBlob && previewBlob.size > 0) {
+              // Отзываем старый URL если есть
+              if (audioPreviewRef.current.src && audioPreviewRef.current.src.startsWith('blob:')) {
+                URL.revokeObjectURL(audioPreviewRef.current.src);
+              }
+              const url = URL.createObjectURL(previewBlob);
+              audioPreviewRef.current.src = url;
+              audioPreviewRef.current.load();
+            }
+          } catch (error) {
+            console.error('Error creating preview blob:', error);
+          }
+        } else if (previewBlob && previewBlob.size > 0) {
+          try {
+            if (audioPreviewRef.current.src && audioPreviewRef.current.src.startsWith('blob:')) {
+              URL.revokeObjectURL(audioPreviewRef.current.src);
+            }
+            const url = URL.createObjectURL(previewBlob);
+            audioPreviewRef.current.src = url;
+            audioPreviewRef.current.load();
+          } catch (error) {
+            console.error('Error setting preview blob:', error);
+          }
+        } else if (audioBlob && audioBlob.size > 0) {
+          try {
+            if (audioPreviewRef.current.src && audioPreviewRef.current.src.startsWith('blob:')) {
+              URL.revokeObjectURL(audioPreviewRef.current.src);
+            }
+            const url = URL.createObjectURL(audioBlob);
+            audioPreviewRef.current.src = url;
+            audioPreviewRef.current.load();
+          } catch (error) {
+            console.error('Error setting audio blob:', error);
+          }
+        }
+      };
+      
+      // Обновляем аудио при изменении состояния
+      updateAudioSrc();
+      
+      // Периодически обновляем для получения актуальных чанков (каждую секунду)
+      // Но только если не воспроизводится (чтобы не прерывать воспроизведение)
+      const interval = setInterval(() => {
+        if (!isPlayingPreview) {
+          updateAudioSrc();
+        }
+      }, 1000);
+      
+      return () => {
+        clearInterval(interval);
+        if (audioPreviewRef.current && audioPreviewRef.current.src && audioPreviewRef.current.src.startsWith('blob:')) {
+          URL.revokeObjectURL(audioPreviewRef.current.src);
+        }
+      };
     }
     return () => {
       if (audioPreviewRef.current && audioPreviewRef.current.src && audioPreviewRef.current.src.startsWith('blob:')) {
         URL.revokeObjectURL(audioPreviewRef.current.src);
       }
     };
-  }, [previewBlob, audioBlob, isRecording, isLocked, isPaused, audioPreviewRef]);
+  }, [previewBlob, audioBlob, isRecording, isLocked, audioPreviewRef, voiceRecording, isPlayingPreview]);
 
   const {
     handleVoiceSendSimple,
@@ -398,8 +452,17 @@ const ChatContainer = ({ chatId }) => {
     isRecording,
     isLocked,
     voiceError,
-    cancelRecording
+    cancelRecording,
+    voiceRecording
   });
+
+  useEffect(() => {
+    onAutoSendRef.current = async (blob) => {
+      if (blob && blob.size > 0) {
+        await handleVoiceSendSimple(blob);
+      }
+    };
+  }, [handleVoiceSendSimple]);
 
   const audioBlobRef = useRef(audioBlob);
   const previewBlobRef = useRef(previewBlob);
@@ -412,21 +475,93 @@ const ChatContainer = ({ chatId }) => {
 
   const handleVoiceSendAndStop = useCallback(async () => {
     if (isRecording) {
+      // Останавливаем запись
       handleStopRecording();
+      
+      // Ждем пока запись остановится и blob будет готов
+      // MediaRecorder.onstop вызывается асинхронно, поэтому нужно подождать
       let attempts = 0;
-      const maxAttempts = 30;
-      while (attempts < maxAttempts && (!audioBlobRef.current || audioBlobRef.current.size === 0)) {
+      const maxAttempts = 50;
+      let finalBlob = null;
+      
+      while (attempts < maxAttempts) {
         await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Сначала проверяем готовый audioBlob (создается в onstop)
+        if (audioBlobRef.current && audioBlobRef.current.size > 0) {
+          finalBlob = audioBlobRef.current;
+          break;
+        }
+        
+        // Затем проверяем audioChunksRef напрямую (если onstop еще не вызвался)
+        const audioChunksRef = voiceRecording.audioChunksRef || { current: [] };
+        if (audioChunksRef.current && audioChunksRef.current.length > 0) {
+          try {
+            const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+            if (blob && blob.size > 0) {
+              finalBlob = blob;
+              // Не break сразу, продолжаем проверять audioBlob (он приоритетнее)
+            }
+          } catch (error) {
+            console.error('Error creating blob from chunks:', error);
+          }
+        }
+        
+        // Проверяем previewBlob как запасной вариант
+        if (!finalBlob && previewBlobRef.current && previewBlobRef.current.size > 0) {
+          finalBlob = previewBlobRef.current;
+        }
+        
+        if (!finalBlob && previewBlob && previewBlob.size > 0) {
+          finalBlob = previewBlob;
+        }
+        
+        if (!finalBlob && audioBlob && audioBlob.size > 0) {
+          finalBlob = audioBlob;
+        }
+        
+        // Если запись остановилась и есть blob, можно отправлять
+        // Проверяем через voiceRecording.isRecording для актуального состояния
+        const stillRecording = voiceRecording?.isRecording || false;
+        if (finalBlob && finalBlob.size > 0 && !stillRecording) {
+          break;
+        }
+        
         attempts++;
       }
-    }
-    const currentBlob = audioBlobRef.current || previewBlobRef.current || audioBlob || previewBlob;
-    if (currentBlob && currentBlob.size > 0) {
-      await handleVoiceSendSimple(currentBlob);
+      
+      // Если все еще нет blob, пробуем создать из чанков в последний раз
+      if (!finalBlob) {
+        const audioChunksRef = voiceRecording.audioChunksRef || { current: [] };
+        if (audioChunksRef.current && audioChunksRef.current.length > 0) {
+          try {
+            const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+            if (blob && blob.size > 0) {
+              finalBlob = blob;
+            }
+          } catch (error) {
+            console.error('Error creating final blob from chunks:', error);
+          }
+        }
+      }
+      
+      // Отправляем blob
+      if (finalBlob && finalBlob.size > 0) {
+        await handleVoiceSendSimple(finalBlob);
+      } else {
+        // Если blob не найден, пробуем отправить что есть (handleVoiceSendSimple проверит)
+        await handleVoiceSendSimple();
+      }
     } else {
-      await handleVoiceSendSimple();
+      // Если запись уже остановлена, просто отправляем
+      const currentBlob = audioBlobRef.current || previewBlobRef.current || audioBlob || previewBlob;
+      if (currentBlob && currentBlob.size > 0) {
+        await handleVoiceSendSimple(currentBlob);
+      } else {
+        await handleVoiceSendSimple();
+      }
     }
-  }, [isRecording, audioBlob, previewBlob, handleStopRecording, handleVoiceSendSimple]);
+  }, [isRecording, audioBlob, previewBlob, handleStopRecording, handleVoiceSendSimple, voiceRecording]);
 
   useEffect(() => {
     scrollStateRef.current = { hasMore, loadingMore, oldestMessageId };

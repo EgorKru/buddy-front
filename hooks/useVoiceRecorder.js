@@ -100,60 +100,83 @@ export const useVoiceRecorder = () => {
   }, []);
 
   const pauseRecording = useCallback(() => {
-    if (mediaRecorderRef.current && isRecording && !isPaused) {
-      
-      if (mediaRecorderRef.current.state === 'recording') {
+    if (!mediaRecorderRef.current || !isRecording || isPaused) {
+      return;
+    }
+    
+    if (mediaRecorderRef.current.state === 'recording') {
+      try {
         mediaRecorderRef.current.requestData();
-      }
-      
-      mediaRecorderRef.current.pause();
-      setIsPaused(true);
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
-      setAudioLevel(0);
-
-      setTimeout(() => {
-        if (audioChunksRef.current.length > 0) {
-          const preview = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-          setPreviewBlob(preview);
+        mediaRecorderRef.current.pause();
+        setIsPaused(true);
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
         }
-      }, 100);
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+          animationFrameRef.current = null;
+        }
+        setAudioLevel(0);
+
+        setTimeout(() => {
+          if (audioChunksRef.current.length > 0) {
+            const preview = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+            setPreviewBlob(preview);
+          }
+        }, 100);
+      } catch (error) {
+        console.error('Error pausing recording:', error);
+      }
     }
   }, [isRecording, isPaused]);
 
   const resumeRecording = useCallback(() => {
-    if (mediaRecorderRef.current && isRecording && isPaused) {
-      mediaRecorderRef.current.resume();
-      setIsPaused(false);
-      setPreviewBlob(null); 
-      timerRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 1);
-      }, 1000);
+    if (!mediaRecorderRef.current || !isRecording || !isPaused) {
+      return;
+    }
+    
+    if (mediaRecorderRef.current.state === 'paused') {
+      try {
+        mediaRecorderRef.current.resume();
+        setIsPaused(false);
+        setPreviewBlob(null); 
+        timerRef.current = setInterval(() => {
+          setRecordingTime(prev => prev + 1);
+        }, 1000);
 
-      const updateAudioLevel = () => {
-        if (!analyserRef.current) {
-          return;
-        }
-        const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-        analyserRef.current.getByteFrequencyData(dataArray);
-        const average = dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length;
-        const normalizedLevel = Math.min(100, (average / 255) * 100);
-        setAudioLevel(normalizedLevel);
-        animationFrameRef.current = requestAnimationFrame(updateAudioLevel);
-      };
-      updateAudioLevel();
+        const updateAudioLevel = () => {
+          if (!analyserRef.current) {
+            return;
+          }
+          const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+          analyserRef.current.getByteFrequencyData(dataArray);
+          const average = dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length;
+          const normalizedLevel = Math.min(100, (average / 255) * 100);
+          setAudioLevel(normalizedLevel);
+          animationFrameRef.current = requestAnimationFrame(updateAudioLevel);
+        };
+        updateAudioLevel();
+      } catch (error) {
+        console.error('Error resuming recording:', error);
+      }
     }
   }, [isRecording, isPaused]);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
+      if (mediaRecorderRef.current.state === 'recording' || mediaRecorderRef.current.state === 'paused') {
+        try {
+          mediaRecorderRef.current.requestData();
+        } catch (error) {
+          console.error('Error requesting data before stop:', error);
+        }
+      }
+      
+      if (mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+      
       setIsRecording(false);
       setIsPaused(false);
       if (timerRef.current) {
@@ -170,20 +193,30 @@ export const useVoiceRecorder = () => {
 
   const cancelRecording = useCallback(() => {
     if (mediaRecorderRef.current && isRecording) {
-      
-      mediaRecorderRef.current.stop();
+      try {
+        if (mediaRecorderRef.current.state !== 'inactive') {
+          mediaRecorderRef.current.stop();
+        }
+      } catch (error) {
+        console.error('Error stopping recorder:', error);
+      }
       
       mediaRecorderRef.current.onstop = null;
+      
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current.getTracks().forEach(track => {
+          track.stop();
+        });
         streamRef.current = null;
       }
+      
       setIsRecording(false);
       setIsPaused(false);
       setRecordingTime(0);
       setAudioBlob(null);
       setPreviewBlob(null);
       audioChunksRef.current = [];
+      
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
@@ -192,35 +225,70 @@ export const useVoiceRecorder = () => {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
       }
+      
       if (audioContextRef.current) {
-        audioContextRef.current.close();
+        try {
+          audioContextRef.current.close();
+        } catch (error) {
+          console.error('Error closing audio context:', error);
+        }
         audioContextRef.current = null;
       }
-      setAudioLevel(0);
-    } else if (audioBlob) {
       
+      setAudioLevel(0);
+    } else if (audioBlob || previewBlob || (audioChunksRef.current && audioChunksRef.current.length > 0)) {
       setAudioBlob(null);
       setPreviewBlob(null);
       audioChunksRef.current = [];
     }
-  }, [isRecording, audioBlob]);
+  }, [isRecording, audioBlob, previewBlob]);
 
   const reset = useCallback(() => {
+    if (isRecording && mediaRecorderRef.current) {
+      try {
+        if (mediaRecorderRef.current.state === 'recording' || mediaRecorderRef.current.state === 'paused') {
+          mediaRecorderRef.current.stop();
+        }
+      } catch (error) {
+        console.error('Error stopping recorder in reset:', error);
+      }
+      
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => {
+          track.stop();
+        });
+        streamRef.current = null;
+      }
+      
+      setIsRecording(false);
+      setIsPaused(false);
+    }
+    
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    
+    if (audioContextRef.current) {
+      try {
+        audioContextRef.current.close();
+      } catch (error) {
+        console.error('Error closing audio context in reset:', error);
+      }
+      audioContextRef.current = null;
+    }
+    
     setAudioBlob(null);
     setPreviewBlob(null);
     setRecordingTime(0);
     setError(null);
     setAudioLevel(0);
     audioChunksRef.current = [];
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
-    }
-  }, []);
+  }, [isRecording]);
 
   const convertToBase64 = useCallback(async (blob) => {
     return new Promise((resolve, reject) => {
@@ -241,7 +309,9 @@ export const useVoiceRecorder = () => {
     audioBlob,
     previewBlob, 
     error,
-    audioLevel, 
+    audioLevel,
+    audioChunksRef,
+    mediaRecorderRef,
     startRecording,
     pauseRecording,
     resumeRecording,

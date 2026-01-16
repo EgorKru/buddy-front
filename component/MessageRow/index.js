@@ -163,7 +163,6 @@ const MessageRow = React.memo(({
           </div>
         )}
         <div className={styles.messageContent}>
-          {}
           {msg.type === 'SYSTEM' && msg.content && msg.content.includes('вызов') ? (
             <>
               {!isOwn && (
@@ -189,15 +188,15 @@ const MessageRow = React.memo(({
                 </div>
               )}
               {msg.type === 'VOICE' && msg.fileUrl ? (
-            <VoiceMessagePlayer 
-              fileUrl={msg.fileUrl} 
-              duration={msg.duration}
-              messageTime={formatChatTime(msg.createdAt)}
-              isOwn={isOwn}
-              statusIcon={statusIcon}
-              isPinned={isPinned}
-            />
-          ) : msg.type === 'IMAGE' && msg.fileUrl ? (
+                <VoiceMessagePlayer 
+                  fileUrl={msg.fileUrl} 
+                  duration={msg.duration}
+                  messageTime={formatChatTime(msg.createdAt)}
+                  isOwn={isOwn}
+                  statusIcon={statusIcon}
+                  isPinned={isPinned}
+                />
+              ) : msg.type === 'IMAGE' && msg.fileUrl ? (
             <div className={`${styles.messageText} ${msg.isOptimistic ? styles.messagePending : ''} ${msg.status === MESSAGE_STATUS.FAILED ? styles.messageFailed : ''}`}>
               {msg.forwardedFrom && (
                 <ForwardedMessage 

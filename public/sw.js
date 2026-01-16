@@ -45,6 +45,10 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
   if (url.pathname.startsWith('/_next/static/')) {
     return; 
   }
@@ -55,6 +59,10 @@ self.addEventListener('fetch', (event) => {
 
   if (url.pathname.includes('/api/chats/') && 
       (url.pathname.includes('/files/') || url.pathname.includes('/images/'))) {
+    if (event.request.method !== 'GET') {
+      return;
+    }
+    
     event.respondWith(
       caches.open(IMAGE_CACHE_NAME).then((cache) => {
         return cache.match(event.request).then((response) => {
@@ -63,7 +71,7 @@ self.addEventListener('fetch', (event) => {
           }
           
           return fetch(event.request).then((fetchResponse) => {
-            if (fetchResponse.status === 200) {
+            if (fetchResponse.status === 200 && event.request.method === 'GET') {
               cache.put(event.request, fetchResponse.clone());
             }
             return fetchResponse;
@@ -78,6 +86,10 @@ self.addEventListener('fetch', (event) => {
 
   if (url.pathname.includes('/api/chats/') && 
       (url.pathname.includes('/voice/') || url.pathname.includes('/audio/'))) {
+    if (event.request.method !== 'GET') {
+      return;
+    }
+    
     event.respondWith(
       caches.open(MEDIA_CACHE_NAME).then((cache) => {
         return cache.match(event.request).then((response) => {
@@ -86,7 +98,7 @@ self.addEventListener('fetch', (event) => {
           }
           
           return fetch(event.request).then((fetchResponse) => {
-            if (fetchResponse.status === 200) {
+            if (fetchResponse.status === 200 && event.request.method === 'GET') {
               cache.put(event.request, fetchResponse.clone());
             }
             return fetchResponse;

@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { VOICE_MIN_HOLD_TIME, VOICE_LOCK_THRESHOLD } from '../constants/chat';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 
-export const useVoiceRecordingUI = () => {
+export const useVoiceRecordingUI = ({ onAutoSend = null }) => {
   const voiceRecorder = useVoiceRecorder();
   
   const [isLocked, setIsLocked] = useState(false);
@@ -18,9 +18,14 @@ export const useVoiceRecordingUI = () => {
   const audioPreviewRef = useRef(null);
   const isHoldingRef = useRef(false);
   const reachedLockThresholdRef = useRef(false);
+  const onAutoSendRef = useRef(onAutoSend);
   
   const lockThreshold = VOICE_LOCK_THRESHOLD;
   const minHoldTime = VOICE_MIN_HOLD_TIME;
+
+  useEffect(() => {
+    onAutoSendRef.current = onAutoSend;
+  }, [onAutoSend]);
 
   const handleMouseDown = useCallback((e) => {
     e.preventDefault();
@@ -61,11 +66,14 @@ export const useVoiceRecordingUI = () => {
   }, [voiceRecorder, minHoldTime]);
 
   const handleMouseMove = useCallback((e) => {
-    if (!isHoldingRef.current || !voiceRecorder.isRecording) return;
+    if (!isHoldingRef.current) return;
+    
+    if (!voiceRecorder.isRecording) return;
     
     const currentY = e.clientY;
     const distance = startYRef.current - currentY;
     const clampedDistance = Math.max(0, distance);
+    
     setDragDistance(clampedDistance);
     
     if (clampedDistance >= lockThreshold && !reachedLockThresholdRef.current) {
@@ -76,11 +84,14 @@ export const useVoiceRecordingUI = () => {
   }, [voiceRecorder.isRecording, lockThreshold]);
 
   const handleTouchMove = useCallback((e) => {
-    if (!isHoldingRef.current || !voiceRecorder.isRecording) return;
+    if (!isHoldingRef.current) return;
+    
+    if (!voiceRecorder.isRecording) return;
     
     const currentY = e.touches[0].clientY;
     const distance = startYRef.current - currentY;
     const clampedDistance = Math.max(0, distance);
+    
     setDragDistance(clampedDistance);
     
     if (clampedDistance >= lockThreshold && !reachedLockThresholdRef.current) {
@@ -90,7 +101,7 @@ export const useVoiceRecordingUI = () => {
     }
   }, [voiceRecorder.isRecording, lockThreshold]);
 
-  const handleMouseUp = useCallback((e) => {
+  const handleMouseUp = useCallback(async (e) => {
     e.preventDefault();
     e.stopPropagation();
     
@@ -113,11 +124,45 @@ export const useVoiceRecordingUI = () => {
     }
     
     voiceRecorder.stopRecording();
+    
     setIsHolding(false);
     setDragDistance(0);
+    
+    if (onAutoSendRef.current) {
+      const audioChunksRef = voiceRecorder.audioChunksRef || { current: [] };
+      let attempts = 0;
+      const maxAttempts = 50;
+      let blob = null;
+      
+      while (attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        if (voiceRecorder.audioBlob && voiceRecorder.audioBlob.size > 0) {
+          blob = voiceRecorder.audioBlob;
+          break;
+        }
+        
+        if (audioChunksRef.current && audioChunksRef.current.length > 0) {
+          blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          if (blob && blob.size > 0) {
+            break;
+          }
+        }
+        
+        if (!voiceRecorder.isRecording) {
+          break;
+        }
+        
+        attempts++;
+      }
+      
+      if (blob && blob.size > 0) {
+        onAutoSendRef.current(blob);
+      }
+    }
   }, [voiceRecorder, isLocked]);
 
-  const handleTouchEnd = useCallback((e) => {
+  const handleTouchEnd = useCallback(async (e) => {
     e.preventDefault();
     e.stopPropagation();
     
@@ -140,8 +185,42 @@ export const useVoiceRecordingUI = () => {
     }
     
     voiceRecorder.stopRecording();
+    
     setIsHolding(false);
     setDragDistance(0);
+    
+    if (onAutoSendRef.current) {
+      const audioChunksRef = voiceRecorder.audioChunksRef || { current: [] };
+      let attempts = 0;
+      const maxAttempts = 50;
+      let blob = null;
+      
+      while (attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        if (voiceRecorder.audioBlob && voiceRecorder.audioBlob.size > 0) {
+          blob = voiceRecorder.audioBlob;
+          break;
+        }
+        
+        if (audioChunksRef.current && audioChunksRef.current.length > 0) {
+          blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          if (blob && blob.size > 0) {
+            break;
+          }
+        }
+        
+        if (!voiceRecorder.isRecording) {
+          break;
+        }
+        
+        attempts++;
+      }
+      
+      if (blob && blob.size > 0) {
+        onAutoSendRef.current(blob);
+      }
+    }
   }, [voiceRecorder, isLocked]);
 
   const handlePauseRecording = useCallback(() => {
@@ -159,10 +238,6 @@ export const useVoiceRecordingUI = () => {
   const handleStopRecording = useCallback(() => {
     if (voiceRecorder.isRecording) {
       voiceRecorder.stopRecording();
-      setIsLocked(false);
-      setDragDistance(0);
-      reachedLockThresholdRef.current = false;
-      setReachedLockThreshold(false);
     }
   }, [voiceRecorder]);
 
@@ -211,6 +286,17 @@ export const useVoiceRecordingUI = () => {
     };
   }, [handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
 
+  const reset = useCallback(() => {
+    voiceRecorder.reset();
+    setIsLocked(false);
+    setIsHolding(false);
+    setDragDistance(0);
+    setIsPlayingPreview(false);
+    setReachedLockThreshold(false);
+    reachedLockThresholdRef.current = false;
+    isHoldingRef.current = false;
+  }, [voiceRecorder]);
+
   return {
     ...voiceRecorder,
     isLocked,
@@ -227,7 +313,8 @@ export const useVoiceRecordingUI = () => {
     handleResumeRecording: handleResumeRecording || voiceRecorder.resumeRecording,
     handleStopRecording: handleStopRecording || voiceRecorder.stopRecording,
     handleCancelRecording: handleCancelRecording || voiceRecorder.cancelRecording,
-    handlePlayPreview
+    handlePlayPreview,
+    reset
   };
 };
 
