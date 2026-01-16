@@ -95,7 +95,7 @@ export const authAPI = {
 };
 
 export const roomAPI = {
-  // Создание комнаты с новыми опциями
+  
   createRoom: async (title, chatId, type = 'PUBLIC', options = {}) => {
     const { customRoomId, maxParticipants, waitingRoom, screenShareEnabled, recordingEnabled } = options;
     return apiRequest('/rooms', {
@@ -150,42 +150,36 @@ export const roomAPI = {
     });
   },
 
-  // Поднять/опустить руку
   raiseHand: async (roomId, raised = true) => {
     return apiRequest(`/rooms/${roomId}/raise-hand?raised=${raised}`, {
       method: 'POST',
     });
   },
 
-  // Начать демонстрацию экрана
   startScreenShare: async (roomId) => {
     return apiRequest(`/rooms/${roomId}/screen-share/start`, {
       method: 'POST',
     });
   },
 
-  // Остановить демонстрацию экрана
   stopScreenShare: async (roomId) => {
     return apiRequest(`/rooms/${roomId}/screen-share/stop`, {
       method: 'POST',
     });
   },
 
-  // Назначить со-ведущим (только для HOST/CO_HOST)
   promoteParticipant: async (roomId, participantId) => {
     return apiRequest(`/rooms/${roomId}/participants/${participantId}/promote`, {
       method: 'POST',
     });
   },
 
-  // Замутить участника (только для HOST/CO_HOST)
   muteParticipant: async (roomId, participantId) => {
     return apiRequest(`/rooms/${roomId}/participants/${participantId}/mute`, {
       method: 'POST',
     });
   },
 
-  // Удалить участника из комнаты (только для HOST/CO_HOST)
   kickParticipant: async (roomId, participantId) => {
     return apiRequest(`/rooms/${roomId}/participants/${participantId}/kick`, {
       method: 'POST',
@@ -385,7 +379,6 @@ export const chatAPI = {
       });
     }
 
-    // Fallback на fetch если onProgress не передан
     const response = await fetch(uploadUrl, {
       method: 'POST',
       headers,
@@ -474,7 +467,6 @@ export const chatAPI = {
       });
     }
 
-    // Fallback на fetch если onProgress не передан
     const response = await fetch(uploadUrl, {
       method: 'POST',
       headers,

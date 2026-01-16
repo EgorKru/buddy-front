@@ -1,9 +1,5 @@
-/**
- * Web Worker для обработки аудио (голосовые сообщения)
- * Offloads heavy audio processing from the main thread
- */
 
-// Обработка сообщений от главного потока
+
 self.addEventListener('message', async (event) => {
   const { type, payload, id } = event.data;
 
@@ -41,14 +37,9 @@ self.addEventListener('message', async (event) => {
   }
 });
 
-/**
- * Кодирование аудио в формат для отправки
- */
 async function encodeAudio(payload, id) {
   const { audioBuffer, format = 'webm' } = payload;
-  
-  // TODO: Implement actual encoding logic
-  // For now, just pass through
+
   postMessage({
     id,
     type: 'ENCODE_COMPLETE',
@@ -59,13 +50,9 @@ async function encodeAudio(payload, id) {
   });
 }
 
-/**
- * Декодирование аудио для воспроизведения
- */
 async function decodeAudio(payload, id) {
   const { audioData } = payload;
-  
-  // TODO: Implement actual decoding logic
+
   postMessage({
     id,
     type: 'DECODE_COMPLETE',
@@ -75,14 +62,11 @@ async function decodeAudio(payload, id) {
   });
 }
 
-/**
- * Анализ аудио (уровень громкости, длительность и т.д.)
- */
 async function analyzeAudio(payload, id) {
   const { audioBuffer } = payload;
   
   try {
-    // Простой анализ: вычисляем RMS (Root Mean Square) для определения уровня громкости
+    
     const channelData = audioBuffer.getChannelData ? audioBuffer.getChannelData(0) : new Float32Array(audioBuffer);
     
     let sum = 0;
@@ -110,14 +94,9 @@ async function analyzeAudio(payload, id) {
   }
 }
 
-/**
- * Сжатие аудио для оптимизации размера файла
- */
 async function compressAudio(payload, id) {
   const { audioData, quality = 0.7 } = payload;
-  
-  // TODO: Implement actual compression logic
-  // For now, just pass through
+
   postMessage({
     id,
     type: 'COMPRESS_COMPLETE',
@@ -130,7 +109,6 @@ async function compressAudio(payload, id) {
   });
 }
 
-// Отправляем сообщение о готовности воркера
 postMessage({
   type: 'READY',
   message: 'Audio Worker initialized'

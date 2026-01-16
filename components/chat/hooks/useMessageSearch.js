@@ -3,12 +3,6 @@ import { MESSAGE_PAGE_SIZE, SEARCH_DEBOUNCE_DELAY } from '../constants/chat';
 import { MESSAGE_STATUS } from '@/utils/messageQueue';
 import { chatAPI } from '@/utils/api';
 
-/**
- * Сортировка результатов поиска по приоритету
- * 1. Точные совпадения (полное совпадение слова)
- * 2. Совпадения в начале слова
- * 3. Совпадения в середине/конце
- */
 const sortSearchResults = (results, searchText) => {
   if (!searchText || results.length === 0) return results;
   
@@ -18,17 +12,14 @@ const sortSearchResults = (results, searchText) => {
   return [...results].sort((a, b) => {
     const contentA = (a.content || '').toLowerCase();
     const contentB = (b.content || '').toLowerCase();
-    
-    // Вычисляем приоритет для каждого сообщения
+
     const priorityA = calculateMatchPriority(contentA, searchLower, searchWords);
     const priorityB = calculateMatchPriority(contentB, searchLower, searchWords);
-    
-    // Сначала по приоритету (меньше = выше)
+
     if (priorityA !== priorityB) {
       return priorityA - priorityB;
     }
-    
-    // Если приоритет одинаковый, сортируем по дате (новые сначала)
+
     const dateA = new Date(a.createdAt).getTime();
     const dateB = new Date(b.createdAt).getTime();
     return dateB - dateA;
@@ -37,37 +28,29 @@ const sortSearchResults = (results, searchText) => {
 
 const calculateMatchPriority = (content, searchLower, searchWords) => {
   if (!content) return 999;
-  
-  // 1. Точное совпадение (полное совпадение слова)
+
   const exactWordMatch = searchWords.some(word => {
     const wordRegex = new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
     return wordRegex.test(content);
   });
   if (exactWordMatch) return 1;
-  
-  // 2. Совпадение в начале слова
+
   const startOfWordMatch = searchWords.some(word => {
     const startRegex = new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i');
     return startRegex.test(content);
   });
   if (startOfWordMatch) return 2;
-  
-  // 3. Совпадение в начале строки
+
   if (content.startsWith(searchLower)) return 3;
-  
-  // 4. Совпадение в любом месте
+
   if (content.includes(searchLower)) return 4;
-  
-  // 5. Частичное совпадение (некоторые слова)
+
   const partialMatch = searchWords.some(word => content.includes(word));
   if (partialMatch) return 5;
   
   return 999;
 };
 
-/**
- * Хук для поиска сообщений в чате
- */
 export const useMessageSearch = ({ chatId, onNavigateToMessage, upsertMessage }) => {
   const [searchText, setSearchText] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -89,18 +72,15 @@ export const useMessageSearch = ({ chatId, onNavigateToMessage, upsertMessage })
 
     setIsSearching(true);
     try {
-      // Поиск работает для ВСЕХ сообщений в чате через серверный API,
-      // а не только для загруженных на клиенте. API ищет по всей истории чата.
+
       const response = await chatAPI.searchMessages(chatId, query.trim(), pageNum, MESSAGE_PAGE_SIZE);
       const results = Array.isArray(response?.content) ? response.content : (Array.isArray(response) ? response : []);
-      
-      // Сортируем результаты по приоритету: точные совпадения сначала
+
       const sortedResults = sortSearchResults(results, query.trim());
-      
-      // Загружаем найденные сообщения в контекст, чтобы они отображались в списке
+
       if (upsertMessage) {
         for (const msg of sortedResults) {
-          // Обработка метаданных файлов
+          
           if ((msg.type === 'FILE' || msg.type === 'IMAGE') && msg.fileUrl && typeof window !== 'undefined') {
             const metadataKey = `file_metadata_${msg.fileUrl}`;
             if (msg.fileSize && msg.fileName && msg.mimeType) {
@@ -127,14 +107,13 @@ export const useMessageSearch = ({ chatId, onNavigateToMessage, upsertMessage })
       setSearchMode(true);
       setCurrentSearchIndex(-1);
     } catch (error) {
-      console.error('Error searching messages:', error);
+      
       alert('Не удалось выполнить поиск');
     } finally {
       setIsSearching(false);
     }
   }, [chatId, upsertMessage]);
 
-  // Автопоиск при изменении текста
   useEffect(() => {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
@@ -189,7 +168,6 @@ export const useMessageSearch = ({ chatId, onNavigateToMessage, upsertMessage })
     }
   }, [onNavigateToMessage, handleCloseSearch]);
 
-  // Обработка Escape для закрытия поиска
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key === 'Escape' && searchOpen) {
@@ -204,7 +182,7 @@ export const useMessageSearch = ({ chatId, onNavigateToMessage, upsertMessage })
   }, [searchOpen, handleCloseSearch]);
 
   return {
-    // Состояние
+    
     searchText,
     searchResults,
     isSearching,
@@ -214,13 +192,11 @@ export const useMessageSearch = ({ chatId, onNavigateToMessage, upsertMessage })
     currentSearchIndex,
     searchOpen,
     searchInputRef,
-    
-    // Setters
+
     setSearchText,
     setSearchPage,
     setCurrentSearchIndex,
-    
-    // Обработчики
+
     handleSearch,
     handleSearchSubmit,
     handleOpenSearch,

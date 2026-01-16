@@ -2,75 +2,64 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useStomp } from '@/context/socket';
 import { safeJsonParse, safeUnsubscribe } from '@/utils/safe';
 
-// Signal Types (отправляемые команды)
 const SIGNAL_TYPES = {
-  // Управление комнатой
+  
   ROOM_CREATE: 'ROOM_CREATE',
   ROOM_JOIN: 'ROOM_JOIN',
   ROOM_LEAVE: 'ROOM_LEAVE',
   ROOM_END: 'ROOM_END',
-  
-  // WebRTC
+
   ROOM_OFFER: 'ROOM_OFFER',
   ROOM_ANSWER: 'ROOM_ANSWER',
   ROOM_ICE_CANDIDATE: 'ROOM_ICE_CANDIDATE',
-  
-  // Медиа (своё)
+
   ROOM_MUTE_AUDIO: 'ROOM_MUTE_AUDIO',
   ROOM_UNMUTE_AUDIO: 'ROOM_UNMUTE_AUDIO',
   ROOM_MUTE_VIDEO: 'ROOM_MUTE_VIDEO',
   ROOM_UNMUTE_VIDEO: 'ROOM_UNMUTE_VIDEO',
-  
-  // Интерактив
+
   ROOM_RAISE_HAND: 'ROOM_RAISE_HAND',
   ROOM_LOWER_HAND: 'ROOM_LOWER_HAND',
   ROOM_START_SCREEN_SHARE: 'ROOM_START_SCREEN_SHARE',
   ROOM_STOP_SCREEN_SHARE: 'ROOM_STOP_SCREEN_SHARE',
-  
-  // Управление участниками (host/co-host)
+
   ROOM_PROMOTE_CO_HOST: 'ROOM_PROMOTE_CO_HOST',
   ROOM_DEMOTE_TO_PARTICIPANT: 'ROOM_DEMOTE_TO_PARTICIPANT',
   ROOM_MUTE_PARTICIPANT: 'ROOM_MUTE_PARTICIPANT',
   ROOM_KICK_PARTICIPANT: 'ROOM_KICK_PARTICIPANT',
 };
 
-// Event Types (входящие события)
 const EVENT_TYPES = {
-  // Комната
+  
   ROOM_CREATED: 'ROOM_CREATED',
   ROOM_STARTED: 'ROOM_STARTED',
   ROOM_JOINED: 'ROOM_JOINED',
   ROOM_LEFT: 'ROOM_LEFT',
   ROOM_ENDED: 'ROOM_ENDED',
-  
-  // Медиа участников
+
   PARTICIPANT_AUDIO_CHANGED: 'PARTICIPANT_AUDIO_CHANGED',
   PARTICIPANT_VIDEO_CHANGED: 'PARTICIPANT_VIDEO_CHANGED',
   PARTICIPANT_HAND_RAISED: 'PARTICIPANT_HAND_RAISED',
   PARTICIPANT_HAND_LOWERED: 'PARTICIPANT_HAND_LOWERED',
   PARTICIPANT_SCREEN_SHARE_STARTED: 'PARTICIPANT_SCREEN_SHARE_STARTED',
   PARTICIPANT_SCREEN_SHARE_STOPPED: 'PARTICIPANT_SCREEN_SHARE_STOPPED',
-  
-  // Роли
+
   PARTICIPANT_PROMOTED: 'PARTICIPANT_PROMOTED',
   PARTICIPANT_DEMOTED: 'PARTICIPANT_DEMOTED',
   PARTICIPANT_MUTED_BY_HOST: 'PARTICIPANT_MUTED_BY_HOST',
   PARTICIPANT_KICKED: 'PARTICIPANT_KICKED',
-  
-  // WebRTC
+
   WEBRTC_OFFER: 'WEBRTC_OFFER',
   WEBRTC_ANSWER: 'WEBRTC_ANSWER',
   WEBRTC_ICE_CANDIDATE: 'WEBRTC_ICE_CANDIDATE',
 };
 
-// Статусы комнаты
 export const ROOM_STATUS = {
   WAITING: 'WAITING',
   ACTIVE: 'ACTIVE',
   ENDED: 'ENDED',
 };
 
-// Роли участников
 export const PARTICIPANT_ROLE = {
   HOST: 'HOST',
   CO_HOST: 'CO_HOST',
@@ -86,28 +75,23 @@ export const useRoomProtocol = (initialRoomId = null) => {
   const isBrowser = typeof window !== 'undefined';
   
   const { client, connected } = useStomp();
-  
-  // Состояние комнаты
+
   const [room, setRoom] = useState(null);
   const [participants, setParticipants] = useState([]);
   const [isInRoom, setIsInRoom] = useState(false);
   const [error, setError] = useState(null);
-  
-  // Медиа стримы
+
   const [localStream, setLocalStream] = useState(null);
   const [remoteStreams, setRemoteStreams] = useState(new Map());
   const [screenStream, setScreenStream] = useState(null);
-  
-  // Состояние медиа
+
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [videoEnabled, setVideoEnabled] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [handRaised, setHandRaised] = useState(false);
-  
-  // Роль
+
   const [myRole, setMyRole] = useState(PARTICIPANT_ROLE.PARTICIPANT);
-  
-  // Refs
+
   const peerConnectionsRef = useRef(new Map());
   const roomSubscriptionRef = useRef(null);
   const userQueueSubscriptionRef = useRef(null);
@@ -115,14 +99,13 @@ export const useRoomProtocol = (initialRoomId = null) => {
   const screenStreamRef = useRef(null);
   const roomIdRef = useRef(initialRoomId);
   const pendingCallbacksRef = useRef(new Map());
-  const negotiationTimeoutRef = useRef(new Set()); // Для отслеживания переговоров
-  
-  // Seq/Pts для Gap Recovery
+  const negotiationTimeoutRef = useRef(new Set()); 
+  const connectedRef = useRef(connected); 
+
   const lastSeqRef = useRef(0);
   const eventQueueRef = useRef([]);
   const isRecoveringRef = useRef(false);
 
-  // Текущий пользователь
   const getCurrentUser = useCallback(() => {
     if (!isBrowser) return null;
     try {
@@ -135,19 +118,20 @@ export const useRoomProtocol = (initialRoomId = null) => {
   const currentUser = getCurrentUser();
   const myUserId = currentUser?.id;
 
-  // Обновляем roomId ref
   useEffect(() => {
     roomIdRef.current = initialRoomId;
   }, [initialRoomId]);
 
-  // Отправка сигнала через WebSocket
+  useEffect(() => {
+    connectedRef.current = connected;
+  }, [connected]);
+
   const sendSignal = useCallback((signal, callback) => {
     if (!client || !connected) {
-      console.error('WebSocket not connected');
+      
       return;
     }
-    
-    // Генерируем ID для отслеживания ответа
+
     const signalId = Date.now().toString();
     if (callback) {
       pendingCallbacksRef.current.set(signalId, callback);
@@ -159,7 +143,6 @@ export const useRoomProtocol = (initialRoomId = null) => {
     });
   }, [client, connected]);
 
-  // Создание PeerConnection
   const createPeerConnection = useCallback((userId) => {
     if (!isBrowser || !window.RTCPeerConnection) return null;
 
@@ -170,21 +153,18 @@ export const useRoomProtocol = (initialRoomId = null) => {
 
     const pc = new RTCPeerConnection({ iceServers: STUN_SERVERS });
 
-    // Добавляем локальные треки
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => {
         pc.addTrack(track, localStreamRef.current);
       });
     }
-    
-    // Добавляем screen sharing треки, если они есть
+
     if (screenStreamRef.current) {
       screenStreamRef.current.getTracks().forEach(track => {
         pc.addTrack(track, screenStreamRef.current);
       });
     }
 
-    // ICE кандидаты
     pc.onicecandidate = (event) => {
       if (event.candidate && roomIdRef.current) {
         sendSignal({
@@ -198,24 +178,20 @@ export const useRoomProtocol = (initialRoomId = null) => {
       }
     };
 
-    // Обработка необходимости пересоздания offer/answer (например, при добавлении screen sharing)
-    // Это событие вызывается автоматически при добавлении треков через addTrack
     pc.onnegotiationneeded = async () => {
-      // Пересоздаем offer только если соединение в стабильном состоянии
-      // и мы инициаторы соединения (создали offer первыми)
+
       if (pc.signalingState !== 'stable' && pc.signalingState !== 'have-local-offer') {
-        return; // Избегаем гонки условий
+        return; 
       }
-      
-      // Используем debounce для избежания множественных вызовов
+
       const negotiationTimeout = `negotiation_${userId}`;
       if (negotiationTimeoutRef.current?.has(negotiationTimeout)) {
-        return; // Уже обрабатывается
+        return; 
       }
       negotiationTimeoutRef.current?.set(negotiationTimeout, true);
       
       try {
-        // Небольшая задержка для избежания множественных вызовов (уменьшена до 50ms)
+        
         await new Promise(resolve => setTimeout(resolve, 50));
         
         if (pc.signalingState === 'stable' || pc.signalingState === 'have-local-offer') {
@@ -230,26 +206,24 @@ export const useRoomProtocol = (initialRoomId = null) => {
           });
         }
       } catch (err) {
-        console.error('Error creating renegotiation offer:', err);
+        
       } finally {
-        // Очищаем флаг через небольшую задержку
+        
         setTimeout(() => {
           negotiationTimeoutRef.current?.delete(negotiationTimeout);
         }, 200);
       }
     };
 
-    // Получение удалённых треков
     pc.ontrack = (event) => {
       const stream = event.streams[0];
       if (stream) {
         setRemoteStreams(prev => {
           const newMap = new Map(prev);
           const existingStream = newMap.get(userId);
-          
-          // Если стрим уже существует, объединяем треки
+
           if (existingStream) {
-            // Проверяем, изменились ли треки
+            
             const existingTrackIds = new Set(
               Array.from(existingStream.getTracks())
                 .filter(t => t.readyState === 'live')
@@ -260,38 +234,35 @@ export const useRoomProtocol = (initialRoomId = null) => {
                 .filter(t => t.readyState === 'live')
                 .map(t => t.id)
             );
-            
-            // Если треки не изменились, не обновляем (предотвращаем мерцание)
+
             const tracksChanged = 
               existingTrackIds.size !== newTrackIds.size ||
               Array.from(newTrackIds).some(id => !existingTrackIds.has(id));
             
             if (tracksChanged) {
-              // Создаем новый стрим с объединенными треками
-              const combinedStream = new MediaStream();
               
-              // Добавляем все треки из существующего стрима
+              const combinedStream = new MediaStream();
+
               existingStream.getTracks().forEach(track => {
                 if (track.readyState === 'live') {
                   combinedStream.addTrack(track);
                 }
               });
-              
-              // Добавляем треки из нового стрима
+
               stream.getTracks().forEach(track => {
                 if (track.readyState === 'live') {
-                  // Проверяем, нет ли уже такого трека (по kind и id)
+                  
                   const existingTrack = Array.from(combinedStream.getTracks()).find(
                     t => t.kind === track.kind && t.id === track.id
                   );
                   if (!existingTrack) {
                     combinedStream.addTrack(track);
                   } else {
-                    // Если трек уже есть, но это screen sharing трек - заменяем его
+                    
                     const isScreenShareTrack = track.label?.toLowerCase().includes('screen') || 
                                              track.label?.toLowerCase().includes('display');
                     if (isScreenShareTrack) {
-                      // Удаляем старый трек и добавляем новый
+                      
                       const oldTrack = Array.from(combinedStream.getTracks()).find(
                         t => t.kind === track.kind && t.id === track.id
                       );
@@ -306,7 +277,7 @@ export const useRoomProtocol = (initialRoomId = null) => {
               
               newMap.set(userId, combinedStream);
             }
-            // Если треки не изменились, оставляем существующий стрим
+            
           } else {
             newMap.set(userId, stream);
           }
@@ -316,7 +287,6 @@ export const useRoomProtocol = (initialRoomId = null) => {
       }
     };
 
-    // Состояние соединения
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
         pc.close();
@@ -333,7 +303,6 @@ export const useRoomProtocol = (initialRoomId = null) => {
     return pc;
   }, [isBrowser, sendSignal]);
 
-  // Отправка offer
   const sendOffer = useCallback(async (userId) => {
     const pc = createPeerConnection(userId);
     if (!pc) return;
@@ -349,13 +318,12 @@ export const useRoomProtocol = (initialRoomId = null) => {
         sdp: offer.sdp,
       });
     } catch (err) {
-      console.error('Error creating offer:', err);
+      
       pc.close();
       peerConnectionsRef.current.delete(userId);
     }
   }, [createPeerConnection, sendSignal]);
 
-  // Обработка входящего offer
   const handleOffer = useCallback(async (fromUserId, sdp) => {
     const pc = createPeerConnection(fromUserId);
     if (!pc) return;
@@ -372,13 +340,12 @@ export const useRoomProtocol = (initialRoomId = null) => {
         sdp: answer.sdp,
       });
     } catch (err) {
-      console.error('Error handling offer:', err);
+      
       pc.close();
       peerConnectionsRef.current.delete(fromUserId);
     }
   }, [createPeerConnection, sendSignal]);
 
-  // Обработка входящего answer
   const handleAnswer = useCallback(async (fromUserId, sdp) => {
     const pc = peerConnectionsRef.current.get(fromUserId);
     if (!pc) return;
@@ -386,11 +353,10 @@ export const useRoomProtocol = (initialRoomId = null) => {
     try {
       await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp }));
     } catch (err) {
-      console.error('Error handling answer:', err);
+      
     }
   }, []);
 
-  // Обработка ICE кандидата
   const handleIceCandidate = useCallback(async (fromUserId, candidate) => {
     const pc = peerConnectionsRef.current.get(fromUserId);
     if (!pc) return;
@@ -398,11 +364,10 @@ export const useRoomProtocol = (initialRoomId = null) => {
     try {
       await pc.addIceCandidate(new RTCIceCandidate(candidate));
     } catch (err) {
-      console.error('Error adding ICE candidate:', err);
+      
     }
   }, []);
 
-  // Закрытие peer connection
   const closePeerConnection = useCallback((userId) => {
     const pc = peerConnectionsRef.current.get(userId);
     if (pc) {
@@ -416,14 +381,11 @@ export const useRoomProtocol = (initialRoomId = null) => {
     });
   }, []);
 
-  // Refs для избежания циклических зависимостей
   const processEventRef = useRef(null);
   const cleanupRef = useRef(null);
-  
-  // Gap Recovery: очередь событий с ключом по seq
+
   const eventQueueMapRef = useRef(new Map());
 
-  // Запрос состояния комнаты (Gap Recovery)
   const requestRoomState = useCallback(() => {
     if (!client || !connected || !roomIdRef.current || isRecoveringRef.current) return;
     
@@ -437,8 +399,13 @@ export const useRoomProtocol = (initialRoomId = null) => {
         setRoom(response.room);
         setParticipants(response.room.participants || []);
         lastSeqRef.current = response.seq || 0;
-        
-        // Обрабатываем очередь событий по порядку
+
+        const myParticipant = response.room.participants?.find(p => p.user?.id === myUserId);
+        if (myParticipant) {
+          
+          setIsInRoom(true);
+        }
+
         while (eventQueueMapRef.current.has(lastSeqRef.current + 1)) {
           const nextEvent = eventQueueMapRef.current.get(lastSeqRef.current + 1);
           eventQueueMapRef.current.delete(lastSeqRef.current + 1);
@@ -449,48 +416,60 @@ export const useRoomProtocol = (initialRoomId = null) => {
         }
       }
     });
-  }, [client, connected, sendSignal]);
+  }, [client, connected, sendSignal, myUserId]);
 
-  // Обработка одного события
-  // Формат бэкенда: fromUserId вместо userId, participant объект содержит все данные
   const processEvent = useCallback((event) => {
     const eventRoomId = event.room?.roomId || event.roomId;
     if (roomIdRef.current && eventRoomId && eventRoomId !== roomIdRef.current) return;
 
-    // Универсальный userId: fromUserId (новый формат) или userId (старый)
     const eventUserId = event.fromUserId || event.userId;
 
     switch (event.eventType) {
-      // === Комната ===
+      
       case EVENT_TYPES.ROOM_CREATED:
       case EVENT_TYPES.ROOM_STARTED:
         setRoom(event.room);
         setParticipants(event.room?.participants || []);
+        
+        const myParticipantInRoom = event.room?.participants?.find(p => p.user?.id === myUserId);
+        if (myParticipantInRoom && !isInRoom) {
+          
+          setIsInRoom(true);
+        }
         break;
 
       case EVENT_TYPES.ROOM_JOINED:
-        // Обновляем комнату если пришла
+        
+        const joinedUserId = event.participant?.user?.id || event.fromUserId;
+
+        if (joinedUserId === myUserId || !isInRoom) {
+          setIsInRoom(true);
+          
+          setTimeout(() => {
+            setIsInRoom(true);
+          }, 0);
+        }
+
         if (event.room) {
           setRoom(event.room);
-          // Можно взять participants из room, но лучше добавить participant отдельно
-          // чтобы не потерять локальные изменения
+
         }
-        // Добавляем нового участника
+        
         if (event.participant) {
           setParticipants(prev => {
             const existingIdx = prev.findIndex(p => p.user?.id === event.participant.user?.id);
             if (existingIdx >= 0) {
-              // Обновляем существующего
+              
               const updated = [...prev];
               updated[existingIdx] = event.participant;
               return updated;
             }
             return [...prev, event.participant];
           });
-          // Устанавливаем WebRTC соединение с новым участником (без задержки для быстроты)
+          
           const newUserId = event.participant.user?.id || eventUserId;
           if (newUserId && newUserId !== myUserId && isInRoom) {
-            // Используем requestAnimationFrame для неблокирующего выполнения
+            
             requestAnimationFrame(() => {
               sendOffer(newUserId);
             });
@@ -499,13 +478,13 @@ export const useRoomProtocol = (initialRoomId = null) => {
         break;
 
       case EVENT_TYPES.ROOM_LEFT:
-        // fromUserId — кто вышел
+        
         const leftUserId = eventUserId || event.participant?.user?.id;
         if (leftUserId) {
           setParticipants(prev => prev.filter(p => p.user?.id !== leftUserId));
           closePeerConnection(leftUserId);
         }
-        // Обновляем room если пришла
+        
         if (event.room) {
           setRoom(event.room);
         }
@@ -515,16 +494,14 @@ export const useRoomProtocol = (initialRoomId = null) => {
         if (cleanupRef.current) cleanupRef.current();
         break;
 
-      // === Медиа участников ===
-      // Формат: fromUserId — чей статус, participant.audioEnabled/videoEnabled — новые значения
       case EVENT_TYPES.PARTICIPANT_AUDIO_CHANGED:
         if (event.participant) {
-          // Обновляем весь participant объект
+          
           setParticipants(prev => prev.map(p => 
             p.user?.id === eventUserId ? { ...p, ...event.participant } : p
           ));
         } else {
-          // Fallback на старый формат
+          
           setParticipants(prev => prev.map(p => 
             p.user?.id === eventUserId ? { ...p, audioEnabled: event.enabled } : p
           ));
@@ -595,7 +572,6 @@ export const useRoomProtocol = (initialRoomId = null) => {
         if (eventUserId === myUserId) setIsScreenSharing(false);
         break;
 
-      // === Роли ===
       case EVENT_TYPES.PARTICIPANT_PROMOTED:
         if (event.participant) {
           setParticipants(prev => prev.map(p => 
@@ -650,7 +626,6 @@ export const useRoomProtocol = (initialRoomId = null) => {
         }
         break;
 
-      // === WebRTC ===
       case EVENT_TYPES.WEBRTC_OFFER:
         if (event.targetUserId === myUserId) {
           handleOffer(event.fromUserId, event.sdp);
@@ -678,7 +653,6 @@ export const useRoomProtocol = (initialRoomId = null) => {
     }
   }, [myUserId, isInRoom, sendOffer, closePeerConnection, handleOffer, handleAnswer, handleIceCandidate]);
 
-  // Обработка очереди событий после получения события в правильном порядке
   const processQueuedEvents = useCallback(() => {
     while (eventQueueMapRef.current.has(lastSeqRef.current + 1)) {
       const nextEvent = eventQueueMapRef.current.get(lastSeqRef.current + 1);
@@ -690,50 +664,43 @@ export const useRoomProtocol = (initialRoomId = null) => {
     }
   }, []);
 
-  // Обработка событий комнаты с Gap Recovery
   const handleRoomEvent = useCallback((message) => {
     const event = safeJsonParse(message.body);
     if (!event) return;
 
-    // Проверяем roomId
     const eventRoomId = event.room?.roomId || event.roomId;
     if (roomIdRef.current && eventRoomId && eventRoomId !== roomIdRef.current) return;
 
-    // Gap Recovery: проверяем seq
     const eventSeq = event.seq;
     if (eventSeq) {
       if (eventSeq === lastSeqRef.current + 1) {
-        // В порядке — обрабатываем
+        
         processEvent(event);
         lastSeqRef.current = eventSeq;
-        
-        // Проверяем очередь на следующие события
+
         processQueuedEvents();
       } else if (eventSeq > lastSeqRef.current + 1) {
-        // Пропуск — кладем в очередь и запрашиваем состояние
+        
         eventQueueMapRef.current.set(eventSeq, event);
         requestRoomState();
       }
-      // eventSeq <= lastSeqRef.current — дубликат, игнорируем
+      
     } else {
-      // Без seq — просто обрабатываем (WebRTC сигналы)
+      
       processEvent(event);
     }
   }, [processEvent, requestRoomState, processQueuedEvents]);
 
-  // Обработка ответов на команды (user queue)
   const handleUserQueueMessage = useCallback((message) => {
     const response = safeJsonParse(message.body);
     if (!response) return;
 
-    // Обработка callback если есть
     if (response.signalId && pendingCallbacksRef.current.has(response.signalId)) {
       const callback = pendingCallbacksRef.current.get(response.signalId);
       pendingCallbacksRef.current.delete(response.signalId);
       callback(response);
     }
 
-    // Обработка ответа
     if (response.success === false && response.errorMessage) {
       setError(response.errorMessage);
       return;
@@ -742,10 +709,11 @@ export const useRoomProtocol = (initialRoomId = null) => {
     if (response.room) {
       setRoom(response.room);
       setParticipants(response.room.participants || []);
-      
-      // Определяем свою роль
+
       const myParticipant = response.room.participants?.find(p => p.user?.id === myUserId);
       if (myParticipant) {
+        
+        setIsInRoom(true);
         setMyRole(myParticipant.role || PARTICIPANT_ROLE.PARTICIPANT);
         setHandRaised(myParticipant.handRaised || false);
         setIsScreenSharing(myParticipant.screenSharing || false);
@@ -753,13 +721,11 @@ export const useRoomProtocol = (initialRoomId = null) => {
     }
   }, [myUserId]);
 
-  // Cleanup
   const cleanup = useCallback(() => {
-    // Закрываем все peer connections
+    
     peerConnectionsRef.current.forEach((pc) => pc.close());
     peerConnectionsRef.current.clear();
-    
-    // Останавливаем стримы
+
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => track.stop());
       localStreamRef.current = null;
@@ -768,12 +734,10 @@ export const useRoomProtocol = (initialRoomId = null) => {
       screenStreamRef.current.getTracks().forEach(track => track.stop());
       screenStreamRef.current = null;
     }
-    
-    // Отписки
+
     safeUnsubscribe(roomSubscriptionRef);
     safeUnsubscribe(userQueueSubscriptionRef);
-    
-    // Сброс состояния
+
     setLocalStream(null);
     setScreenStream(null);
     setRemoteStreams(new Map());
@@ -785,15 +749,13 @@ export const useRoomProtocol = (initialRoomId = null) => {
     setParticipants([]);
     setError(null);
     roomIdRef.current = null;
-    
-    // Сброс seq/pts
+
     lastSeqRef.current = 0;
     eventQueueRef.current = [];
     eventQueueMapRef.current.clear();
     isRecoveringRef.current = false;
   }, []);
 
-  // Обновляем refs при изменении функций
   useEffect(() => {
     cleanupRef.current = cleanup;
   }, [cleanup]);
@@ -802,7 +764,6 @@ export const useRoomProtocol = (initialRoomId = null) => {
     processEventRef.current = processEvent;
   }, [processEvent]);
 
-  // Подписка на user queue (для ответов на команды)
   const ensureUserQueueSubscription = useCallback(() => {
     if (!client || !connected) return false;
     
@@ -815,24 +776,28 @@ export const useRoomProtocol = (initialRoomId = null) => {
     return true;
   }, [client, connected, handleUserQueueMessage]);
 
-  // Подписка на события комнаты
   const subscribeToRoom = useCallback((roomId) => {
-    if (!client || !connected || !roomId) return;
 
-    // Подписка на события комнаты
+    if (!client || !connected || !roomId) {
+      
+      return;
+    }
+
     if (roomSubscriptionRef.current) {
+      
       safeUnsubscribe(roomSubscriptionRef);
     }
+    
+    const topic = `/topic/room/${roomId}`;
+    
     roomSubscriptionRef.current = client.subscribe(
-      `/topic/room/${roomId}`,
+      topic,
       handleRoomEvent
     );
 
-    // Подписка на личные ответы (если ещё не подписаны)
     ensureUserQueueSubscription();
   }, [client, connected, handleRoomEvent, ensureUserQueueSubscription]);
 
-  // Запуск локального стрима
   const startLocalStream = useCallback(async (audio = true, video = true) => {
     if (!isBrowser || !navigator.mediaDevices) {
       throw new Error('Медиа устройства недоступны');
@@ -849,7 +814,6 @@ export const useRoomProtocol = (initialRoomId = null) => {
       setAudioEnabled(audio);
       setVideoEnabled(video);
 
-      // Добавляем треки в существующие соединения
       peerConnectionsRef.current.forEach((pc) => {
         stream.getTracks().forEach(track => {
           pc.addTrack(track, stream);
@@ -858,17 +822,11 @@ export const useRoomProtocol = (initialRoomId = null) => {
 
       return stream;
     } catch (err) {
-      // Не блокируем вход в комнату из-за ошибки доступа к медиа
-      // Просто логируем ошибку и продолжаем без медиа
-      console.warn('Не удалось получить доступ к медиа устройствам:', err.message);
-      // Не устанавливаем ошибку и не бросаем исключение - пользователь может войти без медиа
+
       return null;
     }
   }, [isBrowser]);
 
-  // === API методы ===
-
-  // Создать комнату (через REST API) — обёртка для удобства
   const createRoom = useCallback(async (options = {}) => {
     try {
       const { roomAPI } = await import('@/utils/api');
@@ -888,116 +846,191 @@ export const useRoomProtocol = (initialRoomId = null) => {
     }
   }, []);
 
-  // Войти в комнату (через REST API + WebSocket подписка)
   const joinRoom = useCallback(async (roomId, requestMedia = true, initialAudio = true, initialVideo = true) => {
+    const startTime = Date.now();
+    let websocketSubscriptionEstablished = false; 
+    
     try {
-      // Сбрасываем seq для новой комнаты
+
       lastSeqRef.current = 0;
       eventQueueRef.current = [];
       eventQueueMapRef.current.clear();
       roomIdRef.current = roomId;
+
+      if (!client) {
+
+        const clientWaitStartTime = Date.now();
+        const maxClientWaitTime = 10000;
+        await new Promise((resolve, reject) => {
+          const checkClientInterval = setInterval(() => {
+
+            if (client) {
+              clearInterval(checkClientInterval);
+              resolve();
+            } else if (Date.now() - clientWaitStartTime >= maxClientWaitTime) {
+              clearInterval(checkClientInterval);
+              resolve();
+            }
+          }, 100);
+        });
+      }
+
+      if (!client) {
+
+      }
       
-      // 1. Подписываемся на WebSocket события комнаты (быстро)
-      ensureUserQueueSubscription();
-      subscribeToRoom(roomId);
-      
-      // 2. Устанавливаем isInRoom сразу после подписки, чтобы показать интерфейс раньше
-      // Данные участников придут через WebSocket события или REST API
+      if (!connected && client) {
+        
+        const waitStartTime = Date.now();
+        const maxWaitTime = 15000; 
+
+        await new Promise((resolve, reject) => {
+          const checkInterval = setInterval(() => {
+            
+            if (connectedRef.current) {
+              clearInterval(checkInterval);
+              resolve();
+            } else if (Date.now() - waitStartTime >= maxWaitTime) {
+              clearInterval(checkInterval);
+              resolve();
+            }
+          }, 100);
+        });
+      } else if (!client) {
+        
+      }
+
+      if (client) {
+        
+        ensureUserQueueSubscription();
+        
+        subscribeToRoom(roomId);
+
+        websocketSubscriptionEstablished = true;
+      } else {
+      }
+
+      const beforeSetInRoom = Date.now();
       setIsInRoom(true);
       
-      // 3. Параллельно запускаем REST API и запрос медиа
+      setTimeout(() => {
+        setIsInRoom(true); 
+      }, 0);
+
       const { roomAPI } = await import('@/utils/api');
-      
-      // Запускаем REST API и запрос медиа параллельно для ускорения
+
+      const shouldRequestMedia = requestMedia && (initialAudio || initialVideo);
+
+      const finalAudio = requestMedia && !initialAudio && !initialVideo ? true : initialAudio;
+      const finalVideo = requestMedia && !initialAudio && !initialVideo ? false : initialVideo;
+
+      const apiStartTime = Date.now();
       const [roomData, mediaResult] = await Promise.allSettled([
-        roomAPI.joinRoom(roomId),
-        requestMedia ? startLocalStream(initialAudio, initialVideo).catch(err => {
-          // Не устанавливаем ошибку - пользователь может войти без медиа
-          console.warn('Не удалось получить медиа при входе в комнату:', err.message);
-          return null; // Не бросаем ошибку — пользователь уже в комнате
-        }) : Promise.resolve(null)
+        (async () => {
+          
+          const result = await roomAPI.joinRoom(roomId);
+          return result;
+        })(),
+        (requestMedia && (finalAudio || finalVideo)) ? (async () => {
+          
+          try {
+            const stream = await startLocalStream(finalAudio, finalVideo);
+            return stream;
+          } catch (err) {
+            return null;
+          }
+        })() : (() => {
+          
+          return Promise.resolve(null);
+        })()
       ]);
       
-      // Обрабатываем результат REST API
       if (roomData.status === 'fulfilled' && roomData.value) {
         const roomDataValue = roomData.value;
+
         setRoom(roomDataValue);
-        
-        // Обновляем участников только если их еще нет (они могут прийти через WebSocket)
+
         setParticipants(prev => {
           if (prev.length === 0 && roomDataValue.participants) {
+            
             return roomDataValue.participants;
           }
+          
           return prev;
         });
-        
-        // Определяем роль
+
         const myParticipant = roomDataValue.participants?.find(p => p.user?.id === myUserId);
         if (myParticipant) {
+          
           setMyRole(myParticipant.role || PARTICIPANT_ROLE.PARTICIPANT);
         }
+
+        const otherParticipants = roomDataValue.participants?.filter(p => p.user?.id !== myUserId && p.isActive !== false) || [];
         
-        // Устанавливаем WebRTC соединения с другими участниками (без задержки)
-        roomDataValue.participants?.forEach(p => {
-          if (p.user?.id !== myUserId && p.isActive !== false) {
-            // Используем requestAnimationFrame для неблокирующего выполнения
-            requestAnimationFrame(() => {
-              sendOffer(p.user.id);
-            });
-          }
+        otherParticipants.forEach(p => {
+          requestAnimationFrame(() => {
+            
+            sendOffer(p.user.id);
+          });
         });
+
+        setIsInRoom(true);
         
         return roomDataValue;
       } else if (roomData.status === 'rejected') {
-        // Если REST API не удался, но WebSocket подписка работает,
-        // участники могут прийти через WebSocket события
+
         const errorMsg = roomData.reason?.message || 'Не удалось получить данные комнаты';
-        console.warn('REST API joinRoom failed, but WebSocket subscription is active:', errorMsg);
-        // Не бросаем ошибку, так как WebSocket подписка уже работает
-        // Участники придут через ROOM_JOINED событие
+
+        setIsInRoom(true);
+      } else {
+
+        setIsInRoom(true);
       }
       
+      setIsInRoom(true);
       return null;
     } catch (err) {
-      // Не устанавливаем ошибку - просто логируем и откатываем состояние
-      console.error('Ошибка входа в комнату:', err.message);
-      setIsInRoom(false); // Откатываем состояние при ошибке
-      // Не бросаем ошибку - пусть пользователь попробует снова
-    }
-  }, [subscribeToRoom, myUserId, sendOffer, startLocalStream, ensureUserQueueSubscription]);
+      if (!websocketSubscriptionEstablished) {
+        setIsInRoom(false);
+      } else {
 
-  // Выйти из комнаты (через REST API)
+        setIsInRoom(true);
+      }
+
+      throw err;
+    }
+  }, [subscribeToRoom, myUserId, sendOffer, startLocalStream, ensureUserQueueSubscription, client, connected]);
+
   const leaveRoom = useCallback(async () => {
     if (roomIdRef.current) {
       try {
         const { roomAPI } = await import('@/utils/api');
         await roomAPI.leaveRoom(roomIdRef.current);
       } catch (err) {
-        console.error('Error leaving room:', err);
+        
       }
     }
     cleanup();
   }, [cleanup]);
 
-  // Завершить комнату (через REST API)
   const endRoom = useCallback(async () => {
     if (roomIdRef.current) {
       try {
         const { roomAPI } = await import('@/utils/api');
         await roomAPI.endRoom(roomIdRef.current);
       } catch (err) {
-        console.error('Error ending room:', err);
+        
       }
     }
     cleanup();
   }, [cleanup]);
 
-  // Переключить аудио
   const toggleAudio = useCallback(async () => {
-    const newEnabled = !audioEnabled;
     
-    // Если стрима нет, но хотим включить - создаем стрим
+    const newEnabled = !audioEnabled;
+
     if (!localStreamRef.current && newEnabled) {
+      
       try {
         const stream = await startLocalStream(true, videoEnabled);
         if (stream) {
@@ -1010,25 +1043,35 @@ export const useRoomProtocol = (initialRoomId = null) => {
           }
         }
       } catch (err) {
-        // Не показываем ошибку пользователю - просто логируем
-        console.warn('Не удалось включить микрофон:', err.message);
+
       }
       return;
     }
-    
-    // Если стрима нет и хотим выключить - ничего не делаем
+
     if (!localStreamRef.current) {
+      if (!newEnabled) {
+        
+        setAudioEnabled(false);
+        if (roomIdRef.current) {
+          sendSignal({
+            type: SIGNAL_TYPES.ROOM_MUTE_AUDIO,
+            roomId: roomIdRef.current,
+          });
+        }
+      }
       return;
     }
-    
-    // Стрим есть - переключаем треки
+
     const audioTracks = localStreamRef.current.getAudioTracks();
     if (audioTracks.length > 0) {
+      
       audioTracks.forEach(track => {
         track.enabled = newEnabled;
       });
+      
+      setAudioEnabled(newEnabled);
     } else if (newEnabled) {
-      // Треков нет, но хотим включить - добавляем трек
+      
       try {
         const audioStream = await navigator.mediaDevices.getUserMedia({
           audio: { echoCancellation: true, noiseSuppression: true },
@@ -1037,19 +1080,22 @@ export const useRoomProtocol = (initialRoomId = null) => {
         audioStream.getAudioTracks().forEach(track => {
           localStreamRef.current.addTrack(track);
         });
-        // Обновляем все peer connections
+        
         peerConnectionsRef.current.forEach((pc) => {
           audioStream.getAudioTracks().forEach(track => {
             pc.addTrack(track, localStreamRef.current);
           });
         });
+        
+        setAudioEnabled(true);
       } catch (err) {
-        console.warn('Не удалось включить микрофон');
+        
         return;
       }
+    } else {
+      
+      setAudioEnabled(false);
     }
-    
-    setAudioEnabled(newEnabled);
     
     if (roomIdRef.current) {
       sendSignal({
@@ -1059,12 +1105,12 @@ export const useRoomProtocol = (initialRoomId = null) => {
     }
   }, [audioEnabled, videoEnabled, sendSignal, startLocalStream]);
 
-  // Переключить видео
   const toggleVideo = useCallback(async () => {
-    const newEnabled = !videoEnabled;
     
-    // Если стрима нет, но хотим включить - создаем стрим
+    const newEnabled = !videoEnabled;
+
     if (!localStreamRef.current && newEnabled) {
+      
       try {
         const stream = await startLocalStream(audioEnabled, true);
         if (stream) {
@@ -1077,25 +1123,35 @@ export const useRoomProtocol = (initialRoomId = null) => {
           }
         }
       } catch (err) {
-        // Не показываем ошибку пользователю - просто логируем
-        console.warn('Не удалось включить камеру:', err.message);
+
       }
       return;
     }
-    
-    // Если стрима нет и хотим выключить - ничего не делаем
+
     if (!localStreamRef.current) {
+      if (!newEnabled) {
+        
+        setVideoEnabled(false);
+        if (roomIdRef.current) {
+          sendSignal({
+            type: SIGNAL_TYPES.ROOM_MUTE_VIDEO,
+            roomId: roomIdRef.current,
+          });
+        }
+      }
       return;
     }
-    
-    // Стрим есть - переключаем треки
+
     const videoTracks = localStreamRef.current.getVideoTracks();
     if (videoTracks.length > 0) {
+      
       videoTracks.forEach(track => {
         track.enabled = newEnabled;
       });
+      
+      setVideoEnabled(newEnabled);
     } else if (newEnabled) {
-      // Треков нет, но хотим включить - добавляем трек
+      
       try {
         const videoStream = await navigator.mediaDevices.getUserMedia({
           video: { width: { ideal: 1280 }, height: { ideal: 720 } },
@@ -1104,20 +1160,23 @@ export const useRoomProtocol = (initialRoomId = null) => {
         videoStream.getVideoTracks().forEach(track => {
           localStreamRef.current.addTrack(track);
         });
-        // Обновляем все peer connections
+        
         peerConnectionsRef.current.forEach((pc) => {
           videoStream.getVideoTracks().forEach(track => {
             pc.addTrack(track, localStreamRef.current);
           });
         });
+        
+        setVideoEnabled(true);
       } catch (err) {
-        console.warn('Не удалось включить камеру');
+        
         return;
       }
+    } else {
+      
+      setVideoEnabled(false);
     }
-    
-    setVideoEnabled(newEnabled);
-    
+
     if (roomIdRef.current) {
       sendSignal({
         type: newEnabled ? SIGNAL_TYPES.ROOM_UNMUTE_VIDEO : SIGNAL_TYPES.ROOM_MUTE_VIDEO,
@@ -1126,22 +1185,19 @@ export const useRoomProtocol = (initialRoomId = null) => {
     }
   }, [videoEnabled, audioEnabled, sendSignal, startLocalStream]);
 
-  // Поднять руку (оптимистичное обновление)
   const raiseHand = useCallback(() => {
     if (!roomIdRef.current) return;
     
     const newHandRaised = !handRaised;
-    // Мгновенно обновляем UI
-    setHandRaised(newHandRaised);
     
-    // Отправляем сигнал серверу
+    setHandRaised(newHandRaised);
+
     sendSignal({
       type: newHandRaised ? SIGNAL_TYPES.ROOM_RAISE_HAND : SIGNAL_TYPES.ROOM_LOWER_HAND,
       roomId: roomIdRef.current,
     });
   }, [handRaised, sendSignal]);
 
-  // Демонстрация экрана (оптимистичное обновление)
   const startScreenShare = useCallback(async () => {
     if (!isBrowser || !navigator.mediaDevices?.getDisplayMedia) {
       setError('Демонстрация экрана не поддерживается');
@@ -1156,29 +1212,25 @@ export const useRoomProtocol = (initialRoomId = null) => {
 
       screenStreamRef.current = stream;
       setScreenStream(stream);
-      // Мгновенно обновляем UI
-      setIsScreenSharing(true);
       
-      // Уведомляем сервер
+      setIsScreenSharing(true);
+
       sendSignal({
         type: SIGNAL_TYPES.ROOM_START_SCREEN_SHARE,
         roomId: roomIdRef.current,
       });
 
-      // При остановке через браузер
       stream.getVideoTracks()[0].onended = () => {
         stopScreenShare();
       };
 
-      // Добавляем в peer connections для передачи другим участникам
-      // WebRTC автоматически вызовет onnegotiationneeded для пересоздания offer/answer
       peerConnectionsRef.current.forEach((pc) => {
         if (pc.signalingState === 'stable' || pc.signalingState === 'have-local-offer') {
           stream.getTracks().forEach(track => {
             try {
               pc.addTrack(track, stream);
             } catch (err) {
-              console.error('Error adding screen share track to peer connection:', err);
+              
             }
           });
         }
@@ -1206,7 +1258,6 @@ export const useRoomProtocol = (initialRoomId = null) => {
     }
   }, [sendSignal]);
 
-  // Управление участниками (host/co-host)
   const promoteParticipant = useCallback((targetUserId) => {
     if (!roomIdRef.current) return;
     sendSignal({
@@ -1243,24 +1294,21 @@ export const useRoomProtocol = (initialRoomId = null) => {
     });
   }, [sendSignal]);
 
-  // Cleanup при размонтировании
   useEffect(() => {
     return () => cleanup();
   }, [cleanup]);
 
-  // Права
   const isHost = myRole === PARTICIPANT_ROLE.HOST;
   const isCoHost = myRole === PARTICIPANT_ROLE.CO_HOST;
   const canManageParticipants = isHost || isCoHost;
 
   return {
-    // Состояние
+    
     room,
     participants,
     isInRoom,
     error,
-    
-    // Медиа
+
     localStream,
     remoteStreams,
     screenStream,
@@ -1268,36 +1316,30 @@ export const useRoomProtocol = (initialRoomId = null) => {
     videoEnabled,
     isScreenSharing,
     handRaised,
-    
-    // Роль
+
     myRole,
     isHost,
     isCoHost,
     canManageParticipants,
-    
-    // Управление комнатой
+
     createRoom,
     joinRoom,
     leaveRoom,
     endRoom,
-    
-    // Медиа
+
     startLocalStream,
     toggleAudio,
     toggleVideo,
-    
-    // Интерактив
+
     raiseHand,
     startScreenShare,
     stopScreenShare,
-    
-    // Управление участниками
+
     promoteParticipant,
     demoteParticipant,
     muteParticipant,
     kickParticipant,
-    
-    // Утилиты
+
     sendOffer,
     clearError: () => setError(null),
   };

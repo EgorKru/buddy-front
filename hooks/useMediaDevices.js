@@ -50,8 +50,6 @@ export function useMediaDevices() {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
 
-      // Запрашиваем доступ к устройствам (нужно для получения разрешения),
-      // но затем выключим треки если они не нужны
       const constraints = {
         video: {
           deviceId: selectedCamera ? { exact: selectedCamera } : undefined,
@@ -67,8 +65,7 @@ export function useMediaDevices() {
       };
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      
-      // Выключаем треки если они не нужны
+
       stream.getVideoTracks().forEach(track => {
         track.enabled = video;
       });
@@ -111,8 +108,7 @@ export function useMediaDevices() {
 
   const toggleAudio = useCallback(async () => {
     const newAudioEnabled = !audioEnabled;
-    
-    // Если хотим выключить - просто выключаем треки
+
     if (!newAudioEnabled) {
       if (localStream) {
         const audioTracks = localStream.getAudioTracks();
@@ -123,10 +119,9 @@ export function useMediaDevices() {
       setAudioEnabled(false);
       return;
     }
-    
-    // Если хотим включить - запрашиваем доступ
+
     if (!localStream) {
-      // Стрима нет - создаем новый с аудио
+      
       try {
         setIsLoading(true);
         setError(null);
@@ -159,17 +154,16 @@ export function useMediaDevices() {
       }
       return;
     }
-    
-    // Стрим есть - проверяем треки
+
     const audioTracks = localStream.getAudioTracks();
     if (audioTracks.length > 0) {
-      // Треки есть - просто включаем
+      
       audioTracks.forEach(track => {
         track.enabled = true;
       });
       setAudioEnabled(true);
     } else {
-      // Треков нет - добавляем новый
+      
       try {
         setIsLoading(true);
         setError(null);
@@ -199,24 +193,22 @@ export function useMediaDevices() {
 
   const toggleVideo = useCallback(async () => {
     const newVideoEnabled = !videoEnabled;
-    
-    // Если хотим выключить - просто выключаем треки
+
     if (!newVideoEnabled) {
       if (localStream) {
         const videoTracks = localStream.getVideoTracks();
         videoTracks.forEach(track => {
           track.enabled = false;
         });
-        // Обновляем стрим, чтобы React перерендерил компонент
+        
         setLocalStream(new MediaStream(localStream.getTracks()));
       }
       setVideoEnabled(false);
       return;
     }
-    
-    // Если хотим включить - запрашиваем доступ
+
     if (!localStream) {
-      // Стрима нет - создаем новый с видео
+      
       try {
         setIsLoading(true);
         setError(null);
@@ -250,19 +242,18 @@ export function useMediaDevices() {
       }
       return;
     }
-    
-    // Стрим есть - проверяем треки
+
     const videoTracks = localStream.getVideoTracks();
     if (videoTracks.length > 0) {
-      // Треки есть - просто включаем
+      
       videoTracks.forEach(track => {
         track.enabled = true;
       });
       setVideoEnabled(true);
-      // Обновляем стрим, чтобы React перерендерил компонент
+      
       setLocalStream(new MediaStream(localStream.getTracks()));
     } else {
-      // Треков нет - добавляем новый
+      
       try {
         setIsLoading(true);
         setError(null);
@@ -281,7 +272,7 @@ export function useMediaDevices() {
           localStream.addTrack(videoTrack);
           streamRef.current = localStream;
           setVideoEnabled(true);
-          // Обновляем стрим, чтобы React перерендерил компонент
+          
           setLocalStream(new MediaStream(localStream.getTracks()));
         }
       } catch (err) {
@@ -346,7 +337,6 @@ export function useMediaDevices() {
     return streamRef.current;
   }, []);
 
-  // Анализ уровня звука микрофона
   const startAudioAnalysis = useCallback((stream) => {
     try {
       if (audioContextRef.current) {
@@ -371,19 +361,16 @@ export function useMediaDevices() {
         if (!analyserRef.current) return;
         
         analyserRef.current.getByteFrequencyData(dataArray);
-        
-        // Вычисляем средний уровень громкости
+
         let sum = 0;
         for (let i = 0; i < dataArray.length; i++) {
           sum += dataArray[i];
         }
         const average = sum / dataArray.length;
-        
-        // Нормализуем до 0-100
+
         const normalizedLevel = Math.min(100, (average / 128) * 100);
         setAudioLevel(normalizedLevel);
-        
-        // Если уровень выше порога, значит микрофон работает
+
         if (normalizedLevel > 5 && !peakDetected) {
           peakDetected = true;
           setIsMicWorking(true);
@@ -394,7 +381,7 @@ export function useMediaDevices() {
       
       checkAudioLevel();
     } catch (err) {
-      console.error('Ошибка анализа аудио:', err);
+      
     }
   }, []);
 
@@ -412,7 +399,6 @@ export function useMediaDevices() {
     setIsMicWorking(false);
   }, []);
 
-  // Запускаем анализ при получении стрима
   useEffect(() => {
     if (localStream && audioEnabled) {
       const audioTracks = localStream.getAudioTracks();

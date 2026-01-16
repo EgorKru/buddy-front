@@ -90,7 +90,7 @@ export const useChatRealtime = (chatId) => {
         localPtsRef.current.set(chatIdStr, update.pts);
       }
     } catch (error) {
-      console.error('[Gap Recovery] Failed to recover updates:', error);
+      
     }
   }, [upsertMessage, updateMessage, removeMessage]);
 
@@ -276,8 +276,7 @@ export const useChatRealtime = (chatId) => {
         }
 
         const dto = data;
-        
-        // Обработка системных сообщений (включая сообщения о звонках)
+
         if (dto.type === 'SYSTEM') {
           if (Number(dto.chatId) !== Number(chatId)) return;
           
@@ -435,5 +434,4 @@ export const useChatRealtime = (chatId) => {
     };
   }, [chatId, client, connected, upsertMessage, updateMessage, markChatAsRead, replaceOptimistic, messageIdsByChatId, messagesById]);
 };
-
 

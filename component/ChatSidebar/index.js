@@ -102,11 +102,11 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
   });
 
   const handleChatClick = (chatId, e) => {
-    // Предотвращаем стандартное поведение, если используется Link
+    
     if (e) {
       e.preventDefault();
     }
-    // Используем router.push с shallow: false для клиентской навигации
+    
     router.push(`/chat/${chatId}`, undefined, { shallow: false });
     if (onClose) onClose();
   };

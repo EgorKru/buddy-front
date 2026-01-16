@@ -11,10 +11,6 @@ import {
 } from '../constants/chat';
 import { useInfiniteScroll } from './useInfiniteScroll';
 
-/**
- * Хук для управления скроллом в чате
- * Инкапсулирует всю логику сохранения/восстановления позиции скролла
- */
 export const useScrollManagement = ({
   chatId,
   messages,
@@ -26,7 +22,7 @@ export const useScrollManagement = ({
   onLoadOlderMessages,
   setShowScrollToBottom
 }) => {
-  // Refs для управления состоянием скролла
+  
   const scrollPositionSavedRef = useRef(false);
   const shouldRestorePositionRef = useRef(true);
   const userScrolledToBottomRef = useRef(false);
@@ -43,23 +39,14 @@ export const useScrollManagement = ({
   const [unreadCount, setUnreadCount] = useState(0);
   const unreadCountUpdateTimeoutRef = useRef(null);
   const lastReadMessageIdRef = useRef(null);
-  
-  // Используем хук для бесконечной прокрутки
-  // Создаем функцию для получения актуального значения isRestoringScroll
+
   const getIsRestoringScroll = () => isRestoringScrollRef.current;
-  
-  /**
-   * Проверяет, находится ли пользователь внизу контейнера
-   */
+
   const checkIsAtBottom = useCallback((threshold = CHECK_BOTTOM_DEFAULT_THRESHOLD) => {
     if (!messagesContainerRef.current) return false;
     return isAtBottom(messagesContainerRef.current, threshold);
   }, [messagesContainerRef]);
-  
-  /**
-   * Обновляет счетчик непрочитанных сообщений ниже видимой области
-   * Считает только те сообщения, которые появились после последнего прочитанного
-   */
+
   const updateUnreadCount = useCallback(() => {
     if (!messagesContainerRef.current || !messages || messages.length === 0) {
       setUnreadCount(0);
@@ -68,7 +55,7 @@ export const useScrollManagement = ({
     
     const isAtBottomNow = checkIsAtBottom(50);
     if (isAtBottomNow) {
-      // Пользователь внизу - обновляем последнее прочитанное сообщение
+      
       const sortedMessages = [...messages].sort((a, b) => {
         const timeA = new Date(a.createdAt || 0).getTime();
         const timeB = new Date(b.createdAt || 0).getTime();
@@ -81,16 +68,14 @@ export const useScrollManagement = ({
       setUnreadCount(0);
       return;
     }
-    
-    // Пользователь не внизу - считаем только новые сообщения
+
     if (!lastReadMessageIdRef.current) {
-      // Если еще не было прочитанного сообщения, считаем все ниже видимой области
+      
       const count = countMessagesBelowViewport(messagesContainerRef.current);
       setUnreadCount(count);
       return;
     }
-    
-    // Считаем только сообщения, которые появились после последнего прочитанного
+
     const containerRect = messagesContainerRef.current.getBoundingClientRect();
     const viewportBottom = containerRect.bottom;
     const messageElements = messagesContainerRef.current.querySelectorAll('[data-message-id]');
@@ -106,7 +91,7 @@ export const useScrollManagement = ({
       
       if (foundLastRead) {
         const msgRect = msgEl.getBoundingClientRect();
-        // Если сообщение полностью ниже видимой области или это новое сообщение после последнего прочитанного
+        
         if (msgRect.top > viewportBottom) {
           count++;
         }
@@ -129,13 +114,11 @@ export const useScrollManagement = ({
     updateSentinelOnScroll: true
   });
 
-  const loadMoreObserverRef = useRef(null); // Оставляем для обратной совместимости, если нужно
+  const loadMoreObserverRef = useRef(null); 
 
-  // Инициализация: при смене чата всегда скроллим вниз (как в Telegram Web)
   useEffect(() => {
     if (!chatId) return;
-    
-    // При смене чата всегда сбрасываем флаги и скроллим вниз
+
     scrollPositionSavedRef.current = false;
     userScrolledToBottomRef.current = false;
     restoreAttemptsRef.current = 0;
@@ -143,9 +126,6 @@ export const useScrollManagement = ({
     lastReadMessageIdRef.current = null;
   }, [chatId]);
 
-  /**
-   * Сохраняет текущую позицию скролла
-   */
   const saveScrollPosition = useCallback((force = false) => {
     if (!messagesContainerRef.current || !chatId) return;
     
@@ -153,8 +133,7 @@ export const useScrollManagement = ({
     const scrollTop = container.scrollTop;
     const scrollHeight = container.scrollHeight;
     const isBottom = checkIsAtBottom(CHECK_BOTTOM_STRICT_THRESHOLD);
-    
-    // Находим первое видимое сообщение для точного восстановления
+
     let messageId = null;
     if (!isBottom) {
       const firstVisible = findFirstVisibleMessage(container);
@@ -172,7 +151,7 @@ export const useScrollManagement = ({
     
     if (isBottom) {
       userScrolledToBottomRef.current = true;
-      // Обновляем последнее прочитанное сообщение при скролле вниз
+      
       if (messages && messages.length > 0) {
         const sortedMessages = [...messages].sort((a, b) => {
           const timeA = new Date(a.createdAt || 0).getTime();
@@ -187,16 +166,12 @@ export const useScrollManagement = ({
     }
   }, [chatId, checkIsAtBottom, messages]);
 
-  /**
-   * Скроллит контейнер вниз
-   */
   const scrollToBottom = useCallback((behavior = 'auto') => {
     if (!messagesContainerRef.current) return;
     
     const container = messagesContainerRef.current;
     const targetScrollTop = container.scrollHeight;
-    
-    // Убеждаемся, что behavior - это валидная строка
+
     const validBehavior = (typeof behavior === 'string' && (behavior === 'auto' || behavior === 'smooth')) 
       ? behavior 
       : 'auto';
@@ -209,8 +184,7 @@ export const useScrollManagement = ({
     lastScrollTopRef.current = targetScrollTop;
     userScrolledToBottomRef.current = true;
     isUserScrollingUpRef.current = false;
-    
-    // Обновляем последнее прочитанное сообщение при скролле вниз
+
     if (messages && messages.length > 0) {
       const sortedMessages = [...messages].sort((a, b) => {
         const timeA = new Date(a.createdAt || 0).getTime();
@@ -224,15 +198,11 @@ export const useScrollManagement = ({
     setUnreadCount(0);
   }, [messages]);
 
-  /**
-   * Восстанавливает позицию скролла
-   */
   const restoreScrollPosition = useCallback(() => {
     if (!messagesContainerRef.current || !chatId || messages.length === 0) return;
     
     const saved = loadScrollPositionFromStorage(chatId);
-    
-    // Если не нужно восстанавливать позицию - скроллим вниз
+
     if (!shouldRestorePositionRef.current) {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -242,8 +212,7 @@ export const useScrollManagement = ({
       });
       return;
     }
-    
-    // Если нет сохраненной позиции - скроллим вниз
+
     if (!saved) {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -254,21 +223,18 @@ export const useScrollManagement = ({
       });
       return;
     }
-    
-    // Восстанавливаем сохраненную позицию
+
     try {
       const { scrollTop, scrollHeight, isBottom, messageId } = saved;
       const container = messagesContainerRef.current;
-      
-      // Если сохранение старое - скроллим вниз
+
       if (!saved.isRecent) {
         scrollToBottom('auto');
         scrollPositionSavedRef.current = true;
         shouldRestorePositionRef.current = false;
         return;
       }
-      
-      // Если пользователь был внизу - скроллим вниз
+
       if (isBottom) {
         setTimeout(() => {
           scrollToBottom('auto');
@@ -277,8 +243,7 @@ export const useScrollManagement = ({
         }, RESTORE_POSITION_DELAY);
         return;
       }
-      
-      // Если есть messageId - пытаемся найти сообщение
+
       if (messageId) {
         const targetMessage = document.querySelector(`[data-message-id="${messageId}"]`);
         if (targetMessage) {
@@ -289,8 +254,7 @@ export const useScrollManagement = ({
           return;
         }
       }
-      
-      // Восстанавливаем позицию скролла
+
       isRestoringScrollRef.current = true;
       const attemptRestore = () => {
         if (container.scrollHeight >= scrollHeight) {
@@ -337,8 +301,7 @@ export const useScrollManagement = ({
           scrollPositionSavedRef.current = true;
           userScrolledToBottomRef.current = true;
           isUserScrollingUpRef.current = false;
-          
-          // Обновляем последнее прочитанное сообщение
+
           if (messages && messages.length > 0) {
             const sortedMessages = [...messages].sort((a, b) => {
               const timeA = new Date(a.createdAt || 0).getTime();
@@ -355,7 +318,6 @@ export const useScrollManagement = ({
     }
   }, [messages.length, isLoadingInitial, messages]);
 
-  // useEffect для восстановления позиции после загрузки
   useEffect(() => {
     if (messages.length > 0 && !scrollPositionSavedRef.current && messagesContainerRef.current) {
       if (!isLoadingInitial) {
@@ -364,9 +326,6 @@ export const useScrollManagement = ({
     }
   }, [messages.length, isLoadingInitial, restoreScrollPosition]);
 
-  // Intersection Observer логика теперь в useInfiniteScroll
-
-  // Автоскролл при новых сообщениях
   useEffect(() => {
     if (!messagesContainerRef.current || messages.length === 0) return;
     if (!scrollPositionSavedRef.current) return;
@@ -398,8 +357,7 @@ export const useScrollManagement = ({
     
     scrollHeightBeforeMessageRef.current = currentScrollHeight;
   }, [messages.length, checkIsAtBottom, scrollToBottom, updateUnreadCount]);
-  
-  // Обновление счетчика при скролле и изменении сообщений
+
   useEffect(() => {
     if (!messagesContainerRef.current) return;
     
@@ -416,14 +374,12 @@ export const useScrollManagement = ({
     };
     
     container.addEventListener('scroll', handleScroll, { passive: true });
-    
-    // Обновляем счетчик при изменении размера контейнера
+
     const resizeObserver = new ResizeObserver(() => {
       updateUnreadCount();
     });
     resizeObserver.observe(container);
-    
-    // Первоначальное обновление
+
     updateUnreadCount();
     
     return () => {
@@ -436,16 +392,14 @@ export const useScrollManagement = ({
   }, [updateUnreadCount, messages.length]);
 
   return {
-    // Функции
+    
     saveScrollPosition,
     restoreScrollPosition,
     scrollToBottom,
     checkIsAtBottom,
-    
-    // Состояние
+
     unreadCount,
-    
-    // Refs для внешнего использования
+
     scrollPositionSavedRef,
     userScrolledToBottomRef,
     restoreAttemptsRef,

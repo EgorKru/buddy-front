@@ -616,8 +616,7 @@ export const MessagingProvider = ({ children }) => {
       const existingMessages = existingIds
         .map(id => state.messagesById[String(id)])
         .filter(Boolean);
-      
-      // Проверяем, есть ли уже сообщение с таким ID
+
       const isDuplicate = existingMessages.some(existing => {
         if (!existing || !existing.id) return false;
         if (String(existing.id) === mid) return true;
@@ -793,13 +792,11 @@ export const MessagingProvider = ({ children }) => {
     if (!isAuthenticated()) return;
     if (!client || !connected || !client.connected || !client.active) return;
 
-    // Собираем все чаты: из chatOrder и активный чат
     const chatIds = new Set(state.chatOrder.map(String));
     if (state.activeChatId) {
       chatIds.add(String(state.activeChatId));
     }
 
-    // Отписываемся от чатов, которых больше нет
     for (const [cid, sub] of readSubsRef.current.entries()) {
       if (!chatIds.has(cid)) {
         safeUnsubscribe(sub);
@@ -807,7 +804,6 @@ export const MessagingProvider = ({ children }) => {
       }
     }
 
-    // Подписываемся на новые чаты
     for (const cid of chatIds) {
       if (readSubsRef.current.has(cid)) continue;
       try {
@@ -818,7 +814,7 @@ export const MessagingProvider = ({ children }) => {
         });
         readSubsRef.current.set(cid, sub);
       } catch (e) {
-        console.error('Failed to subscribe to read receipts for chat', cid, e);
+        
       }
     }
 
@@ -953,5 +949,4 @@ export const MessagingProvider = ({ children }) => {
     </MessagingContext.Provider>
   );
 };
-
 

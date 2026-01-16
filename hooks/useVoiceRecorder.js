@@ -5,9 +5,9 @@ export const useVoiceRecorder = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [audioBlob, setAudioBlob] = useState(null);
-  const [previewBlob, setPreviewBlob] = useState(null); // Промежуточный blob для предпросмотра
+  const [previewBlob, setPreviewBlob] = useState(null); 
   const [error, setError] = useState(null);
-  const [audioLevel, setAudioLevel] = useState(0); // Уровень звука от 0 до 100
+  const [audioLevel, setAudioLevel] = useState(0); 
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -29,7 +29,6 @@ export const useVoiceRecorder = () => {
         mimeType: 'audio/webm;codecs=opus',
       });
 
-      // Создаем AudioContext для анализа уровня звука
       const audioContext = new (window.AudioContext || window.webkitAudioContext)();
       const analyser = audioContext.createAnalyser();
       const microphone = audioContext.createMediaStreamSource(stream);
@@ -41,7 +40,6 @@ export const useVoiceRecorder = () => {
       audioContextRef.current = audioContext;
       analyserRef.current = analyser;
 
-      // Функция для обновления уровня звука
       const updateAudioLevel = () => {
         if (!analyserRef.current) {
           return;
@@ -49,8 +47,7 @@ export const useVoiceRecorder = () => {
 
         const dataArray = new Uint8Array(analyser.frequencyBinCount);
         analyser.getByteFrequencyData(dataArray);
-        
-        // Вычисляем средний уровень звука
+
         const average = dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length;
         const normalizedLevel = Math.min(100, (average / 255) * 100);
         
@@ -85,8 +82,7 @@ export const useVoiceRecorder = () => {
       };
 
       mediaRecorderRef.current = mediaRecorder;
-      // Используем timeslice для более частого получения данных (каждые 100ms)
-      // Это поможет при паузе получить все данные
+
       mediaRecorder.start(100);
       setIsRecording(true);
       setIsPaused(false);
@@ -96,7 +92,6 @@ export const useVoiceRecorder = () => {
         setRecordingTime(prev => prev + 1);
       }, 1000);
 
-      // Запускаем обновление уровня звука
       updateAudioLevel();
     } catch (err) {
       setError('Не удалось получить доступ к микрофону');
@@ -106,7 +101,7 @@ export const useVoiceRecorder = () => {
 
   const pauseRecording = useCallback(() => {
     if (mediaRecorderRef.current && isRecording && !isPaused) {
-      // Запрашиваем все накопленные данные перед паузой
+      
       if (mediaRecorderRef.current.state === 'recording') {
         mediaRecorderRef.current.requestData();
       }
@@ -122,9 +117,7 @@ export const useVoiceRecorder = () => {
         animationFrameRef.current = null;
       }
       setAudioLevel(0);
-      
-      // Создаем preview blob из уже записанных чанков для предпросмотра
-      // Используем небольшую задержку, чтобы убедиться, что все данные получены
+
       setTimeout(() => {
         if (audioChunksRef.current.length > 0) {
           const preview = new Blob(audioChunksRef.current, { type: 'audio/webm' });
@@ -138,12 +131,11 @@ export const useVoiceRecorder = () => {
     if (mediaRecorderRef.current && isRecording && isPaused) {
       mediaRecorderRef.current.resume();
       setIsPaused(false);
-      setPreviewBlob(null); // Очищаем preview при возобновлении
+      setPreviewBlob(null); 
       timerRef.current = setInterval(() => {
         setRecordingTime(prev => prev + 1);
       }, 1000);
-      
-      // Возобновляем обновление уровня звука
+
       const updateAudioLevel = () => {
         if (!analyserRef.current) {
           return;
@@ -178,9 +170,9 @@ export const useVoiceRecorder = () => {
 
   const cancelRecording = useCallback(() => {
     if (mediaRecorderRef.current && isRecording) {
-      // Останавливаем запись, но не вызываем onstop, чтобы не создавать audioBlob
+      
       mediaRecorderRef.current.stop();
-      // Отключаем обработчик onstop, чтобы audioBlob не был установлен
+      
       mediaRecorderRef.current.onstop = null;
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
@@ -206,7 +198,7 @@ export const useVoiceRecorder = () => {
       }
       setAudioLevel(0);
     } else if (audioBlob) {
-      // Если запись уже остановлена, но audioBlob есть, просто очищаем его
+      
       setAudioBlob(null);
       setPreviewBlob(null);
       audioChunksRef.current = [];
@@ -247,9 +239,9 @@ export const useVoiceRecorder = () => {
     isPaused,
     recordingTime,
     audioBlob,
-    previewBlob, // Промежуточный blob для предпросмотра при паузе
+    previewBlob, 
     error,
-    audioLevel, // Уровень звука от 0 до 100
+    audioLevel, 
     startRecording,
     pauseRecording,
     resumeRecording,

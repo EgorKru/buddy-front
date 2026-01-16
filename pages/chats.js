@@ -59,15 +59,13 @@ export default function Chats() {
     createChat.resetForm();
   };
 
-  // Чаты уже отсортированы в контексте, но делаем дополнительную сортировку для надежности
   const sortedChats = useMemo(() => {
     if (!chats || chats.length === 0) return [];
     
     return [...chats].sort((a, b) => {
       const timeA = getChatTime(a);
       const timeB = getChatTime(b);
-      
-      // Более новые (большее время) идут первыми (сверху)
+
       return timeB - timeA;
     });
   }, [chats]);

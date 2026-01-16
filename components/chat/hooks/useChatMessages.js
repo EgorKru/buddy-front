@@ -4,9 +4,6 @@ import { MESSAGE_STATUS } from '@/utils/messageQueue';
 import { saveFileMetadata } from '../utils/messageHelpers';
 import { INITIAL_MESSAGES_LIMIT, OLDER_MESSAGES_LIMIT } from '../constants/chat';
 
-/**
- * Хук для загрузки и управления сообщениями чата
- */
 export const useChatMessages = ({
   chatId,
   upsertMessage,
@@ -14,7 +11,7 @@ export const useChatMessages = ({
   localPtsRef,
   localSeqRef
 }) => {
-  // Не показываем loading при первой загрузке, чтобы не было "дерганий"
+  
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -26,36 +23,30 @@ export const useChatMessages = ({
   const loadingMessagesRef = useRef(false);
   const lastLoadedMessageIdRef = useRef(null);
 
-  /**
-   * Загружает полное состояние чата одним запросом
-   */
   const loadChatStateFull = useCallback(async (chatId) => {
     if (!chatId) return;
-    
-    // Отменяем предыдущий запрос
+
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
     abortControllerRef.current = new AbortController();
     
     try {
-      // Не устанавливаем loading, чтобы UI не блокировался
-      // setLoading(true);
+
       isLoadingInitialRef.current = true;
       
       const state = await chatAPI.getChatStateFull(chatId, INITIAL_MESSAGES_LIMIT);
       
       if (state) {
-        // Обновляем чат
+        
         if (state.chat) {
           refreshChats();
         }
-        
-        // Загружаем сообщения
+
         if (state.messages && Array.isArray(state.messages)) {
           const ordered = [...state.messages].reverse();
           for (const m of ordered) {
-            // Обработка метаданных файлов
+            
             saveFileMetadata(m);
             upsertMessage(
               { ...m, status: MESSAGE_STATUS.SENT, isOptimistic: false },
@@ -63,8 +54,7 @@ export const useChatMessages = ({
             );
           }
         }
-        
-        // Обновляем последовательности
+
         if (state.pts !== undefined && localPtsRef) {
           if (!localPtsRef.current) {
             localPtsRef.current = new Map();
@@ -78,13 +68,11 @@ export const useChatMessages = ({
           }
           localSeqRef.current = state.seq;
         }
-        
-        // Устанавливаем курсор для следующей загрузки
+
         if (state.oldestMessageId) {
           setOldestMessageId(state.oldestMessageId);
         }
-        
-        // Обновляем флаг наличия еще сообщений
+
         if (state.hasMoreMessages !== undefined) {
           setHasMore(state.hasMoreMessages);
         }
@@ -93,10 +81,9 @@ export const useChatMessages = ({
       if (error.name === 'AbortError') {
         return;
       }
-      console.error('[Load Chat State Full] Error:', error);
+      
     } finally {
-      // Не устанавливаем loading, чтобы UI не блокировался
-      // setLoading(false);
+
       isLoadingInitialRef.current = false;
       if (abortControllerRef.current) {
         abortControllerRef.current = null;
@@ -104,18 +91,13 @@ export const useChatMessages = ({
     }
   }, [upsertMessage, refreshChats, localPtsRef, localSeqRef]);
 
-  /**
-   * Загружает более старые сообщения (курсорная пагинация)
-   */
   const loadOlderMessages = useCallback(async (beforeMessageId) => {
     if (!chatId || !beforeMessageId || loadingMessagesRef.current) return;
-    
-    // Защита от повторных запросов с тем же ID
+
     if (lastLoadedMessageIdRef.current === beforeMessageId) {
       return;
     }
-    
-    // Отменяем предыдущий запрос
+
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -136,8 +118,7 @@ export const useChatMessages = ({
           lastLoadedMessageIdRef.current = null;
           return;
         }
-        
-        // Обрабатываем метаданные и добавляем сообщения
+
         for (const m of newMessages) {
           saveFileMetadata(m);
           upsertMessage(
@@ -145,8 +126,7 @@ export const useChatMessages = ({
             { unreadDelta: 0 }
           );
         }
-        
-        // Обновляем курсор только если получили новые сообщения
+
         const newOldestId = newMessages[0]?.id;
         if (newOldestId && newOldestId !== oldestMessageId) {
           setOldestMessageId(newOldestId);
@@ -160,7 +140,7 @@ export const useChatMessages = ({
       if (error.name === 'AbortError') {
         return;
       }
-      console.error('[Load Older Messages] Error:', error);
+      
       lastLoadedMessageIdRef.current = null;
     } finally {
       setLoadingMore(false);
@@ -171,9 +151,6 @@ export const useChatMessages = ({
     }
   }, [chatId, upsertMessage, oldestMessageId]);
 
-  /**
-   * Загружает сообщения (обертка для обратной совместимости)
-   */
   const loadMessages = useCallback(async (pageNum = 0, append = false) => {
     if (!chatId) return;
     
@@ -182,10 +159,10 @@ export const useChatMessages = ({
     }
     
     if (!append) {
-      // Первая загрузка
+      
       return loadChatStateFull(chatId);
     } else if (append && oldestMessageId) {
-      // Загрузка старых сообщений
+      
       return loadOlderMessages(oldestMessageId);
     }
   }, [chatId, oldestMessageId, loadChatStateFull, loadOlderMessages]);
@@ -194,25 +171,23 @@ export const useChatMessages = ({
     if (!chatId) {
       setLoading(false);
     } else {
-      // Сбрасываем защиту от повторных запросов при смене чата
+      
       lastLoadedMessageIdRef.current = null;
     }
   }, [chatId]);
 
   return {
-    // Состояние
+    
     loading,
     loadingMore,
     hasMore,
     oldestMessageId,
     page,
-    
-    // Функции
+
     loadMessages,
     loadChatStateFull,
     loadOlderMessages,
-    
-    // Refs
+
     isLoadingInitialRef,
     loadingMessagesRef
   };

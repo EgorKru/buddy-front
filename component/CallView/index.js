@@ -12,16 +12,16 @@ const CallView = ({
   onToggleAudio,
   onToggleVideo,
   onEndCall,
-  isCallActive = true, // По умолчанию звонок активен
+  isCallActive = true, 
 }) => {
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
-  const remoteAudioRef = useRef(null); // Аудио-элемент для удаленного потока
+  const remoteAudioRef = useRef(null); 
   const minimizedRemoteVideoRef = useRef(null);
   const minimizedRef = useRef(null);
   const [callDuration, setCallDuration] = useState(0);
-  const callStartTimeRef = useRef(null); // Время начала звонка
-  const callBecameActiveTimeRef = useRef(null); // Время когда звонок стал активным (fallback)
+  const callStartTimeRef = useRef(null); 
+  const callBecameActiveTimeRef = useRef(null); 
   const [isMinimized, setIsMinimized] = useState(false);
   const [position, setPosition] = useState({ 
     x: typeof window !== 'undefined' ? window.innerWidth - 320 : 0, 
@@ -31,24 +31,21 @@ const CallView = ({
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [hasDragged, setHasDragged] = useState(false);
 
-  // Локальный видеопоток
   useEffect(() => {
     if (localVideoRef.current && localStream) {
       localVideoRef.current.srcObject = localStream;
     }
   }, [localStream]);
 
-  // Удалённый видеопоток (для полного экрана)
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream && !isMinimized) {
       remoteVideoRef.current.srcObject = remoteStream;
     }
   }, [remoteStream, isMinimized]);
 
-  // Удалённый аудиопоток (для всех звонков - и аудио, и видео)
   useEffect(() => {
     if (!remoteStream) {
-      // Очищаем аудио если стрима нет
+      
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = null;
       }
@@ -56,21 +53,17 @@ const CallView = ({
     }
 
     if (!remoteAudioRef.current) {
-      // Ждем пока ref будет готов
+      
       return;
     }
 
-    // Получаем все треки из стрима
     const allTracks = remoteStream.getTracks();
     const audioTracks = remoteStream.getAudioTracks();
-    
-    console.log('[CallView] Remote stream - total tracks:', allTracks.length, 'audio tracks:', audioTracks.length);
-    
+
     if (audioTracks.length > 0) {
-      // Создаем новый стрим только с аудио-треками
-      const audioStream = new MediaStream(audioTracks);
       
-      // Убеждаемся что треки включены
+      const audioStream = new MediaStream(audioTracks);
+
       audioTracks.forEach(track => {
         if (!track.enabled) {
           track.enabled = true;
@@ -78,47 +71,41 @@ const CallView = ({
       });
       
       remoteAudioRef.current.srcObject = audioStream;
-      
-      // Убеждаемся что элемент не muted и volume = 1.0
+
       remoteAudioRef.current.muted = false;
       remoteAudioRef.current.volume = 1.0;
-      
-      // Воспроизводим аудио
+
       const playPromise = remoteAudioRef.current.play();
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
-            console.log('[CallView] Remote audio playing successfully');
+            
           })
           .catch(err => {
-            console.error('[CallView] Error playing remote audio:', err);
-            // Пробуем еще раз через небольшую задержку
+
             setTimeout(() => {
               if (remoteAudioRef.current && remoteAudioRef.current.srcObject) {
                 remoteAudioRef.current.play().catch(e => {
-                  console.error('[CallView] Retry play failed:', e);
+                  
                 });
               }
             }, 500);
           });
       }
     } else {
-      console.warn('[CallView] No audio tracks in remote stream');
-      // Очищаем srcObject если треков нет
+
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = null;
       }
     }
   }, [remoteStream]);
 
-  // Удалённый видеопоток (для мини-окна)
   useEffect(() => {
     if (minimizedRemoteVideoRef.current && remoteStream && isMinimized) {
       minimizedRemoteVideoRef.current.srcObject = remoteStream;
     }
   }, [remoteStream, isMinimized]);
 
-  // Таймер звонка
   useEffect(() => {
     if (!call || !isCallActive) {
       callStartTimeRef.current = null;
@@ -127,79 +114,69 @@ const CallView = ({
       return;
     }
 
-    // Запоминаем время когда звонок стал активным (fallback)
     if (!callBecameActiveTimeRef.current) {
       callBecameActiveTimeRef.current = Date.now();
     }
 
-    // Используем acceptedAt или startedAt из объекта call (приоритет acceptedAt)
     const acceptedAt = call.acceptedAt || call.startedAt;
     
     if (acceptedAt) {
-      // Парсим ISO-8601 дату (может быть с миллисекундами: "2026-01-14T20:30:45.123")
-      // Бэкенд отправляет дату в UTC без 'Z', поэтому парсим как UTC
+
       let startTime;
       
       try {
-        // Парсим дату - если нет временной зоны, добавляем 'Z' для UTC
-        // Бэкенд отправляет дату в UTC, но без 'Z'
+
         let dateString = String(acceptedAt).trim();
         const now = Date.now();
-        const minValidTimestamp = now - 86400000 * 365; // 1 год назад
-        const maxValidTimestamp = now + 86400000 * 365; // 1 год вперед
-        
-        // Проверяем, является ли это уже числом (timestamp)
+        const minValidTimestamp = now - 86400000 * 365; 
+        const maxValidTimestamp = now + 86400000 * 365; 
+
         if (/^\d+$/.test(dateString)) {
-          // Это уже timestamp в миллисекундах
+          
           startTime = parseInt(dateString, 10);
         } else {
-          // Это строка даты, нужно парсить
-          // Проверяем, что это похоже на ISO дату
+
           if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(dateString)) {
             throw new Error('Invalid date format');
           }
           
           if (!dateString.includes('Z') && !dateString.includes('+') && !dateString.match(/[+-]\d{2}:\d{2}$/)) {
-            // Если нет временной зоны, добавляем 'Z' для UTC парсинга
+            
             dateString = dateString + 'Z';
           }
           
           const parsedDate = new Date(dateString);
           startTime = parsedDate.getTime();
-          
-          // Дополнительная проверка: если парсинг дал Invalid Date, выбрасываем ошибку
+
           if (isNaN(startTime)) {
             throw new Error('Invalid Date after parsing');
           }
         }
-        
-        // Проверяем валидность: не NaN, положительное число, в разумных пределах
+
         const isValid = !isNaN(startTime) && 
                        startTime > 0 && 
                        startTime >= minValidTimestamp && 
                        startTime <= maxValidTimestamp;
         
         if (isValid) {
-          // Обновляем время начала, если оно изменилось
           if (!callStartTimeRef.current || callStartTimeRef.current !== startTime) {
             callStartTimeRef.current = startTime;
           }
         } else {
-          console.warn('[CallView] Invalid acceptedAt/startedAt:', acceptedAt, 'parsed as:', startTime, '(current time:', now, ', valid range:', minValidTimestamp, '-', maxValidTimestamp, ')');
           if (!callStartTimeRef.current) {
             callStartTimeRef.current = callBecameActiveTimeRef.current;
           }
         }
       } catch (e) {
-        console.error('[CallView] Error parsing acceptedAt/startedAt:', acceptedAt, e);
+        
         if (!callStartTimeRef.current) {
           callStartTimeRef.current = callBecameActiveTimeRef.current;
         }
       }
     } else {
-      // Если acceptedAt не пришел, используем время когда звонок стал активным
+      
       if (!callStartTimeRef.current) {
-        console.warn('[CallView] No acceptedAt/startedAt in call object, using time when call became active');
+        
         callStartTimeRef.current = callBecameActiveTimeRef.current;
       }
     }
@@ -214,7 +191,6 @@ const CallView = ({
     return () => clearInterval(interval);
   }, [call, isCallActive]);
 
-  // Обработчики перетаскивания
   const handleMouseDown = (e) => {
     if (!isMinimized) return;
     if (e.target.closest(`.${styles.minimizedControlButton}`)) return;
@@ -238,7 +214,7 @@ const CallView = ({
 
   const handleMouseUp = () => {
     setIsDragging(false);
-    // Сбрасываем флаг через небольшую задержку, чтобы onClick не сработал
+    
     setTimeout(() => setHasDragged(false), 100);
   };
 
@@ -282,7 +258,6 @@ const CallView = ({
     return name.substring(0, 2).toUpperCase();
   };
 
-  // Минимизированный вид
   if (isMinimized) {
     return (
       <div 
@@ -294,13 +269,13 @@ const CallView = ({
           className={`${styles.minimized} ${isDragging ? styles.dragging : ''}`}
           onMouseDown={handleMouseDown}
           onClick={(e) => {
-            // Открываем только если не было перетаскивания и не кликнули по кнопке
+            
             if (!hasDragged && !isDragging && !e.target.closest(`.${styles.minimizedControlButton}`)) {
               setIsMinimized(false);
             }
           }}
         >
-          {/* Видео или аватар */}
+          {}
           {isVideo && remoteStream ? (
             <div className={styles.minimizedVideo}>
               <video
@@ -316,17 +291,17 @@ const CallView = ({
             </div>
           )}
           
-          {/* Информация */}
+          {}
           <div className={styles.minimizedInfo}>
             <span className={styles.minimizedName}>{remoteName}</span>
             <span className={styles.minimizedTimer}>{formatDuration(callDuration)}</span>
           </div>
           
-          {/* Индикатор активности */}
+          {}
           <div className={styles.minimizedPulse}></div>
         </div>
         
-        {/* Мини-панель управления */}
+        {}
         <div className={styles.minimizedControls}>
           <button
             className={`${styles.minimizedControlButton} ${!audioEnabled ? styles.off : ''}`}
@@ -381,7 +356,7 @@ const CallView = ({
   return (
     <div className={styles.overlay}>
       <div className={styles.callContainer}>
-        {/* Заголовок */}
+        {}
         <div className={styles.header}>
           <button 
             className={styles.minimizeButton}
@@ -396,7 +371,7 @@ const CallView = ({
           </div>
         </div>
 
-        {/* Скрытый аудио-элемент для удаленного потока (для всех звонков) */}
+        {}
         {remoteStream && (
           <audio
             ref={remoteAudioRef}
@@ -406,9 +381,9 @@ const CallView = ({
           />
         )}
 
-        {/* Видео область */}
+        {}
         <div className={styles.videoArea}>
-          {/* Удалённое видео / Аватар */}
+          {}
           {isVideo && remoteStream ? (
             <video
               ref={remoteVideoRef}
@@ -429,7 +404,7 @@ const CallView = ({
             </div>
           )}
 
-          {/* Локальное видео (PiP) */}
+          {}
           {isVideo && localStream && (
             <div className={styles.localVideoContainer}>
               <video
@@ -448,7 +423,7 @@ const CallView = ({
           )}
         </div>
 
-        {/* Панель управления */}
+        {}
         <div className={styles.controls}>
           <button
             className={`${styles.controlButton} ${!audioEnabled ? styles.off : ''}`}

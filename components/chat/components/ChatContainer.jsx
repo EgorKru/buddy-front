@@ -19,8 +19,7 @@ import ChatPresenter from './ChatPresenter';
 const ChatContainer = ({ chatId }) => {
   const router = useRouter();
   const user = getCurrentUser();
-  
-  // Звонки
+
   const callContext = useCall();
   const { initiateCall } = callContext;
   const [showCallTypeModal, setShowCallTypeModal] = useState(false);
@@ -28,7 +27,7 @@ const ChatContainer = ({ chatId }) => {
   
   const handleOpenCallModal = useCallback((targetUserId, chatIdForCall, targetUserInfo) => {
     if (!targetUserId) {
-      console.error('[handleOpenCallModal] No targetUserId');
+      
       return;
     }
     setPendingCallTarget({ targetUserId, chatIdForCall, targetUserInfo });
@@ -290,7 +289,7 @@ const ChatContainer = ({ chatId }) => {
           messageActions.setReplyingToMessage(null);
         }
       } catch (error) {
-        console.error('Error uploading and sending file:', error);
+        
         alert(`Не удалось отправить файл: ${error.message || 'Неизвестная ошибка'}`);
         setSelectedFile(fileToSend);
         if (fileToSend && fileToSend.type.startsWith('image/') && !selectedFileUrlRef.current) {
@@ -432,8 +431,7 @@ const ChatContainer = ({ chatId }) => {
   useEffect(() => {
     scrollStateRef.current = { hasMore, loadingMore, oldestMessageId };
   }, [hasMore, loadingMore, oldestMessageId, scrollStateRef]);
-  
-  // Устанавливаем scrollButtonReady после загрузки сообщений
+
   useEffect(() => {
     if (messages.length > 0 && messagesContainerRef.current && !messagesLoading) {
       setScrollButtonReady(true);
@@ -576,7 +574,7 @@ const ChatContainer = ({ chatId }) => {
       onStartCall={handleOpenCallModal}
     />
     
-    {/* Модалка выбора типа звонка */}
+    {}
     <CallTypeModal
       isOpen={showCallTypeModal}
       onClose={() => {

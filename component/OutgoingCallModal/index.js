@@ -20,7 +20,6 @@ const OutgoingCallModal = ({
   const [hasDragged, setHasDragged] = useState(false);
   const minimizedRef = useRef(null);
 
-  // Таймер ожидания
   useEffect(() => {
     if (!call) return;
     
@@ -34,42 +33,38 @@ const OutgoingCallModal = ({
     };
   }, [call]);
 
-  // Мягкая классическая музыка при вызове
   useEffect(() => {
     if (!call) return;
 
-    // Используем более мягкий, тихий звук (имитация классической музыки)
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
     let oscillators = [];
     let gainNode = null;
 
     const playSoftMusic = () => {
       try {
-        // Создаем аккорд из нескольких нот для более мягкого звука
-        const notes = [261.63, 329.63, 392.00]; // C, E, G (мажорный аккорд)
+        
+        const notes = [261.63, 329.63, 392.00]; 
         gainNode = audioContext.createGain();
         gainNode.connect(audioContext.destination);
-        
-        // Очень тихий звук (0.05 = 5% громкости)
+
         gainNode.gain.setValueAtTime(0.05, audioContext.currentTime);
         
         notes.forEach((freq, index) => {
           const osc = audioContext.createOscillator();
           osc.connect(gainNode);
           osc.frequency.value = freq;
-          osc.type = 'sine'; // Плавная синусоида
+          osc.type = 'sine'; 
           osc.start(audioContext.currentTime + index * 0.1);
           osc.stop(audioContext.currentTime + 1.5);
           oscillators.push(osc);
         });
       } catch (error) {
-        console.warn('Не удалось воспроизвести звук:', error);
+        
       }
     };
 
-    // Воспроизводим каждые 3 секунды (реже и тише)
     const musicInterval = setInterval(playSoftMusic, 3000);
-    playSoftMusic(); // Первый звук сразу
+    playSoftMusic(); 
 
     return () => {
       clearInterval(musicInterval);
@@ -110,7 +105,6 @@ const OutgoingCallModal = ({
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  // Обработчики перетаскивания
   const handleMouseDown = (e) => {
     if (!isMinimized) return;
     if (e.target.closest(`.${styles.minimizedControlButton}`)) return;
@@ -134,7 +128,7 @@ const OutgoingCallModal = ({
 
   const handleMouseUp = () => {
     setIsDragging(false);
-    // Сбрасываем флаг через небольшую задержку, чтобы onClick не сработал
+    
     setTimeout(() => setHasDragged(false), 100);
   };
 
@@ -149,7 +143,6 @@ const OutgoingCallModal = ({
     }
   }, [isDragging, isMinimized, dragOffset]);
 
-  // Минимизированный вид
   if (isMinimized) {
 
     return (
@@ -162,7 +155,7 @@ const OutgoingCallModal = ({
           className={`${styles.minimized} ${isDragging ? styles.dragging : ''}`}
           onMouseDown={handleMouseDown}
           onClick={(e) => {
-            // Открываем только если не было перетаскивания и не кликнули по кнопке
+            
             if (!hasDragged && !isDragging && !e.target.closest(`.${styles.minimizedControlButton}`)) {
               setIsMinimized(false);
             }
@@ -178,7 +171,7 @@ const OutgoingCallModal = ({
           <div className={styles.minimizedPulse}></div>
         </div>
         
-        {/* Мини-панель управления */}
+        {}
         <div className={styles.minimizedControls}>
           <button
             className={`${styles.minimizedControlButton} ${!audioEnabled ? styles.off : ''}`}
@@ -233,7 +226,7 @@ const OutgoingCallModal = ({
   return (
     <div className={styles.overlay}>
       <div className={styles.container}>
-        {/* Кнопка сворачивания */}
+        {}
         <button 
           className={styles.minimizeButton}
           onClick={() => setIsMinimized(true)}
@@ -241,22 +234,22 @@ const OutgoingCallModal = ({
         >
           <Minimize2 size={20} />
         </button>
-        {/* Аватар */}
+        {}
         <div className={styles.avatarSection}>
           <div className={styles.avatar}>
             {getInitials(calleeName)}
           </div>
         </div>
 
-        {/* Информация */}
+        {}
         <div className={styles.info}>
           <h2 className={styles.calleeName}>{calleeName}</h2>
           <p className={styles.status}>ожидание...</p>
         </div>
 
-        {/* Панель управления */}
+        {}
         <div className={styles.controls}>
-          {/* Демонстрация экрана (заглушка) */}
+          {}
           <div className={styles.controlItem}>
             <button className={styles.controlButton} disabled>
               <Monitor size={24} />
@@ -264,7 +257,7 @@ const OutgoingCallModal = ({
             <span className={styles.controlLabel}>Экран</span>
           </div>
 
-          {/* Видео */}
+          {}
           <div className={styles.controlItem}>
             <button 
               className={`${styles.controlButton} ${!videoEnabled ? styles.off : ''}`}
@@ -277,7 +270,7 @@ const OutgoingCallModal = ({
             </span>
           </div>
 
-          {/* Завершить */}
+          {}
           <div className={styles.controlItem}>
             <button 
               className={`${styles.controlButton} ${styles.endCall}`}
@@ -288,7 +281,7 @@ const OutgoingCallModal = ({
             <span className={styles.controlLabel}>Завершить</span>
           </div>
 
-          {/* Микрофон */}
+          {}
           <div className={styles.controlItem}>
             <button 
               className={`${styles.controlButton} ${!audioEnabled ? styles.off : ''}`}

@@ -120,14 +120,6 @@ const ChatPresenter = ({
   handleSelectMessage,
   onStartCall
 }) => {
-  // Убрали экран загрузки - показываем интерфейс сразу, сообщения подгрузятся в фоне
-  // if (messagesLoading) {
-  //   return (
-  //     <div className={styles.container}>
-  //       <div className={styles.loading}>Загрузка чата...</div>
-  //     </div>
-  //   );
-  // }
 
   const selectedMessagesList = selectionMode 
     ? Array.from(selectedMessages).map(id => 

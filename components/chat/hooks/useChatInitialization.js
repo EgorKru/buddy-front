@@ -10,7 +10,7 @@ export const useChatInitialization = ({
   loadPinnedMessages,
   chat,
   clearSelectedFile,
-  // Refs из других хуков
+  
   scrollPositionSavedRef,
   userScrolledToBottomRef,
   restoreAttemptsRef,

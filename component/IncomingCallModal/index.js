@@ -5,7 +5,6 @@ import styles from "./index.module.css";
 const IncomingCallModal = ({ call, onAccept, onReject, onBusy }) => {
   const [elapsedTime, setElapsedTime] = useState(0);
 
-  // Таймер звонка
   useEffect(() => {
     if (!call) return;
     
@@ -13,7 +12,6 @@ const IncomingCallModal = ({ call, onAccept, onReject, onBusy }) => {
       setElapsedTime(prev => prev + 1);
     }, 1000);
 
-    // Авто-пропуск после 30 секунд
     const timeout = setTimeout(() => {
       onBusy?.(call.id);
     }, 30000);
@@ -43,21 +41,21 @@ const IncomingCallModal = ({ call, onAccept, onReject, onBusy }) => {
   return (
     <div className={styles.overlay}>
       <div className={styles.modal}>
-        {/* Анимированные круги */}
+        {}
         <div className={styles.pulseRings}>
           <div className={styles.ring1}></div>
           <div className={styles.ring2}></div>
           <div className={styles.ring3}></div>
         </div>
 
-        {/* Аватар */}
+        {}
         <div className={styles.avatarContainer}>
           <div className={styles.avatar}>
             {getInitials(callerName)}
           </div>
         </div>
 
-        {/* Информация */}
+        {}
         <div className={styles.info}>
           <h2 className={styles.callerName}>{callerName}</h2>
           <p className={styles.callType}>
@@ -76,7 +74,7 @@ const IncomingCallModal = ({ call, onAccept, onReject, onBusy }) => {
           <p className={styles.timer}>Звонит {elapsedTime} сек...</p>
         </div>
 
-        {/* Кнопки */}
+        {}
         <div className={styles.actions}>
           <button 
             className={styles.rejectButton}
@@ -95,7 +93,7 @@ const IncomingCallModal = ({ call, onAccept, onReject, onBusy }) => {
           </button>
         </div>
 
-        {/* Кнопка "Занят" */}
+        {}
         <button 
           className={styles.busyButton}
           onClick={() => onBusy?.(call.id)}

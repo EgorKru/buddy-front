@@ -60,7 +60,7 @@ export default function FileMessage({
       document.body.removeChild(link);
       URL.revokeObjectURL(blobUrl);
     } catch (error) {
-      console.error('Error downloading file:', error);
+      
       alert('Не удалось скачать файл');
     } finally {
       setDownloading(false);

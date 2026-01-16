@@ -1,10 +1,6 @@
 import { useCallback } from 'react';
 import { chatAPI } from '@/utils/api';
 
-/**
- * Хук для массовых операций с сообщениями
- * Используется в режиме выбора сообщений
- */
 export const useBulkMessageActions = ({
   chatId,
   messages,
@@ -16,9 +12,7 @@ export const useBulkMessageActions = ({
   setDeleteConfirm,
   setForwardModal
 }) => {
-  /**
-   * Массовое закрепление сообщений
-   */
+  
   const handlePinSelected = useCallback(async (selectedMessages) => {
     if (selectedMessages.size === 0 || !chatId) return;
     try {
@@ -67,15 +61,12 @@ export const useBulkMessageActions = ({
       await Promise.all(messagesToPin.map(({ messageId }) => chatAPI.pinMessage(chatId, messageId)));
       exitSelectionMode();
     } catch (error) {
-      console.error('Error pinning messages:', error);
+      
       loadPinnedMessages();
       alert('Не удалось закрепить сообщения');
     }
   }, [chatId, messages, pinnedMessages, updateMessage, setPinnedMessages, loadPinnedMessages, exitSelectionMode]);
 
-  /**
-   * Массовое открепление сообщений
-   */
   const handleUnpinSelected = useCallback(async (selectedMessages) => {
     if (selectedMessages.size === 0 || !chatId) return;
     try {
@@ -106,15 +97,12 @@ export const useBulkMessageActions = ({
       await Promise.all(messagesToUnpin.map(messageId => chatAPI.unpinMessage(chatId, messageId)));
       exitSelectionMode();
     } catch (error) {
-      console.error('Error unpinning messages:', error);
+      
       loadPinnedMessages();
       alert('Не удалось открепить сообщения');
     }
   }, [chatId, messages, pinnedMessages, updateMessage, setPinnedMessages, loadPinnedMessages, exitSelectionMode]);
 
-  /**
-   * Массовое удаление сообщений
-   */
   const handleDeleteSelected = useCallback((selectedMessages) => {
     if (selectedMessages.size === 0) return;
     setDeleteConfirm({ 
@@ -123,9 +111,6 @@ export const useBulkMessageActions = ({
     });
   }, [setDeleteConfirm]);
 
-  /**
-   * Массовая пересылка сообщений
-   */
   const handleForwardSelected = useCallback((selectedMessages) => {
     if (selectedMessages.size === 0) return;
     setForwardModal({ 

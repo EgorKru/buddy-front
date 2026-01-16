@@ -21,8 +21,7 @@ export const usePinnedMessages = (chatId, messages) => {
   const loadPinnedMessages = useCallback(async () => {
     if (!chatId) return;
     const chatIdStr = String(chatId);
-    
-    // Защита от повторных вызовов для того же чата
+
     if (loadingPinnedRef.current && lastLoadedChatIdRef.current === chatIdStr) {
       return;
     }
@@ -38,7 +37,7 @@ export const usePinnedMessages = (chatId, messages) => {
       setPinnedMessages(sorted);
       setViewedPinnedMessageId(null);
     } catch (error) {
-      console.error('Error loading pinned messages:', error);
+      
     } finally {
       loadingPinnedRef.current = false;
     }
@@ -204,7 +203,7 @@ export const usePinnedMessages = (chatId, messages) => {
       });
       deletedForAllSubRef.current = deletedForAllSub;
     } catch (e) {
-      console.error('Error subscribing to pinned/deleted messages:', e);
+      
     }
 
     return () => {

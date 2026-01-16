@@ -1,8 +1,5 @@
 import { DUPLICATE_WINDOW_MS } from '../constants/chat';
 
-/**
- * Проверяет, являются ли два сообщения дубликатами
- */
 export const isDuplicate = (a, b) => {
   if (a?.id && b?.id && Number(a.id) === Number(b.id)) return true;
   if (Number(a?.senderId) !== Number(b?.senderId)) return false;
@@ -11,9 +8,6 @@ export const isDuplicate = (a, b) => {
   return timeDiff < DUPLICATE_WINDOW_MS;
 };
 
-/**
- * Форматирует размер файла
- */
 export const formatFileSize = (bytes) => {
   if (!bytes || bytes === 0) return '0 B';
   const k = 1024;
@@ -22,9 +16,6 @@ export const formatFileSize = (bytes) => {
   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
 };
 
-/**
- * Обрабатывает метаданные файлов для сохранения в localStorage
- */
 export const saveFileMetadata = (message) => {
   if ((message.type === 'FILE' || message.type === 'IMAGE') && message.fileUrl && typeof window !== 'undefined') {
     const metadataKey = `file_metadata_${message.fileUrl}`;
@@ -40,9 +31,6 @@ export const saveFileMetadata = (message) => {
   }
 };
 
-/**
- * Восстанавливает метаданные файлов из localStorage
- */
 export const restoreFileMetadata = (message) => {
   if ((message.type === 'FILE' || message.type === 'IMAGE') && message.fileUrl && typeof window !== 'undefined') {
     const metadataKey = `file_metadata_${message.fileUrl}`;
@@ -57,7 +45,7 @@ export const restoreFileMetadata = (message) => {
           mimeType: message.mimeType || metadata.mimeType
         };
       } catch (e) {
-        // Игнорируем ошибки парсинга
+        
       }
     }
   }

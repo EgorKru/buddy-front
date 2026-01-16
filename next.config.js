@@ -1,18 +1,15 @@
 const nextConfig = {
   reactStrictMode: true,
-  
-  // Генерируем buildId на основе git commit hash для правильного кеширования
+
   generateBuildId: async () => {
-    // Используем git commit hash если доступен, иначе timestamp
-    // Это обеспечит правильную инвалидацию кеша при деплое
+
     if (process.env.BUILD_ID) {
       return process.env.BUILD_ID;
     }
-    // Fallback на timestamp для стабильности
+    
     return `build-${Date.now()}`;
   },
-  
-  // Настройки для production
+
   poweredByHeader: false,
   
   async rewrites() {
@@ -29,8 +26,7 @@ const nextConfig = {
     
     return [];
   },
-  
-  // Заголовки для правильного кеширования статических файлов
+
   async headers() {
     return [
       {

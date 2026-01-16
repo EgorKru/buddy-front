@@ -21,7 +21,6 @@ const TopBar = ({ roomId, onStart }) => {
     return () => clearInterval(interval);
   }, [isRunning]);
 
-
   const handleStart = () => {
     setIsRunning(true);
     if (onStart) onStart();

@@ -20,13 +20,12 @@ export default function Login() {
   useEffect(() => {
     const handleMouseMove = (e) => {
       if (isPagerEyesClosed) return;
-      
-      // Для логотипа используем центр экрана как точку отсчета
+
       const cx = window.innerWidth / 2;
       const cy = window.innerHeight / 2;
       const dx = e.clientX - cx;
       const dy = e.clientY - cy;
-      const maxOffset = showLoader ? 6 : 4; // больше смещение для лоадера
+      const maxOffset = showLoader ? 6 : 4; 
 
       const dist = Math.sqrt(dx * dx + dy * dy) || 1;
       const nx = dx / dist;
@@ -50,18 +49,13 @@ export default function Login() {
     try {
       const data = await authAPI.login(username, password);
       setCurrentUser(data.user, data.token);
-      
-      // Показываем лоадер минимум 2 секунды
+
       setShowLoader(true);
-      
-      // Минимум 2 секунды показа лоадера
+
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Переходим на главную
+
       router.push('/');
-      
-      // Лоадер скроется автоматически при размонтировании компонента
-      // или можно добавить таймер на скрытие через несколько секунд
+
       setTimeout(() => {
         setShowLoader(false);
       }, 500);

@@ -21,13 +21,80 @@ const Bottom = (props) => {
   const isMuted = muted ?? true;
   const isPlaying = playing ?? true;
 
+  const handleToggleAudio = (e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    
+    if (toggleAudio) {
+      toggleAudio();
+    } else {
+      
+    }
+  };
+  
+  const handleToggleVideo = (e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    
+    if (toggleVideo) {
+      toggleVideo();
+    } else {
+      
+    }
+  };
+  
+  const handleLeaveRoom = (e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    
+    if (leaveRoom) {
+      leaveRoom();
+    } else {
+      
+    }
+  };
+  
+  const handleRaiseHand = (e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    
+    if (onRaiseHand) {
+      onRaiseHand();
+    } else {
+      
+    }
+  };
+  
+  const handleToggleScreenShare = (e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    
+    if (onToggleScreenShare) {
+      onToggleScreenShare();
+    } else {
+      
+    }
+  };
+  
+  const handleParticipantsClick = (e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    
+    if (onParticipantsClick) {
+      onParticipantsClick();
+    } else {
+      
+    }
+  };
+
   return (
     <div className={styles.bottomMenu}>
       <div className={styles.leftSection}>
         <button 
           className={styles.participantButton}
-          onClick={onParticipantsClick}
+          onClick={handleParticipantsClick}
           title="Показать участников"
+          type="button"
         >
           <Users size={18} />
           <span>{participantCount || 1}</span>
@@ -39,7 +106,7 @@ const Bottom = (props) => {
           <button
             className={cx(styles.icon, styles.active)}
             title="Включить микрофон"
-            onClick={toggleAudio}
+            onClick={handleToggleAudio}
             type="button"
           >
             <MicOff size={22} />
@@ -48,7 +115,7 @@ const Bottom = (props) => {
           <button
             className={styles.icon}
             title="Выключить микрофон"
-            onClick={toggleAudio}
+            onClick={handleToggleAudio}
             type="button"
           >
             <Mic size={22} />
@@ -58,7 +125,7 @@ const Bottom = (props) => {
           <button
             className={styles.icon}
             title="Выключить камеру"
-            onClick={toggleVideo}
+            onClick={handleToggleVideo}
             type="button"
           >
             <Video size={22} />
@@ -67,28 +134,28 @@ const Bottom = (props) => {
           <button
             className={cx(styles.icon, styles.active)}
             title="Включить камеру"
-            onClick={toggleVideo}
+            onClick={handleToggleVideo}
             type="button"
           >
             <VideoOff size={22} />
           </button>
         )}
         
-        {/* Поднять руку */}
+        {}
         <button
           className={cx(styles.icon, { [styles.handRaised]: handRaised })}
           title={handRaised ? "Опустить руку" : "Поднять руку"}
-          onClick={onRaiseHand}
+          onClick={handleRaiseHand}
           type="button"
         >
           <Hand size={22} />
         </button>
         
-        {/* Демонстрация экрана */}
+        {}
         <button
           className={cx(styles.icon, { [styles.screenSharing]: isScreenSharing })}
           title={isScreenSharing ? "Остановить демонстрацию" : "Показать экран"}
-          onClick={onToggleScreenShare}
+          onClick={handleToggleScreenShare}
           type="button"
         >
           {isScreenSharing ? <MonitorOff size={22} /> : <Monitor size={22} />}
@@ -97,7 +164,7 @@ const Bottom = (props) => {
         <button
           className={cx(styles.icon, styles.leaveButton)}
           title="Покинуть встречу"
-          onClick={leaveRoom}
+          onClick={handleLeaveRoom}
           type="button"
         >
           <PhoneOff size={22} />

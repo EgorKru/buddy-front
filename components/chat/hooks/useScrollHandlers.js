@@ -87,8 +87,7 @@ export const useScrollHandlers = ({
         }
       }, LOAD_MORE_DELAY);
     }
-    
-    // Показываем кнопку, если пользователь не внизу (порог 300px для появления после 4-5 сообщений)
+
     const isNearBottom = checkIsAtBottom(300);
     setShowScrollToBottom(!isNearBottom);
     

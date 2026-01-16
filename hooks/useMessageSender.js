@@ -93,10 +93,8 @@ export const useMessageSender = (chatId, onMessageSent) => {
       try {
         updateMessageStatus(message.tempId, MESSAGE_STATUS.SENDING);
 
-        // Для IMAGE/FILE/VOICE используем WebSocket, не REST API
         if (message.type === 'IMAGE' || message.type === 'FILE' || message.type === 'VOICE') {
-          // Retry через WebSocket не поддерживается в этом методе
-          // Сообщения с файлами должны отправляться только через WebSocket в основном методе sendMessage
+
           updateMessageStatus(message.tempId, MESSAGE_STATUS.FAILED);
           if (onMessageSentCallback) {
             onMessageSentCallback({ status: 'failed', message: message }, message.tempId);
@@ -150,7 +148,6 @@ export const useMessageSender = (chatId, onMessageSent) => {
         client.active &&
         (connected || client.state === STOMP_CONNECTED_STATE);
 
-
       if (isWebSocketReady) {
         try {
           const payload = {
@@ -160,17 +157,17 @@ export const useMessageSender = (chatId, onMessageSent) => {
 
           if (type === 'VOICE') {
             if (fileUrl) {
-              // Способ 2: отправка с fileUrl (рекомендуемый)
+              
               payload.fileUrl = fileUrl;
-              // Передаём duration если указан
+              
               if (duration !== null && duration !== undefined) {
                 payload.duration = duration;
               }
             } else if (voiceData) {
-              // Способ 3: отправка с Base64 (fallback)
+              
               payload.voiceData = voiceData;
               payload.voiceMimeType = voiceMimeType || 'audio/webm';
-              // Передаём duration если указан
+              
               if (duration !== null && duration !== undefined) {
                 payload.duration = duration;
               }
@@ -178,7 +175,7 @@ export const useMessageSender = (chatId, onMessageSent) => {
               throw new Error('Neither fileUrl nor voiceData provided for VOICE message');
             }
           } else if (type === 'IMAGE' || type === 'FILE') {
-            // Для IMAGE и FILE всегда используем fileUrl
+            
             if (!fileUrl) {
               throw new Error(`fileUrl is required for ${type} message`);
             }
@@ -257,7 +254,6 @@ export const useMessageSender = (chatId, onMessageSent) => {
     const sendMessageFn = async (message) => {
       if (message.status === MESSAGE_STATUS.SENT) return null;
 
-      // Используем chatId из сообщения, если есть, иначе из замыкания
       const messageChatId = message.chatId || chatId;
       
       if (message.type === 'VOICE' || message.type === 'IMAGE' || message.type === 'FILE') {
@@ -303,7 +299,6 @@ export const useMessageSender = (chatId, onMessageSent) => {
         }
       }
 
-      // Для IMAGE/FILE/VOICE не используем REST API fallback
       if (message.type === 'IMAGE' || message.type === 'FILE' || message.type === 'VOICE') {
         return null;
       }

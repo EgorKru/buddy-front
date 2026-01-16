@@ -103,12 +103,11 @@ export const StompProvider = (props) => {
                 handleAuthError();
               }
             });
-            
-            // Telegram-подход: подписка на синхронизацию состояния
+
             stompClient.subscribe('/user/queue/state-sync', (message) => {
               const stateData = safeJsonParse(message.body);
               if (stateData && stateData.eventType === 'STATE_SYNC') {
-                // Отправляем событие для обработки состояния
+                
                 if (typeof window !== 'undefined') {
                   window.dispatchEvent(new CustomEvent('state-sync', { detail: stateData }));
                 }

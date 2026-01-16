@@ -35,41 +35,31 @@ export default function Register() {
     
     const handleMouseMove = (e) => {
       if (isPagerEyesClosed || !logoRef.current) return;
-      
-      // Используем requestAnimationFrame для плавной анимации
+
       if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
       }
       
       animationFrameId = requestAnimationFrame(() => {
-        // Получаем позицию логотипа относительно экрана
+        
         const rect = logoRef.current.getBoundingClientRect();
         const cx = rect.left + rect.width / 2;
         const cy = rect.top + rect.height / 2;
-        
-        // Вычисляем смещение курсора относительно центра логотипа
+
         const dx = e.clientX - cx;
         const dy = e.clientY - cy;
-        
-        // Размеры глаза: 14px, зрачка: 4px
-        // Максимальное смещение: (14 - 4) / 2 = 5px
-        // Используем 4.5px для безопасности
+
         const maxOffset = 4.5;
 
-        // Нормализуем вектор направления
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
         const nx = dx / dist;
         const ny = dy / dist;
 
-        // Применяем смещение с ограничением, чтобы зрачок не выходил за границы глаза
-        // Используем более агрессивное отслеживание для лучшей видимости
         const distanceFactor = Math.min(dist / 100, 1.2);
-        
-        // Вычисляем желаемое смещение
+
         const desiredX = nx * maxOffset * distanceFactor;
         const desiredY = ny * maxOffset * distanceFactor;
-        
-        // Ограничиваем смещение, чтобы зрачок не выходил за границы глаза
+
         const clampedX = Math.max(-maxOffset, Math.min(maxOffset, desiredX));
         const clampedY = Math.max(-maxOffset, Math.min(maxOffset, desiredY));
         
@@ -147,8 +137,8 @@ export default function Register() {
 
     try {
       await authAPI.sendVerificationCode(formData.email);
-      setCodeTimer(600); // 10 минут
-      setResendTimer(60); // 1 минута до повторной отправки
+      setCodeTimer(600); 
+      setResendTimer(60); 
     } catch (err) {
       setError(err.message || 'Ошибка при отправке кода');
     } finally {
@@ -166,7 +156,6 @@ export default function Register() {
     e.preventDefault();
     setError('');
 
-    // Проверка совпадения паролей на фронтенде
     if (formData.password !== formData.passwordConfirmation) {
       setPasswordError('Пароли не совпадают');
       return;
@@ -181,10 +170,10 @@ export default function Register() {
     setSendingCode(true);
 
     try {
-      // Отправляем код подтверждения на email
+      
       await authAPI.sendVerificationCode(formData.email);
-      setCodeTimer(600); // 10 минут
-      setResendTimer(60); // 1 минута до повторной отправки
+      setCodeTimer(600); 
+      setResendTimer(60); 
       setShowCodeModal(true);
     } catch (err) {
       if (err.message.includes('already exists')) {

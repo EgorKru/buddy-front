@@ -141,9 +141,6 @@ export const useVoiceMessageHandling = ({
     sentAudioBlobRef.current = null;
   }, [cancelRecording, resetVoice, sentAudioBlobRef]);
 
-  // Автоматическая отправка убрана — отправка происходит через onStopRecording в ChatPresenter
-  // Это предотвращает двойную отправку голосовых сообщений
-
   return { handleVoiceSendSimple, handleVoiceSend, handleVoiceCancel };
 };
 

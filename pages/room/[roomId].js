@@ -14,9 +14,23 @@ import styles from "@/styles/room.module.css";
 const Room = () => {
   const router = useRouter();
   const { roomId, audio, video } = router.query;
+
+  const [roomIdFromPath, setRoomIdFromPath] = useState(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const match = window.location.pathname.match(/\/room\/([^/?]+)/);
+      if (match && match[1]) {
+        setRoomIdFromPath(match[1]);
+      }
+    }
+  }, []);
   
-  const initialAudio = audio !== '0';
-  const initialVideo = video !== '0';
+  const isRouterReady = router.isReady || !!roomIdFromPath;
+  const actualRoomId = roomId || roomIdFromPath || undefined;
+
+  const initialAudio = audio !== undefined ? audio !== '0' : true; 
+  const initialVideo = video !== undefined ? video !== '0' : false;
   
   const {
     participants,
@@ -32,7 +46,7 @@ const Room = () => {
     endRoom,
     joinRoom,
     clearError,
-    // Новые функции
+    
     handRaised,
     raiseHand,
     isScreenSharing,
@@ -46,7 +60,7 @@ const Room = () => {
     demoteParticipant,
     muteParticipant,
     kickParticipant,
-  } = useRoomProtocol(roomId);
+  } = useRoomProtocol(actualRoomId);
 
   const [players, setPlayers] = useState({});
   const [playerNames, setPlayerNames] = useState({});
@@ -62,14 +76,12 @@ const Room = () => {
   const currentUserIdStr = currentUserId?.toString() || 'local';
   const currentUserName = currentUser?.displayName || currentUser?.username || "Вы";
 
-  // Отслеживаем вход/выход участников для тостов
   useEffect(() => {
     if (!isInRoom) return;
     
     const prevIds = new Set(prevParticipantsRef.current.map(p => p.user?.id));
     const currentIds = new Set(participants.map(p => p.user?.id));
-    
-    // Новые участники (кроме себя)
+
     participants.forEach(p => {
       const userId = p.user?.id;
       if (userId && !prevIds.has(userId) && userId !== currentUserId) {
@@ -77,8 +89,7 @@ const Room = () => {
         addToast('join', userName, userId);
       }
     });
-    
-    // Ушедшие участники
+
     prevParticipantsRef.current.forEach(p => {
       const userId = p.user?.id;
       if (userId && !currentIds.has(userId) && userId !== currentUserId) {
@@ -99,7 +110,6 @@ const Room = () => {
     setToastNotifications(prev => prev.filter(n => n.id !== id));
   }, []);
 
-  // Таймер встречи
   useEffect(() => {
     if (!isInRoom) return;
     const interval = setInterval(() => {
@@ -118,30 +128,59 @@ const Room = () => {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  // Подключение к комнате — только один раз
   useEffect(() => {
-    if (roomId && !hasJoinedRef.current && !isInRoom) {
+    if (!isRouterReady) {
+      return;
+    }
+
+    if (isInRoom) {
+      if (isJoining) {
+        setIsJoining(false);
+      }
+      return; 
+    }
+
+    if (actualRoomId && !hasJoinedRef.current) {
       hasJoinedRef.current = true;
       setIsJoining(true);
-      joinRoom(roomId, true, initialAudio, initialVideo)
-        .then(() => {
+      
+      const startTime = Date.now();
+      
+      joinRoom(actualRoomId, true, initialAudio, initialVideo)
+        .then((result) => {
           setIsJoining(false);
         })
-        .catch(() => {
+        .catch((err) => {
           setIsJoining(false);
-          hasJoinedRef.current = false; // Разрешаем повторную попытку при ошибке
+          hasJoinedRef.current = false; 
         });
     }
-  }, [roomId]);
+  }, [isRouterReady, actualRoomId, isInRoom, joinRoom, initialAudio, initialVideo]); 
+
+  useEffect(() => {
+    if (isInRoom) {
+      setIsJoining(false);
+      hasJoinedRef.current = true; 
+    }
+  }, [isInRoom]);
+
+  useEffect(() => {
+    if (hasJoinedRef.current && !isInRoom && !isJoining && actualRoomId) {
+      const timeout = setTimeout(() => {
+        hasJoinedRef.current = false;
+      }, 1000);
+      return () => clearTimeout(timeout);
+    }
+  }, [isInRoom, isJoining, actualRoomId]);
 
   const handleRetry = async () => {
     clearError();
     hasJoinedRef.current = false;
     setIsJoining(true);
-    if (roomId) {
+    if (actualRoomId) {
       try {
         hasJoinedRef.current = true;
-        await joinRoom(roomId, true);
+        await joinRoom(actualRoomId, true);
         setIsJoining(false);
       } catch (err) {
         setIsJoining(false);
@@ -154,10 +193,10 @@ const Room = () => {
     clearError();
     hasJoinedRef.current = false;
     setIsJoining(true);
-    if (roomId) {
+    if (actualRoomId) {
       try {
         hasJoinedRef.current = true;
-        await joinRoom(roomId, false);
+        await joinRoom(actualRoomId, false);
         setIsJoining(false);
       } catch (err) {
         setIsJoining(false);
@@ -166,14 +205,12 @@ const Room = () => {
     }
   };
 
-  // Обновляем локальный плеер при изменении stream
   useEffect(() => {
-    // Всегда показываем локального участника, даже если нет стрима
     setPlayers(prev => ({
       ...prev,
       [currentUserIdStr]: {
         stream: localStream || null,
-        muted: true, // Локальный всегда muted чтобы не слышать себя
+        muted: true, 
         playing: localStream ? videoEnabled : false,
         isLocal: true,
       },
@@ -184,7 +221,6 @@ const Room = () => {
     }));
   }, [localStream, videoEnabled, currentUserIdStr, currentUserName]);
 
-  // Обновляем состояние видео при переключении камеры
   useEffect(() => {
     setPlayers(prev => {
       if (!prev[currentUserIdStr]) return prev;
@@ -198,21 +234,18 @@ const Room = () => {
     });
   }, [videoEnabled, currentUserIdStr]);
 
-  // Обновляем удалённые плееры
   useEffect(() => {
     setPlayers(prev => {
       const newPlayers = { ...prev };
-      
-      // Добавляем/обновляем удалённые стримы
+
       remoteStreams.forEach((stream, odUserId) => {
         const userIdStr = odUserId.toString();
-        // Проверяем, есть ли активные видео треки (включая screen sharing)
         const hasVideoTracks = stream && stream.getVideoTracks().length > 0;
         const videoTracks = hasVideoTracks ? stream.getVideoTracks() : [];
         const hasActiveVideoTracks = videoTracks.some(track => 
           track.readyState === 'live' && track.enabled
         );
-        // Проверяем наличие screen sharing треков
+        
         const hasScreenShareTracks = videoTracks.some(track => 
           track.readyState === 'live' && 
           (track.label?.toLowerCase().includes('screen') || 
@@ -221,13 +254,12 @@ const Room = () => {
         
         newPlayers[userIdStr] = {
           stream: stream,
-          muted: false, // Удалённые не muted
-          playing: hasActiveVideoTracks || hasScreenShareTracks, // playing = true если есть активные видео треки или screen sharing
+          muted: false,
+          playing: hasActiveVideoTracks || hasScreenShareTracks,
           isLocal: false,
         };
       });
-      
-      // Удаляем плееры для отключившихся участников
+
       Object.keys(newPlayers).forEach(id => {
         if (id !== currentUserIdStr && !remoteStreams.has(parseInt(id)) && !remoteStreams.has(id)) {
           delete newPlayers[id];
@@ -237,10 +269,8 @@ const Room = () => {
       return newPlayers;
     });
 
-    // Обновляем имена участников для всех участников (не только тех, у кого есть stream)
     setPlayerNames(prev => {
       const newNames = { ...prev };
-      // Обновляем имена для всех участников
       participants.forEach(participant => {
         const participantId = participant.user?.id;
         if (!participantId) return;
@@ -253,7 +283,6 @@ const Room = () => {
     });
   }, [remoteStreams, participants, currentUserIdStr]);
 
-  // Обновляем имена всех участников сразу при изменении списка participants
   useEffect(() => {
     if (!participants || participants.length === 0) return;
     
@@ -266,7 +295,6 @@ const Room = () => {
         if (userIdStr) {
           const user = participant.user;
           const displayName = user?.displayName || user?.username || `Участник ${userIdStr.substring(0, 6)}`;
-          // Обновляем имя, даже если оно уже есть (на случай изменения)
           if (newNames[userIdStr] !== displayName) {
             newNames[userIdStr] = displayName;
             hasChanges = true;
@@ -293,18 +321,19 @@ const Room = () => {
   };
 
   const handleToggleAudio = async () => {
-    await toggleAudio();
-    // audioEnabled обновится в useRoomProtocol, 
-    // Player получит новое значение через проп
+    try {
+      await toggleAudio();
+    } catch (err) {
+    }
   };
 
   const handleToggleVideo = async () => {
-    await toggleVideo();
-    // videoEnabled обновится в useRoomProtocol,
-    // useEffect синхронизирует players[].playing
+    try {
+      await toggleVideo();
+    } catch (err) {
+    }
   };
 
-  // Мемоизируем вычисления для производительности
   const playerHighlighted = useMemo(() => players[currentUserIdStr], [players, currentUserIdStr]);
   
   const nonHighlightedPlayers = useMemo(() => {
@@ -320,10 +349,39 @@ const Room = () => {
     return participants.length || Object.keys(players).length || 1;
   }, [participants.length, players]);
 
-  // Убрали экран ошибки - пользователь может войти в комнату даже без медиа
+  const [showLoadingTimeout, setShowLoadingTimeout] = useState(false);
+  const [forceShowInterface, setForceShowInterface] = useState(false);
 
-  // Экран загрузки
-  if (!isInRoom || isJoining) {
+  useEffect(() => {
+    if (actualRoomId && hasJoinedRef.current && !isInRoom) {
+      const timeout = setTimeout(() => {
+        setForceShowInterface(true);
+        setIsJoining(false);
+      }, 8000);
+      return () => clearTimeout(timeout);
+    } else {
+      setForceShowInterface(false);
+    }
+  }, [actualRoomId, hasJoinedRef.current, isInRoom]);
+  
+  useEffect(() => {
+    if (isJoining && !isInRoom) {
+      const timeout = setTimeout(() => {
+        setShowLoadingTimeout(true);
+        setIsJoining(false);
+      }, 5000);
+      return () => clearTimeout(timeout);
+    } else {
+      setShowLoadingTimeout(false);
+    }
+  }, [isJoining, isInRoom]);
+
+  const shouldShowLoading = isRouterReady && !isInRoom && !forceShowInterface && (
+    (isJoining && !showLoadingTimeout) || 
+    (!hasJoinedRef.current && actualRoomId)
+  );
+
+  if (shouldShowLoading) {
     return (
       <div className={styles.roomContainer}>
         <div className={styles.topBar}>
@@ -339,24 +397,20 @@ const Room = () => {
 
   return (
     <div className={styles.roomContainer}>
-      {/* Тост-уведомления */}
       <RoomToast 
         notifications={toastNotifications} 
         onDismiss={dismissToast} 
       />
 
-      {/* Верхняя панель */}
       <div className={styles.topBar}>
         <div className={styles.logo}>Pager Meet</div>
         <div className={styles.meetingInfo}>
           <span className={styles.timer}>{formatTime(meetingTime)}</span>
-          <span className={styles.roomCode}>{roomId}</span>
+          <span className={styles.roomCode}>{actualRoomId}</span>
         </div>
       </div>
       
-      {/* Видео контейнер */}
       <div className={styles.videoGrid}>
-        {/* Превью своей демонстрации экрана */}
         {isScreenSharing && screenStream && (
           <div className={styles.screenSharePreview}>
             <video
@@ -370,15 +424,14 @@ const Room = () => {
           </div>
         )}
         
-        {/* Локальный плеер - показываем всегда, даже если нет стрима */}
         <div className={Object.keys(nonHighlightedPlayers).length > 0 ? styles.videoItem : styles.videoItemFull}>
           <Player
             stream={playerHighlighted?.stream || null}
-            muted={true}  // Локальный всегда muted чтобы не слышать себя
+            muted={true}
             playing={playerHighlighted?.playing || false}
             isActive
             isLocal
-            audioEnabled={audioEnabled}  // Реальное состояние микрофона
+            audioEnabled={audioEnabled}
             playerId={currentUserIdStr}
             playerName={playerNames[currentUserIdStr] || currentUserName}
             handRaised={handRaised}
@@ -386,28 +439,23 @@ const Room = () => {
           />
         </div>
         
-        {/* Удалённые плееры - показываем ВСЕХ участников, не только тех у кого есть stream */}
         {participants
           .filter(p => {
-            // Исключаем текущего пользователя (он показывается отдельно)
             const participantId = p.user?.id;
             return participantId && participantId.toString() !== currentUserIdStr && participantId !== currentUserId;
           })
           .map((participant) => {
             const participantId = participant.user?.id;
             const participantIdStr = participantId?.toString();
-            
-            // Находим stream для этого участника (если есть)
+
             const player = nonHighlightedPlayers[participantIdStr] || 
                           (participantId && nonHighlightedPlayers[participantId]);
-            
-            // Получаем имя участника
+
             const participantName = participant?.user?.displayName || 
                                     participant?.user?.username || 
                                     (player && playerNames[participantIdStr]) || 
                                     `Участник ${participantIdStr?.substring(0, 6) || ''}`;
-            
-            // Определяем screen sharing: проверяем и participant.screenSharing, и наличие screen sharing треков
+
             const hasScreenShareTracks = player?.stream && 
               player.stream.getVideoTracks().some(track => 
                 track.readyState === 'live' && 
@@ -420,11 +468,11 @@ const Room = () => {
               <div key={participantIdStr || participant.id} className={styles.videoItem}>
                 <Player
                   stream={player?.stream || null}
-                  muted={false}  // Удалённых слышим
+                  muted={false}
                   playing={player?.playing || false}
                   isActive={false}
                   isLocal={false}
-                  audioEnabled={participant?.audioEnabled !== false}  // Состояние микрофона участника
+                  audioEnabled={participant?.audioEnabled !== false}
                   playerId={participantIdStr}
                   playerName={participantName}
                   handRaised={participant?.handRaised === true}
@@ -434,13 +482,11 @@ const Room = () => {
             );
           })}
         
-        {/* Если один участник — показываем CopySection */}
         {participantCount <= 1 && (
-          <CopySection roomId={roomId} />
+          <CopySection roomId={actualRoomId} />
         )}
       </div>
       
-      {/* Нижняя панель управления */}
       <Bottom
         muted={!audioEnabled}
         playing={videoEnabled}
@@ -455,7 +501,6 @@ const Room = () => {
         onToggleScreenShare={isScreenSharing ? stopScreenShare : startScreenShare}
       />
 
-      {/* Модалка участников */}
       <ParticipantsModal
         isOpen={showParticipants}
         onClose={() => setShowParticipants(false)}

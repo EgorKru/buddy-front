@@ -15,7 +15,6 @@ export const CallProvider = ({ children }) => {
 
 CallProvider.displayName = 'CallProvider';
 
-// Пустой объект-заглушка для SSR и случаев вне провайдера
 const noopCall = {
   call: null,
   incomingCall: null,
@@ -40,7 +39,7 @@ const noopCall = {
 
 export const useCall = () => {
   const context = useContext(CallContext);
-  // Возвращаем заглушку если контекст недоступен (SSR или вне провайдера)
+  
   if (!context) {
     return noopCall;
   }

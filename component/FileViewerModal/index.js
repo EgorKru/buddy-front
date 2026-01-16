@@ -40,7 +40,7 @@ export default function FileViewerModal({ fileUrl, fileName, mimeType, onClose }
         const text = await response.text();
         setContent(text);
       } catch (err) {
-        console.error('Error loading file:', err);
+        
         setError('Не удалось загрузить файл');
       } finally {
         setLoading(false);
@@ -102,7 +102,7 @@ export default function FileViewerModal({ fileUrl, fileName, mimeType, onClose }
       document.body.removeChild(link);
       URL.revokeObjectURL(blobUrl);
     } catch (error) {
-      console.error('Error downloading file:', error);
+      
       alert('Не удалось скачать файл');
     }
   };

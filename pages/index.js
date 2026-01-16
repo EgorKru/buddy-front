@@ -46,20 +46,26 @@ export default function Home() {
   };
 
   const handleCreateRoom = async ({ stream, audioEnabled, videoEnabled }) => {
+    
     setIsCreating(true);
     setInputError('');
     try {
+      
       const newRoom = await roomAPI.createRoom(null, null, 'PUBLIC');
+
       if (newRoom && newRoom.roomId) {
         const params = new URLSearchParams({
           audio: audioEnabled ? '1' : '0',
           video: videoEnabled ? '1' : '0',
         });
-        router.push(`/room/${newRoom.roomId}?${params}`);
+        const targetUrl = `/room/${newRoom.roomId}?${params}`;
+
+        window.location.href = targetUrl;
       } else {
         throw new Error('Не удалось получить ID комнаты');
       }
     } catch (error) {
+      
       setInputError(error.message || 'Ошибка при создании комнаты');
       setIsCreating(false);
     }

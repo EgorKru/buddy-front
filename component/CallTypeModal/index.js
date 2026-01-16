@@ -25,22 +25,22 @@ const CallTypeModal = ({
   return (
     <div className={styles.overlay} onClick={onClose}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-        {/* Аватар */}
+        {}
         <div className={styles.avatarContainer}>
           <div className={styles.avatar}>
             {initials}
           </div>
         </div>
 
-        {/* Имя */}
+        {}
         <h2 className={styles.userName}>{displayName}</h2>
 
-        {/* Инструкция */}
+        {}
         <p className={styles.instruction}>
           Если Вы хотите начать видеозвонок, нажмите на значок камеры.
         </p>
 
-        {/* Кнопки */}
+        {}
         <div className={styles.actions}>
           <button
             className={styles.videoButton}

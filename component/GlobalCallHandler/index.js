@@ -25,7 +25,7 @@ const GlobalCallHandler = () => {
 
   return (
     <>
-      {/* Входящий звонок */}
+      {}
       {incomingCall && !isCallActive && !isRinging && (
         <IncomingCallModal
           call={incomingCall}
@@ -35,7 +35,7 @@ const GlobalCallHandler = () => {
         />
       )}
 
-      {/* Исходящий звонок (ожидание ответа) */}
+      {}
       {isRinging && call && !isCallActive && (
         <OutgoingCallModal
           call={call}
@@ -48,7 +48,7 @@ const GlobalCallHandler = () => {
         />
       )}
 
-      {/* Активный звонок */}
+      {}
       {isCallActive && call && (
         <CallView
           call={call}

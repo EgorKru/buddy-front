@@ -163,7 +163,7 @@ const MessageRow = React.memo(({
           </div>
         )}
         <div className={styles.messageContent}>
-          {/* Системные сообщения о звонках */}
+          {}
           {msg.type === 'SYSTEM' && msg.content && msg.content.includes('вызов') ? (
             <>
               {!isOwn && (

@@ -23,7 +23,7 @@ const ToastItem = ({ notification, onDismiss }) => {
     const timer = setTimeout(() => {
       setIsExiting(true);
       setTimeout(onDismiss, 300);
-    }, 2500); // 2.5 секунды
+    }, 2500); 
 
     return () => clearTimeout(timer);
   }, [onDismiss]);

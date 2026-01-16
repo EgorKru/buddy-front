@@ -6,6 +6,8 @@
   background: rgba(25, 25, 30, 0.95);
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   flex-shrink: 0;
+  position: relative;
+  z-index: 100;
 }
 
 .leftSection {
@@ -72,6 +74,9 @@
   color: rgb(255, 255, 255);
   cursor: pointer;
   transition: all 0.2s ease;
+  position: relative;
+  z-index: 101;
+  pointer-events: auto;
 }
 
 .icon:hover {

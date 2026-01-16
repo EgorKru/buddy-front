@@ -10,7 +10,6 @@ const CopySection = (props) => {
   const [visible, setVisible] = useState(true);
   const [fading, setFading] = useState(false);
 
-  // Автоматически скрываем через 5 секунд
   useEffect(() => {
     const fadeTimer = setTimeout(() => {
       setFading(true);
@@ -18,7 +17,7 @@ const CopySection = (props) => {
 
     const hideTimer = setTimeout(() => {
       setVisible(false);
-    }, 6000); // 5 сек + 1 сек на анимацию
+    }, 6000); 
 
     return () => {
       clearTimeout(fadeTimer);

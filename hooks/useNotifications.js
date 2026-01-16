@@ -26,7 +26,7 @@ export const useNotifications = () => {
       setLoading(false);
       return;
     }
-    // Защита от повторных вызовов
+    
     if (loadedRef.current || loadingRef.current) {
       return;
     }
@@ -69,7 +69,7 @@ export const useNotifications = () => {
   }, [client, connected]);
 
   const loadNotifications = async () => {
-    // Защита от параллельных вызовов
+    
     if (loadingRef.current) {
       return;
     }

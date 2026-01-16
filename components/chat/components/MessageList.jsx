@@ -32,7 +32,7 @@ export default function MessageList({
   chats
 }) {
   const visibleMessages = (() => {
-    // Если активен режим поиска, показываем только найденные сообщения
+    
     if (searchMode && searchResults && searchResults.length > 0) {
       const resultIds = new Set(searchResults.map(r => String(r.id)));
       return searchResults.filter(msg => {
@@ -41,8 +41,7 @@ export default function MessageList({
         return !isDeleted;
       });
     }
-    
-    // Обычный режим - показываем все сообщения
+
     return messages.filter(msg => {
       if (!msg || !msg.id) return false;
       const isDeleted = msg.deletedForMe === true || msg.deletedForAll === true;

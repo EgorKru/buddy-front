@@ -101,7 +101,7 @@ export default function ImageMessage({ fileUrl, content, messageTime, isOwn, sta
         img.src = blobUrl;
       } catch (err) {
         if (!cancelled) {
-          console.error('Error loading image:', err);
+          
           setError('Не удалось загрузить изображение');
           setLoading(false);
         }
@@ -144,7 +144,7 @@ export default function ImageMessage({ fileUrl, content, messageTime, isOwn, sta
           onImageClick(blobUrl, fileUrl);
         })
         .catch(err => {
-          console.error('Error loading image for modal:', err);
+          
         });
     }
   };
@@ -186,7 +186,7 @@ export default function ImageMessage({ fileUrl, content, messageTime, isOwn, sta
       document.body.removeChild(link);
       URL.revokeObjectURL(blobUrl);
     } catch (error) {
-      console.error('Error downloading image:', error);
+      
       alert('Не удалось скачать изображение');
     }
   };

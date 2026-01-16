@@ -223,8 +223,7 @@ export const useChat = (chatId, modals = {}) => {
     gapRecoveryInProgressRef,
     chat,
     messages,
-    
-    // Загрузка сообщений
+
     loading: messagesLoading,
     loadingMore,
     hasMore,
@@ -234,23 +233,20 @@ export const useChat = (chatId, modals = {}) => {
     loadChatStateFull,
     loadOlderMessages,
     isLoadingInitialRef,
-    
-    // Закрепленные сообщения
+
     pinnedMessages,
     viewedPinnedMessageId,
     setViewedPinnedMessageId,
     setPinnedMessages,
     loadPinnedMessages,
-    
-    // Выбор сообщений
+
     selectionMode,
     selectedMessages,
     handleSelectMessageBase,
     toggleMessageSelection,
     handleSelectAllBase,
     exitSelectionMode,
-    
-    // Управление скроллом
+
     ...restScrollManagement,
     scrollPositionSavedRef,
     userScrolledToBottomRef,
@@ -259,33 +255,25 @@ export const useChat = (chatId, modals = {}) => {
     lastScrollTopRef,
     isUserScrollingUpRef,
     unreadCount,
-    
-    // Навигация
+
     handleNavigateToMessage,
-    
-    // Поиск
+
     ...messageSearch,
-    
-    // Действия с сообщениями
+
     messageActions,
-    
-    // Голосовая запись
+
     voiceRecording,
-    
-    // Загрузка файлов
+
     fileUpload,
-    
-    // Массовые операции
+
     ...bulkMessageActions,
-    
-    // Отправка сообщений
+
     ...messageSending,
     prepareScrollForSending: messageSending.prepareScrollForSending,
     sendMessageHook,
     sending,
     syncQueue,
-    
-    // Refs
+
     messagesContainerRef,
     messageInputRef,
     sentAudioBlobRef,

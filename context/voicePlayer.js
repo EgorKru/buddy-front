@@ -3,13 +3,13 @@ import { createContext, useContext, useState, useCallback, useRef } from 'react'
 const VoicePlayerContext = createContext(null);
 
 export function VoicePlayerProvider({ children }) {
-  // ID текущего воспроизводимого плеера
+  
   const [activePlayerId, setActivePlayerId] = useState(null);
-  // Функция для остановки текущего плеера
+  
   const stopCurrentRef = useRef(null);
 
   const registerPlayer = useCallback((playerId, stopFn) => {
-    // Если это новый плеер и есть активный - останавливаем старый
+    
     if (activePlayerId && activePlayerId !== playerId && stopCurrentRef.current) {
       stopCurrentRef.current();
     }
@@ -48,7 +48,7 @@ export function VoicePlayerProvider({ children }) {
 export function useVoicePlayer() {
   const context = useContext(VoicePlayerContext);
   if (!context) {
-    // Возвращаем заглушку если провайдер не найден
+    
     return {
       activePlayerId: null,
       registerPlayer: () => {},

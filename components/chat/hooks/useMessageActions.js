@@ -3,9 +3,6 @@ import { chatAPI } from '@/utils/api';
 import { getCurrentUser } from '@/utils/api';
 import { NOTIFICATION_DISPLAY_DURATION, SEARCH_DEBOUNCE_DELAY } from '../constants/chat';
 
-/**
- * Хук для действий с сообщениями (edit, delete, pin, forward, reply)
- */
 export const useMessageActions = ({
   chatId,
   messages,
@@ -34,9 +31,6 @@ export const useMessageActions = ({
   
   const user = getCurrentUser();
 
-  /**
-   * Копирование сообщения в буфер обмена
-   */
   const handleCopyMessage = useCallback(async (message) => {
     if (!message?.content) return;
     
@@ -45,8 +39,7 @@ export const useMessageActions = ({
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(textToCopy);
-        
-        // Визуальная обратная связь
+
         if (typeof window !== 'undefined') {
           const notification = document.createElement('div');
           notification.textContent = 'Текст скопирован';
@@ -59,7 +52,7 @@ export const useMessageActions = ({
           }, NOTIFICATION_DISPLAY_DURATION);
         }
       } else {
-        // Fallback для старых браузеров
+        
         const textArea = document.createElement('textarea');
         textArea.value = textToCopy;
         textArea.style.cssText = 'position: fixed; opacity: 0;';
@@ -70,14 +63,11 @@ export const useMessageActions = ({
         document.body.removeChild(textArea);
       }
     } catch (err) {
-      console.error('Failed to copy text:', err);
+      
       alert('Не удалось скопировать текст');
     }
   }, []);
 
-  /**
-   * Удаление сообщения
-   */
   const handleDeleteMessage = useCallback((message) => {
     if (!message?.id || !chatId) return;
     setContextMenu(null);
@@ -86,9 +76,6 @@ export const useMessageActions = ({
     }
   }, [chatId, setContextMenu, setDeleteConfirm]);
 
-  /**
-   * Подтверждение удаления
-   */
   const handleConfirmDelete = useCallback(async () => {
     if (!deleteConfirm || !chatId) {
       return;
@@ -107,8 +94,7 @@ export const useMessageActions = ({
     
     const shouldDeleteForAll = deleteForAll;
     const deletedMessageIds = new Set(messageIds.map(id => Number(id)));
-    
-    // Немедленное удаление из списка
+
     for (const messageId of messageIds) {
       const messageToDelete = messages.find(m => Number(m.id) === Number(messageId));
       if (messageToDelete) {
@@ -118,8 +104,7 @@ export const useMessageActions = ({
         removeMessage(chatId, messageId, deletedForMe, deletedForAll);
       }
     }
-    
-    // Обновляем закрепленные сообщения
+
     setPinnedMessages(prev => {
       return prev.filter(p => {
         const pMsgId = p.message?.id;
@@ -152,8 +137,7 @@ export const useMessageActions = ({
         exitSelectionMode();
       }
     } catch (error) {
-      console.error('Error deleting messages:', error);
-      // Откатываем изменения при ошибке
+
       for (const messageId of messageIds) {
         const messageToDelete = messages.find(m => Number(m.id) === Number(messageId));
         if (messageToDelete) {
@@ -169,9 +153,6 @@ export const useMessageActions = ({
     }
   }, [chatId, deleteConfirm, deleteForAll, messages, updateMessage, removeMessage, viewedPinnedMessageId, setViewedPinnedMessageId, loadPinnedMessages, user, selectionMode, exitSelectionMode, setPinnedMessages]);
 
-  /**
-   * Редактирование сообщения
-   */
   const handleEditMessage = useCallback((message) => {
     setEditingMessageId(message.id);
     setEditingContent(message.content || '');
@@ -181,9 +162,6 @@ export const useMessageActions = ({
     }, SEARCH_DEBOUNCE_DELAY);
   }, [setContextMenu]);
 
-  /**
-   * Сохранение редактирования
-   */
   const handleSaveEdit = useCallback(async () => {
     if (!editingMessageId || !chatId || !editingContent.trim()) {
       setEditingMessageId(null);
@@ -217,22 +195,16 @@ export const useMessageActions = ({
       setEditingMessageId(null);
       setEditingContent('');
     } catch (error) {
-      console.error('Error editing message:', error);
+      
       alert('Не удалось отредактировать сообщение');
     }
   }, [editingMessageId, chatId, editingContent, messages, updateMessage]);
 
-  /**
-   * Отмена редактирования
-   */
   const handleCancelEdit = useCallback(() => {
     setEditingMessageId(null);
     setEditingContent('');
   }, []);
 
-  /**
-   * Ответ на сообщение
-   */
   const handleReplyMessage = useCallback((message) => {
     if (!message?.id) return;
     setReplyingToMessageId(message.id);
@@ -243,17 +215,11 @@ export const useMessageActions = ({
     }, SEARCH_DEBOUNCE_DELAY);
   }, [setContextMenu]);
 
-  /**
-   * Отмена ответа
-   */
   const handleCancelReply = useCallback(() => {
     setReplyingToMessageId(null);
     setReplyingToMessage(null);
   }, []);
 
-  /**
-   * Закрепление/открепление сообщения
-   */
   const handlePinMessage = useCallback(async (message) => {
     if (!message?.id || !chatId) return;
     setContextMenu(null);
@@ -265,7 +231,7 @@ export const useMessageActions = ({
     
     try {
       if (isCurrentlyPinned) {
-        // Оптимистичное обновление
+        
         const messageIdToUnpin = Number(message.id);
         setPinnedMessages(prev => prev.filter(p => {
           const pMsgId = p.message?.id;
@@ -280,8 +246,7 @@ export const useMessageActions = ({
         loadPinnedMessages();
       }
     } catch (error) {
-      console.error('Error pinning/unpinning message:', error);
-      // Откатываем изменения
+
       if (isCurrentlyPinned) {
         loadPinnedMessages();
         updateMessage({ ...message, isPinned: true }, { unreadDelta: 0 });
@@ -291,15 +256,12 @@ export const useMessageActions = ({
     }
   }, [chatId, pinnedMessages, setPinnedMessages, updateMessage, loadPinnedMessages, setContextMenu]);
 
-  /**
-   * Открепление сообщения (из PinnedMessagesHeader)
-   */
   const handleUnpinMessage = useCallback(async (pinnedMessage) => {
     if (!pinnedMessage?.message?.id || !chatId) return;
     const messageId = pinnedMessage.message.id;
     
     try {
-      // Оптимистичное обновление: сразу убираем из списка закрепленных
+      
       const messageIdToUnpin = Number(messageId);
       setPinnedMessages(prev => prev.filter(p => {
         const pMsgId = p.message?.id;
@@ -317,15 +279,12 @@ export const useMessageActions = ({
       
       await chatAPI.unpinMessage(chatId, messageId);
     } catch (error) {
-      console.error('Error unpinning message:', error);
+      
       loadPinnedMessages();
       alert('Не удалось открепить сообщение');
     }
   }, [chatId, messages, updateMessage, loadPinnedMessages, setPinnedMessages, viewedPinnedMessageId, setViewedPinnedMessageId]);
 
-  /**
-   * Пересылка сообщения
-   */
   const handleForwardMessage = useCallback((message) => {
     if (!message?.id) return;
     setContextMenu(null);
@@ -336,9 +295,6 @@ export const useMessageActions = ({
     });
   }, [setContextMenu]);
 
-  /**
-   * Подтверждение пересылки
-   */
   const handleConfirmForward = useCallback(async () => {
     if (!forwardModal || !forwardModal.selectedChatId) return;
     
@@ -357,24 +313,22 @@ export const useMessageActions = ({
       
       setForwardModal(null);
     } catch (error) {
-      console.error('Error forwarding message:', error);
+      
       alert('Не удалось переслать сообщение');
     }
   }, [forwardModal, chatId]);
 
   return {
-    // Состояние
+    
     editingMessageId,
     editingContent,
     replyingToMessageId,
     replyingToMessage,
-    
-    // Setters
+
     setEditingContent,
     setReplyingToMessageId,
     setReplyingToMessage,
-    
-    // Обработчики
+
     handleCopyMessage,
     handleDeleteMessage,
     handleConfirmDelete,

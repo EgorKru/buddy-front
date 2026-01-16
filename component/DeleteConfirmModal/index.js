@@ -62,7 +62,7 @@ export default function DeleteConfirmModal({
               if (onConfirm && typeof onConfirm === 'function') {
                 onConfirm();
               } else {
-                console.error('[DeleteModal] onConfirm is not a function:', typeof onConfirm);
+                
               }
             }}
           >

@@ -74,7 +74,7 @@ export default function ImageModal({ imageUrl, fileUrl, onClose }) {
       document.body.removeChild(link);
       URL.revokeObjectURL(blobUrl);
     } catch (error) {
-      console.error('Error downloading image:', error);
+      
       alert('Не удалось скачать изображение');
     }
   };

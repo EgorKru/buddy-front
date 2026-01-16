@@ -51,13 +51,12 @@ const ParticipantsModal = ({
     return name.substring(0, 2).toUpperCase();
   };
 
-  // Сортируем: HOST первый, потом CO_HOST, потом с поднятой рукой, потом остальные
   const sortedParticipants = [...(participants || [])].sort((a, b) => {
     const roleOrder = { HOST: 0, CO_HOST: 1, PARTICIPANT: 2 };
     const roleA = roleOrder[a.role] ?? 2;
     const roleB = roleOrder[b.role] ?? 2;
     if (roleA !== roleB) return roleA - roleB;
-    // Поднятая рука выше
+    
     if (a.handRaised && !b.handRaised) return -1;
     if (!a.handRaised && b.handRaised) return 1;
     return 0;
@@ -144,7 +143,7 @@ const ParticipantsModal = ({
                   )}
                 </div>
 
-                {/* Меню действий для хоста/со-хоста */}
+                {}
                 {canManageThis && (
                   <div className={styles.actionMenu}>
                     <button 

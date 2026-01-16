@@ -36,8 +36,6 @@ export default function MediaPreviewModal({
     setError,
   } = useMediaDevices();
 
-  // НЕ запрашиваем доступ при открытии модального окна
-  // Доступ будет запрошен только когда пользователь явно включит микрофон или камеру
   useEffect(() => {
     if (!isOpen) {
       stopPreview();
@@ -64,11 +62,15 @@ export default function MediaPreviewModal({
   }, [isOpen, stopPreview]);
 
   const handleConfirm = () => {
+
+    const finalAudio = audioEnabled || (!audioEnabled && !videoEnabled);
+    const finalVideo = videoEnabled;
+    
     const stream = getStream();
     onConfirm({
       stream,
-      audioEnabled,
-      videoEnabled,
+      audioEnabled: finalAudio,
+      videoEnabled: finalVideo,
     });
   };
 
@@ -125,7 +127,7 @@ export default function MediaPreviewModal({
             )}
           </div>
 
-          {/* Проверка микрофона */}
+          {}
           {permissionGranted && audioEnabled && (
             <div className={styles.micTest}>
               <div className={styles.micTestHeader}>

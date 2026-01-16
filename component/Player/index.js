@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import cx from "classnames";
 import { Mic, MicOff, Hand, Monitor } from "lucide-react";
 
@@ -7,41 +7,38 @@ import styles from "@/component/Player/index.module.css";
 const Player = (props) => {
   const { 
     stream, 
-    muted,           // Для video элемента (локальный всегда muted чтобы не слышать себя)
+    muted,           
     playing, 
     isActive, 
     playerId, 
     playerName, 
     isLocal,
-    audioEnabled = true,  // Реальное состояние микрофона (включён/выключен)
-    handRaised = false,   // Поднята ли рука
-    isScreenSharing = false  // Демонстрирует ли экран
+    audioEnabled = true,  
+    handRaised = false,   
+    isScreenSharing = false  
   } = props;
   const videoRef = useRef(null);
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
   const animationFrameRef = useRef(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  
-  // Для локального: audioEnabled показывает включён ли микрофон
-  // Для удалённых: muted показывает слышим ли мы их (всегда false)
+
   const isMicOn = isLocal ? audioEnabled : !muted;
   
   useEffect(() => {
     if (videoRef.current && stream) {
-      // Предотвращаем мерцание: обновляем только если stream действительно изменился
+      
       if (videoRef.current.srcObject !== stream) {
         videoRef.current.srcObject = stream;
       }
     } else if (videoRef.current && !stream) {
-      // Очищаем только если stream действительно удален
+      
       if (videoRef.current.srcObject) {
         videoRef.current.srcObject = null;
       }
     }
   }, [stream]);
 
-  // Voice Activity Detection — работает для всех участников
   useEffect(() => {
     if (!stream) {
       setIsSpeaking(false);
@@ -54,7 +51,6 @@ const Player = (props) => {
       return;
     }
 
-    // Если микрофон выключен — не показываем индикатор
     if (!isMicOn) {
       setIsSpeaking(false);
       return;
@@ -73,15 +69,14 @@ const Player = (props) => {
       const dataArray = new Uint8Array(bufferLength);
       
       let speakingTimeout = null;
-      const SPEAKING_THRESHOLD = 12; // Порог громкости (чуть ниже для лучшей чувствительности)
-      const SPEAKING_DELAY = 250; // Задержка перед выключением индикатора
+      const SPEAKING_THRESHOLD = 12; 
+      const SPEAKING_DELAY = 250; 
       
       const checkAudioLevel = () => {
         if (!analyserRef.current) return;
         
         analyserRef.current.getByteFrequencyData(dataArray);
-        
-        // Считаем среднюю громкость
+
         let sum = 0;
         for (let i = 0; i < bufferLength; i++) {
           sum += dataArray[i];
@@ -114,7 +109,7 @@ const Player = (props) => {
         }
       };
     } catch (err) {
-      console.error('Error setting up audio analysis:', err);
+      
     }
   }, [stream, isMicOn]);
 
@@ -128,24 +123,26 @@ const Player = (props) => {
   };
 
   const displayName = playerName || `Участник ${playerId?.substring(0, 6) || ""}`;
-  const initials = getInitials(displayName);
+
+  const [initials, setInitials] = useState("??");
   
-  // Определяем, есть ли видео треки в стриме
+  useEffect(() => {
+    
+    setInitials(getInitials(displayName));
+  }, [displayName]);
+
   const hasVideoTracks = stream && stream.getVideoTracks().length > 0;
   const videoTracks = hasVideoTracks ? stream.getVideoTracks() : [];
   const hasActiveVideoTracks = videoTracks.some(track => 
     track.readyState === 'live' && track.enabled
   );
-  // Проверяем наличие screen sharing треков в стриме
+  
   const hasScreenShareTracksInStream = videoTracks.some(track => 
     track.readyState === 'live' && 
     (track.label?.toLowerCase().includes('screen') || 
      track.label?.toLowerCase().includes('display'))
   );
-  
-  // Показываем видео, если есть активные видео треки и playing = true
-  // Или если есть screen sharing (всегда показываем видео для screen sharing)
-  // Но не показываем видео, если stream пустой или нет треков
+
   const shouldShowVideo = stream && ((playing && hasActiveVideoTracks) || isScreenSharing || hasScreenShareTracksInStream);
 
   return (
@@ -167,25 +164,29 @@ const Player = (props) => {
         />
       ) : (
         <div className={styles.avatarContainer}>
-          <div className={cx(styles.avatar, { [styles.avatarSpeaking]: isSpeaking && isMicOn })} style={{ fontSize: isActive ? '120px' : '60px' }}>
+          <div 
+            className={cx(styles.avatar, { [styles.avatarSpeaking]: isSpeaking && isMicOn })} 
+            style={{ fontSize: isActive ? '120px' : '60px' }}
+            suppressHydrationWarning
+          >
             {initials}
           </div>
         </div>
       )}
 
-      <div className={styles.nameLabel}>
+      <div className={styles.nameLabel} suppressHydrationWarning>
         {displayName}
         {isSpeaking && isMicOn && <span className={styles.speakingIndicator}>🔊</span>}
       </div>
 
-      {/* Индикатор поднятой руки */}
+      {}
       {handRaised && (
         <div className={styles.handRaisedBadge}>
           <Hand size={20} />
         </div>
       )}
 
-      {/* Индикатор демонстрации экрана */}
+      {}
       {isScreenSharing && (
         <div className={styles.screenShareBadge}>
           <Monitor size={16} />

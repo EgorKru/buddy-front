@@ -11,7 +11,6 @@ import GlobalNotifications from "@/component/GlobalNotifications";
 import GlobalCallHandler from "@/component/GlobalCallHandler";
 import { isAuthenticated } from "@/utils/api";
 
-// Telegram Web подход: регистрация Service Worker для кеширования
 function registerServiceWorker() {
   if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
     window.addEventListener('load', () => {
@@ -46,7 +45,6 @@ export default function App({ Component, pageProps }) {
 
   const authed = isAuthenticated();
 
-  // Регистрируем Service Worker при монтировании (Telegram Web подход)
   useEffect(() => {
     registerServiceWorker();
   }, []);

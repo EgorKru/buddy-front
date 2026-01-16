@@ -16,11 +16,13 @@ export default function RoomControls({ chatId, chatType }) {
   };
 
   const handleConfirm = async ({ stream, audioEnabled, videoEnabled }) => {
+    
     setIsCreating(true);
     try {
       const type = chatType === 'GROUP' ? 'PRIVATE' : 'PUBLIC';
-      const newRoom = await roomAPI.createRoom(null, chatId, type);
       
+      const newRoom = await roomAPI.createRoom(null, chatId, type);
+
       if (!newRoom || !newRoom.roomId) {
         throw new Error('Не удалось получить ID комнаты');
       }
@@ -30,8 +32,11 @@ export default function RoomControls({ chatId, chatType }) {
         video: videoEnabled ? '1' : '0',
       });
       
-      router.push(`/room/${newRoom.roomId}?${params}`);
+      const targetUrl = `/room/${newRoom.roomId}?${params}`;
+
+      window.location.href = targetUrl;
     } catch (error) {
+      
       alert(`Ошибка при создании комнаты: ${error.message}`);
       setIsCreating(false);
     }

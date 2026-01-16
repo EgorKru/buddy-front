@@ -1,8 +1,5 @@
 import { SCROLL_RESTORE_TIMEOUT } from '../constants/chat';
 
-/**
- * Сохраняет позицию скролла в localStorage
- */
 export const saveScrollPositionToStorage = (chatId, scrollData) => {
   if (typeof window !== 'undefined' && chatId) {
     localStorage.setItem(`chat_scroll_${chatId}`, JSON.stringify({
@@ -12,9 +9,6 @@ export const saveScrollPositionToStorage = (chatId, scrollData) => {
   }
 };
 
-/**
- * Загружает сохраненную позицию скролла из localStorage
- */
 export const loadScrollPositionFromStorage = (chatId) => {
   if (typeof window === 'undefined' || !chatId) return null;
   
@@ -33,18 +27,12 @@ export const loadScrollPositionFromStorage = (chatId) => {
   }
 };
 
-/**
- * Проверяет, находится ли пользователь внизу контейнера
- */
 export const isAtBottom = (container, threshold = 100) => {
   if (!container) return false;
   const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
   return distanceFromBottom <= threshold;
 };
 
-/**
- * Находит первое видимое сообщение в контейнере
- */
 export const findFirstVisibleMessage = (container) => {
   if (!container) return null;
   
@@ -67,9 +55,6 @@ export const findFirstVisibleMessage = (container) => {
   return bestMessage;
 };
 
-/**
- * Подсчитывает количество сообщений ниже видимой области
- */
 export const countMessagesBelowViewport = (container) => {
   if (!container) return 0;
   
@@ -80,7 +65,7 @@ export const countMessagesBelowViewport = (container) => {
   
   for (const msgEl of messages) {
     const msgRect = msgEl.getBoundingClientRect();
-    // Если сообщение полностью ниже видимой области
+    
     if (msgRect.top > viewportBottom) {
       count++;
     }

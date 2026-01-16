@@ -20,10 +20,9 @@ export const useMessageEffects = ({
   useEffect(() => {
     if (messages.length > 0 && !scrollPositionSavedRef.current && messagesContainerRef.current) {
       const container = messagesContainerRef.current;
-      
-      // Синхронно устанавливаем позицию вниз сразу при рендере
+
       if (!shouldRestorePositionRef.current) {
-        // Двойной requestAnimationFrame для гарантии, что DOM полностью обновлен
+        
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             const targetScrollTop = container.scrollHeight;
@@ -40,7 +39,6 @@ export const useMessageEffects = ({
     }
   }, [messages.length, scrollPositionSavedRef, messagesContainerRef, shouldRestorePositionRef, userScrolledToBottomRef, isUserScrollingUpRef, lastScrollTopRef]);
 
-  // Дополнительная проверка после отрисовки для гарантированного скролла
   useEffect(() => {
     if (messages.length > 0 && messagesContainerRef.current && !scrollPositionSavedRef.current) {
       const container = messagesContainerRef.current;
@@ -60,11 +58,10 @@ export const useMessageEffects = ({
         }
       };
 
-      // Используем несколько попыток для гарантии скролла
       const attemptScroll = (attempt = 0) => {
         if (container.scrollHeight > container.clientHeight) {
           performScroll();
-          // Дополнительная проверка через небольшую задержку
+          
           setTimeout(() => {
             const currentScrollTop = container.scrollTop;
             const maxScrollTop = container.scrollHeight - container.clientHeight;
@@ -73,7 +70,7 @@ export const useMessageEffects = ({
             }
           }, 100);
         } else if (attempt < 20) {
-          // Если контент еще не загружен, ждем (максимум 20 попыток = 1 секунда)
+          
           setTimeout(() => {
             if (!scrollPositionSavedRef.current) {
               attemptScroll(attempt + 1);

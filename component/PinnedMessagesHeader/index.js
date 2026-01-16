@@ -65,7 +65,7 @@ export default function PinnedMessagesHeader({
           messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
           onViewedChange(msg.id);
         } catch (error) {
-          console.error('Failed to load message:', error);
+          
         }
       }
     }

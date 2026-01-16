@@ -11,12 +11,12 @@ export const config = {
     nativeUrl: process.env.NEXT_PUBLIC_WS_NATIVE_URL ||
       (process.env.NEXT_PUBLIC_SOCKET_URL ? `${process.env.NEXT_PUBLIC_SOCKET_URL}/ws-native` : null) ||
       (process.env.NEXT_PUBLIC_API_URL?.replace('/api', '/ws-native')) ||
-      'wss://pager.website/ws-native',
+      'ws://localhost:8080/ws-native',
     sockjsUrl: process.env.NEXT_PUBLIC_WS_SOCKJS_URL ||
       process.env.NEXT_PUBLIC_WS_URL ||
       (process.env.NEXT_PUBLIC_SOCKET_URL ? `${process.env.NEXT_PUBLIC_SOCKET_URL}/ws` : null) ||
       (process.env.NEXT_PUBLIC_API_URL?.replace('/api', '/ws')) ||
-      'https://pager.website/ws',
+      'https://localhost:8080/ws',
     options: {
       reconnectDelay: 5000,
       heartbeatIncoming: 4000,

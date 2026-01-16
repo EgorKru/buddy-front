@@ -2,10 +2,6 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { VOICE_MIN_HOLD_TIME, VOICE_LOCK_THRESHOLD } from '../constants/chat';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 
-/**
- * Хук для управления UI голосовой записи
- * Объединяет useVoiceRecorder с UI логикой (drag, lock, preview)
- */
 export const useVoiceRecordingUI = () => {
   const voiceRecorder = useVoiceRecorder();
   
