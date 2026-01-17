@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Edit, Reply, X, Paperclip, Mic, Send, Lock, Unlock, ChevronDown, ChevronUp, File as FileIcon, Loader2, Pause, Play, Trash2, Volume2 } from 'lucide-react';
+import { Edit, Reply, X, Paperclip, Mic, Send, Lock, Unlock, ChevronDown, ChevronUp, File as FileIcon, Loader2, Pause, Play, Trash2, Volume2, Headphones } from 'lucide-react';
 import { formatFileSize } from '../utils/messageHelpers';
 import { useAutoResizeTextarea } from '../hooks/useAutoResizeTextarea';
 import styles from '@/styles/chat.module.css';
@@ -51,50 +51,47 @@ export default function MessageInputArea({
 
   useEffect(() => {
     if (!audioPreviewRef?.current || !isRecording || !isLocked) {
-      setCurrentTime(0);
-      setDuration(0);
+      if (!isRecording || !isLocked) {
+        setCurrentTime(0);
+        if (!isRecording || !isLocked) {
+          setDuration(0);
+        }
+      }
       return;
     }
 
     const audio = audioPreviewRef.current;
     if (!audio) return;
     
-    const updateTime = () => {
-      if (audio && audio.duration && Number.isFinite(audio.duration)) {
-        setCurrentTime(audio.currentTime || 0);
-        setDuration(audio.duration || 0);
+    const updateDuration = () => {
+      if (audio && audio.duration && Number.isFinite(audio.duration) && audio.duration > 0) {
+        setDuration(audio.duration);
       }
     };
 
     const handleLoadedMetadata = () => {
-      if (audio && audio.duration && Number.isFinite(audio.duration)) {
-        setDuration(audio.duration);
-      }
+      updateDuration();
     };
 
     const handleDurationChange = () => {
-      if (audio && audio.duration && Number.isFinite(audio.duration)) {
-        setDuration(audio.duration);
-      }
+      updateDuration();
     };
 
-    // Обновляем время сразу если доступно
-    if (audio.duration && Number.isFinite(audio.duration)) {
-      setDuration(audio.duration);
-    }
-    if (audio.currentTime && Number.isFinite(audio.currentTime)) {
-      setCurrentTime(audio.currentTime);
-    }
+    const handleCanPlay = () => {
+      updateDuration();
+    };
 
-    audio.addEventListener('timeupdate', updateTime);
+    updateDuration();
+
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
     audio.addEventListener('durationchange', handleDurationChange);
+    audio.addEventListener('canplay', handleCanPlay);
 
     return () => {
       if (audio) {
-        audio.removeEventListener('timeupdate', updateTime);
         audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
         audio.removeEventListener('durationchange', handleDurationChange);
+        audio.removeEventListener('canplay', handleCanPlay);
       }
     };
   }, [audioPreviewRef, isRecording, isLocked]);
@@ -215,83 +212,116 @@ export default function MessageInputArea({
               Для отмены отпустите курсор вне поля
             </div>
           </>
-        ) : isRecording && isLocked ? (
-          <div className={styles.voicePreviewBar}>
-            <div className={styles.voiceLockIcon}>
-              <Lock size={16} />
-            </div>
-            <button
-              type="button"
-              onClick={onCancelRecording}
-              className={styles.voiceDeleteButton}
-              title="Удалить запись"
-            >
-              <Trash2 size={20} />
-            </button>
-            <button
-              type="button"
-              onClick={async () => {
-                if (audioPreviewRef?.current) {
-                  try {
-                    if (isPlayingPreview) {
-                      audioPreviewRef.current.pause();
-                      onPlayPreview(false);
-                    } else {
-                      await audioPreviewRef.current.play();
-                      onPlayPreview(true);
-                    }
-                  } catch (error) {
-                    console.error('Error playing audio:', error);
-                    onPlayPreview(false);
-                  }
-                }
-              }}
-              className={styles.voicePlayButton}
-              title={isPlayingPreview ? "Пауза" : "Прослушать"}
-            >
-              {isPlayingPreview ? <Pause size={20} /> : <Play size={20} />}
-            </button>
-            <div className={styles.voiceWaveform}>
-              {Array.from({ length: 50 }).map((_, i) => {
-                const progress = duration > 0 ? currentTime / duration : 0;
-                const isPlayed = i < progress * 50;
-                const baseHeight = 6;
-                const variation = Math.sin(i * 0.25) * 5;
-                const height = baseHeight + variation;
-                return (
-                  <div
-                    key={i}
-                    className={`${styles.waveformBar} ${isPlayed ? styles.played : ''}`}
-                    style={{ 
-                      height: `${Math.max(4, height)}px`,
-                      opacity: isPlayed ? 1 : 0.4
-                    }}
-                  />
-                );
-              })}
-            </div>
-            <div className={styles.voiceDuration}>
-              {duration > 0
-                ? `${Math.floor(currentTime / 60)}:${Math.floor(currentTime % 60).toString().padStart(2, '0')} / ${Math.floor(duration / 60)}:${Math.floor(duration % 60).toString().padStart(2, '0')}`
-                : `${Math.floor((recordingTime || 0) / 60)}:${((recordingTime || 0) % 60).toString().padStart(2, '0')}`
-              }
-            </div>
-            <button
-              type="button"
-              onClick={onStopRecording}
-              className={styles.voiceSendButton}
-              title="Отправить запись"
-            >
-              <Send size={20} />
-            </button>
-          </div>
         ) : (
           <>
-            {isRecording && !isLocked ? (
+            {isRecording ? (
               <div className={styles.voiceRecordingInput}>
-                <div className={styles.voiceRecordingTime}>
-                  {Math.floor((recordingTime || 0) / 60)}:{((recordingTime || 0) % 60).toString().padStart(2, '0')}
-                </div>
+                {isLocked ? (
+                  <>
+                    <div className={styles.voiceLockIcon}>
+                      <Lock size={16} />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={onCancelRecording}
+                      className={styles.voiceDeleteButton}
+                      title="Удалить запись"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isPaused) {
+                          if (isPlayingPreview && audioPreviewRef?.current) {
+                            audioPreviewRef.current.pause();
+                            onPlayPreview(false);
+                          }
+                          onResumeRecording();
+                        } else {
+                          onPauseRecording();
+                        }
+                      }}
+                      className={styles.voiceActionButton}
+                      title={isPaused ? "Возобновить запись" : "Приостановить запись"}
+                    >
+                      {isPaused ? <Mic size={18} /> : <Pause size={18} />}
+                    </button>
+                    {isPaused && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (audioPreviewRef?.current) {
+                            try {
+                              if (isPlayingPreview) {
+                                audioPreviewRef.current.pause();
+                                onPlayPreview(false);
+                              } else {
+                                const audio = audioPreviewRef.current;
+                                if (!audio.src) {
+                                  return;
+                                }
+                                
+                                const currentSrc = audio.src;
+                                if (currentSrc && currentSrc.startsWith('blob:')) {
+                                  audio.currentTime = 0;
+                                  if (audio.readyState < 2) {
+                                    await new Promise((resolve, reject) => {
+                                      const timeout = setTimeout(() => reject(new Error('Timeout')), 3000);
+                                      const onCanPlay = () => {
+                                        clearTimeout(timeout);
+                                        audio.removeEventListener('canplay', onCanPlay);
+                                        audio.removeEventListener('error', onError);
+                                        resolve();
+                                      };
+                                      const onError = (e) => {
+                                        clearTimeout(timeout);
+                                        audio.removeEventListener('canplay', onCanPlay);
+                                        audio.removeEventListener('error', onError);
+                                        reject(e);
+                                      };
+                                      audio.addEventListener('canplay', onCanPlay);
+                                      audio.addEventListener('error', onError);
+                                      audio.load();
+                                    });
+                                  }
+                                  audio.currentTime = 0;
+                                  await audio.play();
+                                  onPlayPreview(true);
+                                }
+                              }
+                            } catch (error) {
+                              console.error('Error playing audio:', error);
+                              onPlayPreview(false);
+                            }
+                          }
+                        }}
+                        className={styles.voicePlayButton}
+                        title={isPlayingPreview ? "Пауза прослушивания" : "Прослушать запись"}
+                      >
+                        {isPlayingPreview ? <Pause size={18} /> : <Headphones size={18} />}
+                      </button>
+                    )}
+                    <div className={styles.voiceRecordingTime}>
+                      {isPlayingPreview && duration > 0
+                        ? `${Math.floor(currentTime / 60)}:${Math.floor(currentTime % 60).toString().padStart(2, '0')} / ${Math.floor(duration / 60)}:${Math.floor(duration % 60).toString().padStart(2, '0')}`
+                        : `${Math.floor((recordingTime || 0) / 60)}:${((recordingTime || 0) % 60).toString().padStart(2, '0')}`
+                      }
+                    </div>
+                    <button
+                      type="button"
+                      onClick={onStopRecording}
+                      className={styles.voiceSendButton}
+                      title="Отправить запись"
+                    >
+                      <Send size={18} />
+                    </button>
+                  </>
+                ) : (
+                  <div className={styles.voiceRecordingTime}>
+                    {Math.floor((recordingTime || 0) / 60)}:{((recordingTime || 0) % 60).toString().padStart(2, '0')}
+                  </div>
+                )}
               </div>
             ) : (
               <textarea
@@ -443,28 +473,67 @@ export default function MessageInputArea({
       {isRecording && isLocked && audioPreviewRef && (
         <audio
           ref={audioPreviewRef}
+          preload="metadata"
           onTimeUpdate={() => {
             if (audioPreviewRef.current) {
               const audio = audioPreviewRef.current;
-              // Проверяем, что воспроизведение закончилось
-              if (audio.duration && Number.isFinite(audio.duration) && 
-                  audio.currentTime && Number.isFinite(audio.currentTime) &&
-                  audio.duration > 0 && audio.currentTime >= audio.duration - 0.1) {
-                onPlayPreview(false);
+              const current = audio.currentTime || 0;
+              const dur = audio.duration || 0;
+              
+              setCurrentTime(current);
+              if (dur > 0 && Number.isFinite(dur)) {
+                setDuration(dur);
+              }
+            }
+          }}
+          onLoadedMetadata={() => {
+            if (audioPreviewRef.current) {
+              const audio = audioPreviewRef.current;
+              const dur = audio.duration || 0;
+              if (dur > 0 && Number.isFinite(dur)) {
+                setDuration(dur);
+              }
+            }
+          }}
+          onCanPlay={() => {
+            if (audioPreviewRef.current) {
+              const audio = audioPreviewRef.current;
+              const dur = audio.duration || 0;
+              if (dur > 0 && Number.isFinite(dur)) {
+                setDuration(dur);
+              }
+            }
+          }}
+          onDurationChange={() => {
+            if (audioPreviewRef.current) {
+              const audio = audioPreviewRef.current;
+              const dur = audio.duration || 0;
+              if (dur > 0 && Number.isFinite(dur)) {
+                setDuration(dur);
               }
             }
           }}
           onEnded={() => {
+            if (audioPreviewRef.current) {
+              const audio = audioPreviewRef.current;
+              audio.pause();
+              audio.currentTime = 0;
+            }
+            setCurrentTime(0);
             onPlayPreview(false);
           }}
           onPause={() => {
-            // Если пауза не была вызвана пользователем, сбрасываем состояние
-            if (audioPreviewRef.current && audioPreviewRef.current.ended) {
-              onPlayPreview(false);
+            if (audioPreviewRef.current) {
+              const audio = audioPreviewRef.current;
+              if (audio.ended) {
+                setCurrentTime(0);
+                onPlayPreview(false);
+              }
             }
           }}
           onError={(e) => {
             console.error('Audio playback error:', e);
+            setCurrentTime(0);
             onPlayPreview(false);
           }}
           style={{ display: 'none' }}

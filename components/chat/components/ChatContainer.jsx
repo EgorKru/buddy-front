@@ -361,42 +361,80 @@ const ChatContainer = ({ chatId }) => {
       const updateAudioSrc = () => {
         if (!audioPreviewRef.current) return;
         
-        // Создаем blob из текущих чанков для предпросмотра
+        const audio = audioPreviewRef.current;
+        const isCurrentlyPlaying = !audio.paused && 
+                                   !audio.ended && 
+                                   audio.currentTime > 0 &&
+                                   audio.readyState > 2;
+        
+        if (isCurrentlyPlaying || isPlayingPreview) {
+          return;
+        }
+        
         const audioChunksRef = voiceRecording.audioChunksRef || { current: [] };
         if (audioChunksRef.current && audioChunksRef.current.length > 0) {
           try {
-            const previewBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+            const allChunks = [...audioChunksRef.current];
+            const previewBlob = new Blob(allChunks, { type: 'audio/webm' });
             if (previewBlob && previewBlob.size > 0) {
-              // Отзываем старый URL если есть
-              if (audioPreviewRef.current.src && audioPreviewRef.current.src.startsWith('blob:')) {
-                URL.revokeObjectURL(audioPreviewRef.current.src);
-              }
               const url = URL.createObjectURL(previewBlob);
-              audioPreviewRef.current.src = url;
-              audioPreviewRef.current.load();
+              const oldSrc = audio.src;
+              audio.src = url;
+              const revokeOldSrc = () => {
+                if (oldSrc && oldSrc.startsWith('blob:') && oldSrc !== url) {
+                  URL.revokeObjectURL(oldSrc);
+                }
+              };
+              audio.addEventListener('loadeddata', revokeOldSrc, { once: true });
+              audio.addEventListener('error', revokeOldSrc, { once: true });
+              if (audio.readyState === 0) {
+                audio.load();
+              } else {
+                setTimeout(revokeOldSrc, 200);
+              }
             }
           } catch (error) {
             console.error('Error creating preview blob:', error);
           }
         } else if (previewBlob && previewBlob.size > 0) {
           try {
-            if (audioPreviewRef.current.src && audioPreviewRef.current.src.startsWith('blob:')) {
-              URL.revokeObjectURL(audioPreviewRef.current.src);
-            }
+            const currentSrc = audio.src;
             const url = URL.createObjectURL(previewBlob);
-            audioPreviewRef.current.src = url;
-            audioPreviewRef.current.load();
+            const oldSrc = currentSrc;
+            audio.src = url;
+            const revokeOldSrc = () => {
+              if (oldSrc && oldSrc.startsWith('blob:') && oldSrc !== url) {
+                URL.revokeObjectURL(oldSrc);
+              }
+            };
+            audio.addEventListener('loadeddata', revokeOldSrc, { once: true });
+            audio.addEventListener('error', revokeOldSrc, { once: true });
+            if (audio.readyState === 0) {
+              audio.load();
+            } else {
+              setTimeout(revokeOldSrc, 200);
+            }
           } catch (error) {
             console.error('Error setting preview blob:', error);
           }
         } else if (audioBlob && audioBlob.size > 0) {
           try {
-            if (audioPreviewRef.current.src && audioPreviewRef.current.src.startsWith('blob:')) {
-              URL.revokeObjectURL(audioPreviewRef.current.src);
-            }
+            const currentSrc = audio.src;
             const url = URL.createObjectURL(audioBlob);
-            audioPreviewRef.current.src = url;
-            audioPreviewRef.current.load();
+            const oldSrc = currentSrc;
+            audio.src = url;
+            const revokeOldSrc = () => {
+              if (oldSrc && oldSrc.startsWith('blob:') && oldSrc !== url) {
+                URL.revokeObjectURL(oldSrc);
+              }
+            };
+            audio.addEventListener('loadeddata', revokeOldSrc, { once: true });
+            audio.addEventListener('error', revokeOldSrc, { once: true });
+            if (audio.readyState === 0) {
+              audio.load();
+            } else {
+              setTimeout(revokeOldSrc, 200);
+            }
           } catch (error) {
             console.error('Error setting audio blob:', error);
           }
@@ -406,26 +444,34 @@ const ChatContainer = ({ chatId }) => {
       // Обновляем аудио при изменении состояния
       updateAudioSrc();
       
-      // Периодически обновляем для получения актуальных чанков (каждую секунду)
-      // Но только если не воспроизводится (чтобы не прерывать воспроизведение)
+      let lastChunksCount = 0;
+      let lastBlobSize = 0;
       const interval = setInterval(() => {
-        if (!isPlayingPreview) {
-          updateAudioSrc();
+        if (!audioPreviewRef.current) return;
+        const audio = audioPreviewRef.current;
+        const isCurrentlyPlaying = !audio.paused && 
+                                   !audio.ended && 
+                                   audio.currentTime > 0 &&
+                                   audio.readyState > 2;
+        if (isPlayingPreview || isCurrentlyPlaying) {
+          return;
         }
-      }, 1000);
+        const audioChunksRef = voiceRecording.audioChunksRef || { current: [] };
+        if (audioChunksRef.current && audioChunksRef.current.length > 0) {
+          const currentSize = audioChunksRef.current.reduce((sum, chunk) => sum + (chunk.size || 0), 0);
+          if (audioChunksRef.current.length === lastChunksCount && currentSize === lastBlobSize) {
+            return;
+          }
+          lastChunksCount = audioChunksRef.current.length;
+          lastBlobSize = currentSize;
+        }
+        updateAudioSrc();
+      }, 500);
       
       return () => {
         clearInterval(interval);
-        if (audioPreviewRef.current && audioPreviewRef.current.src && audioPreviewRef.current.src.startsWith('blob:')) {
-          URL.revokeObjectURL(audioPreviewRef.current.src);
-        }
       };
     }
-    return () => {
-      if (audioPreviewRef.current && audioPreviewRef.current.src && audioPreviewRef.current.src.startsWith('blob:')) {
-        URL.revokeObjectURL(audioPreviewRef.current.src);
-      }
-    };
   }, [previewBlob, audioBlob, isRecording, isLocked, audioPreviewRef, voiceRecording, isPlayingPreview]);
 
   const {
