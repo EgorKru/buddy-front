@@ -1,8 +1,26 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { Edit, Reply, X, Paperclip, Mic, Send, Lock, Unlock, ChevronDown, ChevronUp, File as FileIcon, Loader2, Pause, Play, Trash2, Volume2, Headphones } from 'lucide-react';
 import { formatFileSize } from '../utils/messageHelpers';
 import { useAutoResizeTextarea } from '../hooks/useAutoResizeTextarea';
 import styles from '@/styles/chat.module.css';
+
+const generateWaveform = (seed, barCount = 35) => {
+  const bars = [];
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    const char = seed.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  
+  for (let i = 0; i < barCount; i++) {
+    const val = Math.abs(Math.sin(hash * (i + 1) * 0.1)) * 0.85 + 0.15;
+    bars.push(val);
+    hash = ((hash << 5) - hash) + i;
+  }
+  
+  return bars;
+};
 
 export default function MessageInputArea({
   newMessage,
@@ -48,6 +66,13 @@ export default function MessageInputArea({
   useAutoResizeTextarea(messageInputRef, textareaValue);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  
+  const waveform = useMemo(() => {
+    if (isLocked && recordingTime > 0) {
+      return generateWaveform(`recording-${Math.floor(recordingTime)}`, 35);
+    }
+    return generateWaveform('default', 35);
+  }, [isLocked, recordingTime]);
 
   useEffect(() => {
     if (!audioPreviewRef?.current || !isRecording || !isLocked) {
@@ -81,20 +106,34 @@ export default function MessageInputArea({
       updateDuration();
     };
 
+    const handleLoadedData = () => {
+      updateDuration();
+    };
+
     updateDuration();
+
+    const interval = setInterval(() => {
+      if (audio && audio.duration && Number.isFinite(audio.duration) && audio.duration > 0) {
+        setDuration(audio.duration);
+      }
+    }, 500);
 
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
     audio.addEventListener('durationchange', handleDurationChange);
     audio.addEventListener('canplay', handleCanPlay);
+    audio.addEventListener('loadeddata', handleLoadedData);
 
     return () => {
+      clearInterval(interval);
       if (audio) {
         audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
         audio.removeEventListener('durationchange', handleDurationChange);
         audio.removeEventListener('canplay', handleCanPlay);
+        audio.removeEventListener('loadeddata', handleLoadedData);
       }
     };
-  }, [audioPreviewRef, isRecording, isLocked]);
+  }, [audioPreviewRef, isRecording, isLocked, recordingTime]);
+
 
   return (
     <form onSubmit={editingMessageId ? onSaveEdit : onSendMessage} className={styles.messageForm}>
@@ -302,9 +341,52 @@ export default function MessageInputArea({
                         {isPlayingPreview ? <Pause size={18} /> : <Headphones size={18} />}
                       </button>
                     )}
+                    <div 
+                      className={styles.voiceWaveformPreview}
+                      onClick={(e) => {
+                        if (audioPreviewRef?.current && duration > 0) {
+                          e.stopPropagation();
+                          const container = e.currentTarget;
+                          const bars = container.querySelectorAll(`.${styles.waveformBarPreview}`);
+                          if (bars.length === 0) return;
+                          
+                          const firstBar = bars[0].getBoundingClientRect();
+                          const lastBar = bars[bars.length - 1].getBoundingClientRect();
+                          const waveformStart = firstBar.left;
+                          const waveformEnd = lastBar.right;
+                          const waveformWidth = waveformEnd - waveformStart;
+                          
+                          const clickX = e.clientX - waveformStart;
+                          const percentage = Math.max(0, Math.min(1, clickX / waveformWidth));
+                          const newTime = percentage * duration;
+                          if (audioPreviewRef.current) {
+                            audioPreviewRef.current.currentTime = newTime;
+                            setCurrentTime(newTime);
+                          }
+                        }
+                      }}
+                      title={duration > 0 ? "Нажмите для перемотки" : ""}
+                    >
+                      {waveform.map((height, index) => {
+                        const progress = duration > 0 
+                          ? (isPlayingPreview ? currentTime / duration : (recordingTime > 0 ? recordingTime / duration : 0))
+                          : 0;
+                        const playedBars = Math.ceil(progress * waveform.length);
+                        const isPlayed = index < playedBars;
+                        return (
+                          <div
+                            key={index}
+                            className={`${styles.waveformBarPreview} ${isPlayed ? styles.played : ''}`}
+                            style={{ height: `${height * 100}%` }}
+                          />
+                        );
+                      })}
+                    </div>
                     <div className={styles.voiceRecordingTime}>
                       {isPlayingPreview && duration > 0
                         ? `${Math.floor(currentTime / 60)}:${Math.floor(currentTime % 60).toString().padStart(2, '0')} / ${Math.floor(duration / 60)}:${Math.floor(duration % 60).toString().padStart(2, '0')}`
+                        : duration > 0
+                        ? `${Math.floor((recordingTime || 0) / 60)}:${((recordingTime || 0) % 60).toString().padStart(2, '0')} / ${Math.floor(duration / 60)}:${Math.floor(duration % 60).toString().padStart(2, '0')}`
                         : `${Math.floor((recordingTime || 0) / 60)}:${((recordingTime || 0) % 60).toString().padStart(2, '0')}`
                       }
                     </div>
@@ -511,6 +593,11 @@ export default function MessageInputArea({
               if (dur > 0 && Number.isFinite(dur)) {
                 setDuration(dur);
               }
+            }
+          }}
+          onPlay={() => {
+            if (audioPreviewRef.current) {
+              setCurrentTime(audioPreviewRef.current.currentTime || 0);
             }
           }}
           onEnded={() => {

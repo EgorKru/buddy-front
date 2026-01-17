@@ -358,6 +358,11 @@ const ChatContainer = ({ chatId }) => {
 
   useEffect(() => {
     if (audioPreviewRef.current && isRecording && isLocked) {
+      let currentBlobUrl = null;
+      let lastChunksCount = 0;
+      let lastBlobSize = 0;
+      const revokedUrls = new Set();
+      
       const updateAudioSrc = () => {
         if (!audioPreviewRef.current) return;
         
@@ -373,103 +378,157 @@ const ChatContainer = ({ chatId }) => {
         
         const audioChunksRef = voiceRecording.audioChunksRef || { current: [] };
         if (audioChunksRef.current && audioChunksRef.current.length > 0) {
-          try {
-            const allChunks = [...audioChunksRef.current];
-            const previewBlob = new Blob(allChunks, { type: 'audio/webm' });
-            if (previewBlob && previewBlob.size > 0) {
-              const url = URL.createObjectURL(previewBlob);
-              const oldSrc = audio.src;
-              audio.src = url;
-              const revokeOldSrc = () => {
-                if (oldSrc && oldSrc.startsWith('blob:') && oldSrc !== url) {
-                  URL.revokeObjectURL(oldSrc);
-                }
-              };
-              audio.addEventListener('loadeddata', revokeOldSrc, { once: true });
-              audio.addEventListener('error', revokeOldSrc, { once: true });
-              if (audio.readyState === 0) {
-                audio.load();
-              } else {
-                setTimeout(revokeOldSrc, 200);
-              }
-            }
-          } catch (error) {
-            console.error('Error creating preview blob:', error);
-          }
-        } else if (previewBlob && previewBlob.size > 0) {
-          try {
-            const currentSrc = audio.src;
-            const url = URL.createObjectURL(previewBlob);
-            const oldSrc = currentSrc;
-            audio.src = url;
-            const revokeOldSrc = () => {
-              if (oldSrc && oldSrc.startsWith('blob:') && oldSrc !== url) {
-                URL.revokeObjectURL(oldSrc);
-              }
-            };
-            audio.addEventListener('loadeddata', revokeOldSrc, { once: true });
-            audio.addEventListener('error', revokeOldSrc, { once: true });
-            if (audio.readyState === 0) {
-              audio.load();
-            } else {
-              setTimeout(revokeOldSrc, 200);
-            }
-          } catch (error) {
-            console.error('Error setting preview blob:', error);
-          }
-        } else if (audioBlob && audioBlob.size > 0) {
-          try {
-            const currentSrc = audio.src;
-            const url = URL.createObjectURL(audioBlob);
-            const oldSrc = currentSrc;
-            audio.src = url;
-            const revokeOldSrc = () => {
-              if (oldSrc && oldSrc.startsWith('blob:') && oldSrc !== url) {
-                URL.revokeObjectURL(oldSrc);
-              }
-            };
-            audio.addEventListener('loadeddata', revokeOldSrc, { once: true });
-            audio.addEventListener('error', revokeOldSrc, { once: true });
-            if (audio.readyState === 0) {
-              audio.load();
-            } else {
-              setTimeout(revokeOldSrc, 200);
-            }
-          } catch (error) {
-            console.error('Error setting audio blob:', error);
-          }
-        }
-      };
-      
-      // Обновляем аудио при изменении состояния
-      updateAudioSrc();
-      
-      let lastChunksCount = 0;
-      let lastBlobSize = 0;
-      const interval = setInterval(() => {
-        if (!audioPreviewRef.current) return;
-        const audio = audioPreviewRef.current;
-        const isCurrentlyPlaying = !audio.paused && 
-                                   !audio.ended && 
-                                   audio.currentTime > 0 &&
-                                   audio.readyState > 2;
-        if (isPlayingPreview || isCurrentlyPlaying) {
-          return;
-        }
-        const audioChunksRef = voiceRecording.audioChunksRef || { current: [] };
-        if (audioChunksRef.current && audioChunksRef.current.length > 0) {
           const currentSize = audioChunksRef.current.reduce((sum, chunk) => sum + (chunk.size || 0), 0);
           if (audioChunksRef.current.length === lastChunksCount && currentSize === lastBlobSize) {
             return;
           }
           lastChunksCount = audioChunksRef.current.length;
           lastBlobSize = currentSize;
+          
+          try {
+            const allChunks = Array.from(audioChunksRef.current);
+            const previewBlob = new Blob(allChunks, { type: 'audio/webm' });
+            if (previewBlob && previewBlob.size > 0) {
+              const url = URL.createObjectURL(previewBlob);
+              const oldSrc = audio.src;
+              
+              audio.src = url;
+              
+              if (oldSrc && oldSrc.startsWith('blob:') && oldSrc !== url && !revokedUrls.has(oldSrc)) {
+                revokedUrls.add(oldSrc);
+                audio.addEventListener('loadeddata', () => {
+                  if (!revokedUrls.has(oldSrc)) {
+                    revokedUrls.add(oldSrc);
+                    setTimeout(() => {
+                      try {
+                        URL.revokeObjectURL(oldSrc);
+                      } catch (e) {
+                      }
+                    }, 500);
+                  }
+                }, { once: true });
+              }
+              
+              if (currentBlobUrl && currentBlobUrl.startsWith('blob:') && currentBlobUrl !== url && !revokedUrls.has(currentBlobUrl)) {
+                revokedUrls.add(currentBlobUrl);
+                setTimeout(() => {
+                  try {
+                    URL.revokeObjectURL(currentBlobUrl);
+                  } catch (e) {
+                  }
+                }, 500);
+              }
+              
+              currentBlobUrl = url;
+              
+              if (audio.readyState === 0) {
+                audio.load();
+              }
+            }
+          } catch (error) {
+          }
+        } else if (previewBlob && previewBlob.size > 0) {
+          if (!currentBlobUrl || !audio.src || !audio.src.startsWith('blob:')) {
+            try {
+              const url = URL.createObjectURL(previewBlob);
+              const oldSrc = audio.src;
+              
+              audio.src = url;
+              
+              if (oldSrc && oldSrc.startsWith('blob:') && oldSrc !== url && !revokedUrls.has(oldSrc)) {
+                revokedUrls.add(oldSrc);
+                audio.addEventListener('loadeddata', () => {
+                  if (!revokedUrls.has(oldSrc)) {
+                    revokedUrls.add(oldSrc);
+                    setTimeout(() => {
+                      try {
+                        URL.revokeObjectURL(oldSrc);
+                      } catch (e) {
+                      }
+                    }, 500);
+                  }
+                }, { once: true });
+              }
+              
+              if (currentBlobUrl && currentBlobUrl.startsWith('blob:') && currentBlobUrl !== url && !revokedUrls.has(currentBlobUrl)) {
+                revokedUrls.add(currentBlobUrl);
+                setTimeout(() => {
+                  try {
+                    URL.revokeObjectURL(currentBlobUrl);
+                  } catch (e) {
+                  }
+                }, 500);
+              }
+              
+              currentBlobUrl = url;
+              
+              if (audio.readyState === 0) {
+                audio.load();
+              }
+            } catch (error) {
+            }
+          }
+        } else if (audioBlob && audioBlob.size > 0) {
+          if (!currentBlobUrl || !audio.src || !audio.src.startsWith('blob:')) {
+            try {
+              const url = URL.createObjectURL(audioBlob);
+              const oldSrc = audio.src;
+              
+              audio.src = url;
+              
+              if (oldSrc && oldSrc.startsWith('blob:') && oldSrc !== url && !revokedUrls.has(oldSrc)) {
+                revokedUrls.add(oldSrc);
+                audio.addEventListener('loadeddata', () => {
+                  if (!revokedUrls.has(oldSrc)) {
+                    revokedUrls.add(oldSrc);
+                    setTimeout(() => {
+                      try {
+                        URL.revokeObjectURL(oldSrc);
+                      } catch (e) {
+                      }
+                    }, 500);
+                  }
+                }, { once: true });
+              }
+              
+              if (currentBlobUrl && currentBlobUrl.startsWith('blob:') && currentBlobUrl !== url && !revokedUrls.has(currentBlobUrl)) {
+                revokedUrls.add(currentBlobUrl);
+                setTimeout(() => {
+                  try {
+                    URL.revokeObjectURL(currentBlobUrl);
+                  } catch (e) {
+                  }
+                }, 500);
+              }
+              
+              currentBlobUrl = url;
+              
+              if (audio.readyState === 0) {
+                audio.load();
+              }
+            } catch (error) {
+            }
+          }
         }
+      };
+      
+      updateAudioSrc();
+      
+      const interval = setInterval(() => {
+        if (!audioPreviewRef.current) return;
         updateAudioSrc();
-      }, 500);
+      }, 1000);
       
       return () => {
         clearInterval(interval);
+        if (currentBlobUrl && currentBlobUrl.startsWith('blob:') && !revokedUrls.has(currentBlobUrl)) {
+          setTimeout(() => {
+            try {
+              URL.revokeObjectURL(currentBlobUrl);
+            } catch (e) {
+            }
+          }, 1000);
+        }
       };
     }
   }, [previewBlob, audioBlob, isRecording, isLocked, audioPreviewRef, voiceRecording, isPlayingPreview]);
