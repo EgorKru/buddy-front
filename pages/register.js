@@ -401,6 +401,7 @@ export default function Register() {
                 onChange={handleChange}
                 maxLength={6}
                 placeholder="000000"
+                className={styles.verificationCodeInput}
                 style={{
                   width: '100%',
                   padding: '16px',
