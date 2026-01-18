@@ -30,6 +30,15 @@ export const apiRequest = async (endpoint, options = {}) => {
       throw new Error('Unauthorized');
     }
 
+    if (response.status === 403) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
+      throw new Error('Forbidden');
+    }
+
     if (!response.ok) {
       let errorMessage = `Request failed with status ${response.status}`;
       try {
@@ -40,8 +49,6 @@ export const apiRequest = async (endpoint, options = {}) => {
           errorMessage = 'Internal server error';
         } else if (response.status === 404) {
           errorMessage = 'Not found';
-        } else if (response.status === 403) {
-          errorMessage = 'Forbidden';
         }
       }
       throw new Error(errorMessage);

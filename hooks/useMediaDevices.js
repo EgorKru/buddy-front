@@ -51,27 +51,20 @@ export function useMediaDevices() {
       }
 
       const constraints = {
-        video: {
+        video: video ? {
           deviceId: selectedCamera ? { exact: selectedCamera } : undefined,
           width: { ideal: 1280 },
           height: { ideal: 720 },
           facingMode: 'user'
-        },
-        audio: {
+        } : false,
+        audio: audio ? {
           deviceId: selectedMicrophone ? { exact: selectedMicrophone } : undefined,
           echoCancellation: true,
           noiseSuppression: true,
-        },
+        } : false,
       };
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
-
-      stream.getVideoTracks().forEach(track => {
-        track.enabled = video;
-      });
-      stream.getAudioTracks().forEach(track => {
-        track.enabled = audio;
-      });
       
       streamRef.current = stream;
       setLocalStream(stream);
@@ -83,13 +76,13 @@ export function useMediaDevices() {
       
       return stream;
     } catch (err) {
-      let errorMessage = 'Не удалось получить доступ к микрофону';
+      let errorMessage = 'Не удалось получить доступ к устройствам';
       if (err.name === 'NotAllowedError') {
-        errorMessage = 'Доступ к микрофону запрещён. Разрешите доступ в настройках браузера.';
+        errorMessage = 'Доступ к устройствам запрещён. Разрешите доступ в настройках браузера.';
       } else if (err.name === 'NotFoundError') {
-        errorMessage = 'Микрофон не найден.';
+        errorMessage = 'Устройство не найдено.';
       } else if (err.name === 'NotReadableError') {
-        errorMessage = 'Микрофон уже используется другим приложением.';
+        errorMessage = 'Устройство уже используется другим приложением.';
       }
       setError(errorMessage);
       throw new Error(errorMessage);
@@ -198,10 +191,16 @@ export function useMediaDevices() {
       if (localStream) {
         const videoTracks = localStream.getVideoTracks();
         videoTracks.forEach(track => {
-          track.enabled = false;
+          track.stop();
+          localStream.removeTrack(track);
         });
         
-        setLocalStream(new MediaStream(localStream.getTracks()));
+        if (localStream.getTracks().length > 0) {
+          setLocalStream(new MediaStream(localStream.getTracks()));
+        } else {
+          setLocalStream(null);
+          streamRef.current = null;
+        }
       }
       setVideoEnabled(false);
       return;
@@ -245,12 +244,10 @@ export function useMediaDevices() {
 
     const videoTracks = localStream.getVideoTracks();
     if (videoTracks.length > 0) {
-      
       videoTracks.forEach(track => {
         track.enabled = true;
       });
       setVideoEnabled(true);
-      
       setLocalStream(new MediaStream(localStream.getTracks()));
     } else {
       
@@ -301,7 +298,15 @@ export function useMediaDevices() {
         }
         localStream.addTrack(newVideoTrack);
         
-        setLocalStream(localStream);
+        const updatedStream = new MediaStream(localStream.getTracks());
+        streamRef.current = updatedStream;
+        setLocalStream(updatedStream);
+        
+        newStream.getTracks().forEach(track => {
+          if (track !== newVideoTrack) {
+            track.stop();
+          }
+        });
       } catch (err) {
         setError('Не удалось переключить камеру');
       }
@@ -326,7 +331,15 @@ export function useMediaDevices() {
         }
         localStream.addTrack(newAudioTrack);
         
-        setLocalStream(localStream);
+        const updatedStream = new MediaStream(localStream.getTracks());
+        streamRef.current = updatedStream;
+        setLocalStream(updatedStream);
+        
+        newStream.getTracks().forEach(track => {
+          if (track !== newAudioTrack) {
+            track.stop();
+          }
+        });
       } catch (err) {
         setError('Не удалось переключить микрофон');
       }

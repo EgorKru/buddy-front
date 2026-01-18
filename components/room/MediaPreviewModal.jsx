@@ -37,29 +37,88 @@ export default function MediaPreviewModal({
   } = useMediaDevices();
 
   useEffect(() => {
-    if (!isOpen) {
+    if (isOpen) {
+      startPreview(true, true).catch(() => {});
+    } else {
       stopPreview();
       setShowSettings(false);
     }
-  }, [isOpen, stopPreview]);
+  }, [isOpen, startPreview, stopPreview]);
 
   useEffect(() => {
-    if (videoRef.current && localStream) {
-      const videoTracks = localStream.getVideoTracks();
-      if (videoTracks.length > 0 && videoTracks[0].enabled) {
-        videoRef.current.srcObject = localStream;
-      } else {
-        videoRef.current.srcObject = null;
+    if (!localStream) return;
+    
+    const updateVideo = () => {
+      if (!videoRef.current) {
+        setTimeout(updateVideo, 50);
+        return;
       }
-    }
+      
+      const video = videoRef.current;
+      const videoTracks = localStream.getVideoTracks();
+      
+      if (videoTracks.length > 0 && videoTracks[0].enabled) {
+        if (video.srcObject !== localStream) {
+          video.srcObject = localStream;
+        } else {
+          video.srcObject = null;
+          setTimeout(() => {
+            if (videoRef.current && localStream) {
+              videoRef.current.srcObject = localStream;
+            }
+          }, 0);
+        }
+        
+        const tryPlay = () => {
+          if (videoRef.current && videoRef.current.srcObject === localStream) {
+            videoRef.current.play().catch(() => {
+              setTimeout(() => {
+                if (videoRef.current && videoRef.current.srcObject === localStream) {
+                  videoRef.current.play().catch(() => {});
+                }
+              }, 200);
+            });
+          }
+        };
+        
+        const onCanPlay = () => {
+          tryPlay();
+          video.removeEventListener('canplay', onCanPlay);
+          video.removeEventListener('loadedmetadata', onLoadedMetadata);
+        };
+        
+        const onLoadedMetadata = () => {
+          tryPlay();
+          video.removeEventListener('canplay', onCanPlay);
+          video.removeEventListener('loadedmetadata', onLoadedMetadata);
+        };
+        
+        video.removeEventListener('canplay', onCanPlay);
+        video.removeEventListener('loadedmetadata', onLoadedMetadata);
+        
+        if (video.readyState >= 2) {
+          setTimeout(tryPlay, 50);
+        } else {
+          video.addEventListener('canplay', onCanPlay, { once: true });
+          video.addEventListener('loadedmetadata', onLoadedMetadata, { once: true });
+          
+          setTimeout(() => {
+            if (videoRef.current && videoRef.current.srcObject === localStream) {
+              tryPlay();
+            }
+          }, 200);
+        }
+        
+        setTimeout(tryPlay, 100);
+      } else {
+        if (video.srcObject) {
+          video.srcObject = null;
+        }
+      }
+    };
+    
+    updateVideo();
   }, [localStream, videoEnabled]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      stopPreview();
-      setShowSettings(false);
-    }
-  }, [isOpen, stopPreview]);
 
   const handleConfirm = () => {
 
@@ -111,7 +170,7 @@ export default function MediaPreviewModal({
                   Попробовать снова
                 </button>
               </div>
-            ) : !videoEnabled || !localStream || !localStream.getVideoTracks().length || !localStream.getVideoTracks()[0].enabled ? (
+            ) : !videoEnabled || !localStream || !localStream.getVideoTracks().length || (localStream.getVideoTracks()[0] && !localStream.getVideoTracks()[0].enabled) ? (
               <div className={styles.cameraOff}>
                 <VideoOff size={64} />
                 <p>Камера выключена</p>

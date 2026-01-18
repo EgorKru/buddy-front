@@ -511,6 +511,10 @@ export const MessagingProvider = ({ children }) => {
     try {
       const data = await chatAPI.getChats();
       dispatch({ type: actionTypes.SET_CHATS, payload: { chats: data } });
+    } catch (error) {
+      if (error.message === 'Forbidden' || error.message === 'Unauthorized') {
+        return;
+      }
     } finally {
       refreshInFlightRef.current = false;
     }
