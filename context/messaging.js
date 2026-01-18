@@ -545,24 +545,49 @@ export const MessagingProvider = ({ children }) => {
       const data = await chatAPI.getChats();
       dispatch({ type: actionTypes.SET_CHATS, payload: { chats: data } });
       
-      if (Array.isArray(data)) {
-        for (const chat of data) {
-          if (!chat?.id || !chat.readReceipts) continue;
-          
-          if (typeof chat.readReceipts === 'object') {
-            const readReceipts = {};
-            for (const [userId, lastReadAt] of Object.entries(chat.readReceipts)) {
-              if (userId && lastReadAt != null) {
-                readReceipts[String(userId)] = lastReadAt;
+      if (Array.isArray(data) && data.length > 0) {
+        const processReadReceipts = (chats) => {
+          for (const chat of chats) {
+            if (!chat?.id || !chat.readReceipts) continue;
+            
+            if (typeof chat.readReceipts === 'object') {
+              const readReceipts = {};
+              for (const [userId, lastReadAt] of Object.entries(chat.readReceipts)) {
+                if (userId && lastReadAt != null) {
+                  readReceipts[String(userId)] = lastReadAt;
+                }
+              }
+              if (Object.keys(readReceipts).length > 0) {
+                dispatch({ 
+                  type: actionTypes.SET_READ_RECEIPTS_FOR_CHAT, 
+                  payload: { chatId: chat.id, readReceipts } 
+                });
               }
             }
-            if (Object.keys(readReceipts).length > 0) {
-              dispatch({ 
-                type: actionTypes.SET_READ_RECEIPTS_FOR_CHAT, 
-                payload: { chatId: chat.id, readReceipts } 
-              });
-            }
           }
+        };
+        
+        if (data.length > 20) {
+          const BATCH_SIZE = 20;
+          let index = 0;
+          
+          const processBatch = () => {
+            const batch = data.slice(index, index + BATCH_SIZE);
+            processReadReceipts(batch);
+            index += BATCH_SIZE;
+            
+            if (index < data.length) {
+              if (typeof window !== 'undefined' && window.requestIdleCallback) {
+                window.requestIdleCallback(processBatch, { timeout: 50 });
+              } else {
+                setTimeout(processBatch, 0);
+              }
+            }
+          };
+          
+          processBatch();
+        } else {
+          processReadReceipts(data);
         }
       }
     } catch (error) {
@@ -582,7 +607,16 @@ export const MessagingProvider = ({ children }) => {
       dispatch({ type: actionTypes.SET_CHATS, payload: { chats: [] } });
       hasInitialLoadRef.current = false;
       lastConnectedRef.current = false;
+      lastTokenRef.current = null;
       return;
+    }
+    
+    const token = getToken();
+    const tokenChanged = lastTokenRef.current !== token;
+    
+    if (tokenChanged) {
+      lastTokenRef.current = token;
+      hasInitialLoadRef.current = false;
     }
     
     if (connected && !lastConnectedRef.current) {
@@ -593,7 +627,7 @@ export const MessagingProvider = ({ children }) => {
       }
     } else if (!connected) {
       lastConnectedRef.current = false;
-      if (!hasInitialLoadRef.current) {
+      if (!hasInitialLoadRef.current && !tokenChanged) {
         hasInitialLoadRef.current = true;
         refreshChats();
       }
@@ -601,6 +635,11 @@ export const MessagingProvider = ({ children }) => {
   }, [connected, refreshChats]);
 
   useEffect(() => {
+    if (lastTokenRef.current === null) {
+      lastTokenRef.current = getToken();
+      return;
+    }
+
     const handleAuthMaybeChanged = () => {
       const token = getToken();
       if (!token) {
@@ -618,15 +657,17 @@ export const MessagingProvider = ({ children }) => {
       }
     };
 
-    handleAuthMaybeChanged();
-
     const onStorage = (e) => {
       if (e?.key === 'token') {
         handleAuthMaybeChanged();
       }
     };
 
-    const onFocus = () => handleAuthMaybeChanged();
+    const onFocus = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        handleAuthMaybeChanged();
+      }
+    };
     const onVisibility = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
         handleAuthMaybeChanged();
