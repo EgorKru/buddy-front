@@ -12,6 +12,9 @@ export default function MediaPreviewModal({
   isCreating = false,
 }) {
   const videoRef = useRef(null);
+  const previousStreamRef = useRef(null);
+  const previousVideoTrackIdRef = useRef(null);
+  const isUpdatingRef = useRef(false);
   const [showSettings, setShowSettings] = useState(false);
   
   const {
@@ -38,6 +41,8 @@ export default function MediaPreviewModal({
 
   useEffect(() => {
     if (isOpen) {
+      previousStreamRef.current = null;
+      previousVideoTrackIdRef.current = null;
       startPreview(true, true)
         .then((stream) => {
           if (stream && videoRef.current) {
@@ -53,14 +58,29 @@ export default function MediaPreviewModal({
     } else {
       stopPreview();
       setShowSettings(false);
+      previousStreamRef.current = null;
+      previousVideoTrackIdRef.current = null;
     }
   }, [isOpen, startPreview, stopPreview]);
 
   useEffect(() => {
     if (!localStream) {
-      if (videoRef.current && videoRef.current.srcObject) {
+      if (videoRef.current && videoRef.current.srcObject && !isUpdatingRef.current) {
         videoRef.current.srcObject = null;
       }
+      previousVideoTrackIdRef.current = null;
+      previousStreamRef.current = null;
+      isUpdatingRef.current = false;
+      return;
+    }
+    
+    if (isUpdatingRef.current) {
+      return;
+    }
+    
+    const currentVideoTracks = localStream.getVideoTracks();
+    if (currentVideoTracks.length === 0 || !currentVideoTracks[0].enabled) {
+      isUpdatingRef.current = false;
       return;
     }
     
@@ -74,12 +94,48 @@ export default function MediaPreviewModal({
       const videoTracks = localStream.getVideoTracks();
       
       if (videoTracks.length > 0 && videoTracks[0].enabled) {
+        const currentVideoTrackId = videoTracks[0].id;
         const currentSrcObject = video.srcObject;
         
-        if (currentSrcObject !== localStream) {
-          video.srcObject = localStream;
-        } else if (currentSrcObject === localStream) {
-          video.load();
+        const videoTrackChanged = previousVideoTrackIdRef.current !== currentVideoTrackId;
+        const hasNoPreviousTrack = previousVideoTrackIdRef.current === null;
+        const streamChanged = previousStreamRef.current !== localStream;
+        const hasNoVideoInCurrentSrc = !currentSrcObject || currentSrcObject.getVideoTracks().length === 0;
+        const srcObjectDifferent = currentSrcObject !== localStream;
+        
+        const isSameTrackAndStream = currentSrcObject === localStream && 
+                                     previousVideoTrackIdRef.current === currentVideoTrackId &&
+                                     previousStreamRef.current === localStream;
+        
+        if (!isSameTrackAndStream) {
+          if (srcObjectDifferent || videoTrackChanged || hasNoPreviousTrack || hasNoVideoInCurrentSrc || streamChanged) {
+            isUpdatingRef.current = true;
+            
+            if (video.srcObject !== localStream) {
+              video.srcObject = localStream;
+            }
+            
+            previousVideoTrackIdRef.current = currentVideoTrackId;
+            previousStreamRef.current = localStream;
+            
+            setTimeout(() => {
+              if (videoRef.current && videoRef.current.srcObject === localStream) {
+                isUpdatingRef.current = false;
+              } else {
+            setTimeout(() => {
+              if (videoRef.current && videoRef.current.srcObject === localStream) {
+                isUpdatingRef.current = false;
+              } else {
+                setTimeout(() => {
+                  isUpdatingRef.current = false;
+                }, 100);
+              }
+            }, 300);
+              }
+            }, 300);
+          }
+        } else {
+          previousStreamRef.current = localStream;
         }
         
         const tryPlay = () => {
@@ -117,7 +173,7 @@ export default function MediaPreviewModal({
         video.removeEventListener('loadeddata', onLoadedData);
         
         if (video.readyState >= 2) {
-          tryPlay();
+          setTimeout(tryPlay, 10);
         } else {
           video.addEventListener('canplay', onCanPlay, { once: true });
           video.addEventListener('loadedmetadata', onLoadedMetadata, { once: true });
@@ -126,11 +182,19 @@ export default function MediaPreviewModal({
         
         setTimeout(tryPlay, 50);
         setTimeout(tryPlay, 150);
-        setTimeout(tryPlay, 300);
+        
+        return () => {
+          video.removeEventListener('canplay', onCanPlay);
+          video.removeEventListener('loadedmetadata', onLoadedMetadata);
+          video.removeEventListener('loadeddata', onLoadedData);
+        };
       } else {
-        if (video.srcObject) {
+        if (video.srcObject && !isUpdatingRef.current) {
           video.srcObject = null;
         }
+        previousVideoTrackIdRef.current = null;
+        previousStreamRef.current = null;
+        isUpdatingRef.current = false;
       }
     };
     

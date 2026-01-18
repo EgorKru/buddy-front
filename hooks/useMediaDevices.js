@@ -171,11 +171,21 @@ export function useMediaDevices() {
         });
         
         const audioTrack = audioStream.getAudioTracks()[0];
+        const videoTracks = localStream.getVideoTracks();
         if (audioTrack) {
-          localStream.addTrack(audioTrack);
-          streamRef.current = localStream;
+          const allTracks = [...videoTracks, audioTrack].filter(Boolean);
+          const updatedStream = new MediaStream(allTracks);
+          streamRef.current = updatedStream;
           setAudioEnabled(true);
-          setLocalStream(new MediaStream(localStream.getTracks()));
+          setLocalStream(updatedStream);
+          
+          audioStream.getTracks().forEach(track => {
+            if (track !== audioTrack) {
+              track.stop();
+            }
+          });
+        } else {
+          audioStream.getTracks().forEach(track => track.stop());
         }
       } catch (err) {
         setError('Не удалось включить микрофон');
@@ -197,7 +207,9 @@ export function useMediaDevices() {
         });
         
         if (localStream.getTracks().length > 0) {
-          setLocalStream(new MediaStream(localStream.getTracks()));
+          const updatedStream = new MediaStream(localStream.getTracks());
+          streamRef.current = updatedStream;
+          setLocalStream(updatedStream);
         } else {
           setLocalStream(null);
           streamRef.current = null;
@@ -245,11 +257,16 @@ export function useMediaDevices() {
 
     const videoTracks = localStream.getVideoTracks();
     if (videoTracks.length > 0) {
-      videoTracks.forEach(track => {
-        track.enabled = true;
-      });
+      const allEnabled = videoTracks.every(track => track.enabled);
+      if (!allEnabled) {
+        videoTracks.forEach(track => {
+          track.enabled = true;
+        });
+      }
       setVideoEnabled(true);
-      setLocalStream(new MediaStream(localStream.getTracks()));
+      const updatedStream = new MediaStream(localStream.getTracks());
+      streamRef.current = updatedStream;
+      setLocalStream(updatedStream);
     } else {
       
       try {
@@ -266,12 +283,21 @@ export function useMediaDevices() {
         });
         
         const videoTrack = videoStream.getVideoTracks()[0];
+        const audioTracks = localStream.getAudioTracks();
         if (videoTrack) {
-          localStream.addTrack(videoTrack);
-          streamRef.current = localStream;
+          const allTracks = [videoTrack, ...audioTracks].filter(Boolean);
+          const updatedStream = new MediaStream(allTracks);
+          streamRef.current = updatedStream;
           setVideoEnabled(true);
+          setLocalStream(updatedStream);
           
-          setLocalStream(new MediaStream(localStream.getTracks()));
+          videoStream.getTracks().forEach(track => {
+            if (track !== videoTrack) {
+              track.stop();
+            }
+          });
+        } else {
+          videoStream.getTracks().forEach(track => track.stop());
         }
       } catch (err) {
         setError('Не удалось включить камеру');
@@ -286,20 +312,30 @@ export function useMediaDevices() {
     if (localStream && videoEnabled) {
       try {
         const newStream = await navigator.mediaDevices.getUserMedia({
-          video: { deviceId: { exact: deviceId } },
+          video: { 
+            deviceId: { exact: deviceId },
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          },
           audio: false,
         });
         
         const oldVideoTrack = localStream.getVideoTracks()[0];
         const newVideoTrack = newStream.getVideoTracks()[0];
+        const audioTracks = localStream.getAudioTracks();
+        
+        if (!newVideoTrack) {
+          newStream.getTracks().forEach(track => track.stop());
+          setError('Не удалось получить видео трек с новой камеры');
+          return;
+        }
         
         if (oldVideoTrack) {
-          localStream.removeTrack(oldVideoTrack);
           oldVideoTrack.stop();
         }
-        localStream.addTrack(newVideoTrack);
         
-        const updatedStream = new MediaStream(localStream.getTracks());
+        const allTracks = [newVideoTrack, ...audioTracks].filter(Boolean);
+        const updatedStream = new MediaStream(allTracks);
         streamRef.current = updatedStream;
         setLocalStream(updatedStream);
         
@@ -309,6 +345,7 @@ export function useMediaDevices() {
           }
         });
       } catch (err) {
+        console.error('Ошибка переключения камеры:', err);
         setError('Не удалось переключить камеру');
       }
     }
@@ -320,21 +357,32 @@ export function useMediaDevices() {
       try {
         const newStream = await navigator.mediaDevices.getUserMedia({
           video: false,
-          audio: { deviceId: { exact: deviceId } },
+          audio: { 
+            deviceId: { exact: deviceId },
+            echoCancellation: true,
+            noiseSuppression: true,
+          },
         });
         
         const oldAudioTrack = localStream.getAudioTracks()[0];
         const newAudioTrack = newStream.getAudioTracks()[0];
+        const videoTracks = localStream.getVideoTracks();
+        
+        if (!newAudioTrack) {
+          newStream.getTracks().forEach(track => track.stop());
+          setError('Не удалось получить аудио трек с нового микрофона');
+          return;
+        }
         
         if (oldAudioTrack) {
           localStream.removeTrack(oldAudioTrack);
           oldAudioTrack.stop();
         }
-        localStream.addTrack(newAudioTrack);
         
-        const updatedStream = new MediaStream(localStream.getTracks());
-        streamRef.current = updatedStream;
-        setLocalStream(updatedStream);
+        localStream.addTrack(newAudioTrack);
+        streamRef.current = localStream;
+        
+        setLocalStream(localStream);
         
         newStream.getTracks().forEach(track => {
           if (track !== newAudioTrack) {
@@ -342,6 +390,7 @@ export function useMediaDevices() {
           }
         });
       } catch (err) {
+        console.error('Ошибка переключения микрофона:', err);
         setError('Не удалось переключить микрофон');
       }
     }
