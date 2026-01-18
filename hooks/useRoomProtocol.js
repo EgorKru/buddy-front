@@ -91,6 +91,9 @@ export const useRoomProtocol = (initialRoomId = null) => {
   const [handRaised, setHandRaised] = useState(false);
 
   const [myRole, setMyRole] = useState(PARTICIPANT_ROLE.PARTICIPANT);
+  const [devices, setDevices] = useState({ cameras: [], microphones: [] });
+  const [selectedCamera, setSelectedCamera] = useState('');
+  const [selectedMicrophone, setSelectedMicrophone] = useState('');
 
   const peerConnectionsRef = useRef(new Map());
   const roomSubscriptionRef = useRef(null);
@@ -804,10 +807,19 @@ export const useRoomProtocol = (initialRoomId = null) => {
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: audio ? { echoCancellation: true, noiseSuppression: true } : false,
-        video: video ? { width: { ideal: 1280 }, height: { ideal: 720 } } : false,
-      });
+      const constraints = {
+        audio: audio ? { 
+          deviceId: selectedMicrophone ? { exact: selectedMicrophone } : undefined,
+          echoCancellation: true, 
+          noiseSuppression: true 
+        } : false,
+        video: video ? { 
+          deviceId: selectedCamera ? { exact: selectedCamera } : undefined,
+          width: { ideal: 1280 }, 
+          height: { ideal: 720 } 
+        } : false,
+      };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
 
       localStreamRef.current = stream;
       setLocalStream(stream);
@@ -1074,7 +1086,11 @@ export const useRoomProtocol = (initialRoomId = null) => {
       
       try {
         const audioStream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true },
+          audio: { 
+            deviceId: selectedMicrophone ? { exact: selectedMicrophone } : undefined,
+            echoCancellation: true, 
+            noiseSuppression: true 
+          },
           video: false,
         });
         audioStream.getAudioTracks().forEach(track => {
@@ -1103,7 +1119,7 @@ export const useRoomProtocol = (initialRoomId = null) => {
         roomId: roomIdRef.current,
       });
     }
-  }, [audioEnabled, videoEnabled, sendSignal, startLocalStream]);
+  }, [audioEnabled, videoEnabled, sendSignal, startLocalStream, selectedMicrophone]);
 
   const toggleVideo = useCallback(async () => {
     
@@ -1153,10 +1169,15 @@ export const useRoomProtocol = (initialRoomId = null) => {
     } else if (newEnabled) {
       
       try {
-        const videoStream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+        const constraints = {
+          video: selectedCamera ? { 
+            deviceId: { exact: selectedCamera },
+            width: { ideal: 1280 }, 
+            height: { ideal: 720 } 
+          } : { width: { ideal: 1280 }, height: { ideal: 720 } },
           audio: false,
-        });
+        };
+        const videoStream = await navigator.mediaDevices.getUserMedia(constraints);
         videoStream.getVideoTracks().forEach(track => {
           localStreamRef.current.addTrack(track);
         });
@@ -1183,7 +1204,7 @@ export const useRoomProtocol = (initialRoomId = null) => {
         roomId: roomIdRef.current,
       });
     }
-  }, [videoEnabled, audioEnabled, sendSignal, startLocalStream]);
+  }, [videoEnabled, audioEnabled, sendSignal, startLocalStream, selectedCamera]);
 
   const raiseHand = useCallback(() => {
     if (!roomIdRef.current) return;
@@ -1197,6 +1218,139 @@ export const useRoomProtocol = (initialRoomId = null) => {
       roomId: roomIdRef.current,
     });
   }, [handRaised, sendSignal]);
+
+  const getDevices = useCallback(async () => {
+    if (!isBrowser || !navigator.mediaDevices) {
+      return { cameras: [], microphones: [] };
+    }
+
+    try {
+      const deviceList = await navigator.mediaDevices.enumerateDevices();
+      const cameras = deviceList.filter(d => d.kind === 'videoinput');
+      const microphones = deviceList.filter(d => d.kind === 'audioinput');
+      
+      setDevices({ cameras, microphones });
+      
+      if (cameras.length > 0 && !selectedCamera) {
+        setSelectedCamera(cameras[0].deviceId);
+      }
+      if (microphones.length > 0 && !selectedMicrophone) {
+        setSelectedMicrophone(microphones[0].deviceId);
+      }
+      
+      return { cameras, microphones };
+    } catch (err) {
+      return { cameras: [], microphones: [] };
+    }
+  }, [isBrowser, selectedCamera, selectedMicrophone]);
+
+  const switchCamera = useCallback(async (deviceId) => {
+    if (!isBrowser || !navigator.mediaDevices) return;
+    
+    setSelectedCamera(deviceId);
+    
+    if (!localStreamRef.current || !videoEnabled) return;
+
+    try {
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          deviceId: { exact: deviceId },
+          width: { ideal: 1280 }, 
+          height: { ideal: 720 } 
+        },
+        audio: false,
+      });
+      
+      const oldVideoTrack = localStreamRef.current.getVideoTracks()[0];
+      const newVideoTrack = newStream.getVideoTracks()[0];
+      
+      if (oldVideoTrack) {
+        localStreamRef.current.removeTrack(oldVideoTrack);
+        oldVideoTrack.stop();
+      }
+      
+      if (newVideoTrack) {
+        localStreamRef.current.addTrack(newVideoTrack);
+        
+        peerConnectionsRef.current.forEach((pc) => {
+          const sender = pc.getSenders().find(s => 
+            s.track && s.track.kind === 'video'
+          );
+          if (sender) {
+            sender.replaceTrack(newVideoTrack);
+          } else {
+            pc.addTrack(newVideoTrack, localStreamRef.current);
+          }
+        });
+        
+        const updatedStream = new MediaStream(localStreamRef.current.getTracks());
+        localStreamRef.current = updatedStream;
+        setLocalStream(updatedStream);
+      }
+      
+      newStream.getTracks().forEach(track => {
+        if (track !== newVideoTrack) {
+          track.stop();
+        }
+      });
+    } catch (err) {
+      console.error('Не удалось переключить камеру:', err);
+    }
+  }, [isBrowser, videoEnabled]);
+
+  const switchMicrophone = useCallback(async (deviceId) => {
+    if (!isBrowser || !navigator.mediaDevices) return;
+    
+    setSelectedMicrophone(deviceId);
+    
+    if (!localStreamRef.current || !audioEnabled) return;
+
+    try {
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: false,
+        audio: { 
+          deviceId: { exact: deviceId },
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
+      });
+      
+      const oldAudioTrack = localStreamRef.current.getAudioTracks()[0];
+      const newAudioTrack = newStream.getAudioTracks()[0];
+      
+      if (oldAudioTrack) {
+        localStreamRef.current.removeTrack(oldAudioTrack);
+        oldAudioTrack.stop();
+      }
+      
+      if (newAudioTrack) {
+        localStreamRef.current.addTrack(newAudioTrack);
+        
+        peerConnectionsRef.current.forEach((pc) => {
+          const sender = pc.getSenders().find(s => 
+            s.track && s.track.kind === 'audio'
+          );
+          if (sender) {
+            sender.replaceTrack(newAudioTrack);
+          } else {
+            pc.addTrack(newAudioTrack, localStreamRef.current);
+          }
+        });
+        
+        const updatedStream = new MediaStream(localStreamRef.current.getTracks());
+        localStreamRef.current = updatedStream;
+        setLocalStream(updatedStream);
+      }
+      
+      newStream.getTracks().forEach(track => {
+        if (track !== newAudioTrack) {
+          track.stop();
+        }
+      });
+    } catch (err) {
+      console.error('Не удалось переключить микрофон:', err);
+    }
+  }, [isBrowser, audioEnabled]);
 
   const startScreenShare = useCallback(async () => {
     if (!isBrowser || !navigator.mediaDevices?.getDisplayMedia) {
@@ -1339,6 +1493,13 @@ export const useRoomProtocol = (initialRoomId = null) => {
     demoteParticipant,
     muteParticipant,
     kickParticipant,
+
+    getDevices,
+    switchCamera,
+    switchMicrophone,
+    devices,
+    selectedCamera,
+    selectedMicrophone,
 
     sendOffer,
     clearError: () => setError(null),

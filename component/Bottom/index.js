@@ -1,5 +1,5 @@
 import cx from "classnames";
-import { Mic, Video, PhoneOff, MicOff, VideoOff, Users, Hand, Monitor, MonitorOff } from "lucide-react";
+import { Mic, Video, PhoneOff, MicOff, VideoOff, Users, Hand, Monitor, MonitorOff, Settings } from "lucide-react";
 
 import styles from "@/component/Bottom/index.module.css";
 
@@ -16,6 +16,7 @@ const Bottom = (props) => {
     onRaiseHand,
     isScreenSharing,
     onToggleScreenShare,
+    onSettingsClick,
   } = props;
 
   const isMuted = muted ?? true;
@@ -84,6 +85,15 @@ const Bottom = (props) => {
       onParticipantsClick();
     } else {
       
+    }
+  };
+
+  const handleSettingsClick = (e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    
+    if (onSettingsClick) {
+      onSettingsClick();
     }
   };
 
@@ -159,6 +169,16 @@ const Bottom = (props) => {
           type="button"
         >
           {isScreenSharing ? <MonitorOff size={22} /> : <Monitor size={22} />}
+        </button>
+        
+        {}
+        <button
+          className={styles.icon}
+          title="Настройки устройств"
+          onClick={handleSettingsClick}
+          type="button"
+        >
+          <Settings size={22} />
         </button>
         
         <button

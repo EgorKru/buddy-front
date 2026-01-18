@@ -67,12 +67,13 @@ export function useMediaDevices() {
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       
       streamRef.current = stream;
-      setLocalStream(stream);
       setPermissionGranted(true);
       setVideoEnabled(video);
       setAudioEnabled(audio);
       
       await getDevices();
+      
+      setLocalStream(stream);
       
       return stream;
     } catch (err) {

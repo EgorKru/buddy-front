@@ -8,6 +8,7 @@ import Bottom from "@/component/Bottom";
 import CopySection from "@/component/CopySection";
 import ParticipantsModal from "@/component/ParticipantsModal";
 import RoomToast from "@/component/RoomToast";
+import RoomSettingsModal from "@/components/room/RoomSettingsModal";
 
 import styles from "@/styles/room.module.css";
 
@@ -60,6 +61,12 @@ const Room = () => {
     demoteParticipant,
     muteParticipant,
     kickParticipant,
+    getDevices,
+    switchCamera,
+    switchMicrophone,
+    devices,
+    selectedCamera,
+    selectedMicrophone,
   } = useRoomProtocol(actualRoomId);
 
   const [players, setPlayers] = useState({});
@@ -67,6 +74,7 @@ const Room = () => {
   const [isJoining, setIsJoining] = useState(false);
   const [meetingTime, setMeetingTime] = useState(0);
   const [showParticipants, setShowParticipants] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [toastNotifications, setToastNotifications] = useState([]);
   const hasJoinedRef = useRef(false);
   const prevParticipantsRef = useRef([]);
@@ -160,9 +168,12 @@ const Room = () => {
   useEffect(() => {
     if (isInRoom) {
       setIsJoining(false);
-      hasJoinedRef.current = true; 
+      hasJoinedRef.current = true;
+      if (getDevices) {
+        getDevices();
+      }
     }
-  }, [isInRoom]);
+  }, [isInRoom, getDevices]);
 
   useEffect(() => {
     if (hasJoinedRef.current && !isInRoom && !isJoining && actualRoomId) {
@@ -499,6 +510,7 @@ const Room = () => {
         onRaiseHand={raiseHand}
         isScreenSharing={isScreenSharing}
         onToggleScreenShare={isScreenSharing ? stopScreenShare : startScreenShare}
+        onSettingsClick={() => setShowSettings(true)}
       />
 
       <ParticipantsModal
@@ -512,6 +524,17 @@ const Room = () => {
         onDemote={demoteParticipant}
         onMute={muteParticipant}
         onKick={kickParticipant}
+      />
+
+      <RoomSettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        devices={devices}
+        selectedCamera={selectedCamera}
+        selectedMicrophone={selectedMicrophone}
+        onSwitchCamera={switchCamera}
+        onSwitchMicrophone={switchMicrophone}
+        onRefreshDevices={getDevices}
       />
     </div>
   );

@@ -38,7 +38,18 @@ export default function MediaPreviewModal({
 
   useEffect(() => {
     if (isOpen) {
-      startPreview(true, true).catch(() => {});
+      startPreview(true, true)
+        .then((stream) => {
+          if (stream && videoRef.current) {
+            setTimeout(() => {
+              if (videoRef.current && stream) {
+                videoRef.current.srcObject = stream;
+                videoRef.current.play().catch(() => {});
+              }
+            }, 100);
+          }
+        })
+        .catch(() => {});
     } else {
       stopPreview();
       setShowSettings(false);
@@ -46,7 +57,12 @@ export default function MediaPreviewModal({
   }, [isOpen, startPreview, stopPreview]);
 
   useEffect(() => {
-    if (!localStream) return;
+    if (!localStream) {
+      if (videoRef.current && videoRef.current.srcObject) {
+        videoRef.current.srcObject = null;
+      }
+      return;
+    }
     
     const updateVideo = () => {
       if (!videoRef.current) {
@@ -58,58 +74,59 @@ export default function MediaPreviewModal({
       const videoTracks = localStream.getVideoTracks();
       
       if (videoTracks.length > 0 && videoTracks[0].enabled) {
-        if (video.srcObject !== localStream) {
+        const currentSrcObject = video.srcObject;
+        
+        if (currentSrcObject !== localStream) {
           video.srcObject = localStream;
-        } else {
-          video.srcObject = null;
-          setTimeout(() => {
-            if (videoRef.current && localStream) {
-              videoRef.current.srcObject = localStream;
-            }
-          }, 0);
+        } else if (currentSrcObject === localStream) {
+          video.load();
         }
         
         const tryPlay = () => {
-          if (videoRef.current && videoRef.current.srcObject === localStream) {
-            videoRef.current.play().catch(() => {
-              setTimeout(() => {
-                if (videoRef.current && videoRef.current.srcObject === localStream) {
-                  videoRef.current.play().catch(() => {});
-                }
-              }, 200);
-            });
+          if (!videoRef.current) return;
+          
+          const currentVideo = videoRef.current;
+          if (currentVideo.srcObject === localStream) {
+            const playPromise = currentVideo.play();
+            if (playPromise !== undefined) {
+              playPromise.catch((err) => {
+                setTimeout(() => {
+                  if (currentVideo && currentVideo.srcObject === localStream) {
+                    currentVideo.play().catch(() => {});
+                  }
+                }, 100);
+              });
+            }
           }
         };
         
         const onCanPlay = () => {
           tryPlay();
-          video.removeEventListener('canplay', onCanPlay);
-          video.removeEventListener('loadedmetadata', onLoadedMetadata);
         };
         
         const onLoadedMetadata = () => {
           tryPlay();
-          video.removeEventListener('canplay', onCanPlay);
-          video.removeEventListener('loadedmetadata', onLoadedMetadata);
+        };
+        
+        const onLoadedData = () => {
+          tryPlay();
         };
         
         video.removeEventListener('canplay', onCanPlay);
         video.removeEventListener('loadedmetadata', onLoadedMetadata);
+        video.removeEventListener('loadeddata', onLoadedData);
         
         if (video.readyState >= 2) {
-          setTimeout(tryPlay, 50);
+          tryPlay();
         } else {
           video.addEventListener('canplay', onCanPlay, { once: true });
           video.addEventListener('loadedmetadata', onLoadedMetadata, { once: true });
-          
-          setTimeout(() => {
-            if (videoRef.current && videoRef.current.srcObject === localStream) {
-              tryPlay();
-            }
-          }, 200);
+          video.addEventListener('loadeddata', onLoadedData, { once: true });
         }
         
-        setTimeout(tryPlay, 100);
+        setTimeout(tryPlay, 50);
+        setTimeout(tryPlay, 150);
+        setTimeout(tryPlay, 300);
       } else {
         if (video.srcObject) {
           video.srcObject = null;
@@ -176,13 +193,15 @@ export default function MediaPreviewModal({
                 <p>Камера выключена</p>
               </div>
             ) : (
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className={styles.video}
-              />
+              <>
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className={styles.video}
+                />
+              </>
             )}
           </div>
 
