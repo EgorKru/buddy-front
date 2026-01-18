@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useCallback } from 'react';
+import React, { useMemo, useRef, useCallback, useEffect } from 'react';
 import { MESSAGE_STATUS } from '@/utils/messageQueue';
 import { formatChatDate, formatChatTime } from '@/utils/dateHelpers';
 import VoiceMessagePlayer from '@/component/VoiceMessagePlayer';
@@ -93,37 +93,66 @@ const MessageRow = React.memo(({
     return highlightSearchText(msg.content, searchText, styles);
   }, [isSearchMatch, searchText, msg.content]);
 
-  const longPressTimerRef = useRef(null);
-  const longPressStartRef = useRef(null);
-  const LONG_PRESS_DURATION = 500;
+  const messageRef = useRef(null);
 
-  const handleLongPressStart = useCallback((e) => {
-    if (selectionMode || !handleSelectMessage) return;
-    
-    longPressStartRef.current = Date.now();
-    longPressTimerRef.current = setTimeout(() => {
-      if (handleSelectMessage) {
-        handleSelectMessage(msg);
+  useEffect(() => {
+    const messageElement = messageRef.current;
+    if (!messageElement) return;
+
+    const handleSelectStart = (e) => {
+      if (selectionMode) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
       }
-      longPressTimerRef.current = null;
-    }, LONG_PRESS_DURATION);
-  }, [selectionMode, handleSelectMessage, msg]);
+    };
 
-  const handleLongPressEnd = useCallback(() => {
-    if (longPressTimerRef.current) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-    longPressStartRef.current = null;
-  }, []);
+    const handleSelectionChange = () => {
+      if (window.getSelection && selectionMode) {
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+          selection.removeAllRanges();
+        }
+      }
+    };
+
+    messageElement.addEventListener('selectstart', handleSelectStart, { passive: false });
+    document.addEventListener('selectionchange', handleSelectionChange);
+
+    return () => {
+      messageElement.removeEventListener('selectstart', handleSelectStart);
+      document.removeEventListener('selectionchange', handleSelectionChange);
+    };
+  }, [selectionMode]);
 
   const handleClick = useCallback((e) => {
     if (selectionMode) {
+      e.preventDefault();
+      if (window.getSelection) {
+        window.getSelection().removeAllRanges();
+      }
       toggleMessageSelection(msg.id);
-    } else if (longPressStartRef.current && Date.now() - longPressStartRef.current < LONG_PRESS_DURATION) {
-      handleLongPressEnd();
     }
-  }, [selectionMode, toggleMessageSelection, msg.id, handleLongPressEnd]);
+  }, [selectionMode, toggleMessageSelection, msg.id]);
+
+  const handleMouseMove = useCallback((e) => {
+    if (selectionMode) {
+      if (window.getSelection) {
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+          selection.removeAllRanges();
+        }
+      }
+    }
+  }, [selectionMode]);
+
+  const handleDragStart = useCallback((e) => {
+    if (selectionMode) {
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    }
+  }, [selectionMode]);
 
   return (
     <div key={msg.id}>
@@ -133,15 +162,13 @@ const MessageRow = React.memo(({
         </div>
       )}
       <div
+        ref={messageRef}
         className={messageClasses}
         onContextMenu={(e) => !selectionMode && handleContextMenu(e, msg)}
         onClick={handleClick}
-        onMouseDown={handleLongPressStart}
-        onMouseUp={handleLongPressEnd}
-        onMouseLeave={handleLongPressEnd}
-        onTouchStart={handleLongPressStart}
-        onTouchEnd={handleLongPressEnd}
-        onTouchCancel={handleLongPressEnd}
+        onMouseMove={handleMouseMove}
+        onDragStart={handleDragStart}
+        onDrag={handleDragStart}
         data-message-id={msg.id}
       >
         {selectionMode && (

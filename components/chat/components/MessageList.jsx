@@ -1,4 +1,5 @@
 import { Loader2, ChevronDown } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import MessageRow from '@/component/MessageRow';
 import styles from '@/styles/chat.module.css';
 
@@ -49,11 +50,40 @@ export default function MessageList({
     });
   })();
 
+  useEffect(() => {
+    if (!selectionMode) return;
+
+    const handleSelectStart = (e) => {
+      e.preventDefault();
+      return false;
+    };
+
+    const handleSelect = () => {
+      if (window.getSelection) {
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+          selection.removeAllRanges();
+        }
+      }
+    };
+
+    const container = messagesContainerRef.current;
+    if (container) {
+      container.addEventListener('selectstart', handleSelectStart);
+      document.addEventListener('selectionchange', handleSelect);
+      
+      return () => {
+        container.removeEventListener('selectstart', handleSelectStart);
+        document.removeEventListener('selectionchange', handleSelect);
+      };
+    }
+  }, [selectionMode, messagesContainerRef]);
+
   return (
     <>
       <div
         ref={messagesContainerRef}
-        className={styles.messagesContainer}
+        className={`${styles.messagesContainer} ${selectionMode ? styles.selectionMode : ''}`}
         onScroll={onScroll}
       >
         {loadingMore && (

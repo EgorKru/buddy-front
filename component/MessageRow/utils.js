@@ -33,7 +33,7 @@ export const getMessageClasses = (styles, {
   newMessageIdsRef,
   loadedMessageIdsRef
 }) => {
-  return `${styles.message} ${isOwn ? styles.ownMessage : ''} ${isPinned ? styles.messagePinned : ''} ${selectionMode && selectedMessages.has(msgId) ? styles.messageSelected : ''} ${newMessageIdsRef.current.has(String(msgId)) || isOptimistic ? styles.messageNew : ''} ${loadedMessageIdsRef.current.has(String(msgId)) ? styles.messageLoaded : ''} ${isSearchMatch ? styles.messageSearchMatch : ''}`;
+  return `${styles.message} ${isOwn ? styles.ownMessage : ''} ${isPinned ? styles.messagePinned : ''} ${selectionMode ? styles.selectionMode : ''} ${selectionMode && selectedMessages.has(msgId) ? styles.messageSelected : ''} ${newMessageIdsRef.current.has(String(msgId)) || isOptimistic ? styles.messageNew : ''} ${loadedMessageIdsRef.current.has(String(msgId)) ? styles.messageLoaded : ''} ${isSearchMatch ? styles.messageSearchMatch : ''}`;
 };
 
 export const highlightSearchText = (content, searchText, styles) => {
