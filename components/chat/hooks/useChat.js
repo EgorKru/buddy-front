@@ -69,7 +69,8 @@ export const useChat = (chatId, modals = {}) => {
     upsertMessage: chatContext.upsertMessage,
     refreshChats: chatContext.refreshChats,
     localPtsRef,
-    localSeqRef
+    localSeqRef,
+    setReadReceiptsForChat: chatContext.setReadReceiptsForChat
   });
   
   const {

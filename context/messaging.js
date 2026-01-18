@@ -56,6 +56,7 @@ const actionTypes = {
   ADD_OPTIMISTIC: 'ADD_OPTIMISTIC',
   REPLACE_OPTIMISTIC: 'REPLACE_OPTIMISTIC',
   APPLY_READ_RECEIPT: 'APPLY_READ_RECEIPT',
+  SET_READ_RECEIPTS_FOR_CHAT: 'SET_READ_RECEIPTS_FOR_CHAT',
   MARK_CHAT_READ_LOCAL: 'MARK_CHAT_READ_LOCAL',
   UPDATE_PRESENCE: 'UPDATE_PRESENCE',
 };
@@ -414,6 +415,38 @@ const reducer = (state, action) => {
       };
     }
 
+    case actionTypes.SET_READ_RECEIPTS_FOR_CHAT: {
+      const { chatId, readReceipts } = action.payload || {};
+      if (!chatId || !readReceipts) return state;
+      const cid = String(chatId);
+      const newReadAtByChatIdByUserId = {
+        ...state.readAtByChatIdByUserId,
+        [cid]: {},
+      };
+      
+      for (const [readerId, readAt] of Object.entries(readReceipts)) {
+        if (!readerId || !readAt) continue;
+        const rid = String(readerId);
+        const iso = toIso(readAt);
+        if (!iso) continue;
+        const current = newReadAtByChatIdByUserId[cid]?.[rid];
+        if (!current || isNewer(iso, current)) {
+          newReadAtByChatIdByUserId[cid][rid] = iso;
+        }
+      }
+      
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('readReceipts', JSON.stringify(newReadAtByChatIdByUserId));
+        } catch (e) {}
+      }
+      
+      return {
+        ...state,
+        readAtByChatIdByUserId: newReadAtByChatIdByUserId,
+      };
+    }
+
     case actionTypes.MARK_CHAT_READ_LOCAL: {
       const cid = action.payload?.chatId ? String(action.payload.chatId) : null;
       if (!cid) return state;
@@ -511,6 +544,27 @@ export const MessagingProvider = ({ children }) => {
     try {
       const data = await chatAPI.getChats();
       dispatch({ type: actionTypes.SET_CHATS, payload: { chats: data } });
+      
+      if (Array.isArray(data)) {
+        for (const chat of data) {
+          if (!chat?.id || !chat.readReceipts) continue;
+          
+          if (typeof chat.readReceipts === 'object') {
+            const readReceipts = {};
+            for (const [userId, lastReadAt] of Object.entries(chat.readReceipts)) {
+              if (userId && lastReadAt != null) {
+                readReceipts[String(userId)] = lastReadAt;
+              }
+            }
+            if (Object.keys(readReceipts).length > 0) {
+              dispatch({ 
+                type: actionTypes.SET_READ_RECEIPTS_FOR_CHAT, 
+                payload: { chatId: chat.id, readReceipts } 
+              });
+            }
+          }
+        }
+      }
     } catch (error) {
       if (error.message === 'Forbidden' || error.message === 'Unauthorized') {
         return;
@@ -596,6 +650,14 @@ export const MessagingProvider = ({ children }) => {
 
   const markChatAsRead = useCallback(async (chatId) => {
     if (!chatId) return;
+    const currentUser = getCurrentUser();
+    if (currentUser?.id) {
+      const now = new Date().toISOString();
+      dispatch({ 
+        type: actionTypes.APPLY_READ_RECEIPT, 
+        payload: { chatId, readerId: currentUser.id, readAt: now } 
+      });
+    }
     dispatch({ type: actionTypes.MARK_CHAT_READ_LOCAL, payload: { chatId } });
     try {
       await chatAPI.markChatAsRead(chatId);
@@ -604,6 +666,10 @@ export const MessagingProvider = ({ children }) => {
 
   const upsertReadReceipt = useCallback((chatId, readerId, readAt) => {
     dispatch({ type: actionTypes.APPLY_READ_RECEIPT, payload: { chatId, readerId, readAt } });
+  }, []);
+
+  const setReadReceiptsForChat = useCallback((chatId, readReceipts) => {
+    dispatch({ type: actionTypes.SET_READ_RECEIPTS_FOR_CHAT, payload: { chatId, readReceipts } });
   }, []);
 
   const upsertMessage = useCallback((message, meta = {}) => {
@@ -813,7 +879,7 @@ export const MessagingProvider = ({ children }) => {
       try {
         const sub = client.subscribe(`/topic/chat/${cid}/read`, (m) => {
           const ev = safeJsonParse(m.body);
-          if (!ev?.chatId || !ev?.readerId || !ev?.readAt) return;
+          if (!ev || !ev.chatId || !ev.readerId || !ev.readAt) return;
           upsertReadReceipt(ev.chatId, ev.readerId, ev.readAt);
         });
         readSubsRef.current.set(cid, sub);
@@ -922,6 +988,7 @@ export const MessagingProvider = ({ children }) => {
       messageIdsByChatId: state.messageIdsByChatId,
       messagesById: state.messagesById,
       upsertReadReceipt,
+      setReadReceiptsForChat,
       upsertMessage,
       updateMessage,
       removeMessage,
@@ -939,6 +1006,7 @@ export const MessagingProvider = ({ children }) => {
     state.messageIdsByChatId,
     state.messagesById,
     upsertReadReceipt,
+    setReadReceiptsForChat,
     upsertMessage,
     updateMessage,
     removeMessage,

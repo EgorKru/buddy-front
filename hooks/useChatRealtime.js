@@ -17,6 +17,7 @@ export const useChatRealtime = (chatId) => {
     chats,
     messageIdsByChatId,
     messagesById,
+    setReadReceiptsForChat,
   } = useChats();
 
   const topicSubRef = useRef(null);
@@ -109,6 +110,32 @@ export const useChatRealtime = (chatId) => {
       const chatState = await chatAPI.getChatState(chatId);
       if (chatState?.pts !== undefined) {
         localPtsRef.current.set(chatIdStr, chatState.pts);
+      }
+      
+      if (setReadReceiptsForChat && chatState) {
+        const readReceipts = {};
+        
+        if (chatState.readReceipts && typeof chatState.readReceipts === 'object') {
+          for (const [userId, lastReadAt] of Object.entries(chatState.readReceipts)) {
+            if (userId && lastReadAt != null) {
+              readReceipts[String(userId)] = lastReadAt;
+            }
+          }
+        }
+        
+        if (chatState.lastReadAt) {
+          const currentUser = getCurrentUser();
+          if (currentUser?.id) {
+            const currentUserId = String(currentUser.id);
+            if (!readReceipts[currentUserId] || chatState.lastReadAt > readReceipts[currentUserId]) {
+              readReceipts[currentUserId] = chatState.lastReadAt;
+            }
+          }
+        }
+        
+        if (Object.keys(readReceipts).length > 0) {
+          setReadReceiptsForChat(chatId, readReceipts);
+        }
       }
       
       const response = await chatAPI.getMessages(chatId, { page: 0, size: 50 });

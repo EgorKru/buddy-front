@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { chatAPI } from '@/utils/api';
+import { chatAPI, getCurrentUser } from '@/utils/api';
 import { MESSAGE_STATUS } from '@/utils/messageQueue';
 import { saveFileMetadata } from '../utils/messageHelpers';
 import { INITIAL_MESSAGES_LIMIT, OLDER_MESSAGES_LIMIT } from '../constants/chat';
@@ -9,7 +9,8 @@ export const useChatMessages = ({
   upsertMessage,
   refreshChats,
   localPtsRef,
-  localSeqRef
+  localSeqRef,
+  setReadReceiptsForChat
 }) => {
   
   const [loading, setLoading] = useState(false);
@@ -22,6 +23,7 @@ export const useChatMessages = ({
   const isLoadingInitialRef = useRef(false);
   const loadingMessagesRef = useRef(false);
   const lastLoadedMessageIdRef = useRef(null);
+  const pendingReadReceiptsRef = useRef(null);
 
   const loadChatStateFull = useCallback(async (chatId) => {
     if (!chatId) return;
@@ -38,7 +40,6 @@ export const useChatMessages = ({
       const state = await chatAPI.getChatStateFull(chatId, INITIAL_MESSAGES_LIMIT);
       
       if (state) {
-        
         if (state.chat) {
           refreshChats();
         }
@@ -46,12 +47,40 @@ export const useChatMessages = ({
         if (state.messages && Array.isArray(state.messages)) {
           const ordered = [...state.messages].reverse();
           for (const m of ordered) {
-            
             saveFileMetadata(m);
             upsertMessage(
               { ...m, status: MESSAGE_STATUS.SENT, isOptimistic: false },
               { unreadDelta: 0 }
             );
+          }
+        }
+
+        const readReceipts = {};
+        
+        if (state.readReceipts && typeof state.readReceipts === 'object') {
+          for (const [userId, lastReadAt] of Object.entries(state.readReceipts)) {
+            if (userId && lastReadAt != null) {
+              readReceipts[String(userId)] = lastReadAt;
+            }
+          }
+        }
+        
+        if (state.lastReadAt) {
+          const currentUser = getCurrentUser();
+          if (currentUser?.id) {
+            const currentUserId = String(currentUser.id);
+            if (!readReceipts[currentUserId] || state.lastReadAt > readReceipts[currentUserId]) {
+              readReceipts[currentUserId] = state.lastReadAt;
+            }
+          }
+        }
+        
+        if (Object.keys(readReceipts).length > 0) {
+          if (setReadReceiptsForChat) {
+            setReadReceiptsForChat(chatId, readReceipts);
+            pendingReadReceiptsRef.current = null;
+          } else {
+            pendingReadReceiptsRef.current = { chatId, readReceipts };
           }
         }
 
@@ -89,7 +118,7 @@ export const useChatMessages = ({
         abortControllerRef.current = null;
       }
     }
-  }, [upsertMessage, refreshChats, localPtsRef, localSeqRef]);
+  }, [upsertMessage, refreshChats, localPtsRef, localSeqRef, setReadReceiptsForChat, chatId]);
 
   const loadOlderMessages = useCallback(async (beforeMessageId) => {
     if (!chatId || !beforeMessageId || loadingMessagesRef.current) return;
@@ -171,10 +200,17 @@ export const useChatMessages = ({
     if (!chatId) {
       setLoading(false);
     } else {
-      
       lastLoadedMessageIdRef.current = null;
     }
   }, [chatId]);
+
+  useEffect(() => {
+    if (setReadReceiptsForChat && pendingReadReceiptsRef.current) {
+      const { chatId: pendingChatId, readReceipts } = pendingReadReceiptsRef.current;
+      setReadReceiptsForChat(pendingChatId, readReceipts);
+      pendingReadReceiptsRef.current = null;
+    }
+  }, [setReadReceiptsForChat]);
 
   return {
     
