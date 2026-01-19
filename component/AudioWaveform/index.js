@@ -78,8 +78,7 @@ const AudioWaveform = ({
   const scaledBarSpacing = Math.max(1, Math.floor(barSpacing * scaleFactor));
 
   const speedControlData = useSpeedControl(audioRef);
-  const { playbackRate, speedControlRef, ...speedControlProps } =
-    speedControlData;
+  const { playbackRate, toggleSpeed } = speedControlData;
   const waveformData = useWaveformData(src, scaledWidth, scaledBarSpacing);
 
   // Use audio handlers only if not using external audio
@@ -333,9 +332,8 @@ const AudioWaveform = ({
         <div style={{ position: "relative", zIndex: 1000, marginLeft: "auto", flexShrink: 0 }}>
           <SpeedControl
             playbackRate={playbackRate}
-            speedControlRef={speedControlRef}
             themeStyles={themeStyles}
-            {...speedControlProps}
+            toggleSpeed={toggleSpeed}
           />
         </div>
       )}

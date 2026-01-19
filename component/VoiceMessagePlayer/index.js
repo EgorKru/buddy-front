@@ -141,8 +141,8 @@ export default function VoiceMessagePlayer({ fileUrl, duration: propDuration, me
           showTimestamp={true}
           showSpeedControl={true}
           showBackground={false}
-          primaryColor="#0d9488"
-          progressColor="#059669"
+          primaryColor="#1DB954"
+          progressColor="#0d9488"
           onPlay={handlePlay}
           onPause={handlePause}
           onEnded={handleEnded}

@@ -100,15 +100,17 @@ export const getThemeStyles = (
       fontFamily:
         'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       fontWeight: "600",
-      padding: "2px 6px",
+      padding: "4px 8px",
       cursor: "pointer",
-      borderRadius: "4px",
+      borderRadius: "12px",
       transition: "background-color 0.2s ease, color 0.2s ease",
       whiteSpace: "nowrap",
-      display: "flex",
+      display: "inline-flex",
       alignItems: "center",
-      height: "18px",
-      backgroundColor: "rgba(107, 114, 128, 0.1)",
+      justifyContent: "center",
+      height: "20px",
+      backgroundColor: "#e5e7eb",
+      border: "none",
     },
 
     speedDropdown: {
