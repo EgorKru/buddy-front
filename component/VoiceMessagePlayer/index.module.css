@@ -1,13 +1,16 @@
 .voiceMessage {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0;
   min-width: 240px;
   max-width: 320px;
-  background: #f5f7fa;
-  border-radius: 1rem;
-  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.audioWaveformWrapper {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .playButton {
@@ -150,4 +153,15 @@
   color: #60a5fa;
   flex-shrink: 0;
   opacity: 0.8;
+}
+
+.messageMeta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  font-size: 0.7rem;
+  color: #9ca3af;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  margin-top: 0.25rem;
 }

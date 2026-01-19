@@ -1,276 +1,163 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Play, Pause, Pin } from 'lucide-react';
+/**
+ * VoiceMessagePlayer Component
+ */
+
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Pin } from 'lucide-react';
 import { chatAPI, getToken } from '@/utils/api';
 import { useVoicePlayer } from '@/context/voicePlayer';
+import AudioWaveform from '@/component/AudioWaveform';
 import styles from './index.module.css';
 
-const generateWaveform = (seed, barCount = 40) => {
-  const bars = [];
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    const char = seed.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  
-  for (let i = 0; i < barCount; i++) {
-    const val = Math.abs(Math.sin(hash * (i + 1) * 0.1)) * 0.85 + 0.15;
-    bars.push(val);
-    hash = ((hash << 5) - hash) + i;
-  }
-  
-  return bars;
-};
-
 export default function VoiceMessagePlayer({ fileUrl, duration: propDuration, messageTime, isOwn, statusIcon, isPinned }) {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [audioDuration, setAudioDuration] = useState(propDuration || 0);
+  const [audioUrl, setAudioUrl] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [playbackRate, setPlaybackRate] = useState(1);
   const audioRef = useRef(null);
   const blobUrlRef = useRef(null);
   
   const playerIdRef = useRef(fileUrl || `player-${Date.now()}-${Math.random()}`);
   const { activePlayerId, registerPlayer, unregisterPlayer } = useVoicePlayer();
 
-  const waveform = useMemo(() => {
-    return generateWaveform(fileUrl || 'default', 35);
-  }, [fileUrl]);
-
   const stopPlayback = useCallback(() => {
-    const audio = audioRef.current;
-    if (audio) {
-      audio.pause();
-      setIsPlaying(false);
+    if (audioRef.current) {
+      audioRef.current.pause();
     }
   }, []);
 
   useEffect(() => {
-    if (activePlayerId && activePlayerId !== playerIdRef.current && isPlaying) {
-      stopPlayback();
-    }
-  }, [activePlayerId, isPlaying, stopPlayback]);
-
-  useEffect(() => {
-    if (propDuration && propDuration > 0) {
-      setAudioDuration(propDuration);
-    }
-  }, [propDuration]);
-
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    const updateTime = () => setCurrentTime(audio.currentTime);
-    const handleEnded = () => {
-      setIsPlaying(false);
-      setCurrentTime(0);
-      unregisterPlayer(playerIdRef.current);
-    };
-    const handleLoadedMetadata = () => {
-      setIsLoading(false);
-      const dur = audio.duration;
-      if (dur && Number.isFinite(dur) && dur > 0) {
-        setAudioDuration(dur);
-      }
-    };
-    const handleDurationChange = () => {
-      const dur = audio.duration;
-      if (dur && Number.isFinite(dur) && dur > 0) {
-        setAudioDuration(dur);
-      }
-    };
-    const handleError = () => {
-      setIsLoading(false);
-      setError('Не удалось загрузить');
-    };
-
-    audio.addEventListener('timeupdate', updateTime);
-    audio.addEventListener('ended', handleEnded);
-    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
-    audio.addEventListener('durationchange', handleDurationChange);
-    audio.addEventListener('error', handleError);
-
     return () => {
-      audio.removeEventListener('timeupdate', updateTime);
-      audio.removeEventListener('ended', handleEnded);
-      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      audio.removeEventListener('durationchange', handleDurationChange);
-      audio.removeEventListener('error', handleError);
-      if (blobUrlRef.current && !isPlaying) {
+      if (blobUrlRef.current) {
         URL.revokeObjectURL(blobUrlRef.current);
         blobUrlRef.current = null;
       }
     };
-  }, [unregisterPlayer]);
+  }, []);
 
   const loadAudioWithAuth = async () => {
+    if (blobUrlRef.current) {
+      return blobUrlRef.current;
+    }
+
     const url = chatAPI.getVoiceFileUrl(fileUrl);
     const token = getToken();
 
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-    });
+    setIsLoading(true);
+    setError(null);
 
-    if (!response.ok) {
-      throw new Error(`Failed to load audio: ${response.status}`);
-    }
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      });
 
-    const blob = await response.blob();
-    const blobUrl = URL.createObjectURL(blob);
-    blobUrlRef.current = blobUrl;
-    
-    return blobUrl;
-  };
-
-  const togglePlay = async () => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    if (!audio.src) {
-      if (blobUrlRef.current) {
-        audio.src = blobUrlRef.current;
-      } else {
-        setIsLoading(true);
-        setError(null);
-        try {
-          const blobUrl = await loadAudioWithAuth();
-          audio.src = blobUrl;
-        } catch (err) {
-          setIsLoading(false);
-          setError('Не удалось загрузить');
-          return;
-        }
+      if (!response.ok) {
+        throw new Error(`Failed to load audio: ${response.status}`);
       }
-    }
 
-    if (isPlaying) {
-      audio.pause();
-      setIsPlaying(false);
-      unregisterPlayer(playerIdRef.current);
-    } else {
-      registerPlayer(playerIdRef.current, stopPlayback);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      blobUrlRef.current = blobUrl;
+      setAudioUrl(blobUrl);
       
+      if (audioRef.current) {
+        audioRef.current.src = blobUrl;
+      }
+      
+      setIsLoading(false);
+      return blobUrl;
+    } catch (err) {
+      setIsLoading(false);
+      setError('Не удалось загрузить');
+      throw err;
+    }
+  };
+
+  useEffect(() => {
+    if (fileUrl && !blobUrlRef.current) {
+      loadAudioWithAuth().catch(() => {});
+    }
+  }, [fileUrl]);
+
+  const handlePlay = useCallback(async () => {
+    if (!audioUrl) {
       try {
-        audio.playbackRate = playbackRate;
-        await audio.play();
-        setIsPlaying(true);
+        await loadAudioWithAuth();
       } catch (err) {
-        setIsLoading(false);
-        setError('Ошибка воспроизведения');
-        unregisterPlayer(playerIdRef.current);
+        return;
       }
     }
-  };
+    
+    if (activePlayerId && activePlayerId !== playerIdRef.current) {
+      return;
+    }
 
-  const handleWaveformClick = (e) => {
-    if (!audioDuration || audioDuration <= 0) return;
+    registerPlayer(playerIdRef.current, stopPlayback);
     
-    const rect = e.currentTarget.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const percentage = clickX / rect.width;
-    const newTime = percentage * audioDuration;
-    
+    try {
+      await audioRef.current.play();
+    } catch (err) {
+      setError('Ошибка воспроизведения');
+      unregisterPlayer(playerIdRef.current);
+    }
+  }, [audioUrl, activePlayerId, registerPlayer, stopPlayback, unregisterPlayer]);
+
+  const handlePause = useCallback(() => {
     if (audioRef.current) {
-      audioRef.current.currentTime = newTime;
-      setCurrentTime(newTime);
+      audioRef.current.pause();
+      unregisterPlayer(playerIdRef.current);
     }
-  };
+  }, [unregisterPlayer]);
 
-  const toggleSpeed = () => {
-    const speeds = [1, 1.5, 2];
-    const currentIndex = speeds.indexOf(playbackRate);
-    const nextIndex = (currentIndex + 1) % speeds.length;
-    const newSpeed = speeds[nextIndex];
-    setPlaybackRate(newSpeed);
-    
-    if (audioRef.current) {
-      audioRef.current.playbackRate = newSpeed;
+  const handleEnded = useCallback(() => {
+    unregisterPlayer(playerIdRef.current);
+  }, [unregisterPlayer]);
+
+  useEffect(() => {
+    if (activePlayerId && activePlayerId !== playerIdRef.current && audioRef.current) {
+      audioRef.current.pause();
     }
-  };
+  }, [activePlayerId]);
 
-  const formatTime = (seconds) => {
-    if (seconds === null || seconds === undefined || !Number.isFinite(seconds) || seconds < 0) {
-      return '0:00';
-    }
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const progress = audioDuration > 0 ? (currentTime / audioDuration) : 0;
-  const playedBars = Math.floor(progress * waveform.length);
+  if (error) {
+    return (
+      <div className={styles.voiceMessage}>
+        <div className={styles.error}>{error}</div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.voiceMessage}>
-      <button
-        type="button"
-        onClick={togglePlay}
-        className={styles.playButton}
-        disabled={isLoading}
-        title={error || (isPlaying ? 'Пауза' : 'Воспроизвести')}
-      >
-        {isLoading ? (
-          <div className={styles.spinner} />
-        ) : isPlaying ? (
-          <Pause size={20} />
-        ) : (
-          <Play size={20} />
-        )}
-      </button>
+      <div className={styles.audioWaveformWrapper}>
+        <AudioWaveform
+          src={audioUrl || ''}
+          style="viridara"
+          theme="dark"
+          height={50}
+          width={240}
+          barSpacing={2}
+          showControls={true}
+          showTimestamp={true}
+          showSpeedControl={true}
+          showBackground={false}
+          primaryColor="#0d9488"
+          progressColor="#059669"
+          onPlay={handlePlay}
+          onPause={handlePause}
+          onEnded={handleEnded}
+          externalAudioRef={audioRef}
+        />
+      </div>
       
-      <div className={styles.voiceContent}>
-        {error ? (
-          <div className={styles.error}>{error}</div>
-        ) : (
-          <>
-            <div 
-              className={styles.waveformContainer}
-              onClick={handleWaveformClick}
-              title="Нажмите для перемотки"
-            >
-              {waveform.map((height, index) => (
-                <div
-                  key={index}
-                  className={`${styles.waveformBar} ${index < playedBars ? styles.played : ''}`}
-                  style={{ height: `${height * 100}%` }}
-                />
-              ))}
-            </div>
-            
-            <div className={styles.timeRow}>
-              <span className={styles.currentTime}>
-                {isPlaying || currentTime > 0 
-                  ? formatTime(currentTime) 
-                  : formatTime(audioDuration)}
-              </span>
-              
-              {playbackRate !== 1 && (
-                <button 
-                  type="button"
-                  className={styles.speedButton}
-                  onClick={toggleSpeed}
-                  title="Изменить скорость"
-                >
-                  {playbackRate}×
-                </button>
-              )}
-              
-              <div className={styles.messageStatus}>
-                {isPinned && (
-                  <Pin size={12} className={styles.pinnedIcon} title="Закреплено" />
-                )}
-                {messageTime && (
-                  <span className={styles.messageTime}>{messageTime}</span>
-                )}
-                {isOwn && statusIcon}
-              </div>
-            </div>
-          </>
+      <div className={styles.messageMeta}>
+        {isPinned && (
+          <Pin size={12} className={styles.pinnedIcon} title="Закреплено" />
         )}
+        {messageTime && (
+          <span className={styles.messageTime}>{messageTime}</span>
+        )}
+        {isOwn && statusIcon}
       </div>
       
       <audio ref={audioRef} preload="none" />
