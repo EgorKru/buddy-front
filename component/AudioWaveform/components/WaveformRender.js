@@ -48,28 +48,29 @@ export const renderWaveform = (
   const actualSpacing = style === "aurevia" ? barSpacing * 1.5 : barSpacing;
   const actualBarWidth = style === "aurevia" ? Math.min(barWidth, 8) : barWidth;
 
-  return waveformData.map((value, index) => {
+  const bars = waveformData.map((value, index) => {
     let barHeight = value * height;
     let barY = 0;
 
+    // Увеличиваем коэффициенты высоты для более полных баров
     switch (style) {
       case "viridara":
-        barHeight = Math.max(barHeight * 0.8, 2);
+        barHeight = Math.max(barHeight * 1.0, 3); // Было 0.8, стало 1.0
         barY = (height - barHeight) / 2;
         break;
 
       case "solmara":
-        barHeight = barHeight * 0.9;
+        barHeight = Math.max(barHeight * 1.0, 3); // Было 0.9, стало 1.0
         barY = height - barHeight;
         break;
 
       case "aurevia":
-        barHeight = Math.max(barHeight * 0.95, 4);
+        barHeight = Math.max(barHeight * 1.0, 5); // Было 0.95, стало 1.0
         barY = (height - barHeight) / 2;
         break;
 
       case "minimal":
-        barHeight = Math.max(barHeight * 0.6, 1);
+        barHeight = Math.max(barHeight * 0.85, 2); // Было 0.6, стало 0.85
         barY = (height - barHeight) / 2;
         break;
     }
@@ -79,24 +80,28 @@ export const renderWaveform = (
     const barCenterPosition = xPosition + actualBarWidth / 2;
     const barCenterRatio = barCenterPosition / width;
 
-    const isPlayed = progress >= barCenterRatio;
-
     const barStartRatio = xPosition / width;
     const barEndRatio = (xPosition + actualBarWidth) / width;
-    const isCurrentProgressBar =
-      progress >= barStartRatio && progress < barEndRatio;
+    
+    // Более плавное определение состояния бара
+    const isPlayed = progress > barEndRatio;
+    const isCurrentProgressBar = progress >= barStartRatio && progress <= barEndRatio;
 
     let barColor = themeStyles.primary;
-    let opacity = style === "minimal" ? 0.4 : 0.6;
+    let opacity = style === "minimal" ? 0.5 : 0.7; // Увеличили базовую opacity
 
     if (isPlayed) {
       barColor = themeStyles.progress;
       opacity = 1;
     } else if (isCurrentProgressBar) {
-      barColor = themeStyles.progress;
+      // Более плавный переход внутри текущего бара
       const barProgress =
         (progress - barStartRatio) / (barEndRatio - barStartRatio);
-      opacity = 0.6 + 0.4 * Math.max(0, Math.min(1, barProgress));
+      const smoothProgress = Math.max(0, Math.min(1, barProgress));
+      
+      // Плавный переход цвета и opacity
+      barColor = themeStyles.progress;
+      opacity = 0.7 + 0.3 * smoothProgress; // Плавный переход от 0.7 до 1.0
     }
 
     let borderRadius = 0;
@@ -126,11 +131,13 @@ export const renderWaveform = (
         rx={borderRadius}
         opacity={opacity}
         style={{
-          transition: "all 0.15s ease",
+          transition: "fill 0.2s ease, opacity 0.2s ease",
           transformOrigin: "center",
           willChange: "fill, opacity",
         }}
       />
     );
   });
+
+  return bars;
 };

@@ -30,6 +30,7 @@ const AudioWaveform = ({
   showBackground = true,
   className = "",
   externalAudioRef,
+  initialDuration,
   onPlay,
   onPause,
   onEnded,
@@ -41,8 +42,24 @@ const AudioWaveform = ({
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
+  // Используем initialDuration если он передан, иначе 0
+  const [duration, setDuration] = useState(initialDuration && initialDuration > 0 ? initialDuration : 0);
   const [progress, setProgress] = useState(0);
+
+  // Обновляем duration когда initialDuration меняется (только если duration еще не установлен из audio)
+  useEffect(() => {
+    if (initialDuration && initialDuration > 0) {
+      setDuration(prevDuration => {
+        // Если duration еще не установлен (0) или равен предыдущему initialDuration, обновляем
+        // Но не перезаписываем, если уже есть валидный duration из audio
+        if (prevDuration === 0) {
+          return initialDuration;
+        }
+        // Если prevDuration совпадает с предыдущим initialDuration, обновляем на новый
+        return initialDuration;
+      });
+    }
+  }, [initialDuration]);
 
   // Calculate scale factor based on screen size
   useEffect(() => {
@@ -88,37 +105,90 @@ const AudioWaveform = ({
     setIsPlaying,
     setCurrentTime,
     setDuration,
-    setProgress
+    setProgress,
+    initialDuration
   );
 
   // Handle external audio callbacks and time updates
   useEffect(() => {
     if (externalAudioRef && audioRef.current) {
       const audio = audioRef.current;
+      let animationFrameId = null;
+      let isPlayingLocal = false;
+      
+      const updateProgress = () => {
+        if (audio && isPlayingLocal) {
+          const currentTime = audio.currentTime;
+          const dur = audio.duration;
+          
+          setCurrentTime(currentTime);
+          
+          // Используем duration из audio если он валидный, иначе используем initialDuration
+          let effectiveDuration = dur && isFinite(dur) && dur > 0 ? dur : (initialDuration && initialDuration > 0 ? initialDuration : 0);
+          
+          if (dur && isFinite(dur) && dur > 0) {
+            setDuration(dur);
+          } else if (initialDuration && initialDuration > 0) {
+            // Сохраняем initialDuration если audio.duration еще не загружен
+            setDuration(initialDuration);
+          }
+          
+          if (effectiveDuration > 0) {
+            setProgress(currentTime / effectiveDuration);
+          }
+          
+          animationFrameId = requestAnimationFrame(updateProgress);
+        }
+      };
       
       const handlePlay = () => {
         setIsPlaying(true);
+        isPlayingLocal = true;
+        if (!animationFrameId) {
+          animationFrameId = requestAnimationFrame(updateProgress);
+        }
         if (onPlay) onPlay();
       };
       
       const handlePause = () => {
         setIsPlaying(false);
+        isPlayingLocal = false;
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId);
+          animationFrameId = null;
+        }
         if (onPause) onPause();
       };
       
       const handleEnded = () => {
         setIsPlaying(false);
+        isPlayingLocal = false;
         setProgress(0);
         setCurrentTime(0);
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId);
+          animationFrameId = null;
+        }
         if (onEnded) onEnded();
       };
 
       const onTimeUpdate = () => {
-        setCurrentTime(audio.currentTime);
+        // Fallback для случаев, когда requestAnimationFrame не работает
+        const currentTime = audio.currentTime;
         const dur = audio.duration;
+        setCurrentTime(currentTime);
+        
+        // Используем duration из audio если он валидный, иначе используем initialDuration
+        let effectiveDuration = dur && isFinite(dur) && dur > 0 ? dur : (initialDuration && initialDuration > 0 ? initialDuration : 0);
+        
         if (dur && isFinite(dur) && dur > 0) {
           setDuration(dur);
-          setProgress(audio.currentTime / dur);
+        } else if (initialDuration && initialDuration > 0) {
+          setDuration(initialDuration);
+        }
+        
+        if (effectiveDuration > 0) {
+          setProgress(currentTime / effectiveDuration);
         }
       };
 
@@ -135,12 +205,23 @@ const AudioWaveform = ({
       audio.addEventListener('timeupdate', onTimeUpdate);
       audio.addEventListener('loadedmetadata', onLoadedMetadata);
 
-      // Initial check
+      // Initial check - используем initialDuration если audio.duration еще не загружен
       if (audio.readyState >= 1) {
         const dur = audio.duration;
         if (dur && isFinite(dur) && dur > 0) {
           setDuration(dur);
+        } else if (initialDuration && initialDuration > 0) {
+          setDuration(initialDuration);
         }
+      } else if (initialDuration && initialDuration > 0) {
+        // Устанавливаем initialDuration сразу, если audio еще не загружен
+        setDuration(initialDuration);
+      }
+
+      // Проверяем начальное состояние
+      if (!audio.paused) {
+        isPlayingLocal = true;
+        animationFrameId = requestAnimationFrame(updateProgress);
       }
 
       return () => {
@@ -149,9 +230,14 @@ const AudioWaveform = ({
         audio.removeEventListener('ended', handleEnded);
         audio.removeEventListener('timeupdate', onTimeUpdate);
         audio.removeEventListener('loadedmetadata', onLoadedMetadata);
+        
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId);
+          animationFrameId = null;
+        }
       };
     }
-  }, [externalAudioRef, onPlay, onPause, onEnded]);
+  }, [externalAudioRef, onPlay, onPause, onEnded, initialDuration, setCurrentTime, setDuration, setProgress]);
 
   const themeStyles = getThemeStyles(
     style,
