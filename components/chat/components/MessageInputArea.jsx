@@ -2,25 +2,8 @@ import { useEffect, useState, useRef, useMemo } from 'react';
 import { Edit, Reply, X, Paperclip, Mic, Send, Lock, Unlock, ChevronDown, ChevronUp, File as FileIcon, Loader2, Pause, Play, Trash2, Volume2, Headphones } from 'lucide-react';
 import { formatFileSize } from '../utils/messageHelpers';
 import { useAutoResizeTextarea } from '../hooks/useAutoResizeTextarea';
+import AudioWaveform from '@/component/AudioWaveform';
 import styles from '@/styles/chat.module.css';
-
-const generateWaveform = (seed, barCount = 35) => {
-  const bars = [];
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    const char = seed.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  
-  for (let i = 0; i < barCount; i++) {
-    const val = Math.abs(Math.sin(hash * (i + 1) * 0.1)) * 0.85 + 0.15;
-    bars.push(val);
-    hash = ((hash << 5) - hash) + i;
-  }
-  
-  return bars;
-};
 
 export default function MessageInputArea({
   newMessage,
@@ -67,12 +50,17 @@ export default function MessageInputArea({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   
-  const waveform = useMemo(() => {
-    if (isLocked && recordingTime > 0) {
-      return generateWaveform(`recording-${Math.floor(recordingTime)}`, 35);
+  // Получаем blob URL только когда нужно (при паузе/прослушивании), чтобы не делать запросы
+  const previewBlobUrl = useMemo(() => {
+    // Используем blob URL только при паузе или прослушивании, чтобы не анализировать аудио во время записи
+    if (audioPreviewRef?.current && isRecording && isLocked && (isPaused || isPlayingPreview)) {
+      const audio = audioPreviewRef.current;
+      if (audio.src && audio.src.startsWith('blob:')) {
+        return audio.src;
+      }
     }
-    return generateWaveform('default', 35);
-  }, [isLocked, recordingTime]);
+    return ''; // Пустая строка = фиктивные данные без запросов
+  }, [audioPreviewRef, isRecording, isLocked, isPaused, isPlayingPreview]);
 
   useEffect(() => {
     if (!audioPreviewRef?.current || !isRecording || !isLocked) {
@@ -341,55 +329,92 @@ export default function MessageInputArea({
                         {isPlayingPreview ? <Pause size={18} /> : <Headphones size={18} />}
                       </button>
                     )}
-                    <div 
-                      className={styles.voiceWaveformPreview}
-                      onClick={(e) => {
-                        if (audioPreviewRef?.current && duration > 0) {
-                          e.stopPropagation();
-                          const container = e.currentTarget;
-                          const bars = container.querySelectorAll(`.${styles.waveformBarPreview}`);
-                          if (bars.length === 0) return;
-                          
-                          const firstBar = bars[0].getBoundingClientRect();
-                          const lastBar = bars[bars.length - 1].getBoundingClientRect();
-                          const waveformStart = firstBar.left;
-                          const waveformEnd = lastBar.right;
-                          const waveformWidth = waveformEnd - waveformStart;
-                          
-                          const clickX = e.clientX - waveformStart;
-                          const percentage = Math.max(0, Math.min(1, clickX / waveformWidth));
-                          const newTime = percentage * duration;
-                          if (audioPreviewRef.current) {
-                            audioPreviewRef.current.currentTime = newTime;
-                            setCurrentTime(newTime);
-                          }
-                        }
-                      }}
-                      title={duration > 0 ? "Нажмите для перемотки" : ""}
-                    >
-                      {waveform.map((height, index) => {
-                        const progress = duration > 0 
-                          ? (isPlayingPreview ? currentTime / duration : (recordingTime > 0 ? recordingTime / duration : 0))
-                          : 0;
-                        const playedBars = Math.ceil(progress * waveform.length);
-                        const isPlayed = index < playedBars;
-                        return (
-                          <div
-                            key={index}
-                            className={`${styles.waveformBarPreview} ${isPlayed ? styles.played : ''}`}
-                            style={{ height: `${height * 100}%` }}
+                    {/* При записи - только таймер в секундах */}
+                    {!isPaused && !isPlayingPreview && (
+                      <div className={styles.voiceRecordingTime}>
+                        {Math.floor((recordingTime || 0) / 60)}:{((recordingTime || 0) % 60).toString().padStart(2, '0')}
+                      </div>
+                    )}
+                    
+                    {/* При паузе - вейвформа для прослушивания */}
+                    {isPaused && !isPlayingPreview && (
+                      <>
+                        <div className={styles.voiceWaveformPreview}>
+                          <AudioWaveform
+                            src={previewBlobUrl}
+                            style="viridara"
+                            theme="dark"
+                            height={50}
+                            width={240}
+                            barSpacing={2}
+                            showControls={false}
+                            showTimestamp={false}
+                            showSpeedControl={false}
+                            showBackground={false}
+                            primaryColor="#1DB954"
+                            progressColor="#0d9488"
+                            initialDuration={duration > 0 ? duration : (recordingTime > 0 ? recordingTime : undefined)}
+                            externalAudioRef={null}
+                            onPlay={() => onPlayPreview(true)}
+                            onPause={() => onPlayPreview(false)}
+                            onEnded={() => {
+                              if (audioPreviewRef?.current) {
+                                audioPreviewRef.current.pause();
+                                audioPreviewRef.current.currentTime = 0;
+                                setCurrentTime(0);
+                              }
+                              onPlayPreview(false);
+                            }}
                           />
-                        );
-                      })}
-                    </div>
-                    <div className={styles.voiceRecordingTime}>
-                      {isPlayingPreview && duration > 0
-                        ? `${Math.floor(currentTime / 60)}:${Math.floor(currentTime % 60).toString().padStart(2, '0')} / ${Math.floor(duration / 60)}:${Math.floor(duration % 60).toString().padStart(2, '0')}`
-                        : duration > 0
-                        ? `${Math.floor((recordingTime || 0) / 60)}:${((recordingTime || 0) % 60).toString().padStart(2, '0')} / ${Math.floor(duration / 60)}:${Math.floor(duration % 60).toString().padStart(2, '0')}`
-                        : `${Math.floor((recordingTime || 0) / 60)}:${((recordingTime || 0) % 60).toString().padStart(2, '0')}`
-                      }
-                    </div>
+                        </div>
+                        <div className={styles.voiceRecordingTime}>
+                          {duration > 0
+                            ? `${Math.floor((recordingTime || 0) / 60)}:${((recordingTime || 0) % 60).toString().padStart(2, '0')} / ${Math.floor(duration / 60)}:${Math.floor(duration % 60).toString().padStart(2, '0')}`
+                            : `${Math.floor((recordingTime || 0) / 60)}:${((recordingTime || 0) % 60).toString().padStart(2, '0')}`
+                          }
+                        </div>
+                      </>
+                    )}
+                    
+                    {/* При прослушивании - вейвформа с прогрессом */}
+                    {isPlayingPreview && (
+                      <>
+                        <div className={styles.voiceWaveformPreview}>
+                          <AudioWaveform
+                            src={previewBlobUrl}
+                            style="viridara"
+                            theme="dark"
+                            height={50}
+                            width={240}
+                            barSpacing={2}
+                            showControls={false}
+                            showTimestamp={false}
+                            showSpeedControl={false}
+                            showBackground={false}
+                            primaryColor="#1DB954"
+                            progressColor="#0d9488"
+                            initialDuration={duration > 0 ? duration : (recordingTime > 0 ? recordingTime : undefined)}
+                            externalAudioRef={audioPreviewRef}
+                            onPlay={() => onPlayPreview(true)}
+                            onPause={() => onPlayPreview(false)}
+                            onEnded={() => {
+                              if (audioPreviewRef?.current) {
+                                audioPreviewRef.current.pause();
+                                audioPreviewRef.current.currentTime = 0;
+                                setCurrentTime(0);
+                              }
+                              onPlayPreview(false);
+                            }}
+                          />
+                        </div>
+                        <div className={styles.voiceRecordingTime}>
+                          {duration > 0
+                            ? `${Math.floor(currentTime / 60)}:${Math.floor(currentTime % 60).toString().padStart(2, '0')} / ${Math.floor(duration / 60)}:${Math.floor(duration % 60).toString().padStart(2, '0')}`
+                            : `${Math.floor((recordingTime || 0) / 60)}:${((recordingTime || 0) % 60).toString().padStart(2, '0')}`
+                          }
+                        </div>
+                      </>
+                    )}
                     <button
                       type="button"
                       onClick={onStopRecording}
