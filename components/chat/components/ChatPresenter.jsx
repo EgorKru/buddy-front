@@ -11,6 +11,7 @@ import SelectionHeader from '@/component/SelectionHeader';
 import ChatHeader from '@/components/chat/components/ChatHeader';
 import MessageList from '@/components/chat/components/MessageList';
 import MessageInputArea from '@/components/chat/components/MessageInputArea';
+import SearchBar from '@/components/chat/components/SearchBar';
 import { ErrorMessage } from '@/components/chat/components/ErrorMessage';
 
 const ChatPresenter = ({
@@ -183,6 +184,17 @@ const ChatPresenter = ({
           />
         )}
         
+        {searchOpen && (
+          <SearchBar
+            searchMode={searchMode}
+            searchResults={searchResults}
+            searchText={searchText}
+            user={user}
+            onNavigateToResult={handleNavigateToSearchResult}
+            onCloseSearch={handleCloseSearch}
+          />
+        )}
+        
         {searchMode && searchText.trim() && (
           <div className={styles.searchResultsHeader}>
             <span className={styles.searchResultsCount}>
@@ -315,6 +327,7 @@ const ChatPresenter = ({
             const pinnedMsgId = p.message?.id;
             return pinnedMsgId && Number(pinnedMsgId) === Number(contextMenu.message.id);
           })}
+          isSearchResult={!!(searchMode && searchText.trim())}
           onClose={handleCloseContextMenu}
           onReply={() => handleReplyMessage(contextMenu.message)}
           onPin={() => handlePinMessage(contextMenu.message)}
@@ -323,6 +336,14 @@ const ChatPresenter = ({
           onDelete={() => handleDeleteMessage(contextMenu.message)}
           onEdit={() => handleEditMessage(contextMenu.message)}
           onSelect={() => handleSelectMessage(contextMenu.message)}
+          onNavigate={(() => {
+            // Для найденных сообщений используем handleNavigateToSearchResult
+            if (handleNavigateToSearchResult && searchMode && searchText.trim()) {
+              return () => handleNavigateToSearchResult(contextMenu.message.id);
+            }
+            // Для обычных сообщений не показываем кнопку "Перейти к сообщению"
+            return undefined;
+          })()}
         />
       )}
 

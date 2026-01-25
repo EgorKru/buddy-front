@@ -282,6 +282,11 @@ export const chatAPI = {
     return apiRequest(`/chats/${chatId}/messages/${messageId}`);
   },
 
+  getMessageContext: async (chatId, messageId, contextSize = 20) => {
+    const params = new URLSearchParams({ contextSize: String(contextSize) });
+    return apiRequest(`/chats/${chatId}/messages/${messageId}/context?${params}`);
+  },
+
   uploadVoiceFile: async (chatId, audioBlob, duration = null) => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     const formData = new FormData();

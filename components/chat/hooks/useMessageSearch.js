@@ -162,9 +162,30 @@ export const useMessageSearch = ({ chatId, onNavigateToMessage, upsertMessage })
   }, []);
 
   const handleNavigateToSearchResult = useCallback(async (messageId) => {
-    if (onNavigateToMessage) {
-      await onNavigateToMessage(messageId);
+    if (!onNavigateToMessage || !messageId) {
+      console.error('handleNavigateToSearchResult: missing onNavigateToMessage or messageId', { onNavigateToMessage, messageId });
+      return;
+    }
+
+    try {
+      console.log('Navigating to search result:', messageId);
+      
+      // Сначала закрываем поиск, чтобы выйти из режима поиска
+      setSearchMode(false);
+      setSearchResults([]);
+      setSearchText('');
+      // Закрываем поисковую панель
       handleCloseSearch();
+      
+      // Небольшая задержка, чтобы состояние успело обновиться и React перерендерил компоненты
+      await new Promise(resolve => setTimeout(resolve, 150));
+      
+      // Затем выполняем навигацию к сообщению
+      await onNavigateToMessage(messageId);
+      
+      console.log('Navigation completed for message:', messageId);
+    } catch (error) {
+      console.error('Error in handleNavigateToSearchResult:', error);
     }
   }, [onNavigateToMessage, handleCloseSearch]);
 

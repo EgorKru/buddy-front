@@ -1,4 +1,4 @@
-import { Reply, Pin, PinOff, Copy, Forward, Trash2, CheckCircle2, Edit } from 'lucide-react';
+import { Reply, Pin, PinOff, Copy, Forward, Trash2, CheckCircle2, Edit, ArrowRight } from 'lucide-react';
 
 export const adjustMenuPosition = (menuElement, position) => {
   if (!menuElement || !position) return null;
@@ -29,7 +29,7 @@ export const adjustMenuPosition = (menuElement, position) => {
   return { x, y };
 };
 
-export const getMenuItems = (message, isOwn, isPinned, handlers) => {
+export const getMenuItems = (message, isOwn, isPinned, handlers, isSearchResult = false) => {
   const {
     onReply,
     onPin,
@@ -37,10 +37,11 @@ export const getMenuItems = (message, isOwn, isPinned, handlers) => {
     onForward,
     onEdit,
     onDelete,
-    onSelect
+    onSelect,
+    onNavigate
   } = handlers;
 
-  return [
+  const items = [
     { icon: Reply, label: 'Ответить', onClick: onReply, show: true },
     { 
       icon: isPinned ? PinOff : Pin, 
@@ -68,5 +69,16 @@ export const getMenuItems = (message, isOwn, isPinned, handlers) => {
       show: !message.isOptimistic 
     },
     { icon: CheckCircle2, label: 'Выделить', onClick: onSelect, show: true },
-  ].filter(item => item.show);
+    // Показываем кнопку "Перейти к сообщению" только для найденных сообщений
+    {
+      icon: ArrowRight,
+      label: 'Перейти к сообщению',
+      onClick: onNavigate || (() => {}),
+      show: isSearchResult && !!onNavigate
+    },
+  ];
+
+  const filteredItems = items.filter(item => item.show);
+  
+  return filteredItems;
 };

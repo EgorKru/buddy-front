@@ -1,4 +1,5 @@
 import { formatChatTime } from '@/utils/dateHelpers';
+import { ArrowRight } from 'lucide-react';
 import styles from '@/styles/chat.module.css';
 
 export default function SearchBar({
@@ -79,12 +80,14 @@ export default function SearchBar({
             <div
               key={msg.id}
               className={styles.searchResultItem}
-              onClick={async () => {
-                await onNavigateToResult(msg.id);
-                onCloseSearch();
-              }}
             >
-              <div className={styles.searchResultContent}>
+              <div 
+                className={styles.searchResultContent}
+                onClick={async () => {
+                  await onNavigateToResult(msg.id);
+                  onCloseSearch();
+                }}
+              >
                 <div className={styles.searchResultSender}>
                   {isOwn ? 'Вы' : (msg.senderDisplayName || msg.senderUsername)}
                 </div>
@@ -95,6 +98,18 @@ export default function SearchBar({
                   {formatChatTime(msg.createdAt)}
                 </div>
               </div>
+              <button
+                className={styles.searchResultNavigateButton}
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  await onNavigateToResult(msg.id);
+                  onCloseSearch();
+                }}
+                title="Перейти к сообщению"
+                aria-label="Перейти к сообщению"
+              >
+                <ArrowRight size={18} />
+              </button>
             </div>
           );
         })}

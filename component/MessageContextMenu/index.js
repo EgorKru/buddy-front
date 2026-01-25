@@ -7,6 +7,7 @@ export default function MessageContextMenu({
   position, 
   isOwn, 
   isPinned = false,
+  isSearchResult = false,
   onClose, 
   onReply, 
   onPin, 
@@ -14,7 +15,8 @@ export default function MessageContextMenu({
   onForward, 
   onDelete,
   onEdit,
-  onSelect 
+  onSelect,
+  onNavigate
 }) {
   const menuRef = useRef(null);
 
@@ -53,16 +55,18 @@ export default function MessageContextMenu({
   }, [position]);
 
   const menuItems = useMemo(() => {
-    return getMenuItems(message, isOwn, isPinned, {
+    const items = getMenuItems(message, isOwn, isPinned, {
       onReply,
       onPin,
       onCopy,
       onForward,
       onEdit,
       onDelete,
-      onSelect
-    });
-  }, [message, isOwn, isPinned, onReply, onPin, onCopy, onForward, onEdit, onDelete, onSelect]);
+      onSelect,
+      onNavigate
+    }, isSearchResult);
+    return items;
+  }, [message, isOwn, isPinned, isSearchResult, onReply, onPin, onCopy, onForward, onEdit, onDelete, onSelect, onNavigate]);
 
   if (!position) return null;
 
