@@ -191,7 +191,7 @@ export const useRoomProtocol = (initialRoomId = null) => {
       if (negotiationTimeoutRef.current?.has(negotiationTimeout)) {
         return; 
       }
-      negotiationTimeoutRef.current?.set(negotiationTimeout, true);
+      negotiationTimeoutRef.current?.add(negotiationTimeout);
       
       try {
         

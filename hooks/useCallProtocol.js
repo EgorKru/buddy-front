@@ -27,6 +27,8 @@ const EVENT_TYPES = {
   CALL_CANCELLED: 'CALL_CANCELLED',
   CALL_ENDED: 'CALL_ENDED',
   CALL_BUSY: 'CALL_BUSY',
+  CALL_FAILED: 'CALL_FAILED',
+  CALL_MISSED: 'CALL_MISSED',
 
   WEBRTC_OFFER: 'WEBRTC_OFFER',
   WEBRTC_ANSWER: 'WEBRTC_ANSWER',
@@ -287,6 +289,9 @@ export const useCallProtocol = () => {
   }, []);
 
   const handleCallEvent = useCallback((event) => {
+    // События могут содержать поля seq, timestamp, fromUserId, targetUserId
+    // для логирования и отладки, но они не критичны для основной функциональности
+    
     switch (event.eventType) {
       case EVENT_TYPES.INCOMING_CALL:
         setIncomingCall(event.call);
@@ -316,10 +321,25 @@ export const useCallProtocol = () => {
 
       case EVENT_TYPES.CALL_ENDED:
         setIsRinging(false);
+        // Обновляем состояние звонка с финальными данными (durationSeconds, endReason)
+        if (event.call) {
+          setCall(event.call);
+        }
         cleanup();
         break;
 
       case EVENT_TYPES.CALL_BUSY:
+        setIsRinging(false);
+        cleanup();
+        break;
+
+      case EVENT_TYPES.CALL_FAILED:
+        setIsRinging(false);
+        setError('Ошибка при звонке');
+        cleanup();
+        break;
+
+      case EVENT_TYPES.CALL_MISSED:
         setIsRinging(false);
         cleanup();
         break;
@@ -358,12 +378,39 @@ export const useCallProtocol = () => {
 
     const signalSub = stompClient.subscribe('/user/queue/call-signal', (message) => {
       const response = safeJsonParse(message.body);
-      if (response && !response.success && response.errorMessage) {
-        setError(response.errorMessage);
+      if (!response) return;
+
+      // Обработка ошибок
+      if (response.success === false) {
+        if (response.errorMessage) {
+          setError(response.errorMessage);
+        }
+        // Если ошибка при инициации звонка, очищаем состояние
+        if (response.type === SIGNAL_TYPES.CALL_INITIATE) {
+          setIsRinging(false);
+          cleanup();
+        }
+        return;
       }
-      if (response?.call) {
-        setCall(response.call);
-        callIdRef.current = response.call.id;
+
+      // Обработка успешных ответов
+      if (response.success === true) {
+        // Обновляем callId если он пришел отдельно
+        if (response.callId && !callIdRef.current) {
+          callIdRef.current = response.callId;
+        }
+
+        // Обновляем состояние звонка если пришел объект call
+        if (response.call) {
+          setCall(response.call);
+          callIdRef.current = response.call.id;
+          
+          // Если звонок завершен, обновляем состояние
+          if (response.call.status === CALL_STATUS.ENDED) {
+            setIsCallActive(false);
+            setIsRinging(false);
+          }
+        }
       }
     });
 
