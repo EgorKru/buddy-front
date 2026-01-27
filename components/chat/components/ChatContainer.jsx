@@ -337,6 +337,7 @@ const ChatContainer = ({ chatId }) => {
     isRecording,
     editingContent,
     newMessage,
+    selectedFile,
     handleSaveEdit,
     handleCancelEdit,
     sendMessage

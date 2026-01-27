@@ -6,6 +6,7 @@ export const useChatKeyboard = ({
   isRecording,
   editingContent,
   newMessage,
+  selectedFile,
   handleSaveEdit,
   handleCancelEdit,
   sendMessage
@@ -24,12 +25,12 @@ export const useChatKeyboard = ({
           handleSaveEdit();
         }
       } else {
-        if (!sending && !isRecording && newMessage.trim()) {
+        if (!sending && !isRecording && (newMessage.trim() || selectedFile)) {
           sendMessage(e);
         }
       }
     }
-  }, [editingMessageId, sending, isRecording, editingContent, newMessage, handleSaveEdit, handleCancelEdit, sendMessage]);
+  }, [editingMessageId, sending, isRecording, editingContent, newMessage, selectedFile, handleSaveEdit, handleCancelEdit, sendMessage]);
 
   return { handleKeyDown };
 };

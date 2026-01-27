@@ -564,7 +564,7 @@ export default function MessageInputArea({
           </>
         )}
         
-        {(newMessage.trim() || editingMessageId) && !isRecording && (
+        {(newMessage.trim() || editingMessageId || selectedFile) && !isRecording && (
           <button
             type="submit"
             className={styles.sendButton}
