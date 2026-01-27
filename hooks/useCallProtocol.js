@@ -71,6 +71,7 @@ export const useCallProtocol = () => {
 
   const [call, setCall] = useState(null);
   const [incomingCall, setIncomingCall] = useState(null);
+  const [activeCalls, setActiveCalls] = useState([]); // Массив активных звонков
   const [localStream, setLocalStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
   const [audioEnabled, setAudioEnabled] = useState(true);
@@ -88,6 +89,12 @@ export const useCallProtocol = () => {
   
   const currentUser = getCurrentUser();
   const myUserId = currentUser?.id;
+
+  // Функция для проверки возможности инициировать новый звонок
+  // Блокируется только если есть звонок в статусе ACTIVE
+  const canInitiateCall = useCallback(() => {
+    return !activeCalls.some(call => call.status === CALL_STATUS.ACTIVE);
+  }, [activeCalls]);
 
   const sendSignal = useCallback((signal) => {
     if (isConnected && stompClient) {
@@ -295,14 +302,32 @@ export const useCallProtocol = () => {
     switch (event.eventType) {
       case EVENT_TYPES.INCOMING_CALL:
         setIncomingCall(event.call);
+        // Добавляем в список активных звонков
+        if (event.call?.id) {
+          setActiveCalls(prev => {
+            const existing = prev.find(c => c.id === event.call.id);
+            if (!existing) {
+              return [...prev, event.call];
+            }
+            return prev.map(c => c.id === event.call.id ? event.call : c);
+          });
+        }
         break;
 
       case EVENT_TYPES.CALL_ACCEPTED:
-
         setCall(event.call);
         setIncomingCall(null);
         setIsRinging(false);  
         setIsCallActive(true);
+        
+        // Обновляем список активных звонков
+        setActiveCalls(prev => {
+          const existing = prev.find(c => c.id === event.call.id);
+          if (!existing) {
+            return [...prev, event.call];
+          }
+          return prev.map(c => c.id === event.call.id ? event.call : c);
+        });
         
         if (event.call.caller?.id === myUserId) {
           setTimeout(() => sendOffer(), 100);
@@ -325,12 +350,32 @@ export const useCallProtocol = () => {
         if (event.call) {
           setCall(event.call);
         }
-        cleanup();
+        // Удаляем из списка активных звонков
+        if (event.call?.id) {
+          setActiveCalls(prev => prev.filter(c => c.id !== event.call.id));
+        }
+        // Если это был текущий активный звонок, очищаем
+        if (call?.id === event.call?.id && isCallActive) {
+          cleanup();
+        }
         break;
 
       case EVENT_TYPES.CALL_BUSY:
         setIsRinging(false);
-        cleanup();
+        // Показываем уведомление о занятости
+        const busyCallTarget = event.call?.callee || event.call?.caller;
+        const busyTargetName = busyCallTarget?.displayName || busyCallTarget?.username || 'Пользователь';
+        setError(`${busyTargetName} занят и не может ответить`);
+        
+        // Обновляем список активных звонков - удаляем завершенный звонок
+        if (event.call?.id) {
+          setActiveCalls(prev => prev.filter(c => c.id !== event.call.id));
+        }
+        
+        // Если это был текущий звонок, очищаем его
+        if (call?.id === event.call?.id) {
+          cleanup();
+        }
         break;
 
       case EVENT_TYPES.CALL_FAILED:
@@ -402,13 +447,47 @@ export const useCallProtocol = () => {
 
         // Обновляем состояние звонка если пришел объект call
         if (response.call) {
-          setCall(response.call);
-          callIdRef.current = response.call.id;
-          
-          // Если звонок завершен, обновляем состояние
-          if (response.call.status === CALL_STATUS.ENDED) {
-            setIsCallActive(false);
-            setIsRinging(false);
+          // Проверяем endReason === 'BUSY' в ответе на CALL_INITIATE
+          if (response.type === SIGNAL_TYPES.CALL_INITIATE) {
+            if (response.call.status === CALL_STATUS.ENDED && response.call.endReason === END_REASON.BUSY) {
+              // Пользователь занят
+              setIsRinging(false);
+              const busyTargetName = response.call.callee?.displayName || response.call.callee?.username || 'Пользователь';
+              setError(`${busyTargetName} занят и не может ответить`);
+              cleanup();
+              return;
+            } else if (response.call.status === CALL_STATUS.CALLING) {
+              // Звонок инициирован успешно
+              setCall(response.call);
+              callIdRef.current = response.call.id;
+              // Добавляем в список активных звонков
+              setActiveCalls(prev => {
+                const existing = prev.find(c => c.id === response.call.id);
+                if (!existing) {
+                  return [...prev, response.call];
+                }
+                return prev.map(c => c.id === response.call.id ? response.call : c);
+              });
+            }
+          } else {
+            // Для других типов сигналов
+            setCall(response.call);
+            callIdRef.current = response.call.id;
+            
+            // Обновляем список активных звонков
+            if (response.call.status === CALL_STATUS.ENDED) {
+              setActiveCalls(prev => prev.filter(c => c.id !== response.call.id));
+              setIsCallActive(false);
+              setIsRinging(false);
+            } else {
+              setActiveCalls(prev => {
+                const existing = prev.find(c => c.id === response.call.id);
+                if (!existing) {
+                  return [...prev, response.call];
+                }
+                return prev.map(c => c.id === response.call.id ? response.call : c);
+              });
+            }
           }
         }
       }
@@ -445,6 +524,12 @@ export const useCallProtocol = () => {
       return;
     }
 
+    // Проверяем возможность инициировать звонок (блокируется только при ACTIVE)
+    if (!canInitiateCall()) {
+      setError('Вы уже в активном звонке. Завершите текущий звонок перед началом нового.');
+      return;
+    }
+
     try {
 
       const tempCall = {
@@ -477,7 +562,7 @@ export const useCallProtocol = () => {
       setIsRinging(false);
       cleanup();
     }
-  }, [isConnected, stompClient, currentUser, startLocalStream, createPeerConnection, addTracksToPC, sendSignal, cleanup]);
+  }, [isConnected, stompClient, currentUser, startLocalStream, createPeerConnection, addTracksToPC, sendSignal, cleanup, canInitiateCall]);
 
   const acceptCall = useCallback(async (callId) => {
     if (!incomingCall) return;
@@ -575,6 +660,7 @@ export const useCallProtocol = () => {
     
     call,
     incomingCall,
+    activeCalls, // Массив активных звонков
     isCallActive,
     isRinging,  
     error,
@@ -585,6 +671,7 @@ export const useCallProtocol = () => {
     audioEnabled,
     videoEnabled,
 
+    canInitiateCall, // Функция проверки возможности инициировать звонок
     initiateCall,
     acceptCall,
     rejectCall,

@@ -18,6 +18,7 @@ CallProvider.displayName = 'CallProvider';
 const noopCall = {
   call: null,
   incomingCall: null,
+  activeCalls: [],
   isCallActive: false,
   isRinging: false,
   error: null,
@@ -26,6 +27,7 @@ const noopCall = {
   remoteStream: null,
   audioEnabled: true,
   videoEnabled: true,
+  canInitiateCall: () => true,
   initiateCall: () => {},
   acceptCall: () => {},
   rejectCall: () => {},

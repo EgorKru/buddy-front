@@ -2,6 +2,7 @@ import { ArrowLeft, Search, Loader2, X, Phone } from 'lucide-react';
 import { useRouter } from 'next/router';
 import { getChatName } from '@/utils/chatHelpers';
 import { getOnlineStatus } from '@/utils/dateHelpers';
+import { useCall } from '@/context/CallContext';
 import RoomControls from '@/components/room/RoomControls';
 import styles from '@/styles/chat.module.css';
 
@@ -20,8 +21,9 @@ export default function ChatHeader({
   onStartCall,  
 }) {
   const router = useRouter();
+  const { canInitiateCall } = useCall();
 
-  const canCall = chat?.type === 'DIRECT';
+  const canCall = chat?.type === 'DIRECT' && canInitiateCall();
 
   const getCallTarget = () => {
     if (!chat?.participants || !user?.id) {
@@ -92,7 +94,7 @@ export default function ChatHeader({
       
       <div className={styles.headerActions}>
         {}
-        {canCall && (
+        {chat?.type === 'DIRECT' && (
           <button
             onClick={() => {
               const target = getCallTarget();
@@ -101,7 +103,8 @@ export default function ChatHeader({
               }
             }}
             className={styles.callButton}
-            title="Позвонить"
+            disabled={!canCall}
+            title={canCall ? "Позвонить" : "Вы уже в активном звонке"}
           >
             <Phone size={20} />
           </button>
