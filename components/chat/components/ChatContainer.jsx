@@ -545,7 +545,6 @@ const ChatContainer = ({ chatId }) => {
     chatId,
     sendMessageHook,
     addOptimistic,
-    convertToBase64,
     recordingTime,
     checkIsAtBottom,
     scrollHeightBeforeMessageRef,

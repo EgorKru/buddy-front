@@ -10,7 +10,6 @@ export const useVoiceMessageHandling = ({
   chatId,
   sendMessageHook,
   addOptimistic,
-  convertToBase64,
   recordingTime,
   checkIsAtBottom,
   scrollHeightBeforeMessageRef,
@@ -59,42 +58,10 @@ export const useVoiceMessageHandling = ({
       let fileUrl = null;
       let finalDuration = recordingTime > 0 ? recordingTime : null;
 
-      try {
-        const duration = recordingTime > 0 ? recordingTime : null;
-        const uploadResponse = await chatAPI.uploadVoiceFile(chatId, currentBlob, duration);
-        fileUrl = uploadResponse?.fileUrl;
-        finalDuration = uploadResponse?.duration || duration;
-      } catch (uploadError) {
-        const base64 = await convertToBase64(currentBlob);
-        const mimeType = currentBlob.type || 'audio/webm';
-        const duration = recordingTime > 0 ? recordingTime : null;
-        
-        const result = await sendMessageHook(null, 'VOICE', null, base64, mimeType, duration);
-
-        if (result?.serverMessage) {
-          const messageId = result.serverMessage.id;
-          if (messageId) {
-            newMessageIdsRef.current.add(String(messageId));
-            setTimeout(() => {
-              newMessageIdsRef.current.delete(String(messageId));
-            }, NEW_MESSAGE_ID_REMOVE_DELAY);
-          }
-          addOptimistic(chatId, { ...result.serverMessage, status: MESSAGE_STATUS.SENT, isOptimistic: false });
-        } else if (result?.optimisticMessage) {
-          const messageId = result.optimisticMessage.id;
-          if (messageId) {
-            newMessageIdsRef.current.add(String(messageId));
-            setTimeout(() => {
-              newMessageIdsRef.current.delete(String(messageId));
-            }, NEW_MESSAGE_ID_REMOVE_DELAY);
-          }
-          addOptimistic(chatId, result.optimisticMessage);
-        }
-
-        resetVoice();
-        sentAudioBlobRef.current = null;
-        return;
-      }
+      const duration = recordingTime > 0 ? recordingTime : null;
+      const uploadResponse = await chatAPI.uploadVoiceFile(chatId, currentBlob, duration);
+      fileUrl = uploadResponse?.fileUrl;
+      finalDuration = uploadResponse?.duration || duration;
 
       if (!fileUrl) {
         throw new Error('Failed to upload voice file: no fileUrl returned from server');
@@ -134,7 +101,7 @@ export const useVoiceMessageHandling = ({
       resetVoice();
       sentAudioBlobRef.current = null;
     }
-  }, [audioBlob, user, sending, recordingTime, convertToBase64, sendMessageHook, chatId, addOptimistic, resetVoice, checkIsAtBottom, scrollHeightBeforeMessageRef, wasAtBottomBeforeMessageRef, shouldAutoScrollRef, messagesContainerRef, newMessageIdsRef, sentAudioBlobRef, voiceRecording]);
+  }, [audioBlob, user, sending, recordingTime, sendMessageHook, chatId, addOptimistic, resetVoice, checkIsAtBottom, scrollHeightBeforeMessageRef, wasAtBottomBeforeMessageRef, shouldAutoScrollRef, messagesContainerRef, newMessageIdsRef, sentAudioBlobRef, voiceRecording]);
 
   const handleVoiceSend = useCallback(async () => {
     if (!audioBlob || !user) {
