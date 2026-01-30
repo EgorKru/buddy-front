@@ -1,5 +1,7 @@
 import { useRouter } from 'next/router'
 import { useEffect, useState, useRef } from 'react';
+import Link from 'next/link';
+import { Settings } from 'lucide-react';
 
 import styles from '@/styles/home.module.css'
 import { isAuthenticated, getCurrentUser, authAPI, roomAPI } from '@/utils/api';
@@ -175,6 +177,10 @@ export default function Home() {
           <h1>Pager</h1>
           <div className={styles.userInfo}>
             <span>Привет, {user.displayName || user.username}!</span>
+            <Link href="/settings" className={styles.settingsButton}>
+              <Settings size={18} />
+              Настройки
+            </Link>
             <button onClick={handleLogout} className={styles.logoutButton}>
               Выйти
             </button>
