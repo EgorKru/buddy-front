@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useStomp } from '@/context/socket';
 import { safeJsonParse } from '@/utils/safe';
-import { getCurrentUser } from '@/utils/api';
+import { getCurrentUser, turnAPI } from '@/utils/api';
 
 const SIGNAL_TYPES = {
   
@@ -86,6 +86,7 @@ export const useCallProtocol = () => {
   const callIdRef = useRef(null);
   const subscriptionsRef = useRef([]);
   const iceCandidatesQueueRef = useRef([]);
+  const turnCredentialsRef = useRef(null);
   
   const currentUser = getCurrentUser();
   const myUserId = currentUser?.id;
@@ -108,10 +109,31 @@ export const useCallProtocol = () => {
     }
   }, [isConnected, stompClient]);
 
-  const createPeerConnection = useCallback(() => {
+  const createPeerConnection = useCallback(async () => {
     if (!isBrowser) return null;
 
-    const pc = new RTCPeerConnection({ iceServers: STUN_SERVERS });
+    // Получить TURN credentials если еще не получены
+    if (!turnCredentialsRef.current) {
+      try {
+        const turnCreds = await turnAPI.getCredentials();
+        turnCredentialsRef.current = turnCreds;
+      } catch (error) {
+        console.warn('Failed to get TURN credentials, using STUN only:', error);
+      }
+    }
+
+    // Построить конфигурацию ICE серверов
+    const iceServers = [...STUN_SERVERS];
+    
+    if (turnCredentialsRef.current) {
+      iceServers.push({
+        urls: turnCredentialsRef.current.urls,
+        username: turnCredentialsRef.current.username,
+        credential: turnCredentialsRef.current.credential,
+      });
+    }
+
+    const pc = new RTCPeerConnection({ iceServers });
 
     pc.onicecandidate = (event) => {
       if (event.candidate && callIdRef.current) {
@@ -546,7 +568,7 @@ export const useCallProtocol = () => {
 
       const stream = await startLocalStream(callType === CALL_TYPE.VIDEO);
 
-      const pc = createPeerConnection();
+      const pc = await createPeerConnection();
       addTracksToPC(stream, pc);
 
       sendSignal({
@@ -573,7 +595,7 @@ export const useCallProtocol = () => {
       const isVideo = incomingCall.type === CALL_TYPE.VIDEO;
       const stream = await startLocalStream(isVideo);
 
-      const pc = createPeerConnection();
+      const pc = await createPeerConnection();
       addTracksToPC(stream, pc);
 
       sendSignal({

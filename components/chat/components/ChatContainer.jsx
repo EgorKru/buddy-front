@@ -13,6 +13,7 @@ import { useChatModals } from '@/components/chat/hooks/useChatModals';
 import { useChatContextMenu } from '@/components/chat/hooks/useChatContextMenu';
 import { useChatSelection } from '@/components/chat/hooks/useChatSelection';
 import { useCall } from '@/context/CallContext';
+import { useTypingIndicator } from '@/hooks/useTypingIndicator';
 import CallTypeModal from '@/component/CallTypeModal';
 import ChatPresenter from './ChatPresenter';
 
@@ -184,6 +185,52 @@ const ChatContainer = ({ chatId }) => {
     chats, 
     upsertMessage
   } = chatContext;
+
+  // Typing indicator
+  const { 
+    startTyping, 
+    stopTyping, 
+    typingUserIds 
+  } = useTypingIndicator(chatId);
+
+  // Таймер для остановки typing indicator
+  const typingTimeoutRef = useRef(null);
+
+  // Обертка для setNewMessage с typing indicator
+  const handleNewMessageChange = useCallback((value) => {
+    setNewMessage(value);
+    
+    // Если есть текст, отправляем typing indicator
+    if (value && value.trim()) {
+      startTyping();
+      
+      // Сбросить предыдущий таймаут
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      
+      // Остановить typing indicator через 3 секунды
+      typingTimeoutRef.current = setTimeout(() => {
+        stopTyping();
+      }, 3000);
+    } else {
+      // Если текст пустой, сразу останавливаем typing
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      stopTyping();
+    }
+  }, [setNewMessage, startTyping, stopTyping]);
+
+  // Остановить typing при размонтировании
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      stopTyping();
+    };
+  }, [stopTyping]);
 
   useWebSocketMessages({
     upsertMessage,
@@ -758,7 +805,7 @@ const ChatContainer = ({ chatId }) => {
       setFileViewerModal={setFileViewerModal}
       voiceError={voiceError}
       newMessage={newMessage}
-      setNewMessage={setNewMessage}
+      setNewMessage={handleNewMessageChange}
       editingMessageId={editingMessageId}
       editingContent={editingContent}
       setEditingContent={setEditingContent}
@@ -812,6 +859,7 @@ const ChatContainer = ({ chatId }) => {
       handleForwardMessage={handleForwardMessage}
       handleSelectMessage={handleSelectMessage}
       onStartCall={handleOpenCallModal}
+      typingUserIds={typingUserIds}
     />
     
     {}

@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useStomp } from '@/context/socket';
 import { safeJsonParse, safeUnsubscribe } from '@/utils/safe';
+import { turnAPI } from '@/utils/api';
 
 const SIGNAL_TYPES = {
   
@@ -103,7 +104,8 @@ export const useRoomProtocol = (initialRoomId = null) => {
   const roomIdRef = useRef(initialRoomId);
   const pendingCallbacksRef = useRef(new Map());
   const negotiationTimeoutRef = useRef(new Set()); 
-  const connectedRef = useRef(connected); 
+  const connectedRef = useRef(connected);
+  const turnCredentialsRef = useRef(null); 
 
   const lastSeqRef = useRef(0);
   const eventQueueRef = useRef([]);
@@ -146,7 +148,7 @@ export const useRoomProtocol = (initialRoomId = null) => {
     });
   }, [client, connected]);
 
-  const createPeerConnection = useCallback((userId) => {
+  const createPeerConnection = useCallback(async (userId) => {
     if (!isBrowser || !window.RTCPeerConnection) return null;
 
     const existingPc = peerConnectionsRef.current.get(userId);
@@ -154,7 +156,28 @@ export const useRoomProtocol = (initialRoomId = null) => {
       existingPc.close();
     }
 
-    const pc = new RTCPeerConnection({ iceServers: STUN_SERVERS });
+    // Получить TURN credentials если еще не получены
+    if (!turnCredentialsRef.current) {
+      try {
+        const turnCreds = await turnAPI.getCredentials();
+        turnCredentialsRef.current = turnCreds;
+      } catch (error) {
+        console.warn('Failed to get TURN credentials, using STUN only:', error);
+      }
+    }
+
+    // Построить конфигурацию ICE серверов
+    const iceServers = [...STUN_SERVERS];
+    
+    if (turnCredentialsRef.current) {
+      iceServers.push({
+        urls: turnCredentialsRef.current.urls,
+        username: turnCredentialsRef.current.username,
+        credential: turnCredentialsRef.current.credential,
+      });
+    }
+
+    const pc = new RTCPeerConnection({ iceServers });
 
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => {
@@ -307,7 +330,7 @@ export const useRoomProtocol = (initialRoomId = null) => {
   }, [isBrowser, sendSignal]);
 
   const sendOffer = useCallback(async (userId) => {
-    const pc = createPeerConnection(userId);
+    const pc = await createPeerConnection(userId);
     if (!pc) return;
 
     try {
@@ -328,7 +351,7 @@ export const useRoomProtocol = (initialRoomId = null) => {
   }, [createPeerConnection, sendSignal]);
 
   const handleOffer = useCallback(async (fromUserId, sdp) => {
-    const pc = createPeerConnection(fromUserId);
+    const pc = await createPeerConnection(fromUserId);
     if (!pc) return;
 
     try {

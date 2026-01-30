@@ -13,6 +13,7 @@ import MessageList from '@/components/chat/components/MessageList';
 import MessageInputArea from '@/components/chat/components/MessageInputArea';
 import SearchBar from '@/components/chat/components/SearchBar';
 import { ErrorMessage } from '@/components/chat/components/ErrorMessage';
+import TypingIndicator from '@/components/chat/components/TypingIndicator';
 
 const ChatPresenter = ({
   chat,
@@ -119,7 +120,8 @@ const ChatPresenter = ({
   handlePinMessage,
   handleForwardMessage,
   handleSelectMessage,
-  onStartCall
+  onStartCall,
+  typingUserIds,
 }) => {
 
   const selectedMessagesList = selectionMode 
@@ -255,6 +257,12 @@ const ChatPresenter = ({
         {voiceError && (
           <ErrorMessage>{voiceError}</ErrorMessage>
         )}
+
+        <TypingIndicator
+          participants={chat?.participants || []}
+          typingUserIds={typingUserIds || []}
+          currentUserId={user?.id}
+        />
 
         <MessageInputArea
           newMessage={newMessage}

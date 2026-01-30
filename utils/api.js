@@ -640,12 +640,29 @@ export const userAPI = {
     const url = `/users/search?query=${encodeURIComponent(searchQuery)}`;
     return apiRequest(url);
   },
+
+  getUser: async (userId) => {
+    return apiRequest(`/users/${userId}`);
+  },
+
+  updateProfile: async (profileData) => {
+    return apiRequest('/users/me', {
+      method: 'PUT',
+      body: profileData,
+    });
+  },
 };
 
 export const getCurrentUser = () => {
   if (typeof window === 'undefined') return null;
   const userStr = localStorage.getItem('user');
   return userStr ? JSON.parse(userStr) : null;
+};
+
+export const turnAPI = {
+  getCredentials: async () => {
+    return apiRequest('/turn/credentials');
+  },
 };
 
 export const notificationAPI = {
