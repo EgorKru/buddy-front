@@ -2,11 +2,45 @@ const MS_PER_DAY = 86400000;
 
 const parseServerDate = (dateString) => {
   if (!dateString) return null;
-  let str = String(dateString);
+  
+  // Если это timestamp (число)
+  if (typeof dateString === 'number') {
+    return new Date(dateString);
+  }
+  
+  // Если это уже Date объект
+  if (dateString instanceof Date) {
+    return dateString;
+  }
+  
+  // Если это массив (Java LocalDateTime): [year, month, day, hour, minute, second, nanosecond]
+  if (Array.isArray(dateString) && dateString.length >= 3) {
+    const [year, month, day, hour = 0, minute = 0, second = 0, nanosecond = 0] = dateString;
+    // В Java месяцы с 1, в JavaScript с 0, поэтому month - 1
+    const millisecond = Math.floor(nanosecond / 1000000);
+    return new Date(year, month - 1, day, hour, minute, second, millisecond);
+  }
+  
+  let str = String(dateString).trim();
+  
+  // Если это timestamp в виде строки
+  if (/^\d+$/.test(str)) {
+    const timestamp = parseInt(str, 10);
+    // Проверяем что это валидный timestamp (в миллисекундах)
+    if (timestamp > 1000000000000) {
+      return new Date(timestamp);
+    }
+    // Если в секундах, конвертируем в миллисекунды
+    if (timestamp > 1000000000) {
+      return new Date(timestamp * 1000);
+    }
+  }
+  
   // Если дата без timezone, добавляем Z (UTC)
   if (!str.endsWith('Z') && !str.includes('+') && !str.includes('-', 10)) {
     str = str + 'Z';
   }
+  
   return new Date(str);
 };
 
