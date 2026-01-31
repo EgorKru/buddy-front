@@ -1,9 +1,21 @@
 const MS_PER_DAY = 86400000;
 
+const parseServerDate = (dateString) => {
+  if (!dateString) return null;
+  let str = String(dateString);
+  // Если дата без timezone, добавляем Z (UTC)
+  if (!str.endsWith('Z') && !str.includes('+') && !str.includes('-', 10)) {
+    str = str + 'Z';
+  }
+  return new Date(str);
+};
+
 export const formatChatDate = (dateString) => {
   if (!dateString) return '';
 
-  const date = new Date(dateString);
+  const date = parseServerDate(dateString);
+  if (!date || isNaN(date.getTime())) return '';
+  
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const messageDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -24,7 +36,10 @@ export const formatChatDate = (dateString) => {
 export const formatChatTime = (dateString) => {
   if (!dateString) return '';
 
-  return new Date(dateString).toLocaleTimeString('ru-RU', {
+  const date = parseServerDate(dateString);
+  if (!date || isNaN(date.getTime())) return '';
+  
+  return date.toLocaleTimeString('ru-RU', {
     hour: '2-digit',
     minute: '2-digit',
   });
@@ -33,7 +48,9 @@ export const formatChatTime = (dateString) => {
 export const formatChatListTime = (dateString) => {
   if (!dateString) return '';
 
-  const date = new Date(dateString);
+  const date = parseServerDate(dateString);
+  if (!date || isNaN(date.getTime())) return '';
+  
   const now = new Date();
   const diff = now - date;
   const days = Math.floor(diff / MS_PER_DAY);
@@ -60,15 +77,6 @@ export const formatMeetingTime = (seconds) => {
       .padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
   return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-};
-
-const parseServerDate = (dateString) => {
-  if (!dateString) return null;
-  let str = String(dateString);
-  if (!str.endsWith('Z') && !str.includes('+') && !str.includes('-', 10)) {
-    str = str + 'Z';
-  }
-  return new Date(str);
 };
 
 export const formatLastSeen = (dateString) => {

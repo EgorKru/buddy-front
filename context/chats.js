@@ -140,13 +140,35 @@ export const ChatsProvider = ({ children }) => {
     lastReadAtRef.current.set(key, now);
 
     setChats(prev =>
-      prev.map(c => (String(c.id) === key ? { ...c, unreadCount: 0 } : c))
+      prev.map(c => {
+        if (String(c.id) !== key) return c;
+        // Получить lastReadMessageId из lastMessage чата
+        const lastReadMessageId = c.lastMessage?.id;
+        
+        // Отправить через WebSocket если есть lastReadMessageId
+        if (client && connected && lastReadMessageId) {
+          try {
+            client.publish({
+              destination: '/app/chat.markRead',
+              body: JSON.stringify({
+                chatId: parseInt(key),
+                lastReadMessageId: parseInt(lastReadMessageId),
+              }),
+            });
+          } catch (e) {
+            console.error('Failed to send markRead via WebSocket:', e);
+          }
+        }
+        
+        return { ...c, unreadCount: 0 };
+      })
     );
 
+    // Fallback на REST API
     try {
       await chatAPI.markChatAsRead(key);
     } catch (e) {}
-  }, []);
+  }, [client, connected]);
 
   const upsertReadReceipt = useCallback((chatId, readerId, readAt) => {
     const cid = String(chatId);

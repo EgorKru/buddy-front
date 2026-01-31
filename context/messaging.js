@@ -692,6 +692,28 @@ export const MessagingProvider = ({ children }) => {
   const markChatAsRead = useCallback(async (chatId) => {
     if (!chatId) return;
     const currentUser = getCurrentUser();
+    const cid = String(chatId);
+    
+    // Получить ID последнего сообщения в чате
+    const messageIds = state.messageIdsByChatId[cid] || [];
+    const lastReadMessageId = messageIds.length > 0 ? messageIds[messageIds.length - 1] : null;
+    
+    // Отправить через WebSocket (согласно документации)
+    if (client && connected && lastReadMessageId) {
+      try {
+        client.publish({
+          destination: '/app/chat.markRead',
+          body: JSON.stringify({
+            chatId: parseInt(chatId),
+            lastReadMessageId: parseInt(lastReadMessageId),
+          }),
+        });
+      } catch (e) {
+        console.error('Failed to send markRead via WebSocket:', e);
+      }
+    }
+    
+    // Локально обновить read receipt
     if (currentUser?.id) {
       const now = new Date().toISOString();
       dispatch({ 
@@ -699,11 +721,14 @@ export const MessagingProvider = ({ children }) => {
         payload: { chatId, readerId: currentUser.id, readAt: now } 
       });
     }
+    
     dispatch({ type: actionTypes.MARK_CHAT_READ_LOCAL, payload: { chatId } });
+    
+    // Также отправить через REST API как fallback
     try {
       await chatAPI.markChatAsRead(chatId);
     } catch (e) {}
-  }, []);
+  }, [client, connected, state.messageIdsByChatId]);
 
   const upsertReadReceipt = useCallback((chatId, readerId, readAt) => {
     dispatch({ type: actionTypes.APPLY_READ_RECEIPT, payload: { chatId, readerId, readAt } });
