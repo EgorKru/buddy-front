@@ -808,6 +808,17 @@ export const MessagingProvider = ({ children }) => {
     const active = state.activeChatId && String(state.activeChatId) === String(message.chatId);
     const unreadDelta = isOwn ? 0 : (active && isVisible ? 0 : 1);
 
+    console.log('[MESSAGING] upsertMessage:', {
+      messageId: message.id,
+      chatId: message.chatId,
+      isOwn,
+      active,
+      isVisible,
+      activeChatId: state.activeChatId,
+      connected,
+      hasClient: !!client
+    });
+
     dispatch({
       type: actionTypes.UPSERT_MESSAGE,
       payload: { message, chatId: message.chatId, unreadDelta: meta.unreadDelta ?? unreadDelta },
@@ -852,6 +863,14 @@ export const MessagingProvider = ({ children }) => {
           console.error('[MESSAGING] Failed to send instant read receipt:', error);
         }
       }, 50);
+    } else {
+      console.log('[MESSAGING] NOT auto-marking because:', {
+        isOwn,
+        active,
+        isVisible,
+        hasClient: !!client,
+        connected
+      });
     }
   }, [state.activeChatId, state.messageIdsByChatId, state.messagesById, client, connected]);
 
