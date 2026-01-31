@@ -1,53 +1,47 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useChats } from '@/context/messaging';
+import { getCurrentUser } from '@/utils/api';
 
 /**
  * Хук для автоматической отметки сообщений как прочитанных при появлении в viewport
- * Использует Intersection Observer для отслеживания видимости
+ * Логика как в Telegram - МОМЕНТАЛЬНО без задержек
  */
 export const useMessageReadTracking = (chatId, enabled = true) => {
-  const { markChatAsRead, client, connected } = useChats();
+  const { client, connected, readAtByChatIdByUserId, upsertReadReceipt } = useChats();
   const observerRef = useRef(null);
-  const lastReadMessageIdRef = useRef(null);
-  const pendingMarkRef = useRef(null);
+  const processedMessagesRef = useRef(new Set());
   
-  const markAsReadThrottled = useCallback((messageId) => {
-    if (!chatId || !client || !connected || !messageId) return;
+  const markMessageAsRead = useCallback((messageId) => {
+    if (!chatId || !messageId || !client || !connected) return;
     
     const msgId = parseInt(messageId);
+    const key = `${chatId}-${msgId}`;
     
-    // Не отправляем если уже прочитано
-    if (lastReadMessageIdRef.current && msgId <= lastReadMessageIdRef.current) {
-      return;
+    // Не обрабатываем дважды
+    if (processedMessagesRef.current.has(key)) return;
+    processedMessagesRef.current.add(key);
+    
+    const currentUser = getCurrentUser();
+    if (!currentUser?.id) return;
+    
+    // 1. СРАЗУ локально помечаем как прочитанное (оптимистично)
+    const now = new Date().toISOString();
+    upsertReadReceipt(chatId, currentUser.id, now);
+    
+    // 2. Отправляем на сервер (параллельно, не ждем)
+    try {
+      client.publish({
+        destination: '/app/chat.markRead',
+        body: JSON.stringify({
+          chatId: parseInt(chatId),
+          lastReadMessageId: msgId,
+        }),
+      });
+    } catch (error) {
+      console.error('Failed to mark message as read:', error);
+      // Даже если ошибка - локально уже помечено
     }
-    
-    lastReadMessageIdRef.current = msgId;
-    
-    // Отменяем предыдущий таймаут
-    if (pendingMarkRef.current) {
-      clearTimeout(pendingMarkRef.current);
-    }
-    
-    // Отправляем с небольшой задержкой для батчинга
-    pendingMarkRef.current = setTimeout(() => {
-      try {
-        client.publish({
-          destination: '/app/chat.markRead',
-          body: JSON.stringify({
-            chatId: parseInt(chatId),
-            lastReadMessageId: msgId,
-          }),
-        });
-        
-        // Также вызываем полный markChatAsRead для обновления локального состояния
-        markChatAsRead(chatId);
-      } catch (error) {
-        console.error('Failed to mark message as read:', error);
-      }
-      
-      pendingMarkRef.current = null;
-    }, 100); // 100мс для батчинга нескольких сообщений
-  }, [chatId, client, connected, markChatAsRead]);
+  }, [chatId, client, connected, upsertReadReceipt]);
   
   const observeMessage = useCallback((element) => {
     if (!element || !observerRef.current) return;
@@ -62,23 +56,24 @@ export const useMessageReadTracking = (chatId, enabled = true) => {
   useEffect(() => {
     if (!enabled || !chatId) return;
     
-    // Создаем Intersection Observer
+    // Создаем Intersection Observer с высокой чувствительностью
     observerRef.current = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          // Сообщение стало видимым
-          if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+          // ЛЮБАЯ видимость - сразу помечаем прочитанным (как в Telegram)
+          if (entry.isIntersecting) {
             const messageId = entry.target.getAttribute('data-message-id');
             if (messageId) {
-              markAsReadThrottled(messageId);
+              // БЕЗ ЗАДЕРЖЕК - мгновенно!
+              markMessageAsRead(messageId);
             }
           }
         });
       },
       {
-        root: null, // viewport
-        rootMargin: '0px',
-        threshold: 0.5, // 50% сообщения должно быть видно
+        root: null,
+        rootMargin: '50px', // Небольшой запас - помечаем чуть раньше
+        threshold: [0, 0.1], // Даже 10% видимости достаточно
       }
     );
     
@@ -87,13 +82,9 @@ export const useMessageReadTracking = (chatId, enabled = true) => {
         observerRef.current.disconnect();
         observerRef.current = null;
       }
-      
-      if (pendingMarkRef.current) {
-        clearTimeout(pendingMarkRef.current);
-        pendingMarkRef.current = null;
-      }
+      processedMessagesRef.current.clear();
     };
-  }, [enabled, chatId, markAsReadThrottled]);
+  }, [enabled, chatId, markMessageAsRead]);
   
   return {
     observeMessage,

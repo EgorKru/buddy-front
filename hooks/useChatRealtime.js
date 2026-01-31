@@ -184,13 +184,11 @@ export const useChatRealtime = (chatId) => {
     const chatIdStr = String(chatId);
     setActiveChatId(chatId);
     
-    if (lastMarkedReadRef.current !== chatIdStr) {
-      lastMarkedReadRef.current = chatIdStr;
-      markChatAsRead(chatId);
-    }
+    // НЕ вызываем markChatAsRead при открытии - Intersection Observer сделает это автоматически
+    // когда сообщения станут видимыми
     
     return () => setActiveChatId(null);
-  }, [chatId, setActiveChatId, markChatAsRead]);
+  }, [chatId, setActiveChatId]);
 
   useEffect(() => {
     if (!chatId || !client || !connected || !client.connected || !client.active) {
@@ -307,20 +305,11 @@ export const useChatRealtime = (chatId) => {
         if (dto.type === 'SYSTEM') {
           if (Number(dto.chatId) !== Number(chatId)) return;
           
-          const isVisible = typeof document !== 'undefined' && document.visibilityState === 'visible';
+          // Добавляем системное сообщение без задержки
           upsertMessage(
             { ...dto, status: MESSAGE_STATUS.SENT, isOptimistic: false },
-            { unreadDelta: isVisible ? 0 : undefined }
+            { unreadDelta: 0 }
           );
-          
-          if (isVisible) {
-            if (markReadTimeoutRef.current) {
-              clearTimeout(markReadTimeoutRef.current);
-            }
-            markReadTimeoutRef.current = setTimeout(() => {
-              markChatAsRead(chatId);
-            }, 1000);
-          }
           return;
         }
         
@@ -397,16 +386,8 @@ export const useChatRealtime = (chatId) => {
           { ...dto, status: MESSAGE_STATUS.SENT, isOptimistic: false },
           { unreadDelta: isVisible ? 0 : undefined }
         );
-
-        if (isVisible) {
-          if (markReadTimeoutRef.current) {
-            clearTimeout(markReadTimeoutRef.current);
-          }
-          markReadTimeoutRef.current = setTimeout(() => {
-            markChatAsRead(chatId);
-            markReadTimeoutRef.current = null;
-          }, 2000);
-        }
+        
+        // НЕ вызываем markChatAsRead - за это отвечает Intersection Observer
         };
         
         if (typeof window !== 'undefined' && window.requestIdleCallback) {
