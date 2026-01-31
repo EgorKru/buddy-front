@@ -111,6 +111,11 @@ export const useMessageReadTracking = (chatId, enabled = true) => {
     
     console.log('[READ TRACKING] Marking all visible messages as read');
     
+    // ВАЖНО: Очищаем processedMessagesRef, чтобы разрешить повторную отметку
+    // Это нужно при возвращении на вкладку
+    processedMessagesRef.current.clear();
+    console.log('[READ TRACKING] Cleared processed messages cache for re-marking');
+    
     // Получаем все наблюдаемые элементы
     const entries = observerRef.current.takeRecords();
     entries.forEach(entry => {
@@ -125,6 +130,8 @@ export const useMessageReadTracking = (chatId, enabled = true) => {
     // Также проверяем все элементы с data-message-id в viewport
     if (typeof document !== 'undefined') {
       const messageElements = document.querySelectorAll('[data-message-id]');
+      const visibleMessageIds = [];
+      
       messageElements.forEach(element => {
         const rect = element.getBoundingClientRect();
         const isVisible = (
@@ -137,10 +144,13 @@ export const useMessageReadTracking = (chatId, enabled = true) => {
         if (isVisible) {
           const messageId = element.getAttribute('data-message-id');
           if (messageId) {
+            visibleMessageIds.push(parseInt(messageId));
             markMessageAsRead(messageId, 'visibility-check');
           }
         }
       });
+      
+      console.log('[READ TRACKING] Found visible messages:', visibleMessageIds);
     }
   }, [enabled, chatId, markMessageAsRead]);
   

@@ -60,16 +60,30 @@ export const useScrollReadTracking = (chatId, enabled = true) => {
     
     // Находим максимальный ID среди видимых сообщений
     const maxVisibleMessageId = Math.max(...visibleMessages);
-    const key = `${chatId}-${maxVisibleMessageId}`;
     
     // Проверяем, не обрабатывали ли мы уже это сообщение
-    if (processedRef.current.has(key)) return;
+    const key = `${chatId}-${maxVisibleMessageId}`;
+    
+    // ИЗМЕНЕНО: Проверяем только по максимальному ID, а не сохраняем все
+    // Если новый максимальный ID больше предыдущего - отправляем
+    const lastProcessedKey = Array.from(processedRef.current).pop();
+    const lastProcessedId = lastProcessedKey ? parseInt(lastProcessedKey.split('-')[1]) : 0;
+    
+    if (maxVisibleMessageId <= lastProcessedId) {
+      console.log('[SCROLL READ TRACKING] Max visible message already processed:', {
+        maxVisibleMessageId,
+        lastProcessedId
+      });
+      return;
+    }
     
     // Проверяем, что это не наше сообщение
     const cid = String(chatId);
     const message = messagesById?.[String(maxVisibleMessageId)];
     if (message && currentUser.id === message.senderId) return;
     
+    // Очищаем старые записи и добавляем новую
+    processedRef.current.clear();
     processedRef.current.add(key);
     
     console.log('[SCROLL READ TRACKING] Marking messages as read:', {
