@@ -10,6 +10,43 @@ import { formatChatListTime } from '@/utils/dateHelpers';
 import styles from '@/styles/chats.module.css';
 import { useChats, getChatTime } from '@/context/messaging';
 
+// Функция для парсинга дат с бэкенда (включая Java LocalDateTime массив)
+const parseServerDate = (dateString) => {
+  if (!dateString) return null;
+  
+  if (typeof dateString === 'number') {
+    return new Date(dateString);
+  }
+  
+  if (dateString instanceof Date) {
+    return dateString;
+  }
+  
+  if (Array.isArray(dateString) && dateString.length >= 3) {
+    const [year, month, day, hour = 0, minute = 0, second = 0, nanosecond = 0] = dateString;
+    const millisecond = Math.floor(nanosecond / 1000000);
+    return new Date(year, month - 1, day, hour, minute, second, millisecond);
+  }
+  
+  let str = String(dateString).trim();
+  
+  if (/^\d+$/.test(str)) {
+    const timestamp = parseInt(str, 10);
+    if (timestamp > 1000000000000) {
+      return new Date(timestamp);
+    }
+    if (timestamp > 1000000000) {
+      return new Date(timestamp * 1000);
+    }
+  }
+  
+  if (!str.endsWith('Z') && !str.includes('+') && !str.includes('-', 10)) {
+    str = str + 'Z';
+  }
+  
+  return new Date(str);
+};
+
 export default function Chats() {
   const router = useRouter();
   const user = getCurrentUser();
@@ -87,7 +124,8 @@ export default function Chats() {
     if (!lastMessage?.createdAt || !user?.id) return { isRead: false, readCount: 0, totalOthers: 0 };
 
     const chatReadMap = readReceiptsByChatId?.[String(chat.id)] || {};
-    const msgTime = new Date(lastMessage.createdAt).getTime();
+    const msgDate = parseServerDate(lastMessage.createdAt);
+    const msgTime = msgDate ? msgDate.getTime() : NaN;
     if (Number.isNaN(msgTime)) return { isRead: false, readCount: 0, totalOthers: 0 };
 
     const participantIds = Array.isArray(chat?.participants)
@@ -98,7 +136,10 @@ export default function Chats() {
 
     const otherReaders = Object.entries(chatReadMap)
       .filter(([rid]) => Number(rid) !== Number(user.id))
-      .map(([, readAt]) => new Date(readAt).getTime())
+      .map(([, readAt]) => {
+        const readDate = parseServerDate(readAt);
+        return readDate ? readDate.getTime() : NaN;
+      })
       .filter(t => !Number.isNaN(t));
 
     const readCount = otherReaders.reduce((acc, readAtTime) => (readAtTime >= msgTime ? acc + 1 : acc), 0);

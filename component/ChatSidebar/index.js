@@ -10,6 +10,28 @@ import ChatListItem from '@/component/ChatSidebar/ChatListItem';
 import CreateChatModal from '@/component/ChatSidebar/CreateChatModal';
 import styles from '@/component/ChatSidebar/index.module.css';
 
+// Функция для парсинга дат с бэкенда (включая Java LocalDateTime массив)
+const parseServerDate = (dateString) => {
+  if (!dateString) return null;
+  if (typeof dateString === 'number') return new Date(dateString);
+  if (dateString instanceof Date) return dateString;
+  if (Array.isArray(dateString) && dateString.length >= 3) {
+    const [year, month, day, hour = 0, minute = 0, second = 0, nanosecond = 0] = dateString;
+    const millisecond = Math.floor(nanosecond / 1000000);
+    return new Date(year, month - 1, day, hour, minute, second, millisecond);
+  }
+  let str = String(dateString).trim();
+  if (/^\d+$/.test(str)) {
+    const timestamp = parseInt(str, 10);
+    if (timestamp > 1000000000000) return new Date(timestamp);
+    if (timestamp > 1000000000) return new Date(timestamp * 1000);
+  }
+  if (!str.endsWith('Z') && !str.includes('+') && !str.includes('-', 10)) {
+    str = str + 'Z';
+  }
+  return new Date(str);
+};
+
 export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
   const router = useRouter();
   const user = getCurrentUser();
@@ -69,7 +91,13 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
             .map(id => messagesById[String(id)])
             .filter(Boolean)
             .filter(msg => !msg.deletedForMe && !msg.deletedForAll)
-            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            .sort((a, b) => {
+              const dateA = parseServerDate(a.createdAt);
+              const dateB = parseServerDate(b.createdAt);
+              const timeA = dateA ? dateA.getTime() : 0;
+              const timeB = dateB ? dateB.getTime() : 0;
+              return timeB - timeA;
+            });
           
           if (chatMessages.length > 0) {
             return {

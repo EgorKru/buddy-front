@@ -114,9 +114,11 @@ export const getChatTime = (chat) => {
   let time = null;
   
   if (updatedAt && lastMessageTime) {
-    const updatedDate = new Date(updatedAt);
-    const lastMsgDate = new Date(lastMessageTime);
-    time = updatedDate.getTime() > lastMsgDate.getTime() ? updatedAt : lastMessageTime;
+    const updatedDate = parseServerDate(updatedAt);
+    const lastMsgDate = parseServerDate(lastMessageTime);
+    const updatedTime = updatedDate ? updatedDate.getTime() : 0;
+    const lastMsgTime = lastMsgDate ? lastMsgDate.getTime() : 0;
+    time = updatedTime > lastMsgTime ? updatedAt : lastMessageTime;
   } else if (lastMessageTime) {
     time = lastMessageTime;
   } else if (updatedAt) {
@@ -127,8 +129,8 @@ export const getChatTime = (chat) => {
   
   if (!time) return 0;
   try {
-    const date = new Date(time);
-    const timestamp = date.getTime();
+    const date = parseServerDate(time);
+    const timestamp = date ? date.getTime() : 0;
     if (isNaN(timestamp)) return 0;
     return timestamp;
   } catch {
@@ -768,14 +770,6 @@ export const MessagingProvider = ({ children }) => {
   }, [client, connected, state.messageIdsByChatId]);
 
   const upsertReadReceipt = useCallback((chatId, readerId, readAt) => {
-    console.log('[upsertReadReceipt]', {
-      chatId,
-      readerId,
-      readAt,
-      readAtType: typeof readAt,
-      readAtIsArray: Array.isArray(readAt),
-      parsedIso: toIso(readAt)
-    });
     dispatch({ type: actionTypes.APPLY_READ_RECEIPT, payload: { chatId, readerId, readAt } });
   }, []);
 
