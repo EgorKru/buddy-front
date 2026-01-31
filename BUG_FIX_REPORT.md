@@ -230,8 +230,8 @@ const markChatAsRead = useCallback(async (chatId) => {
 |------|-----------|--------------|
 | `utils/dateHelpers.js` | Добавлена поддержка Java LocalDateTime (массив) | Invalid Date |
 | `components/chat/hooks/useMessageStatus.js` | Использование parseServerDate для дат | Invalid Date + Read receipts |
-| `context/messaging.js` | Добавлена WebSocket отправка markRead | Read receipts |
-| `context/chats.js` | Добавлена WebSocket отправка markRead | Read receipts |
+| `context/messaging.js` | parseServerDate в toIso + WebSocket отправка markRead | Read receipts |
+| `context/chats.js` | parseServerDate в toIso + WebSocket отправка markRead | Read receipts |
 
 ---
 
@@ -249,7 +249,16 @@ const markChatAsRead = useCallback(async (chatId) => {
 - ✅ Параметр `lastReadMessageId` передается правильно
 - ✅ Соответствие документации `FRONTEND_INTEGRATION.md`
 - ✅ REST API сохранен как fallback для надежности
-- ✅ Статусы прочтения теперь отображаются
+- ✅ Функция `toIso` использует `parseServerDate` для парсинга массивов
+- ✅ Read receipts теперь правильно парсятся из WebSocket
+
+### Важное исправление (31 января):
+**Проблема:** `readAt` в read receipts тоже приходил как Java LocalDateTime (массив), но функция `toIso` не умела его парсить.
+
+**Решение:** 
+- Добавлен `parseServerDate` в `context/messaging.js`
+- Добавлен `parseServerDate` в `context/chats.js`
+- Функция `toIso` теперь использует `parseServerDate` вместо `new Date()`
 
 ---
 
