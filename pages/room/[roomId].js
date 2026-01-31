@@ -84,6 +84,15 @@ const Room = () => {
   const currentUserIdStr = currentUserId?.toString() || 'local';
   const currentUserName = currentUser?.displayName || currentUser?.username || "Вы";
 
+  const addToast = useCallback((type, userName, odUserId) => {
+    const id = `${type}-${odUserId}-${Date.now()}`;
+    setToastNotifications(prev => [...prev, { id, type, userName }]);
+  }, []);
+
+  const dismissToast = useCallback((id) => {
+    setToastNotifications(prev => prev.filter(n => n.id !== id));
+  }, []);
+
   useEffect(() => {
     if (!isInRoom) return;
     
@@ -107,16 +116,7 @@ const Room = () => {
     });
     
     prevParticipantsRef.current = [...participants];
-  }, [participants, isInRoom, currentUserId]);
-
-  const addToast = useCallback((type, userName, odUserId) => {
-    const id = `${type}-${odUserId}-${Date.now()}`;
-    setToastNotifications(prev => [...prev, { id, type, userName }]);
-  }, []);
-
-  const dismissToast = useCallback((id) => {
-    setToastNotifications(prev => prev.filter(n => n.id !== id));
-  }, []);
+  }, [participants, isInRoom, currentUserId, addToast]);
 
   useEffect(() => {
     if (!isInRoom) return;
@@ -163,7 +163,7 @@ const Room = () => {
           hasJoinedRef.current = false; 
         });
     }
-  }, [isRouterReady, actualRoomId, isInRoom, joinRoom, initialAudio, initialVideo]); 
+  }, [isRouterReady, actualRoomId, isInRoom, joinRoom, initialAudio, initialVideo, isJoining]); 
 
   useEffect(() => {
     if (isInRoom) {
@@ -373,7 +373,7 @@ const Room = () => {
     } else {
       setForceShowInterface(false);
     }
-  }, [actualRoomId, hasJoinedRef.current, isInRoom]);
+  }, [actualRoomId, isInRoom]);
   
   useEffect(() => {
     if (isJoining && !isInRoom) {

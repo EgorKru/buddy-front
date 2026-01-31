@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
+import Image from 'next/image';
 import { Edit, Reply, X, Paperclip, Mic, Send, Lock, Unlock, ChevronDown, ChevronUp, File as FileIcon, Loader2, Pause, Play, Trash2, Volume2, Headphones } from 'lucide-react';
 import { formatFileSize } from '../utils/messageHelpers';
 import { useAutoResizeTextarea } from '../hooks/useAutoResizeTextarea';
@@ -172,9 +173,11 @@ export default function MessageInputArea({
         >
             {selectedFile.type && selectedFile.type.startsWith('image/') ? (
             <div className={styles.imagePreview}>
-              <img 
+              <Image 
                 src={selectedFileUrlRef?.current || ''} 
                 alt={selectedFile.name || 'Preview'}
+                width={200}
+                height={200}
                 className={styles.previewImage}
               />
               <button

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import Image from 'next/image';
 import { getCurrentUser, userAPI, isAuthenticated } from '@/utils/api';
 import { Eye, EyeOff, User, Mail, Save, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
@@ -121,7 +122,7 @@ export default function Settings() {
           <div className={styles.avatarSection}>
             <div className={styles.avatar}>
               {formData.avatarUrl ? (
-                <img src={formData.avatarUrl} alt="Аватар" />
+                <Image src={formData.avatarUrl} alt="Аватар" width={96} height={96} />
               ) : (
                 <User size={48} />
               )}
