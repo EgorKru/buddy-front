@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { useChats } from '@/context/messaging';
+import { useMessaging } from '@/context/messaging';
+import { useStomp } from '@/context/socket';
 import { getCurrentUser } from '@/utils/api';
 
 /**
@@ -7,7 +8,8 @@ import { getCurrentUser } from '@/utils/api';
  * Логика как в Telegram - МОМЕНТАЛЬНО без задержек
  */
 export const useMessageReadTracking = (chatId, enabled = true) => {
-  const { client, connected, readAtByChatIdByUserId, upsertReadReceipt } = useChats();
+  const { upsertReadReceipt } = useMessaging();
+  const { client, connected } = useStomp();
   const observerRef = useRef(null);
   const processedMessagesRef = useRef(new Set());
   
@@ -24,6 +26,12 @@ export const useMessageReadTracking = (chatId, enabled = true) => {
     const currentUser = getCurrentUser();
     if (!currentUser?.id) return;
     
+    console.log('[READ TRACKING] Marking message as read:', {
+      chatId,
+      messageId: msgId,
+      userId: currentUser.id
+    });
+    
     // 1. СРАЗУ локально помечаем как прочитанное (оптимистично)
     const now = new Date().toISOString();
     upsertReadReceipt(chatId, currentUser.id, now);
@@ -37,8 +45,9 @@ export const useMessageReadTracking = (chatId, enabled = true) => {
           lastReadMessageId: msgId,
         }),
       });
+      console.log('[READ TRACKING] Sent markRead to server:', { chatId, lastReadMessageId: msgId });
     } catch (error) {
-      console.error('Failed to mark message as read:', error);
+      console.error('[READ TRACKING] Failed to mark message as read:', error);
       // Даже если ошибка - локально уже помечено
     }
   }, [chatId, client, connected, upsertReadReceipt]);
@@ -56,13 +65,23 @@ export const useMessageReadTracking = (chatId, enabled = true) => {
   useEffect(() => {
     if (!enabled || !chatId) return;
     
+    console.log('[READ TRACKING] Initializing for chat:', chatId);
+    
     // Создаем Intersection Observer с высокой чувствительностью
     observerRef.current = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
+          const messageId = entry.target.getAttribute('data-message-id');
+          
+          console.log('[READ TRACKING] Intersection event:', {
+            messageId,
+            isIntersecting: entry.isIntersecting,
+            intersectionRatio: entry.intersectionRatio,
+            boundingClientRect: entry.boundingClientRect
+          });
+          
           // ЛЮБАЯ видимость - сразу помечаем прочитанным (как в Telegram)
           if (entry.isIntersecting) {
-            const messageId = entry.target.getAttribute('data-message-id');
             if (messageId) {
               // БЕЗ ЗАДЕРЖЕК - мгновенно!
               markMessageAsRead(messageId);
@@ -72,12 +91,13 @@ export const useMessageReadTracking = (chatId, enabled = true) => {
       },
       {
         root: null,
-        rootMargin: '50px', // Небольшой запас - помечаем чуть раньше
-        threshold: [0, 0.1], // Даже 10% видимости достаточно
+        rootMargin: '100px', // Увеличил запас до 100px
+        threshold: [0, 0.01, 0.1], // Даже 1% видимости достаточно
       }
     );
     
     return () => {
+      console.log('[READ TRACKING] Cleanup for chat:', chatId);
       if (observerRef.current) {
         observerRef.current.disconnect();
         observerRef.current = null;
