@@ -40,9 +40,7 @@ const MessageRow = React.memo(({
   setImageModal,
   setFileViewerModal,
   handleNavigateToMessage,
-  chats,
-  observeMessage,      // Новый проп
-  unobserveMessage     // Новый проп
+  chats
 }) => {
   const showDate = useMemo(() => {
     return shouldShowDate(index, msg, visibleMessages);
@@ -96,17 +94,6 @@ const MessageRow = React.memo(({
   }, [isSearchMatch, searchText, msg.content]);
 
   const messageRef = useRef(null);
-
-  useEffect(() => {
-    const messageElement = messageRef.current;
-    if (!messageElement || !observeMessage || !unobserveMessage || isOwn) return;
-    
-    observeMessage(messageElement);
-    
-    return () => {
-      unobserveMessage(messageElement);
-    };
-  }, [observeMessage, unobserveMessage, isOwn, msg.id]);
 
   useEffect(() => {
     const messageElement = messageRef.current;

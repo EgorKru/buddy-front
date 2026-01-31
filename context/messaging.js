@@ -6,42 +6,10 @@ import { playPagerNotificationSound } from '@/utils/pagerSound';
 
 const MessagingContext = createContext(null);
 
-const parseServerDate = (dateString) => {
-  if (!dateString) return null;
-  
-  if (typeof dateString === 'number') {
-    return new Date(dateString);
-  }
-  
-  if (dateString instanceof Date) {
-    return dateString;
-  }
-  
-  if (Array.isArray(dateString) && dateString.length >= 3) {
-    const [year, month, day, hour = 0, minute = 0, second = 0, nanosecond = 0] = dateString;
-    const millisecond = Math.floor(nanosecond / 1000000);
-    return new Date(Date.UTC(year, month - 1, day, hour, minute, second, millisecond));
-  }
-  
-  let str = String(dateString).trim();
-  
-  if (/^\d+$/.test(str)) {
-    const timestamp = parseInt(str, 10);
-    if (timestamp > 1000000000000) {
-      return new Date(timestamp);
-    }
-    if (timestamp > 1000000000) {
-      return new Date(timestamp * 1000);
-    }
-  }
-  
-  return new Date(str);
-};
-
 const toIso = (value) => {
   if (!value) return null;
-  const date = parseServerDate(value);
-  return (date && !Number.isNaN(date.getTime())) ? date.toISOString() : null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 };
 
 const isNewer = (a, b) => {
@@ -109,11 +77,9 @@ export const getChatTime = (chat) => {
   let time = null;
   
   if (updatedAt && lastMessageTime) {
-    const updatedDate = parseServerDate(updatedAt);
-    const lastMsgDate = parseServerDate(lastMessageTime);
-    const updatedTime = updatedDate ? updatedDate.getTime() : 0;
-    const lastMsgTime = lastMsgDate ? lastMsgDate.getTime() : 0;
-    time = updatedTime > lastMsgTime ? updatedAt : lastMessageTime;
+    const updatedDate = new Date(updatedAt);
+    const lastMsgDate = new Date(lastMessageTime);
+    time = updatedDate.getTime() > lastMsgDate.getTime() ? updatedAt : lastMessageTime;
   } else if (lastMessageTime) {
     time = lastMessageTime;
   } else if (updatedAt) {
@@ -124,8 +90,8 @@ export const getChatTime = (chat) => {
   
   if (!time) return 0;
   try {
-    const date = parseServerDate(time);
-    const timestamp = date ? date.getTime() : 0;
+    const date = new Date(time);
+    const timestamp = date.getTime();
     if (isNaN(timestamp)) return 0;
     return timestamp;
   } catch {
@@ -726,25 +692,6 @@ export const MessagingProvider = ({ children }) => {
   const markChatAsRead = useCallback(async (chatId) => {
     if (!chatId) return;
     const currentUser = getCurrentUser();
-    const cid = String(chatId);
-    
-    const messageIds = state.messageIdsByChatId[cid] || [];
-    const lastReadMessageId = messageIds.length > 0 ? messageIds[messageIds.length - 1] : null;
-    
-    if (client && connected && lastReadMessageId) {
-      try {
-        client.publish({
-          destination: '/app/chat.markRead',
-          body: JSON.stringify({
-            chatId: parseInt(chatId),
-            lastReadMessageId: parseInt(lastReadMessageId),
-          }),
-        });
-      } catch (e) {
-        console.error('Failed to send markRead via WebSocket:', e);
-      }
-    }
-    
     if (currentUser?.id) {
       const now = new Date().toISOString();
       dispatch({ 
@@ -752,13 +699,11 @@ export const MessagingProvider = ({ children }) => {
         payload: { chatId, readerId: currentUser.id, readAt: now } 
       });
     }
-    
     dispatch({ type: actionTypes.MARK_CHAT_READ_LOCAL, payload: { chatId } });
-    
     try {
       await chatAPI.markChatAsRead(chatId);
     } catch (e) {}
-  }, [client, connected, state.messageIdsByChatId]);
+  }, []);
 
   const upsertReadReceipt = useCallback((chatId, readerId, readAt) => {
     dispatch({ type: actionTypes.APPLY_READ_RECEIPT, payload: { chatId, readerId, readAt } });
@@ -770,7 +715,6 @@ export const MessagingProvider = ({ children }) => {
 
   const upsertMessage = useCallback((message, meta = {}) => {
     if (!message?.id || !message?.chatId) return;
-    
     const mid = String(message.id);
     if (processedMessageIdsRef.current.has(mid)) return;
     
@@ -786,7 +730,8 @@ export const MessagingProvider = ({ children }) => {
 
       const isDuplicate = existingMessages.some(existing => {
         if (!existing || !existing.id) return false;
-        return String(existing.id) === mid;
+        if (String(existing.id) === mid) return true;
+        return false;
       });
       
       if (isDuplicate) {
@@ -805,32 +750,7 @@ export const MessagingProvider = ({ children }) => {
       type: actionTypes.UPSERT_MESSAGE,
       payload: { message, chatId: message.chatId, unreadDelta: meta.unreadDelta ?? unreadDelta },
     });
-    
-    if (!isOwn && active && isVisible && client && connected) {
-      try {
-        const now = new Date().toISOString();
-        
-        dispatch({ 
-          type: actionTypes.APPLY_READ_RECEIPT, 
-          payload: { 
-            chatId: message.chatId, 
-            readerId: currentUser.id, 
-            readAt: now 
-          } 
-        });
-        
-        client.publish({
-          destination: '/app/chat.markRead',
-          body: JSON.stringify({
-            chatId: parseInt(message.chatId),
-            lastReadMessageId: parseInt(message.id),
-          }),
-        });
-      } catch (error) {
-        console.error('Failed to send read receipt:', error);
-      }
-    }
-  }, [state.activeChatId, state.messageIdsByChatId, state.messagesById, client, connected]);
+  }, [state.activeChatId, state.messageIdsByChatId, state.messagesById]);
 
   const updateMessage = useCallback((message, meta = {}) => {
     if (!message?.id || !message?.chatId) return;
@@ -1001,12 +921,11 @@ export const MessagingProvider = ({ children }) => {
         const sub = client.subscribe(`/topic/chat/${cid}/read`, (m) => {
           const ev = safeJsonParse(m.body);
           if (!ev || !ev.chatId || !ev.readerId || !ev.readAt) return;
-          
           upsertReadReceipt(ev.chatId, ev.readerId, ev.readAt);
         });
         readSubsRef.current.set(cid, sub);
       } catch (e) {
-        console.error('[READ RECEIPTS] Failed to subscribe to chat:', cid, e);
+        
       }
     }
 
