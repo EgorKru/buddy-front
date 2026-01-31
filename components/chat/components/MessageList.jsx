@@ -2,6 +2,7 @@ import { Loader2, ChevronDown } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import MessageRow from '@/component/MessageRow';
 import styles from '@/styles/chat.module.css';
+import { useMessageReadTracking } from '@/hooks/useMessageReadTracking';
 
 export default function MessageList({
   messages,
@@ -30,8 +31,10 @@ export default function MessageList({
   setImageModal,
   setFileViewerModal,
   handleNavigateToMessage,
-  chats
+  chats,
+  chatId  // Добавляем chatId в пропсы
 }) {
+  const { observeMessage, unobserveMessage } = useMessageReadTracking(chatId, true);
   const visibleMessages = (() => {
     
     if (searchMode && searchResults && searchResults.length > 0) {
@@ -127,6 +130,8 @@ export default function MessageList({
                   setFileViewerModal={setFileViewerModal}
                   handleNavigateToMessage={handleNavigateToMessage}
                   chats={chats}
+                  observeMessage={observeMessage}
+                  unobserveMessage={unobserveMessage}
                 />
               );
             })}

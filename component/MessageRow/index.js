@@ -40,7 +40,9 @@ const MessageRow = React.memo(({
   setImageModal,
   setFileViewerModal,
   handleNavigateToMessage,
-  chats
+  chats,
+  observeMessage,      // Новый проп
+  unobserveMessage     // Новый проп
 }) => {
   const showDate = useMemo(() => {
     return shouldShowDate(index, msg, visibleMessages);
@@ -94,6 +96,23 @@ const MessageRow = React.memo(({
   }, [isSearchMatch, searchText, msg.content]);
 
   const messageRef = useRef(null);
+
+  // Отслеживаем видимость сообщения для автоматической отметки как прочитанное
+  useEffect(() => {
+    const messageElement = messageRef.current;
+    if (!messageElement || !observeMessage || !unobserveMessage) return;
+    
+    // Наблюдаем только за чужими сообщениями
+    if (!isOwn) {
+      observeMessage(messageElement);
+    }
+    
+    return () => {
+      if (!isOwn) {
+        unobserveMessage(messageElement);
+      }
+    };
+  }, [observeMessage, unobserveMessage, isOwn]);
 
   useEffect(() => {
     const messageElement = messageRef.current;

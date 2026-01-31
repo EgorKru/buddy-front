@@ -252,6 +252,7 @@ const ChatPresenter = ({
           setFileViewerModal={setFileViewerModal}
           handleNavigateToMessage={handleNavigateToMessage}
           chats={chats}
+          chatId={chatId}
         />
 
         {voiceError && (
