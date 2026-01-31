@@ -776,9 +776,22 @@ export const MessagingProvider = ({ children }) => {
   }, []);
 
   const upsertMessage = useCallback((message, meta = {}) => {
-    if (!message?.id || !message?.chatId) return;
+    console.log('[MESSAGING] upsertMessage called:', {
+      messageId: message?.id,
+      chatId: message?.chatId,
+      hasMessage: !!message
+    });
+    
+    if (!message?.id || !message?.chatId) {
+      console.log('[MESSAGING] upsertMessage rejected: missing id or chatId');
+      return;
+    }
+    
     const mid = String(message.id);
-    if (processedMessageIdsRef.current.has(mid)) return;
+    if (processedMessageIdsRef.current.has(mid)) {
+      console.log('[MESSAGING] upsertMessage rejected: already processed', mid);
+      return;
+    }
     
     const currentUser = getCurrentUser();
     const isOwn = currentUser?.id && message?.senderId && Number(currentUser.id) === Number(message.senderId);
