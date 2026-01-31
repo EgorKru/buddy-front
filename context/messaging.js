@@ -845,37 +845,36 @@ export const MessagingProvider = ({ children }) => {
         userId: currentUser?.id
       });
       
-      // Небольшая задержка чтобы сообщение успело отрендериться
-      setTimeout(() => {
-        try {
-          // Локально обновляем read receipt
-          const now = new Date().toISOString();
-          dispatch({ 
-            type: actionTypes.APPLY_READ_RECEIPT, 
-            payload: { 
-              chatId: message.chatId, 
-              readerId: currentUser.id, 
-              readAt: now 
-            } 
-          });
-          
-          // Отправляем на сервер
-          client.publish({
-            destination: '/app/chat.markRead',
-            body: JSON.stringify({
-              chatId: parseInt(message.chatId),
-              lastReadMessageId: parseInt(message.id),
-            }),
-          });
-          
-          console.log('[MESSAGING] Sent instant read receipt:', {
-            chatId: message.chatId,
-            messageId: message.id
-          });
-        } catch (error) {
-          console.error('[MESSAGING] Failed to send instant read receipt:', error);
-        }
-      }, 50);
+      // СРАЗУ без задержки - чтобы опередить перерисовку компонента!
+      try {
+        // Локально обновляем read receipt
+        const now = new Date().toISOString();
+        dispatch({ 
+          type: actionTypes.APPLY_READ_RECEIPT, 
+          payload: { 
+            chatId: message.chatId, 
+            readerId: currentUser.id, 
+            readAt: now 
+          } 
+        });
+        
+        // Отправляем на сервер НЕМЕДЛЕННО
+        client.publish({
+          destination: '/app/chat.markRead',
+          body: JSON.stringify({
+            chatId: parseInt(message.chatId),
+            lastReadMessageId: parseInt(message.id),
+          }),
+        });
+        
+        console.log('[MESSAGING] Sent instant read receipt IMMEDIATELY:', {
+          chatId: message.chatId,
+          messageId: message.id,
+          timestamp: now
+        });
+      } catch (error) {
+        console.error('[MESSAGING] Failed to send instant read receipt:', error);
+      }
     } else {
       console.log('[MESSAGING] NOT auto-marking because:', {
         isOwn,
