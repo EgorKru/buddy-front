@@ -14,11 +14,13 @@ const parseServerDate = (dateString) => {
   }
   
   // Если это массив (Java LocalDateTime): [year, month, day, hour, minute, second, nanosecond]
+  // УСТАРЕЛО: После перехода бэкенда на UTC с ISO строками, массивы больше не используются
+  // Оставлено для обратной совместимости со старыми данными
   if (Array.isArray(dateString) && dateString.length >= 3) {
     const [year, month, day, hour = 0, minute = 0, second = 0, nanosecond = 0] = dateString;
-    // В Java месяцы с 1, в JavaScript с 0, поэтому month - 1
     const millisecond = Math.floor(nanosecond / 1000000);
-    return new Date(year, month - 1, day, hour, minute, second, millisecond);
+    // Интерпретируем как UTC (так как бэкенд отправлял в UTC)
+    return new Date(Date.UTC(year, month - 1, day, hour, minute, second, millisecond));
   }
   
   let str = String(dateString).trim();
@@ -36,11 +38,9 @@ const parseServerDate = (dateString) => {
     }
   }
   
-  // Если дата без timezone, добавляем Z (UTC)
-  if (!str.endsWith('Z') && !str.includes('+') && !str.includes('-', 10)) {
-    str = str + 'Z';
-  }
-  
+  // Бэкенд теперь отправляет ISO строки с Z суффиксом (UTC)
+  // Пример: "2026-01-31T15:30:00.000Z"
+  // JavaScript new Date() корректно парсит такие строки
   return new Date(str);
 };
 

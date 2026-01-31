@@ -17,11 +17,12 @@ const parseServerDate = (dateString) => {
     return dateString;
   }
   
-  // Если это массив (Java LocalDateTime): [year, month, day, hour, minute, second, nanosecond]
+  // Если это массив (Java LocalDateTime) - УСТАРЕЛО после перехода на UTC
+  // Оставлено для обратной совместимости
   if (Array.isArray(dateString) && dateString.length >= 3) {
     const [year, month, day, hour = 0, minute = 0, second = 0, nanosecond = 0] = dateString;
     const millisecond = Math.floor(nanosecond / 1000000);
-    return new Date(year, month - 1, day, hour, minute, second, millisecond);
+    return new Date(Date.UTC(year, month - 1, day, hour, minute, second, millisecond));
   }
   
   let str = String(dateString).trim();
@@ -36,10 +37,7 @@ const parseServerDate = (dateString) => {
     }
   }
   
-  if (!str.endsWith('Z') && !str.includes('+') && !str.includes('-', 10)) {
-    str = str + 'Z';
-  }
-  
+  // Бэкенд отправляет ISO с Z суффиксом (UTC)
   return new Date(str);
 };
 
