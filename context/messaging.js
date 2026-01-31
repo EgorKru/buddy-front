@@ -776,22 +776,10 @@ export const MessagingProvider = ({ children }) => {
   }, []);
 
   const upsertMessage = useCallback((message, meta = {}) => {
-    console.log('[MESSAGING] upsertMessage called:', {
-      messageId: message?.id,
-      chatId: message?.chatId,
-      hasMessage: !!message
-    });
-    
-    if (!message?.id || !message?.chatId) {
-      console.log('[MESSAGING] upsertMessage rejected: missing id or chatId');
-      return;
-    }
+    if (!message?.id || !message?.chatId) return;
     
     const mid = String(message.id);
-    if (processedMessageIdsRef.current.has(mid)) {
-      console.log('[MESSAGING] upsertMessage rejected: already processed', mid);
-      return;
-    }
+    if (processedMessageIdsRef.current.has(mid)) return;
     
     const currentUser = getCurrentUser();
     const isOwn = currentUser?.id && message?.senderId && Number(currentUser.id) === Number(message.senderId);
@@ -805,8 +793,7 @@ export const MessagingProvider = ({ children }) => {
 
       const isDuplicate = existingMessages.some(existing => {
         if (!existing || !existing.id) return false;
-        if (String(existing.id) === mid) return true;
-        return false;
+        return String(existing.id) === mid;
       });
       
       if (isDuplicate) {
@@ -821,34 +808,15 @@ export const MessagingProvider = ({ children }) => {
     const active = state.activeChatId && String(state.activeChatId) === String(message.chatId);
     const unreadDelta = isOwn ? 0 : (active && isVisible ? 0 : 1);
 
-    console.log('[MESSAGING] upsertMessage:', {
-      messageId: message.id,
-      chatId: message.chatId,
-      isOwn,
-      active,
-      isVisible,
-      activeChatId: state.activeChatId,
-      connected,
-      hasClient: !!client
-    });
-
     dispatch({
       type: actionTypes.UPSERT_MESSAGE,
       payload: { message, chatId: message.chatId, unreadDelta: meta.unreadDelta ?? unreadDelta },
     });
     
-    // МОМЕНТАЛЬНАЯ ОТМЕТКА: если сообщение пришло в активный видимый чат - помечаем прочитанным СРАЗУ
     if (!isOwn && active && isVisible && client && connected) {
-      console.log('[MESSAGING] Auto-marking new message as read (active+visible):', {
-        chatId: message.chatId,
-        messageId: message.id,
-        userId: currentUser?.id
-      });
-      
-      // СРАЗУ без задержки - чтобы опередить перерисовку компонента!
       try {
-        // Локально обновляем read receipt
         const now = new Date().toISOString();
+        
         dispatch({ 
           type: actionTypes.APPLY_READ_RECEIPT, 
           payload: { 
@@ -858,7 +826,6 @@ export const MessagingProvider = ({ children }) => {
           } 
         });
         
-        // Отправляем на сервер НЕМЕДЛЕННО
         client.publish({
           destination: '/app/chat.markRead',
           body: JSON.stringify({
@@ -866,23 +833,9 @@ export const MessagingProvider = ({ children }) => {
             lastReadMessageId: parseInt(message.id),
           }),
         });
-        
-        console.log('[MESSAGING] Sent instant read receipt IMMEDIATELY:', {
-          chatId: message.chatId,
-          messageId: message.id,
-          timestamp: now
-        });
       } catch (error) {
-        console.error('[MESSAGING] Failed to send instant read receipt:', error);
+        console.error('Failed to send read receipt:', error);
       }
-    } else {
-      console.log('[MESSAGING] NOT auto-marking because:', {
-        isOwn,
-        active,
-        isVisible,
-        hasClient: !!client,
-        connected
-      });
     }
   }, [state.activeChatId, state.messageIdsByChatId, state.messagesById, client, connected]);
 

@@ -1,9 +1,8 @@
 import { Loader2, ChevronDown } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import MessageRow from '@/component/MessageRow';
 import styles from '@/styles/chat.module.css';
-import { useMessageReadTracking } from '@/hooks/useMessageReadTracking';
-import { useScrollReadTracking } from '@/hooks/useScrollReadTracking';
+import { useReadTracking } from '@/hooks/useReadTracking';
 
 export default function MessageList({
   messages,
@@ -33,52 +32,28 @@ export default function MessageList({
   setFileViewerModal,
   handleNavigateToMessage,
   chats,
-  chatId  // Добавляем chatId в пропсы
+  chatId
 }) {
-  const { observeMessage, unobserveMessage, markAllVisibleAsRead } = useMessageReadTracking(chatId, true);
-  const { handleScroll: handleScrollRead, markVisibleMessagesAsRead } = useScrollReadTracking(chatId, true);
+  const { observeMessage, unobserveMessage, handleScroll: handleReadScroll } = useReadTracking(chatId, true);
   
   const visibleMessages = (() => {
-    
     if (searchMode && searchResults && searchResults.length > 0) {
-      const resultIds = new Set(searchResults.map(r => String(r.id)));
       return searchResults.filter(msg => {
         if (!msg || !msg.id) return false;
-        const isDeleted = msg.deletedForMe === true || msg.deletedForAll === true;
-        return !isDeleted;
+        return !msg.deletedForMe && !msg.deletedForAll;
       });
     }
 
     return messages.filter(msg => {
       if (!msg || !msg.id) return false;
-      const isDeleted = msg.deletedForMe === true || msg.deletedForAll === true;
-      return !isDeleted;
+      return !msg.deletedForMe && !msg.deletedForAll;
     });
   })();
 
-  // Комбинированный обработчик прокрутки
   const handleCombinedScroll = (e) => {
-    // Вызываем оригинальный обработчик прокрутки
-    if (onScroll) {
-      onScroll(e);
-    }
-    
-    // Вызываем обработчик для отметки прочитанных
-    handleScrollRead();
+    if (onScroll) onScroll(e);
+    handleReadScroll();
   };
-  
-  // При изменении видимых сообщений - помечаем видимые как прочитанные
-  useEffect(() => {
-    if (visibleMessages.length > 0) {
-      // Небольшая задержка для завершения рендеринга
-      const timer = setTimeout(() => {
-        markAllVisibleAsRead();
-        markVisibleMessagesAsRead();
-      }, 100);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [visibleMessages.length, markAllVisibleAsRead, markVisibleMessagesAsRead]);
 
   useEffect(() => {
     if (!selectionMode) return;

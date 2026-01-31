@@ -100,37 +100,12 @@ const MessageRow = React.memo(({
   // Отслеживаем видимость сообщения для автоматической отметки как прочитанное
   useEffect(() => {
     const messageElement = messageRef.current;
-    if (!messageElement || !observeMessage || !unobserveMessage) {
-      console.log('[MessageRow] Cannot observe message:', {
-        hasElement: !!messageElement,
-        hasObserveMessage: !!observeMessage,
-        hasUnobserveMessage: !!unobserveMessage,
-        messageId: msg.id,
-        isOwn
-      });
-      return;
-    }
+    if (!messageElement || !observeMessage || !unobserveMessage || isOwn) return;
     
-    // Наблюдаем только за чужими сообщениями
-    if (!isOwn) {
-      console.log('[MessageRow] Starting to observe message:', {
-        messageId: msg.id,
-        isOwn,
-        element: messageElement
-      });
-      observeMessage(messageElement);
-    } else {
-      console.log('[MessageRow] Skipping own message:', {
-        messageId: msg.id,
-        isOwn
-      });
-    }
+    observeMessage(messageElement);
     
     return () => {
-      if (!isOwn) {
-        console.log('[MessageRow] Unobserving message:', msg.id);
-        unobserveMessage(messageElement);
-      }
+      unobserveMessage(messageElement);
     };
   }, [observeMessage, unobserveMessage, isOwn, msg.id]);
 
