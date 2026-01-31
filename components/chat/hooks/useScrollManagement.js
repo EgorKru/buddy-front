@@ -99,7 +99,7 @@ export const useScrollManagement = ({
     }
     
     setUnreadCount(count);
-  }, [checkIsAtBottom, messages]);
+  }, [checkIsAtBottom, messages, messagesContainerRef]);
   
   useInfiniteScroll({
     containerRef: messagesContainerRef,
@@ -164,7 +164,7 @@ export const useScrollManagement = ({
       }
       setUnreadCount(0);
     }
-  }, [chatId, checkIsAtBottom, messages]);
+  }, [chatId, checkIsAtBottom, messages, messagesContainerRef]);
 
   const scrollToBottom = useCallback((behavior = 'auto') => {
     if (!messagesContainerRef.current) return;
@@ -196,7 +196,7 @@ export const useScrollManagement = ({
       }
     }
     setUnreadCount(0);
-  }, [messages]);
+  }, [messages, messagesContainerRef]);
 
   const restoreScrollPosition = useCallback(() => {
     if (!messagesContainerRef.current || !chatId || messages.length === 0) return;
@@ -287,7 +287,7 @@ export const useScrollManagement = ({
       scrollPositionSavedRef.current = true;
       shouldRestorePositionRef.current = false;
     }
-  }, [chatId, messages.length, scrollToBottom]);
+  }, [chatId, messages.length, scrollToBottom, messagesContainerRef]);
 
   useEffect(() => {
     if (messages.length > 0 && !scrollPositionSavedRef.current && messagesContainerRef.current) {
@@ -316,7 +316,7 @@ export const useScrollManagement = ({
         }
       }
     }
-  }, [messages.length, isLoadingInitial, messages]);
+  }, [messages.length, isLoadingInitial, messages, messagesContainerRef]);
 
   useEffect(() => {
     if (messages.length > 0 && !scrollPositionSavedRef.current && messagesContainerRef.current) {
@@ -324,7 +324,7 @@ export const useScrollManagement = ({
         restoreScrollPosition();
       }
     }
-  }, [messages.length, isLoadingInitial, restoreScrollPosition]);
+  }, [messages.length, isLoadingInitial, restoreScrollPosition, messagesContainerRef]);
 
   useEffect(() => {
     if (!messagesContainerRef.current || messages.length === 0) return;
@@ -356,7 +356,7 @@ export const useScrollManagement = ({
     }
     
     scrollHeightBeforeMessageRef.current = currentScrollHeight;
-  }, [messages.length, checkIsAtBottom, scrollToBottom, updateUnreadCount]);
+  }, [messages.length, checkIsAtBottom, scrollToBottom, updateUnreadCount, messagesContainerRef]);
 
   useEffect(() => {
     if (!messagesContainerRef.current) return;
@@ -389,7 +389,7 @@ export const useScrollManagement = ({
         clearTimeout(unreadCountUpdateTimeoutRef.current);
       }
     };
-  }, [updateUnreadCount, messages.length]);
+  }, [updateUnreadCount, messages.length, messagesContainerRef]);
 
   return {
     

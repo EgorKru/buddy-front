@@ -118,7 +118,7 @@ export const useChatMessages = ({
         abortControllerRef.current = null;
       }
     }
-  }, [upsertMessage, refreshChats, localPtsRef, localSeqRef, setReadReceiptsForChat, chatId]);
+  }, [upsertMessage, refreshChats, localPtsRef, localSeqRef, setReadReceiptsForChat]);
 
   const loadOlderMessages = useCallback(async (beforeMessageId) => {
     if (!chatId || !beforeMessageId || loadingMessagesRef.current) return;

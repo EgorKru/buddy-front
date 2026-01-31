@@ -4,7 +4,6 @@ import { getCurrentUser } from '@/utils/api';
 import { useChat } from '@/components/chat/hooks/useChat';
 import { useChatUI } from '@/components/chat/hooks/useChatUI';
 import { useMessageEffects } from '@/components/chat/hooks/useMessageEffects';
-import { useWebSocketMessages } from '@/components/chat/hooks/useWebSocketMessages';
 import { useMessageStatus } from '@/components/chat/hooks/useMessageStatus';
 import { useChatKeyboard } from '@/components/chat/hooks/useChatKeyboard';
 import { useVoiceMessageHandling } from '@/components/chat/hooks/useVoiceMessageHandling';
@@ -231,11 +230,6 @@ const ChatContainer = ({ chatId }) => {
       stopTyping();
     };
   }, [stopTyping]);
-
-  useWebSocketMessages({
-    upsertMessage,
-    newMessageIdsRef
-  });
 
   useMessageEffects({
     messages,
@@ -614,7 +608,7 @@ const ChatContainer = ({ chatId }) => {
         await handleVoiceSendSimple(blob);
       }
     };
-  }, [handleVoiceSendSimple]);
+  }, [handleVoiceSendSimple, onAutoSendRef]);
 
   const audioBlobRef = useRef(audioBlob);
   const previewBlobRef = useRef(previewBlob);

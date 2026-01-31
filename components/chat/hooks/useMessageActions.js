@@ -151,7 +151,7 @@ export const useMessageActions = ({
       }
       loadPinnedMessages();
     }
-  }, [chatId, deleteConfirm, deleteForAll, messages, updateMessage, removeMessage, viewedPinnedMessageId, setViewedPinnedMessageId, loadPinnedMessages, user, selectionMode, exitSelectionMode, setPinnedMessages]);
+  }, [chatId, deleteConfirm, deleteForAll, messages, updateMessage, removeMessage, viewedPinnedMessageId, setViewedPinnedMessageId, loadPinnedMessages, user, selectionMode, exitSelectionMode, setPinnedMessages, setDeleteConfirm, setDeleteForAll]);
 
   const handleEditMessage = useCallback((message) => {
     setEditingMessageId(message.id);
@@ -160,7 +160,7 @@ export const useMessageActions = ({
     setTimeout(() => {
       messageInputRef.current?.focus();
     }, SEARCH_DEBOUNCE_DELAY);
-  }, [setContextMenu]);
+  }, [setContextMenu, messageInputRef]);
 
   const handleSaveEdit = useCallback(async () => {
     if (!editingMessageId || !chatId || !editingContent.trim()) {
@@ -213,7 +213,7 @@ export const useMessageActions = ({
     setTimeout(() => {
       messageInputRef.current?.focus();
     }, SEARCH_DEBOUNCE_DELAY);
-  }, [setContextMenu]);
+  }, [setContextMenu, messageInputRef]);
 
   const handleCancelReply = useCallback(() => {
     setReplyingToMessageId(null);
@@ -293,7 +293,7 @@ export const useMessageActions = ({
       selectedChatId: null,
       comment: ''
     });
-  }, [setContextMenu]);
+  }, [setContextMenu, setForwardModal]);
 
   const handleConfirmForward = useCallback(async () => {
     if (!forwardModal || !forwardModal.selectedChatId) return;
@@ -316,7 +316,7 @@ export const useMessageActions = ({
       
       alert('Не удалось переслать сообщение');
     }
-  }, [forwardModal, chatId]);
+  }, [forwardModal, chatId, setForwardModal]);
 
   return {
     
