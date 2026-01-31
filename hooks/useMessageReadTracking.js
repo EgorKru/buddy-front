@@ -14,8 +14,21 @@ import { getCurrentUser } from '@/utils/api';
  * 4. Приход новых сообщений в открытый чат
  */
 export const useMessageReadTracking = (chatId, enabled = true) => {
-  const { upsertReadReceipt, messageIdsByChatId, messagesById } = useMessaging();
-  const { client, connected } = useStomp();
+  const messagingContext = useMessaging();
+  const stompContext = useStomp();
+  
+  // Защита от SSR - если контекст не доступен, возвращаем заглушки
+  if (!messagingContext || !stompContext) {
+    return {
+      observeMessage: () => {},
+      unobserveMessage: () => {},
+      markMessageAsRead: () => {},
+      markAllVisibleAsRead: () => {},
+    };
+  }
+  
+  const { upsertReadReceipt, messageIdsByChatId, messagesById } = messagingContext;
+  const { client, connected } = stompContext;
   const observerRef = useRef(null);
   const processedMessagesRef = useRef(new Set());
   const lastReadMessageIdRef = useRef(null);

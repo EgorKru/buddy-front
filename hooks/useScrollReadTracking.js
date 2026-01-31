@@ -8,8 +8,19 @@ import { getCurrentUser } from '@/utils/api';
  * Работает в дополнение к IntersectionObserver для максимальной надежности
  */
 export const useScrollReadTracking = (chatId, enabled = true) => {
-  const { client, connected } = useStomp();
-  const { upsertReadReceipt, messageIdsByChatId, messagesById } = useMessaging();
+  const stompContext = useStomp();
+  const messagingContext = useMessaging();
+  
+  // Защита от SSR - если контекст не доступен, возвращаем заглушки
+  if (!stompContext || !messagingContext) {
+    return {
+      handleScroll: () => {},
+      markVisibleMessagesAsRead: () => {},
+    };
+  }
+  
+  const { client, connected } = stompContext;
+  const { upsertReadReceipt, messageIdsByChatId, messagesById } = messagingContext;
   const processedRef = useRef(new Set());
   const scrollTimerRef = useRef(null);
   const lastScrollTimeRef = useRef(0);
