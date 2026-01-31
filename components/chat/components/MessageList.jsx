@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import MessageRow from '@/component/MessageRow';
 import styles from '@/styles/chat.module.css';
 import { useMessageReadTracking } from '@/hooks/useMessageReadTracking';
+import { useScrollReadTracking } from '@/hooks/useScrollReadTracking';
 
 export default function MessageList({
   messages,
@@ -34,7 +35,9 @@ export default function MessageList({
   chats,
   chatId  // Добавляем chatId в пропсы
 }) {
-  const { observeMessage, unobserveMessage } = useMessageReadTracking(chatId, true);
+  const { observeMessage, unobserveMessage, markAllVisibleAsRead } = useMessageReadTracking(chatId, true);
+  const { handleScroll: handleScrollRead, markVisibleMessagesAsRead } = useScrollReadTracking(chatId, true);
+  
   const visibleMessages = (() => {
     
     if (searchMode && searchResults && searchResults.length > 0) {
@@ -52,6 +55,30 @@ export default function MessageList({
       return !isDeleted;
     });
   })();
+
+  // Комбинированный обработчик прокрутки
+  const handleCombinedScroll = (e) => {
+    // Вызываем оригинальный обработчик прокрутки
+    if (onScroll) {
+      onScroll(e);
+    }
+    
+    // Вызываем обработчик для отметки прочитанных
+    handleScrollRead();
+  };
+  
+  // При изменении видимых сообщений - помечаем видимые как прочитанные
+  useEffect(() => {
+    if (visibleMessages.length > 0) {
+      // Небольшая задержка для завершения рендеринга
+      const timer = setTimeout(() => {
+        markAllVisibleAsRead();
+        markVisibleMessagesAsRead();
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [visibleMessages.length, markAllVisibleAsRead, markVisibleMessagesAsRead]);
 
   useEffect(() => {
     if (!selectionMode) return;
@@ -87,7 +114,7 @@ export default function MessageList({
       <div
         ref={messagesContainerRef}
         className={`${styles.messagesContainer} ${selectionMode ? styles.selectionMode : ''}`}
-        onScroll={onScroll}
+        onScroll={handleCombinedScroll}
       >
         {loadingMore && (
           <div className={styles.loadingMore}>

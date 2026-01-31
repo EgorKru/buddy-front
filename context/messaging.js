@@ -812,7 +812,48 @@ export const MessagingProvider = ({ children }) => {
       type: actionTypes.UPSERT_MESSAGE,
       payload: { message, chatId: message.chatId, unreadDelta: meta.unreadDelta ?? unreadDelta },
     });
-  }, [state.activeChatId, state.messageIdsByChatId, state.messagesById]);
+    
+    // МОМЕНТАЛЬНАЯ ОТМЕТКА: если сообщение пришло в активный видимый чат - помечаем прочитанным СРАЗУ
+    if (!isOwn && active && isVisible && client && connected) {
+      console.log('[MESSAGING] Auto-marking new message as read (active+visible):', {
+        chatId: message.chatId,
+        messageId: message.id,
+        userId: currentUser?.id
+      });
+      
+      // Небольшая задержка чтобы сообщение успело отрендериться
+      setTimeout(() => {
+        try {
+          // Локально обновляем read receipt
+          const now = new Date().toISOString();
+          dispatch({ 
+            type: actionTypes.APPLY_READ_RECEIPT, 
+            payload: { 
+              chatId: message.chatId, 
+              readerId: currentUser.id, 
+              readAt: now 
+            } 
+          });
+          
+          // Отправляем на сервер
+          client.publish({
+            destination: '/app/chat.markRead',
+            body: JSON.stringify({
+              chatId: parseInt(message.chatId),
+              lastReadMessageId: parseInt(message.id),
+            }),
+          });
+          
+          console.log('[MESSAGING] Sent instant read receipt:', {
+            chatId: message.chatId,
+            messageId: message.id
+          });
+        } catch (error) {
+          console.error('[MESSAGING] Failed to send instant read receipt:', error);
+        }
+      }, 50);
+    }
+  }, [state.activeChatId, state.messageIdsByChatId, state.messagesById, client, connected]);
 
   const updateMessage = useCallback((message, meta = {}) => {
     if (!message?.id || !message?.chatId) return;
@@ -970,6 +1011,7 @@ export const MessagingProvider = ({ children }) => {
       chatIds.add(String(state.activeChatId));
     }
 
+    // Отписываемся от чатов, которых больше нет
     for (const [cid, sub] of readSubsRef.current.entries()) {
       if (!chatIds.has(cid)) {
         safeUnsubscribe(sub);
@@ -977,17 +1019,31 @@ export const MessagingProvider = ({ children }) => {
       }
     }
 
+    // Подписываемся на новые чаты
     for (const cid of chatIds) {
       if (readSubsRef.current.has(cid)) continue;
       try {
         const sub = client.subscribe(`/topic/chat/${cid}/read`, (m) => {
           const ev = safeJsonParse(m.body);
-          if (!ev || !ev.chatId || !ev.readerId || !ev.readAt) return;
+          if (!ev || !ev.chatId || !ev.readerId || !ev.readAt) {
+            console.warn('[READ RECEIPTS] Invalid read receipt event:', ev);
+            return;
+          }
+          
+          console.log('[READ RECEIPTS] Received read receipt:', {
+            chatId: ev.chatId,
+            readerId: ev.readerId,
+            readAt: ev.readAt,
+            timestamp: new Date().toISOString()
+          });
+          
+          // МОМЕНТАЛЬНО обновляем локальное состояние
           upsertReadReceipt(ev.chatId, ev.readerId, ev.readAt);
         });
         readSubsRef.current.set(cid, sub);
+        console.log('[READ RECEIPTS] Subscribed to chat:', cid);
       } catch (e) {
-        
+        console.error('[READ RECEIPTS] Failed to subscribe to chat:', cid, e);
       }
     }
 
