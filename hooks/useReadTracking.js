@@ -61,7 +61,7 @@ export const useReadTracking = (chatId, enabled = true) => {
         }),
       });
       return true;
-    } catch (error) {
+    } catch {
       return false;
     }
   }, [chatId, client, connected, upsertReadReceipt, messagesById]);
@@ -71,16 +71,10 @@ export const useReadTracking = (chatId, enabled = true) => {
     
     processedRef.current.clear();
     
-    const messageElements = document.querySelectorAll('[data-message-id]');
-    const visibleIds = [];
-    
-    messageElements.forEach(element => {
+    document.querySelectorAll('[data-message-id]').forEach(element => {
       if (isElementVisible(element)) {
         const messageId = element.getAttribute('data-message-id');
-        if (messageId) {
-          visibleIds.push(parseInt(messageId));
-          sendReadReceipt(messageId);
-        }
+        if (messageId) sendReadReceipt(messageId);
       }
     });
   }, [enabled, chatId, sendReadReceipt]);

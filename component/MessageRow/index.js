@@ -97,7 +97,6 @@ const MessageRow = React.memo(({
 
   const messageRef = useRef(null);
 
-  // Отслеживаем видимость сообщения для автоматической отметки как прочитанное
   useEffect(() => {
     const messageElement = messageRef.current;
     if (!messageElement || !observeMessage || !unobserveMessage || isOwn) return;

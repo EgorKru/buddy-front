@@ -17,8 +17,6 @@ const parseServerDate = (dateString) => {
     return dateString;
   }
   
-  // Если это массив (Java LocalDateTime) - УСТАРЕЛО после перехода на UTC
-  // Оставлено для обратной совместимости
   if (Array.isArray(dateString) && dateString.length >= 3) {
     const [year, month, day, hour = 0, minute = 0, second = 0, nanosecond = 0] = dateString;
     const millisecond = Math.floor(nanosecond / 1000000);
@@ -37,7 +35,6 @@ const parseServerDate = (dateString) => {
     }
   }
   
-  // Бэкенд отправляет ISO с Z суффиксом (UTC)
   return new Date(str);
 };
 
@@ -731,11 +728,9 @@ export const MessagingProvider = ({ children }) => {
     const currentUser = getCurrentUser();
     const cid = String(chatId);
     
-    // Получить ID последнего сообщения в чате
     const messageIds = state.messageIdsByChatId[cid] || [];
     const lastReadMessageId = messageIds.length > 0 ? messageIds[messageIds.length - 1] : null;
     
-    // Отправить через WebSocket (согласно документации)
     if (client && connected && lastReadMessageId) {
       try {
         client.publish({
@@ -750,7 +745,6 @@ export const MessagingProvider = ({ children }) => {
       }
     }
     
-    // Локально обновить read receipt
     if (currentUser?.id) {
       const now = new Date().toISOString();
       dispatch({ 
@@ -761,7 +755,6 @@ export const MessagingProvider = ({ children }) => {
     
     dispatch({ type: actionTypes.MARK_CHAT_READ_LOCAL, payload: { chatId } });
     
-    // Также отправить через REST API как fallback
     try {
       await chatAPI.markChatAsRead(chatId);
     } catch (e) {}
@@ -995,7 +988,6 @@ export const MessagingProvider = ({ children }) => {
       chatIds.add(String(state.activeChatId));
     }
 
-    // Отписываемся от чатов, которых больше нет
     for (const [cid, sub] of readSubsRef.current.entries()) {
       if (!chatIds.has(cid)) {
         safeUnsubscribe(sub);
@@ -1003,29 +995,16 @@ export const MessagingProvider = ({ children }) => {
       }
     }
 
-    // Подписываемся на новые чаты
     for (const cid of chatIds) {
       if (readSubsRef.current.has(cid)) continue;
       try {
         const sub = client.subscribe(`/topic/chat/${cid}/read`, (m) => {
           const ev = safeJsonParse(m.body);
-          if (!ev || !ev.chatId || !ev.readerId || !ev.readAt) {
-            console.warn('[READ RECEIPTS] Invalid read receipt event:', ev);
-            return;
-          }
+          if (!ev || !ev.chatId || !ev.readerId || !ev.readAt) return;
           
-          console.log('[READ RECEIPTS] Received read receipt:', {
-            chatId: ev.chatId,
-            readerId: ev.readerId,
-            readAt: ev.readAt,
-            timestamp: new Date().toISOString()
-          });
-          
-          // МОМЕНТАЛЬНО обновляем локальное состояние
           upsertReadReceipt(ev.chatId, ev.readerId, ev.readAt);
         });
         readSubsRef.current.set(cid, sub);
-        console.log('[READ RECEIPTS] Subscribed to chat:', cid);
       } catch (e) {
         console.error('[READ RECEIPTS] Failed to subscribe to chat:', cid, e);
       }

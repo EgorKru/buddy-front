@@ -10,12 +10,10 @@ import ChatListItem from '@/component/ChatSidebar/ChatListItem';
 import CreateChatModal from '@/component/ChatSidebar/CreateChatModal';
 import styles from '@/component/ChatSidebar/index.module.css';
 
-// Функция для парсинга дат с бэкенда (включая Java LocalDateTime массив)
 const parseServerDate = (dateString) => {
   if (!dateString) return null;
   if (typeof dateString === 'number') return new Date(dateString);
   if (dateString instanceof Date) return dateString;
-  // Если это массив (Java LocalDateTime) - УСТАРЕЛО после перехода на UTC
   if (Array.isArray(dateString) && dateString.length >= 3) {
     const [year, month, day, hour = 0, minute = 0, second = 0, nanosecond = 0] = dateString;
     const millisecond = Math.floor(nanosecond / 1000000);
@@ -27,7 +25,6 @@ const parseServerDate = (dateString) => {
     if (timestamp > 1000000000000) return new Date(timestamp);
     if (timestamp > 1000000000) return new Date(timestamp * 1000);
   }
-  // Бэкенд отправляет ISO с Z суффиксом (UTC)
   return new Date(str);
 };
 
