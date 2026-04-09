@@ -26,7 +26,7 @@ const ChatPanel = ({ roomId, isOpen, onClose }) => {
       textarea.style.height = 'auto';
       const newHeight = Math.min(textarea.scrollHeight, 120);
       textarea.style.height = `${newHeight}px`;
-      
+
       if (textarea.scrollHeight > 120) {
         textarea.style.overflowY = 'auto';
         textarea.style.paddingRight = '20px';
@@ -80,9 +80,11 @@ const ChatPanel = ({ roomId, isOpen, onClose }) => {
           <MessageCircle size={20} />
           <span>Чат комнаты</span>
         </div>
-        <button onClick={onClose} className={styles.closeButton}>×</button>
+        <button onClick={onClose} className={styles.closeButton}>
+          ×
+        </button>
       </div>
-      
+
       <div className={styles.messagesContainer}>
         {messages.length === 0 ? (
           <div className={styles.emptyState}>
@@ -93,9 +95,7 @@ const ChatPanel = ({ roomId, isOpen, onClose }) => {
           messages.map((msg, index) => (
             <div
               key={index}
-              className={`${styles.message} ${
-                msg.senderId === user?.id ? styles.ownMessage : ''
-              }`}
+              className={`${styles.message} ${msg.senderId === user?.id ? styles.ownMessage : ''}`}
             >
               <div className={styles.messageHeader}>
                 <span className={styles.senderName}>
@@ -140,4 +140,3 @@ const ChatPanel = ({ roomId, isOpen, onClose }) => {
 };
 
 export default ChatPanel;
-

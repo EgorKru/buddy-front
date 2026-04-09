@@ -22,7 +22,7 @@ export default function ImageModal({ imageUrl, fileUrl, onClose }) {
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
         const delta = e.deltaY > 0 ? -0.1 : 0.1;
-        setScale(prev => Math.max(0.5, Math.min(3, prev + delta)));
+        setScale((prev) => Math.max(0.5, Math.min(3, prev + delta)));
       }
     };
 
@@ -74,17 +74,16 @@ export default function ImageModal({ imageUrl, fileUrl, onClose }) {
       document.body.removeChild(link);
       URL.revokeObjectURL(blobUrl);
     } catch (error) {
-      
       alert('Не удалось скачать изображение');
     }
   };
 
   const handleZoomIn = () => {
-    setScale(prev => Math.min(3, prev + 0.25));
+    setScale((prev) => Math.min(3, prev + 0.25));
   };
 
   const handleZoomOut = () => {
-    setScale(prev => Math.max(0.5, prev - 0.25));
+    setScale((prev) => Math.max(0.5, prev - 0.25));
   };
 
   const handleResetZoom = () => {
@@ -167,12 +166,7 @@ export default function ImageModal({ imageUrl, fileUrl, onClose }) {
             >
               <Download size={20} />
             </button>
-            <button
-              type="button"
-              className={styles.closeButton}
-              onClick={onClose}
-              title="Закрыть"
-            >
+            <button type="button" className={styles.closeButton} onClick={onClose} title="Закрыть">
               <X size={24} />
             </button>
           </div>
@@ -201,4 +195,3 @@ export default function ImageModal({ imageUrl, fileUrl, onClose }) {
     </div>
   );
 }
-

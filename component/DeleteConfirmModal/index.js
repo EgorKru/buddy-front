@@ -17,15 +17,16 @@ export default function DeleteConfirmModal({
     if (chat.type !== 'DIRECT') {
       return `${chat.participants?.length || 0} участников`;
     }
-    const other = chat.participants.find(p => Number(p.id) !== Number(user.id));
+    const other = chat.participants.find((p) => Number(p.id) !== Number(user.id));
     return other?.displayName || other?.username || '';
   };
 
-  const messageIds = deleteConfirm?.messageIds || (deleteConfirm?.message?.id ? [deleteConfirm.message.id] : []);
+  const messageIds =
+    deleteConfirm?.messageIds || (deleteConfirm?.message?.id ? [deleteConfirm.message.id] : []);
   const isMultiple = messageIds.length > 1;
   const otherParticipantName = getOtherParticipantName();
-  const allOwnMessages = messageIds.every(id => {
-    const msg = messages.find(m => Number(m.id) === Number(id));
+  const allOwnMessages = messageIds.every((id) => {
+    const msg = messages.find((m) => Number(m.id) === Number(id));
     return msg?.senderId === user?.id;
   });
   const canDeleteForAll = allOwnMessages && messageIds.length > 0;
@@ -47,10 +48,7 @@ export default function DeleteConfirmModal({
           </label>
         )}
         <div className={styles.deleteModalButtons}>
-          <button
-            className={styles.deleteModalCancel}
-            onClick={onClose}
-          >
+          <button className={styles.deleteModalCancel} onClick={onClose}>
             Отмена
           </button>
           <button
@@ -62,7 +60,6 @@ export default function DeleteConfirmModal({
               if (onConfirm && typeof onConfirm === 'function') {
                 onConfirm();
               } else {
-                
               }
             }}
           >
@@ -73,4 +70,3 @@ export default function DeleteConfirmModal({
     </div>
   );
 }
-

@@ -20,8 +20,7 @@ export default function CreateChatModal({ isOpen, onClose, onSuccess }) {
         onSuccess();
         onClose();
       });
-    } catch (error) {
-    }
+    } catch (error) {}
   };
 
   const handleClose = () => {
@@ -92,15 +91,13 @@ export default function CreateChatModal({ isOpen, onClose, onSuccess }) {
                     createChat.setShowSearchResults(true);
                   }
                 }}
-                placeholder={createChat.chatType === 'DIRECT' 
-                  ? 'Поиск пользователя...' 
-                  : 'Поиск участников...'}
+                placeholder={
+                  createChat.chatType === 'DIRECT' ? 'Поиск пользователя...' : 'Поиск участников...'
+                }
                 className={styles.searchInput}
                 autoFocus={createChat.chatType === 'DIRECT'}
               />
-              {createChat.searching && (
-                <Loader2 size={16} className={styles.searchLoader} />
-              )}
+              {createChat.searching && <Loader2 size={16} className={styles.searchLoader} />}
             </div>
 
             {createChat.selectedParticipants.length > 0 && (
@@ -109,9 +106,18 @@ export default function CreateChatModal({ isOpen, onClose, onSuccess }) {
                   <div key={participant.id} className={styles.participantTagCompact}>
                     <div className={styles.participantTagAvatar}>
                       {participant.avatarUrl ? (
-                        <Image src={participant.avatarUrl} alt="" width={24} height={24} unoptimized />
+                        <Image
+                          src={participant.avatarUrl}
+                          alt=""
+                          width={24}
+                          height={24}
+                          unoptimized
+                        />
                       ) : (
-                        <span>{(participant.displayName || participant.username)?.[0]?.toUpperCase() || '?'}</span>
+                        <span>
+                          {(participant.displayName || participant.username)?.[0]?.toUpperCase() ||
+                            '?'}
+                        </span>
                       )}
                     </div>
                     <span className={styles.participantTagName}>
@@ -166,11 +172,12 @@ export default function CreateChatModal({ isOpen, onClose, onSuccess }) {
               </div>
             )}
 
-            {createChat.showSearchResults && createChat.searchResults.length === 0 && createChat.participantUsernames.length >= 2 && !createChat.searching && (
-              <div className={styles.searchResultEmpty}>
-                Пользователи не найдены
-              </div>
-            )}
+            {createChat.showSearchResults &&
+              createChat.searchResults.length === 0 &&
+              createChat.participantUsernames.length >= 2 &&
+              !createChat.searching && (
+                <div className={styles.searchResultEmpty}>Пользователи не найдены</div>
+              )}
 
             {!createChat.showSearchResults && createChat.participantUsernames.length === 0 && (
               <div className={styles.searchResultEmpty}>
@@ -179,9 +186,7 @@ export default function CreateChatModal({ isOpen, onClose, onSuccess }) {
             )}
           </div>
 
-          {createChat.createError && (
-            <div className={styles.error}>{createChat.createError}</div>
-          )}
+          {createChat.createError && <div className={styles.error}>{createChat.createError}</div>}
 
           <div className={styles.modalActions}>
             <button
@@ -195,7 +200,13 @@ export default function CreateChatModal({ isOpen, onClose, onSuccess }) {
             <button
               type="submit"
               className={styles.submitButton}
-              disabled={createChat.creating || (createChat.chatType === 'DIRECT' && createChat.selectedParticipants.length !== 1) || (createChat.chatType === 'GROUP' && (createChat.selectedParticipants.length === 0 || !createChat.chatName.trim()))}
+              disabled={
+                createChat.creating ||
+                (createChat.chatType === 'DIRECT' &&
+                  createChat.selectedParticipants.length !== 1) ||
+                (createChat.chatType === 'GROUP' &&
+                  (createChat.selectedParticipants.length === 0 || !createChat.chatName.trim()))
+              }
             >
               {createChat.creating ? 'Создание...' : 'Создать'}
             </button>

@@ -11,27 +11,27 @@ export const useMessageSelection = () => {
   }, []);
 
   const toggleMessageSelection = useCallback((messageId) => {
-    setSelectedMessages(prev => {
+    setSelectedMessages((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(messageId)) {
         newSet.delete(messageId);
       } else {
         newSet.add(messageId);
       }
-      
+
       if (newSet.size === 0) {
         setSelectionMode(false);
       }
-      
+
       return newSet;
     });
   }, []);
 
   const handleSelectAll = useCallback((messages) => {
-    const visibleMessages = messages.filter(msg => {
+    const visibleMessages = messages.filter((msg) => {
       return !(msg.deletedForMe === true || msg.deletedForAll === true);
     });
-    setSelectedMessages(new Set(visibleMessages.map(msg => msg.id)));
+    setSelectedMessages(new Set(visibleMessages.map((msg) => msg.id)));
   }, []);
 
   const exitSelectionMode = useCallback(() => {
@@ -49,4 +49,3 @@ export const useMessageSelection = () => {
     setSelectionMode,
   };
 };
-

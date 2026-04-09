@@ -18,13 +18,27 @@ const DEDUP_CLEANUP_INTERVAL = 5 * 60 * 1000;
 const DEDUP_CLEANUP_THRESHOLD = 100;
 const QUEUE_REMOVAL_DELAY = 1000;
 
-const createOptimisticMessage = (content, type, chatId, user, fileUrl = null, fileName = null, fileSize = null, mimeType = null) => {
+const createOptimisticMessage = (
+  content,
+  type,
+  chatId,
+  user,
+  fileUrl = null,
+  fileName = null,
+  fileSize = null,
+  mimeType = null,
+  e2ee = null,
+  replyToMessageId = null
+) => {
   const tempId = `temp-${Date.now()}-${Math.random()}`;
   let messageContent;
   if (type === 'VOICE') {
     messageContent = '🎤 Голосовое сообщение';
   } else if (type === 'IMAGE' || type === 'FILE') {
-    messageContent = content && content.trim() ? content.trim() : (type === 'IMAGE' ? '📷 Фото' : '📎 Файл');
+    messageContent =
+      content && content.trim() ? content.trim() : type === 'IMAGE' ? '📷 Фото' : '📎 Файл';
+  } else if (e2ee?.wireContent != null) {
+    messageContent = e2ee.wireContent;
   } else {
     messageContent = content.trim();
   }
@@ -46,6 +60,12 @@ const createOptimisticMessage = (content, type, chatId, user, fileUrl = null, fi
     senderDisplayName: user?.displayName || user?.username,
     retryCount: 0,
   };
+  if (e2ee?.encryptionVersion != null) {
+    message.encryptionVersion = e2ee.encryptionVersion;
+  }
+  if (replyToMessageId != null) {
+    message.replyToMessageId = replyToMessageId;
+  }
   return message;
 };
 
@@ -53,14 +73,17 @@ const findQueuedMessageForConfirmation = (lastSent, queue, chatId) => {
   if (lastSent && lastSent.chatId === chatId && lastSent.status === MESSAGE_STATUS.SENDING) {
     return lastSent;
   }
-  const matching = queue.filter(msg => msg.chatId === chatId && msg.status === MESSAGE_STATUS.SENDING);
+  const matching = queue.filter(
+    (msg) => msg.chatId === chatId && msg.status === MESSAGE_STATUS.SENDING
+  );
   if (matching.length > 0) {
     return matching.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
   }
   return null;
 };
 
-export const useMessageSender = (chatId, onMessageSent) => {
+export const useMessageSender = (chatId, onMessageSent, options = {}) => {
+  const directPeerUserId = options?.directPeerUserId ?? null;
   const { client, connected } = useStomp();
   const [sending, setSending] = useState(false);
   const retryTimeoutRef = useRef(null);
@@ -77,176 +100,272 @@ export const useMessageSender = (chatId, onMessageSent) => {
     return () => clearInterval(cleanupInterval);
   }, []);
 
-  const scheduleRetry = useCallback((message, messageChatId, onMessageSentCallback) => {
-    const targetChatId = messageChatId || chatId;
-    const retryCount = message.retryCount || 0;
+  const scheduleRetry = useCallback(
+    (message, messageChatId, onMessageSentCallback) => {
+      const targetChatId = messageChatId || chatId;
+      const retryCount = message.retryCount || 0;
 
-    if (retryCount >= MAX_RETRIES) return;
+      if (retryCount >= MAX_RETRIES) return;
 
-    const delay = RETRY_DELAYS[retryCount] || 10000;
+      const delay = RETRY_DELAYS[retryCount] || 10000;
 
-    if (retryTimeoutRef.current) {
-      clearTimeout(retryTimeoutRef.current);
-    }
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
 
-    retryTimeoutRef.current = setTimeout(async () => {
-      try {
-        updateMessageStatus(message.tempId, MESSAGE_STATUS.SENDING);
+      retryTimeoutRef.current = setTimeout(async () => {
+        try {
+          updateMessageStatus(message.tempId, MESSAGE_STATUS.SENDING);
 
-        if (message.type === 'IMAGE' || message.type === 'FILE' || message.type === 'VOICE') {
+          if (message.type === 'IMAGE' || message.type === 'FILE' || message.type === 'VOICE') {
+            updateMessageStatus(message.tempId, MESSAGE_STATUS.FAILED);
+            if (onMessageSentCallback) {
+              onMessageSentCallback({ status: 'failed', message: message }, message.tempId);
+            }
+            return;
+          }
 
+          const serverMessage = await chatAPI.sendMessage(
+            targetChatId,
+            message.content,
+            message.type,
+            message.fileUrl,
+            message.replyToMessageId ?? null,
+            message.encryptionVersion ?? null
+          );
+
+          updateMessageStatus(message.tempId, MESSAGE_STATUS.SENT, serverMessage);
+          removeMessageFromQueue(message.tempId);
+
+          if (onMessageSentCallback) {
+            onMessageSentCallback({ status: 'sent', message: serverMessage }, message.tempId);
+          }
+        } catch (error) {
           updateMessageStatus(message.tempId, MESSAGE_STATUS.FAILED);
           if (onMessageSentCallback) {
             onMessageSentCallback({ status: 'failed', message: message }, message.tempId);
           }
-          return;
+          scheduleRetry(
+            {
+              ...message,
+              retryCount: retryCount + 1,
+            },
+            targetChatId,
+            onMessageSentCallback
+          );
         }
+      }, delay);
+    },
+    [chatId]
+  );
 
-        const serverMessage = await chatAPI.sendMessage(targetChatId, message.content, message.type, message.fileUrl);
+  const sendMessage = useCallback(
+    async (
+      content,
+      type = 'TEXT',
+      fileUrl = null,
+      voiceData = null,
+      voiceMimeType = null,
+      duration = null,
+      replyToMessageId = null,
+      fileName = null,
+      fileSize = null,
+      mimeType = null
+    ) => {
+      if (type === 'VOICE' && !fileUrl && !voiceData) return null;
+      if (type === 'IMAGE' && !fileUrl) return null;
+      if (type === 'FILE' && !fileUrl) return null;
+      if (type !== 'VOICE' && type !== 'IMAGE' && type !== 'FILE' && !content.trim()) return null;
+      if (sending) return null;
 
-        updateMessageStatus(message.tempId, MESSAGE_STATUS.SENT, serverMessage);
-        removeMessageFromQueue(message.tempId);
-
-        if (onMessageSentCallback) {
-          onMessageSentCallback({ status: 'sent', message: serverMessage }, message.tempId);
-        }
-      } catch (error) {
-        updateMessageStatus(message.tempId, MESSAGE_STATUS.FAILED);
-        if (onMessageSentCallback) {
-          onMessageSentCallback({ status: 'failed', message: message }, message.tempId);
-        }
-        scheduleRetry({
-          ...message,
-          retryCount: retryCount + 1,
-        }, targetChatId, onMessageSentCallback);
-      }
-    }, delay);
-  }, [chatId]);
-
-  const sendMessage = useCallback(async (content, type = 'TEXT', fileUrl = null, voiceData = null, voiceMimeType = null, duration = null, replyToMessageId = null, fileName = null, fileSize = null, mimeType = null) => {
-    if (type === 'VOICE' && !fileUrl && !voiceData) return null;
-    if (type === 'IMAGE' && !fileUrl) return null;
-    if (type === 'FILE' && !fileUrl) return null;
-    if (type !== 'VOICE' && type !== 'IMAGE' && type !== 'FILE' && !content.trim()) return null;
-    if (sending) return null;
-
-    const messageContent = type === 'VOICE' ? '🎤 Голосовое сообщение' : 
-                          type === 'IMAGE' ? (content?.trim() || '📷 Фото') : 
-                          type === 'FILE' ? (content?.trim() || '📎 Файл') : 
-                          content.trim();
-    const user = getCurrentUser();
-    const optimisticMessage = createOptimisticMessage(messageContent, type, chatId, user, fileUrl, fileName, fileSize, mimeType);
-
-    if (!saveMessageToQueue(optimisticMessage)) return null;
-
-    lastSentMessageRef.current = optimisticMessage;
-    setSending(true);
-
-    try {
-      const isWebSocketReady = client &&
-        client.connected &&
-        client.active &&
-        (connected || client.state === STOMP_CONNECTED_STATE);
-
-      if (isWebSocketReady) {
-        try {
-          const payload = {
-            chatId: parseInt(chatId),
-            type,
-          };
-
-          if (type === 'VOICE') {
-            if (fileUrl) {
-              
-              payload.fileUrl = fileUrl;
-              
-              if (duration !== null && duration !== undefined) {
-                payload.duration = duration;
+      let encryptionVersionToSend = null;
+      let textWireContent = null;
+      if (type === 'TEXT') {
+        textWireContent = content.trim();
+        if (directPeerUserId) {
+          try {
+            const e2ee = await import('@/shared/lib/e2ee/directTextE2ee');
+            if (e2ee.isE2eeEnabled()) {
+              const enc = await e2ee.encryptDirectText(directPeerUserId, textWireContent);
+              if (enc) {
+                encryptionVersionToSend = enc.encryptionVersion;
+                textWireContent = enc.content;
               }
-            } else if (voiceData) {
-              
-              payload.voiceData = voiceData;
-              payload.voiceMimeType = voiceMimeType || 'audio/webm';
-              
-              if (duration !== null && duration !== undefined) {
-                payload.duration = duration;
+            }
+          } catch (_e) {
+            /* остаётся plaintext */
+          }
+        }
+      }
+
+      const messageContent =
+        type === 'VOICE'
+          ? '🎤 Голосовое сообщение'
+          : type === 'IMAGE'
+            ? content?.trim() || '📷 Фото'
+            : type === 'FILE'
+              ? content?.trim() || '📎 Файл'
+              : (textWireContent ?? content.trim());
+
+      const e2eeWire =
+        type === 'TEXT' && encryptionVersionToSend != null
+          ? { wireContent: textWireContent, encryptionVersion: encryptionVersionToSend }
+          : null;
+
+      const user = getCurrentUser();
+      const optimisticMessage = createOptimisticMessage(
+        content,
+        type,
+        chatId,
+        user,
+        fileUrl,
+        fileName,
+        fileSize,
+        mimeType,
+        e2eeWire,
+        replyToMessageId
+      );
+
+      if (!saveMessageToQueue(optimisticMessage)) return null;
+
+      lastSentMessageRef.current = optimisticMessage;
+      setSending(true);
+
+      try {
+        const isWebSocketReady =
+          client &&
+          client.connected &&
+          client.active &&
+          (connected || client.state === STOMP_CONNECTED_STATE);
+
+        if (isWebSocketReady) {
+          try {
+            const payload = {
+              chatId: parseInt(chatId),
+              type,
+            };
+
+            if (type === 'VOICE') {
+              if (fileUrl) {
+                payload.fileUrl = fileUrl;
+
+                if (duration !== null && duration !== undefined) {
+                  payload.duration = duration;
+                }
+              } else if (voiceData) {
+                payload.voiceData = voiceData;
+                payload.voiceMimeType = voiceMimeType || 'audio/webm';
+
+                if (duration !== null && duration !== undefined) {
+                  payload.duration = duration;
+                }
+              } else {
+                throw new Error('Neither fileUrl nor voiceData provided for VOICE message');
+              }
+            } else if (type === 'IMAGE' || type === 'FILE') {
+              if (!fileUrl) {
+                throw new Error(`fileUrl is required for ${type} message`);
+              }
+              payload.fileUrl = fileUrl;
+              if (fileName) {
+                payload.fileName = fileName;
+              }
+              if (fileSize !== null && fileSize !== undefined) {
+                payload.fileSize = fileSize;
+              }
+              if (mimeType) {
+                payload.mimeType = mimeType;
+              }
+              if (content && content.trim()) {
+                payload.content = content.trim();
               }
             } else {
-              throw new Error('Neither fileUrl nor voiceData provided for VOICE message');
+              payload.content =
+                type === 'TEXT' ? (textWireContent ?? content.trim()) : messageContent;
+              if (encryptionVersionToSend != null) {
+                payload.encryptionVersion = encryptionVersionToSend;
+              }
             }
-          } else if (type === 'IMAGE' || type === 'FILE') {
-            
-            if (!fileUrl) {
-              throw new Error(`fileUrl is required for ${type} message`);
-            }
-            payload.fileUrl = fileUrl;
-            if (fileName) {
-              payload.fileName = fileName;
-            }
-            if (fileSize !== null && fileSize !== undefined) {
-              payload.fileSize = fileSize;
-            }
-            if (mimeType) {
-              payload.mimeType = mimeType;
-            }
-            if (content && content.trim()) {
-              payload.content = content.trim();
-            }
-          } else {
-            payload.content = messageContent;
-          }
 
-          if (replyToMessageId) {
-            payload.replyToMessageId = replyToMessageId;
-          }
+            if (replyToMessageId) {
+              payload.replyToMessageId = replyToMessageId;
+            }
 
-          if ((type === 'IMAGE' || type === 'FILE') && !payload.fileUrl) {
-            throw new Error(`fileUrl is missing in payload for ${type} message`);
-          }
+            if ((type === 'IMAGE' || type === 'FILE') && !payload.fileUrl) {
+              throw new Error(`fileUrl is missing in payload for ${type} message`);
+            }
 
-          const serializedPayload = JSON.stringify(payload);
-          client.publish({
-            destination: '/app/chat.sendMessage',
-            body: serializedPayload,
-          });
-          setSending(false);
-          return { success: true, tempId: optimisticMessage.tempId, optimisticMessage, serverMessage: null };
-        } catch (wsError) {
-          if (type === 'VOICE' || type === 'IMAGE' || type === 'FILE') {
+            const serializedPayload = JSON.stringify(payload);
+            client.publish({
+              destination: '/app/chat.sendMessage',
+              body: serializedPayload,
+            });
             setSending(false);
-            throw new Error(`Failed to send ${type} message via WebSocket. Please ensure WebSocket is connected.`);
+            return {
+              success: true,
+              tempId: optimisticMessage.tempId,
+              optimisticMessage,
+              serverMessage: null,
+            };
+          } catch (wsError) {
+            if (type === 'VOICE' || type === 'IMAGE' || type === 'FILE') {
+              setSending(false);
+              throw new Error(
+                `Failed to send ${type} message via WebSocket. Please ensure WebSocket is connected.`
+              );
+            }
           }
         }
-      }
 
-      if (type === 'VOICE' || type === 'IMAGE' || type === 'FILE') {
+        if (type === 'VOICE' || type === 'IMAGE' || type === 'FILE') {
+          setSending(false);
+          throw new Error(
+            `${type} messages can only be sent via WebSocket. WebSocket is not connected.`
+          );
+        }
+
+        const serverMessage = await chatAPI.sendMessage(
+          chatId,
+          type === 'TEXT' ? (textWireContent ?? content.trim()) : messageContent,
+          type,
+          fileUrl,
+          replyToMessageId,
+          encryptionVersionToSend
+        );
+
+        updateMessageStatus(optimisticMessage.tempId, MESSAGE_STATUS.SENT, serverMessage);
+        removeMessageFromQueue(optimisticMessage.tempId);
+
+        if (onMessageSent) {
+          onMessageSent({ status: 'sent', message: serverMessage }, optimisticMessage.tempId);
+        }
+
         setSending(false);
-        throw new Error(`${type} messages can only be sent via WebSocket. WebSocket is not connected.`);
+        return {
+          success: true,
+          tempId: optimisticMessage.tempId,
+          optimisticMessage,
+          serverMessage,
+        };
+      } catch (error) {
+        updateMessageStatus(optimisticMessage.tempId, MESSAGE_STATUS.FAILED);
+        if (onMessageSent) {
+          onMessageSent({ status: 'failed', message: optimisticMessage }, optimisticMessage.tempId);
+        }
+        scheduleRetry(optimisticMessage, chatId, onMessageSent);
+        setSending(false);
+        return {
+          success: false,
+          tempId: optimisticMessage.tempId,
+          optimisticMessage,
+          serverMessage: null,
+        };
+      } finally {
+        setSending(false);
       }
-
-      const serverMessage = await chatAPI.sendMessage(chatId, messageContent, type, fileUrl, replyToMessageId);
-
-      updateMessageStatus(optimisticMessage.tempId, MESSAGE_STATUS.SENT, serverMessage);
-      removeMessageFromQueue(optimisticMessage.tempId);
-
-      if (onMessageSent) {
-        onMessageSent({ status: 'sent', message: serverMessage }, optimisticMessage.tempId);
-      }
-
-      setSending(false);
-      return { success: true, tempId: optimisticMessage.tempId, optimisticMessage, serverMessage };
-    } catch (error) {
-      updateMessageStatus(optimisticMessage.tempId, MESSAGE_STATUS.FAILED);
-      if (onMessageSent) {
-        onMessageSent({ status: 'failed', message: optimisticMessage }, optimisticMessage.tempId);
-      }
-      scheduleRetry(optimisticMessage, chatId, onMessageSent);
-      setSending(false);
-      return { success: false, tempId: optimisticMessage.tempId, optimisticMessage, serverMessage: null };
-    } finally {
-      setSending(false);
-    }
-  }, [chatId, client, connected, sending, onMessageSent, scheduleRetry]);
+    },
+    [chatId, client, connected, sending, onMessageSent, scheduleRetry, directPeerUserId]
+  );
 
   const syncQueue = useCallback(async () => {
     if (!chatId || !client || !connected) return;
@@ -255,7 +374,7 @@ export const useMessageSender = (chatId, onMessageSent) => {
       if (message.status === MESSAGE_STATUS.SENT) return null;
 
       const messageChatId = message.chatId || chatId;
-      
+
       if (message.type === 'VOICE' || message.type === 'IMAGE' || message.type === 'FILE') {
         if (!message.fileUrl) {
           return null;
@@ -278,47 +397,62 @@ export const useMessageSender = (chatId, onMessageSent) => {
               body: JSON.stringify(payload),
             });
             return { success: true };
-          } catch (error) {
-          }
+          } catch (error) {}
         }
         return null;
       }
 
       if (client.connected && client.active) {
         try {
+          const textPayload = {
+            chatId: parseInt(messageChatId),
+            content: message.content,
+            type: message.type,
+          };
+          if (message.encryptionVersion != null && message.encryptionVersion > 0) {
+            textPayload.encryptionVersion = message.encryptionVersion;
+          }
+          if (message.replyToMessageId != null) {
+            textPayload.replyToMessageId = message.replyToMessageId;
+          }
           client.publish({
             destination: '/app/chat.sendMessage',
-            body: JSON.stringify({
-              chatId: parseInt(messageChatId),
-              content: message.content,
-              type: message.type,
-            }),
+            body: JSON.stringify(textPayload),
           });
           return { success: true };
-        } catch (error) {
-        }
+        } catch (error) {}
       }
 
       if (message.type === 'IMAGE' || message.type === 'FILE' || message.type === 'VOICE') {
         return null;
       }
 
-      return await chatAPI.sendMessage(messageChatId, message.content, message.type, message.fileUrl);
+      return await chatAPI.sendMessage(
+        messageChatId,
+        message.content,
+        message.type,
+        message.fileUrl,
+        message.replyToMessageId ?? null,
+        message.encryptionVersion ?? null
+      );
     };
 
     return await syncMessageQueue(sendMessageFn);
   }, [chatId, client, connected]);
 
-  const handleServerMessage = useCallback((serverMessage, tempId) => {
-    if (tempId) {
-      updateMessageStatus(tempId, MESSAGE_STATUS.SENT, serverMessage);
-      removeMessageFromQueue(tempId);
-    }
+  const handleServerMessage = useCallback(
+    (serverMessage, tempId) => {
+      if (tempId) {
+        updateMessageStatus(tempId, MESSAGE_STATUS.SENT, serverMessage);
+        removeMessageFromQueue(tempId);
+      }
 
-    if (onMessageSent) {
-      onMessageSent({ status: 'sent', message: serverMessage }, tempId);
-    }
-  }, [onMessageSent]);
+      if (onMessageSent) {
+        onMessageSent({ status: 'sent', message: serverMessage }, tempId);
+      }
+    },
+    [onMessageSent]
+  );
 
   useEffect(() => {
     if (!client || !connected || !client.connected || !client.active) return;
@@ -340,7 +474,11 @@ export const useMessageSender = (chatId, onMessageSent) => {
               : `confirm:${confirmation.chatId}:${Date.now()}`;
 
             if (processedMessagesRef.current.has(confirmationKey)) return;
-            if (confirmation.messageId && processedMessagesRef.current.has(`id:${confirmation.messageId}`)) return;
+            if (
+              confirmation.messageId &&
+              processedMessagesRef.current.has(`id:${confirmation.messageId}`)
+            )
+              return;
 
             const queuedMessage = findQueuedMessageForConfirmation(
               lastSentMessageRef.current,
@@ -392,7 +530,10 @@ export const useMessageSender = (chatId, onMessageSent) => {
               updateMessageStatus(queuedMessage.tempId, MESSAGE_STATUS.FAILED);
 
               if (onMessageSent && queuedMessage.tempId) {
-                const messageDto = { ...queuedMessage, id: confirmation.messageId || queuedMessage.id };
+                const messageDto = {
+                  ...queuedMessage,
+                  id: confirmation.messageId || queuedMessage.id,
+                };
                 onMessageSent({ ...confirmation, message: messageDto }, queuedMessage.tempId);
               }
 
@@ -424,4 +565,3 @@ export const useMessageSender = (chatId, onMessageSent) => {
     handleServerMessage,
   };
 };
-

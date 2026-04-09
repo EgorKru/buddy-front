@@ -3,7 +3,7 @@ import styles from './TypingIndicator.module.css';
 
 /**
  * Компонент для отображения индикатора печати
- * 
+ *
  * @param {Object} props
  * @param {Array} props.participants - Массив участников чата
  * @param {Array} props.typingUserIds - Массив ID пользователей которые печатают
@@ -11,10 +11,8 @@ import styles from './TypingIndicator.module.css';
  */
 const TypingIndicator = ({ participants = [], typingUserIds = [], currentUserId }) => {
   // Фильтруем только тех кто печатает и не является текущим пользователем
-  const typingParticipants = participants.filter(p => 
-    p?.id && 
-    typingUserIds.includes(String(p.id)) && 
-    String(p.id) !== String(currentUserId)
+  const typingParticipants = participants.filter(
+    (p) => p?.id && typingUserIds.includes(String(p.id)) && String(p.id) !== String(currentUserId)
   );
 
   if (typingParticipants.length === 0) {
@@ -24,7 +22,8 @@ const TypingIndicator = ({ participants = [], typingUserIds = [], currentUserId 
   // Формируем текст индикатора
   let text = '';
   if (typingParticipants.length === 1) {
-    const name = typingParticipants[0].displayName || typingParticipants[0].username || 'Пользователь';
+    const name =
+      typingParticipants[0].displayName || typingParticipants[0].username || 'Пользователь';
     text = `${name} печатает`;
   } else if (typingParticipants.length === 2) {
     const name1 = typingParticipants[0].displayName || typingParticipants[0].username;

@@ -11,17 +11,17 @@ export const useSpeedControl = (audioRef) => {
   const toggleSpeed = () => {
     const audio = audioRef.current;
     if (!audio) return;
-    
+
     const currentIndex = speedOptions.indexOf(playbackRate);
     const nextIndex = (currentIndex + 1) % speedOptions.length;
     const newRate = speedOptions[nextIndex];
-    
+
     audio.playbackRate = newRate;
     setPlaybackRate(newRate);
   };
 
   return {
     playbackRate,
-    toggleSpeed
+    toggleSpeed,
   };
 };

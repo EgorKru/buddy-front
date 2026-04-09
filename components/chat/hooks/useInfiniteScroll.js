@@ -11,7 +11,7 @@ export const useInfiniteScroll = ({
   onLoadMore,
   rootMargin = '800px 0px 0px 0px',
   sentinelId = 'messages-load-sentinel',
-  updateSentinelOnScroll = true
+  updateSentinelOnScroll = true,
 }) => {
   const observerRef = useRef(null);
   const sentinelRef = useRef(null);
@@ -43,7 +43,7 @@ export const useInfiniteScroll = ({
       }
 
       sentinel.style.top = '1000px';
-      
+
       sentinelRef.current = sentinel;
       return sentinel;
     };
@@ -52,11 +52,9 @@ export const useInfiniteScroll = ({
 
     const handleIntersection = (entries) => {
       entries.forEach((entry) => {
-        
-        const isRestoring = typeof isRestoringScroll === 'function' 
-          ? isRestoringScroll() 
-          : isRestoringScroll;
-        
+        const isRestoring =
+          typeof isRestoringScroll === 'function' ? isRestoringScroll() : isRestoringScroll;
+
         if (
           entry.isIntersecting &&
           hasMore &&
@@ -66,7 +64,6 @@ export const useInfiniteScroll = ({
           oldestMessageId &&
           onLoadMore
         ) {
-          
           onLoadMore(oldestMessageId);
         }
       });
@@ -99,16 +96,16 @@ export const useInfiniteScroll = ({
         observerRef.current.disconnect();
         observerRef.current = null;
       }
-      
+
       if (scrollHandlerRef.current && container) {
         container.removeEventListener('scroll', scrollHandlerRef.current);
         scrollHandlerRef.current = null;
       }
-      
+
       if (sentinel && sentinel.parentNode) {
         sentinel.parentNode.removeChild(sentinel);
       }
-      
+
       sentinelRef.current = null;
     };
   }, [
@@ -121,12 +118,11 @@ export const useInfiniteScroll = ({
     onLoadMore,
     rootMargin,
     sentinelId,
-    updateSentinelOnScroll
+    updateSentinelOnScroll,
   ]);
 
   return {
     observerRef,
-    sentinelRef
+    sentinelRef,
   };
 };
-

@@ -1,7 +1,16 @@
 {
   "compilerOptions": {
+    "baseUrl": ".",
+    "target": "ES6",
+    "moduleResolution": "node",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@/shared/*": ["./src/shared/*"],
+      "@/entities/*": ["./src/entities/*"],
+      "@/features/*": ["./src/features/*"],
+      "@/widgets/*": ["./src/widgets/*"]
     }
-  }
+  },
+  "include": ["**/*"],
+  "exclude": ["node_modules", ".next", "out"]
 }

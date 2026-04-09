@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { X, Settings, ChevronDown } from 'lucide-react';
+import { X } from 'lucide-react';
 import styles from './RoomSettingsModal.module.css';
 
-export default function RoomSettingsModal({ 
-  isOpen, 
+export default function RoomSettingsModal({
+  isOpen,
   onClose,
   devices,
   selectedCamera,
@@ -12,7 +12,7 @@ export default function RoomSettingsModal({
   onSwitchMicrophone,
   onRefreshDevices,
 }) {
-  const [showSettings, setShowSettings] = useState(false);
+  const [_showSettings, _setShowSettings] = useState(false);
 
   useEffect(() => {
     if (isOpen && onRefreshDevices) {
@@ -24,7 +24,7 @@ export default function RoomSettingsModal({
 
   return (
     <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.modal} onClick={e => e.stopPropagation()}>
+      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <div className={styles.header}>
           <h2 className={styles.title}>Настройки устройств</h2>
           <button className={styles.closeButton} onClick={onClose}>
@@ -41,7 +41,7 @@ export default function RoomSettingsModal({
                 value={selectedCamera || ''}
                 onChange={(e) => onSwitchCamera && onSwitchCamera(e.target.value)}
               >
-                {devices?.cameras?.map(device => (
+                {devices?.cameras?.map((device) => (
                   <option key={device.deviceId} value={device.deviceId}>
                     {device.label || `Камера ${devices.cameras.indexOf(device) + 1}`}
                   </option>
@@ -56,7 +56,7 @@ export default function RoomSettingsModal({
                 value={selectedMicrophone || ''}
                 onChange={(e) => onSwitchMicrophone && onSwitchMicrophone(e.target.value)}
               >
-                {devices?.microphones?.map(device => (
+                {devices?.microphones?.map((device) => (
                   <option key={device.deviceId} value={device.deviceId}>
                     {device.label || `Микрофон ${devices.microphones.indexOf(device) + 1}`}
                   </option>

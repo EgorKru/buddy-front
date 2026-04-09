@@ -6,11 +6,11 @@ export const useStateSync = ({
   upsertMessage,
   localSeqRef,
   localPtsRef,
-  gapRecoveryInProgressRef
+  gapRecoveryInProgressRef,
 }) => {
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    
+
     const handleStateSync = async (event) => {
       const stateData = event.detail;
       if (!stateData || stateData.eventType !== 'STATE_SYNC') return;
@@ -23,11 +23,8 @@ export const useStateSync = ({
           try {
             const updates = await chatAPI.getUserUpdates(oldSeq + 1, GAP_RECOVERY_LIMIT);
             if (updates?.updates && Array.isArray(updates.updates)) {
-
             }
-          } catch (error) {
-            
-          }
+          } catch (error) {}
         }
       }
 
@@ -41,45 +38,45 @@ export const useStateSync = ({
             const gapKey = `${chatIdStr}_${currentLocalPts}`;
             if (!gapRecoveryInProgressRef.current.has(gapKey)) {
               gapRecoveryInProgressRef.current.add(gapKey);
-              chatAPI.getChatUpdates(chatState.chatId, currentLocalPts + 1, GAP_RECOVERY_LIMIT)
+              chatAPI
+                .getChatUpdates(chatState.chatId, currentLocalPts + 1, GAP_RECOVERY_LIMIT)
                 .then((updates) => {
                   if (updates?.updates && Array.isArray(updates.updates)) {
-                    
                     updates.updates.forEach((update) => {
                       if (update.eventData?.message) {
                         upsertMessage(
-                          { ...update.eventData.message, status: MESSAGE_STATUS.SENT, isOptimistic: false },
+                          {
+                            ...update.eventData.message,
+                            status: MESSAGE_STATUS.SENT,
+                            isOptimistic: false,
+                          },
                           { unreadDelta: 0 }
                         );
                       }
                     });
-                    
+
                     if (updates.updates.length > 0) {
                       const lastUpdate = updates.updates[updates.updates.length - 1];
                       localPtsRef.current.set(chatIdStr, lastUpdate.pts);
                     }
                   }
                 })
-                .catch((error) => {
-                  
-                })
+                .catch((_error) => {})
                 .finally(() => {
                   gapRecoveryInProgressRef.current.delete(gapKey);
                 });
             }
           } else {
-            
             localPtsRef.current.set(chatIdStr, serverPts);
           }
         }
       }
     };
-    
+
     window.addEventListener('state-sync', handleStateSync);
-    
+
     return () => {
       window.removeEventListener('state-sync', handleStateSync);
     };
   }, [upsertMessage, localSeqRef, localPtsRef, gapRecoveryInProgressRef]);
 };
-

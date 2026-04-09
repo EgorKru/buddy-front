@@ -31,17 +31,17 @@ export default function MessageList({
   setFileViewerModal,
   handleNavigateToMessage,
   chats,
-  chatId
+  chatId: _chatId,
 }) {
   const visibleMessages = (() => {
     if (searchMode && searchResults && searchResults.length > 0) {
-      return searchResults.filter(msg => {
+      return searchResults.filter((msg) => {
         if (!msg || !msg.id) return false;
         return !msg.deletedForMe && !msg.deletedForAll;
       });
     }
 
-    return messages.filter(msg => {
+    return messages.filter((msg) => {
       if (!msg || !msg.id) return false;
       return !msg.deletedForMe && !msg.deletedForAll;
     });
@@ -72,7 +72,7 @@ export default function MessageList({
     if (container) {
       container.addEventListener('selectstart', handleSelectStart);
       document.addEventListener('selectionchange', handleSelect);
-      
+
       return () => {
         container.removeEventListener('selectstart', handleSelectStart);
         document.removeEventListener('selectionchange', handleSelect);
@@ -93,7 +93,7 @@ export default function MessageList({
             <span>Загрузка старых сообщений...</span>
           </div>
         )}
-        
+
         {visibleMessages.length === 0 ? (
           <div className={styles.emptyState}>
             <p>Пока нет сообщений</p>
@@ -103,7 +103,7 @@ export default function MessageList({
           <div>
             {visibleMessages.map((msg, index) => {
               const isOwn = msg.senderId === user?.id;
-              
+
               return (
                 <MessageRow
                   key={msg.id}
@@ -134,7 +134,7 @@ export default function MessageList({
           </div>
         )}
       </div>
-      
+
       {scrollButtonReady && (showScrollToBottom || unreadCount > 0) && (
         <button
           onClick={(e) => {
@@ -143,7 +143,9 @@ export default function MessageList({
             onScrollToBottom('smooth');
           }}
           className={styles.scrollToBottomButton}
-          title={unreadCount > 0 ? `${unreadCount} новых сообщений` : "Прокрутить к новым сообщениям"}
+          title={
+            unreadCount > 0 ? `${unreadCount} новых сообщений` : 'Прокрутить к новым сообщениям'
+          }
         >
           <ChevronDown size={20} />
           {unreadCount > 0 && (
@@ -156,4 +158,3 @@ export default function MessageList({
     </>
   );
 }
-

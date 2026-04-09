@@ -2,21 +2,21 @@ import { useEffect, useRef, useMemo } from 'react';
 import { adjustMenuPosition, getMenuItems } from './utils';
 import styles from './index.module.css';
 
-export default function MessageContextMenu({ 
-  message, 
-  position, 
-  isOwn, 
+export default function MessageContextMenu({
+  message,
+  position,
+  isOwn,
   isPinned = false,
   isSearchResult = false,
-  onClose, 
-  onReply, 
-  onPin, 
-  onCopy, 
-  onForward, 
+  onClose,
+  onReply,
+  onPin,
+  onCopy,
+  onForward,
   onDelete,
   onEdit,
   onSelect,
-  onNavigate
+  onNavigate,
 }) {
   const menuRef = useRef(null);
 
@@ -55,18 +55,37 @@ export default function MessageContextMenu({
   }, [position]);
 
   const menuItems = useMemo(() => {
-    const items = getMenuItems(message, isOwn, isPinned, {
-      onReply,
-      onPin,
-      onCopy,
-      onForward,
-      onEdit,
-      onDelete,
-      onSelect,
-      onNavigate
-    }, isSearchResult);
+    const items = getMenuItems(
+      message,
+      isOwn,
+      isPinned,
+      {
+        onReply,
+        onPin,
+        onCopy,
+        onForward,
+        onEdit,
+        onDelete,
+        onSelect,
+        onNavigate,
+      },
+      isSearchResult
+    );
     return items;
-  }, [message, isOwn, isPinned, isSearchResult, onReply, onPin, onCopy, onForward, onEdit, onDelete, onSelect, onNavigate]);
+  }, [
+    message,
+    isOwn,
+    isPinned,
+    isSearchResult,
+    onReply,
+    onPin,
+    onCopy,
+    onForward,
+    onEdit,
+    onDelete,
+    onSelect,
+    onNavigate,
+  ]);
 
   if (!position) return null;
 

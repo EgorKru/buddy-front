@@ -7,10 +7,10 @@ import { useChats } from '@/context/messaging';
 export const usePinnedMessages = (chatId, messages) => {
   const { client, connected } = useStomp();
   const { updateMessage, removeMessage } = useChats();
-  
+
   const [pinnedMessages, setPinnedMessages] = useState([]);
   const [viewedPinnedMessageId, setViewedPinnedMessageId] = useState(null);
-  
+
   const pinnedSubRef = useRef(null);
   const unpinnedSubRef = useRef(null);
   const deletedForMeSubRef = useRef(null);
@@ -25,19 +25,18 @@ export const usePinnedMessages = (chatId, messages) => {
     if (loadingPinnedRef.current && lastLoadedChatIdRef.current === chatIdStr) {
       return;
     }
-    
+
     loadingPinnedRef.current = true;
     lastLoadedChatIdRef.current = chatIdStr;
-    
+
     try {
       const pinned = await chatAPI.getPinnedMessages(chatId);
-      const sorted = Array.isArray(pinned) 
+      const sorted = Array.isArray(pinned)
         ? [...pinned].sort((a, b) => (b.orderIndex || 0) - (a.orderIndex || 0))
         : [];
       setPinnedMessages(sorted);
       setViewedPinnedMessageId(null);
     } catch (error) {
-      
     } finally {
       loadingPinnedRef.current = false;
     }
@@ -86,39 +85,43 @@ export const usePinnedMessages = (chatId, messages) => {
         const event = safeJsonParse(message.body);
         if (!event || event.eventType !== 'MESSAGE_PINNED') return;
         if (!event.pinnedMessage) return;
-        
+
         const eventChatId = event.pinnedMessage.chatId;
         if (Number(eventChatId) !== Number(chatId)) return;
 
         const pinnedMsg = event.pinnedMessage?.message;
         const pinnedMsgId = pinnedMsg?.id;
-        
+
         if (!pinnedMsgId) return;
-        
+
         updateMessage({ ...pinnedMsg, isPinned: true }, { unreadDelta: 0 });
 
-        setPinnedMessages(prev => {
-          const existingIndex = prev.findIndex(p => {
+        setPinnedMessages((prev) => {
+          const existingIndex = prev.findIndex((p) => {
             const pMsgId = p.message?.id;
             return pMsgId && Number(pMsgId) === Number(pinnedMsgId);
           });
-          
+
           if (existingIndex >= 0) {
             const updated = [...prev];
             updated[existingIndex] = event.pinnedMessage;
             const sorted = updated.sort((a, b) => (b.orderIndex || 0) - (a.orderIndex || 0));
-            
-            if (sorted[0] && sorted[0].message?.id && Number(sorted[0].message.id) === Number(pinnedMsgId)) {
+
+            if (
+              sorted[0] &&
+              sorted[0].message?.id &&
+              Number(sorted[0].message.id) === Number(pinnedMsgId)
+            ) {
               setViewedPinnedMessageId(null);
             }
-            
+
             return sorted;
           }
-          
+
           const updated = [...prev, event.pinnedMessage];
           const sorted = updated.sort((a, b) => (b.orderIndex || 0) - (a.orderIndex || 0));
           setViewedPinnedMessageId(null);
-          
+
           return sorted;
         });
       });
@@ -130,18 +133,20 @@ export const usePinnedMessages = (chatId, messages) => {
         if (Number(event.chatId) !== Number(chatId)) return;
 
         if (event.messageId) {
-          const messageToUpdate = messages.find(m => Number(m.id) === Number(event.messageId));
+          const messageToUpdate = messages.find((m) => Number(m.id) === Number(event.messageId));
           if (messageToUpdate) {
             updateMessage({ ...messageToUpdate, isPinned: false }, { unreadDelta: 0 });
           }
         }
 
-        setPinnedMessages(prev => prev.filter(p => {
-          const pMsgId = p.message?.id;
-          return !pMsgId || Number(pMsgId) !== Number(event.messageId);
-        }));
+        setPinnedMessages((prev) =>
+          prev.filter((p) => {
+            const pMsgId = p.message?.id;
+            return !pMsgId || Number(pMsgId) !== Number(event.messageId);
+          })
+        );
 
-        setViewedPinnedMessageId(prev => {
+        setViewedPinnedMessageId((prev) => {
           if (prev && Number(prev) === Number(event.messageId)) {
             return null;
           }
@@ -157,15 +162,15 @@ export const usePinnedMessages = (chatId, messages) => {
 
         const deletedMessageId = Number(event.messageId);
 
-        setPinnedMessages(prev => {
-          const filtered = prev.filter(p => {
+        setPinnedMessages((prev) => {
+          const filtered = prev.filter((p) => {
             const pMsgId = p.message?.id || p.id;
             return !pMsgId || Number(pMsgId) !== deletedMessageId;
           });
           return filtered;
         });
 
-        setViewedPinnedMessageId(prev => {
+        setViewedPinnedMessageId((prev) => {
           if (prev && Number(prev) === deletedMessageId) {
             return null;
           }
@@ -184,15 +189,15 @@ export const usePinnedMessages = (chatId, messages) => {
 
         const deletedMessageId = Number(event.messageId);
 
-        setPinnedMessages(prev => {
-          const filtered = prev.filter(p => {
+        setPinnedMessages((prev) => {
+          const filtered = prev.filter((p) => {
             const pMsgId = p.message?.id || p.id;
             return !pMsgId || Number(pMsgId) !== deletedMessageId;
           });
           return filtered;
         });
 
-        setViewedPinnedMessageId(prev => {
+        setViewedPinnedMessageId((prev) => {
           if (prev && Number(prev) === deletedMessageId) {
             return null;
           }
@@ -202,9 +207,7 @@ export const usePinnedMessages = (chatId, messages) => {
         removeMessage(chatId, deletedMessageId, false, true);
       });
       deletedForAllSubRef.current = deletedForAllSub;
-    } catch (e) {
-      
-    }
+    } catch (e) {}
 
     return () => {
       if (pinnedSubRef.current) {
@@ -234,4 +237,3 @@ export const usePinnedMessages = (chatId, messages) => {
     loadPinnedMessages,
   };
 };
-

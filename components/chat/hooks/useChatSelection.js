@@ -8,13 +8,16 @@ export const useChatSelection = ({
   handleSelectAllBase,
   exitSelectionMode,
   messages,
-  setContextMenu
+  setContextMenu,
 }) => {
-  const handleSelectMessage = useCallback((message) => {
-    if (!message?.id) return;
-    setContextMenu(null);
-    handleSelectMessageBase(message);
-  }, [handleSelectMessageBase, setContextMenu]);
+  const handleSelectMessage = useCallback(
+    (message) => {
+      if (!message?.id) return;
+      setContextMenu(null);
+      handleSelectMessageBase(message);
+    },
+    [handleSelectMessageBase, setContextMenu]
+  );
 
   const handleSelectAll = useCallback(() => {
     handleSelectAllBase(messages);
@@ -26,7 +29,6 @@ export const useChatSelection = ({
     handleSelectMessage,
     toggleMessageSelection,
     handleSelectAll,
-    exitSelectionMode
+    exitSelectionMode,
   };
 };
-

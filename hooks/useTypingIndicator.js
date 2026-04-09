@@ -7,16 +7,16 @@ const TYPING_SEND_THROTTLE = 2000; // Отправлять не чаще чем 
 
 /**
  * Хук для работы с индикатором печати
- * 
+ *
  * @param {number|string} chatId - ID чата
  * @returns {Object} - Объект с методами и состоянием
  */
 export const useTypingIndicator = (chatId) => {
   const { client, connected } = useStomp();
-  
+
   // Map для хранения пользователей которые печатают: userId -> timestamp
   const [typingUsers, setTypingUsers] = useState(new Map());
-  
+
   const typingTimeoutRef = useRef(new Map()); // Таймауты для очистки typing
   const lastSentRef = useRef(0); // Время последней отправки typing
   const subscriptionRef = useRef(null);
@@ -25,31 +25,34 @@ export const useTypingIndicator = (chatId) => {
   /**
    * Отправить уведомление о том, что начали/закончили печатать
    */
-  const sendTyping = useCallback((isTyping) => {
-    if (!client || !connected || !chatId) return;
-    
-    const now = Date.now();
-    
-    // Throttle: не отправлять чаще чем раз в TYPING_SEND_THROTTLE мс
-    if (isTyping && now - lastSentRef.current < TYPING_SEND_THROTTLE) {
-      return;
-    }
-    
-    lastSentRef.current = now;
-    isTypingRef.current = isTyping;
+  const sendTyping = useCallback(
+    (isTyping) => {
+      if (!client || !connected || !chatId) return;
 
-    try {
-      client.publish({
-        destination: '/app/chat.typing',
-        body: JSON.stringify({
-          chatId: parseInt(chatId),
-          typing: isTyping,
-        }),
-      });
-    } catch (error) {
-      console.error('Failed to send typing indicator:', error);
-    }
-  }, [client, connected, chatId]);
+      const now = Date.now();
+
+      // Throttle: не отправлять чаще чем раз в TYPING_SEND_THROTTLE мс
+      if (isTyping && now - lastSentRef.current < TYPING_SEND_THROTTLE) {
+        return;
+      }
+
+      lastSentRef.current = now;
+      isTypingRef.current = isTyping;
+
+      try {
+        client.publish({
+          destination: '/app/chat.typing',
+          body: JSON.stringify({
+            chatId: parseInt(chatId),
+            typing: isTyping,
+          }),
+        });
+      } catch (error) {
+        console.error('Failed to send typing indicator:', error);
+      }
+    },
+    [client, connected, chatId]
+  );
 
   /**
    * Вызвать когда пользователь начал печатать
@@ -81,7 +84,7 @@ export const useTypingIndicator = (chatId) => {
 
     if (event.typing) {
       // Пользователь начал печатать
-      setTypingUsers(prev => {
+      setTypingUsers((prev) => {
         const next = new Map(prev);
         next.set(userId, timestamp);
         return next;
@@ -94,7 +97,7 @@ export const useTypingIndicator = (chatId) => {
 
       // Установить новый таймаут для автоматической очистки
       const timeout = setTimeout(() => {
-        setTypingUsers(prev => {
+        setTypingUsers((prev) => {
           const next = new Map(prev);
           next.delete(userId);
           return next;
@@ -105,7 +108,7 @@ export const useTypingIndicator = (chatId) => {
       typingTimeoutRef.current.set(userId, timeout);
     } else {
       // Пользователь закончил печатать
-      setTypingUsers(prev => {
+      setTypingUsers((prev) => {
         const next = new Map(prev);
         next.delete(userId);
         return next;
@@ -172,7 +175,7 @@ export const useTypingIndicator = (chatId) => {
       }
 
       // Очистить все таймауты
-      typingTimeoutRef.current.forEach(timeout => clearTimeout(timeout));
+      typingTimeoutRef.current.forEach((timeout) => clearTimeout(timeout));
       typingTimeoutRef.current.clear();
     };
   }, [stopTyping]);
@@ -187,15 +190,18 @@ export const useTypingIndicator = (chatId) => {
   /**
    * Проверить печатает ли конкретный пользователь
    */
-  const isUserTyping = useCallback((userId) => {
-    return typingUsers.has(String(userId));
-  }, [typingUsers]);
+  const isUserTyping = useCallback(
+    (userId) => {
+      return typingUsers.has(String(userId));
+    },
+    [typingUsers]
+  );
 
   return {
     // Методы
     startTyping,
     stopTyping,
-    
+
     // Состояние
     typingUsers,
     typingUserIds: getTypingUserIds(),

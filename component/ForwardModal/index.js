@@ -21,13 +21,13 @@ export default function ForwardModal({
             ? `Переслать ${forwardModal.messageIds.length} сообщений`
             : 'Переслать сообщение'}
         </h3>
-    
+
         <div className={styles.forwardModalSection}>
           <label className={styles.forwardModalLabel}>Выберите чат:</label>
           <div className={styles.forwardModalChatList}>
             {chats
-              .filter(c => String(c.id) !== String(chatId))
-              .map(c => (
+              .filter((c) => String(c.id) !== String(chatId))
+              .map((c) => (
                 <button
                   key={c.id}
                   className={`${styles.forwardModalChatItem} ${forwardModal.selectedChatId === c.id ? styles.forwardModalChatItemSelected : ''}`}
@@ -36,7 +36,7 @@ export default function ForwardModal({
                   <div className={styles.forwardModalChatName}>{getChatName(c, user)}</div>
                 </button>
               ))}
-            {chats.filter(c => String(c.id) !== String(chatId)).length === 0 && (
+            {chats.filter((c) => String(c.id) !== String(chatId)).length === 0 && (
               <div className={styles.forwardModalEmpty}>Нет других чатов для пересылки</div>
             )}
           </div>
@@ -54,10 +54,7 @@ export default function ForwardModal({
         </div>
 
         <div className={styles.forwardModalButtons}>
-          <button
-            className={styles.forwardModalCancel}
-            onClick={onClose}
-          >
+          <button className={styles.forwardModalCancel} onClick={onClose}>
             Отмена
           </button>
           <button
@@ -72,4 +69,3 @@ export default function ForwardModal({
     </div>
   );
 }
-

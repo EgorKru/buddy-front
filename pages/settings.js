@@ -1,102 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
-import { getCurrentUser, userAPI, isAuthenticated } from '@/utils/api';
-import { Eye, EyeOff, User, Mail, Save, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { User, Mail, Save, ArrowLeft } from 'lucide-react';
+import { useAuth } from '@/features/auth';
+import { useProfile } from '@/features/profile';
 import styles from '@/styles/settings.module.css';
 
 export default function Settings() {
   const router = useRouter();
-  const [user, setUser] = useState(null);
-  const [formData, setFormData] = useState({
-    displayName: '',
-    email: '',
-    avatarUrl: '',
-  });
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const { user, isAuthenticated } = useAuth();
+  const { formData, loading, saving, error, success, handleChange, handleSubmit } =
+    useProfile(user);
 
   useEffect(() => {
-    // Проверка аутентификации
-    if (!isAuthenticated()) {
-      router.push('/login');
-      return;
-    }
-
-    const currentUser = getCurrentUser();
-    if (currentUser) {
-      setUser(currentUser);
-      setFormData({
-        displayName: currentUser.displayName || '',
-        email: currentUser.email || '',
-        avatarUrl: currentUser.avatarUrl || '',
-      });
-      setLoading(false);
-    } else {
+    if (!isAuthenticated) {
       router.push('/login');
     }
-  }, [router]);
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value,
-    }));
-    // Очистить сообщения при изменении
-    setError('');
-    setSuccess('');
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setSuccess('');
-    setSaving(true);
-
-    try {
-      // Подготовить данные для обновления
-      const updateData = {};
-      
-      if (formData.displayName !== user.displayName) {
-        updateData.displayName = formData.displayName;
-      }
-      
-      if (formData.avatarUrl !== user.avatarUrl) {
-        updateData.avatarUrl = formData.avatarUrl;
-      }
-
-      // Если нет изменений
-      if (Object.keys(updateData).length === 0) {
-        setSuccess('Нет изменений для сохранения');
-        setSaving(false);
-        return;
-      }
-
-      // Отправить обновление
-      const updatedUser = await userAPI.updateProfile(updateData);
-      
-      // Обновить localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('user', JSON.stringify(updatedUser));
-      }
-      
-      setUser(updatedUser);
-      setSuccess('Профиль успешно обновлен!');
-      
-      // Перенаправить на главную через 2 секунды
-      setTimeout(() => {
-        router.push('/');
-      }, 2000);
-    } catch (err) {
-      setError(err.message || 'Ошибка при обновлении профиля');
-    } finally {
-      setSaving(false);
-    }
-  };
+  }, [isAuthenticated, router]);
 
   if (loading) {
     return (
@@ -118,7 +39,6 @@ export default function Settings() {
         </div>
 
         <form onSubmit={handleSubmit} className={styles.form}>
-          {/* Аватар */}
           <div className={styles.avatarSection}>
             <div className={styles.avatar}>
               {formData.avatarUrl ? (
@@ -129,7 +49,6 @@ export default function Settings() {
             </div>
           </div>
 
-          {/* Имя пользователя (только для чтения) */}
           <div className={styles.formGroup}>
             <label htmlFor="username">
               <User size={16} />
@@ -145,7 +64,6 @@ export default function Settings() {
             <span className={styles.hint}>Имя пользователя нельзя изменить</span>
           </div>
 
-          {/* Email (только для чтения) */}
           <div className={styles.formGroup}>
             <label htmlFor="email">
               <Mail size={16} />
@@ -161,7 +79,6 @@ export default function Settings() {
             <span className={styles.hint}>Email нельзя изменить</span>
           </div>
 
-          {/* Отображаемое имя */}
           <div className={styles.formGroup}>
             <label htmlFor="displayName">
               <User size={16} />
@@ -178,7 +95,6 @@ export default function Settings() {
             />
           </div>
 
-          {/* URL аватара */}
           <div className={styles.formGroup}>
             <label htmlFor="avatarUrl">URL аватара</label>
             <input
@@ -189,30 +105,13 @@ export default function Settings() {
               onChange={handleChange}
               placeholder="https://example.com/avatar.jpg"
             />
-            <span className={styles.hint}>
-              Введите URL изображения для аватара
-            </span>
+            <span className={styles.hint}>Введите URL изображения для аватара</span>
           </div>
 
-          {/* Сообщения об ошибках/успехе */}
-          {error && (
-            <div className={styles.error}>
-              {error}
-            </div>
-          )}
+          {error && <div className={styles.error}>{error}</div>}
+          {success && <div className={styles.success}>{success}</div>}
 
-          {success && (
-            <div className={styles.success}>
-              {success}
-            </div>
-          )}
-
-          {/* Кнопка сохранения */}
-          <button
-            type="submit"
-            disabled={saving}
-            className={styles.saveButton}
-          >
+          <button type="submit" disabled={saving} className={styles.saveButton}>
             <Save size={18} />
             {saving ? 'Сохранение...' : 'Сохранить изменения'}
           </button>

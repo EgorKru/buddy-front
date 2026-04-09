@@ -14,75 +14,21 @@ export const useMessageSending = ({
   wasAtBottomBeforeMessageRef,
   shouldAutoScrollRef,
   newMessageIdsRef,
-  messagesContainerRef
+  messagesContainerRef,
 }) => {
-  const sendTextMessage = useCallback(async (content, replyToId = null) => {
-    if (!content?.trim() || !user || !chatId) return null;
-
-    const result = await sendMessageHook(content.trim(), 'TEXT', null, null, null, null, replyToId);
-
-    if (result?.serverMessage) {
-      const messageId = result.serverMessage.id;
-      if (messageId) {
-        newMessageIdsRef.current.add(String(messageId));
-        setTimeout(() => {
-          newMessageIdsRef.current.delete(String(messageId));
-        }, NEW_MESSAGE_ID_REMOVE_DELAY);
-      }
-      addOptimistic(chatId, { ...result.serverMessage, status: MESSAGE_STATUS.SENT, isOptimistic: false });
-    } else if (result?.optimisticMessage) {
-      const messageId = result.optimisticMessage.id;
-      if (messageId) {
-        newMessageIdsRef.current.add(String(messageId));
-        setTimeout(() => {
-          newMessageIdsRef.current.delete(String(messageId));
-        }, NEW_MESSAGE_ID_REMOVE_DELAY);
-      }
-      addOptimistic(chatId, result.optimisticMessage);
-    }
-
-    return result;
-  }, [chatId, user, sendMessageHook, addOptimistic, newMessageIdsRef]);
-
-  const sendFileMessage = useCallback(async (file, content = '', replyToId = null, onProgress = null) => {
-    if (!file || !user || !chatId) return null;
-
-    try {
-      const isImage = file.type.startsWith('image/');
-      const uploadResponse = isImage
-        ? await chatAPI.uploadImageFile(chatId, file, onProgress)
-        : await chatAPI.uploadFile(chatId, file, onProgress);
-
-      if (!uploadResponse?.fileUrl) {
-        throw new Error('Не удалось загрузить файл: fileUrl не получен от сервера');
-      }
-
-      const fileSize = uploadResponse.fileSize || file.size;
-      const mimeType = uploadResponse.mimeType || file.type;
-      const fileName = file.name;
+  const sendTextMessage = useCallback(
+    async (content, replyToId = null) => {
+      if (!content?.trim() || !user || !chatId) return null;
 
       const result = await sendMessageHook(
-        content || '',
-        isImage ? 'IMAGE' : 'FILE',
-        uploadResponse.fileUrl,
+        content.trim(),
+        'TEXT',
         null,
         null,
         null,
-        replyToId,
-        fileName,
-        fileSize,
-        mimeType
+        null,
+        replyToId
       );
-
-      if (typeof window !== 'undefined' && uploadResponse.fileUrl) {
-        const fileMetadata = {
-          fileSize,
-          fileName,
-          mimeType,
-          timestamp: Date.now()
-        };
-        localStorage.setItem(`file_metadata_${uploadResponse.fileUrl}`, JSON.stringify(fileMetadata));
-      }
 
       if (result?.serverMessage) {
         const messageId = result.serverMessage.id;
@@ -90,34 +36,113 @@ export const useMessageSending = ({
           newMessageIdsRef.current.add(String(messageId));
           setTimeout(() => {
             newMessageIdsRef.current.delete(String(messageId));
-          }, 500);
+          }, NEW_MESSAGE_ID_REMOVE_DELAY);
         }
-        addOptimistic(chatId, { ...result.serverMessage, status: MESSAGE_STATUS.SENT, isOptimistic: false });
+        addOptimistic(chatId, {
+          ...result.serverMessage,
+          status: MESSAGE_STATUS.SENT,
+          isOptimistic: false,
+        });
       } else if (result?.optimisticMessage) {
         const messageId = result.optimisticMessage.id;
         if (messageId) {
           newMessageIdsRef.current.add(String(messageId));
           setTimeout(() => {
             newMessageIdsRef.current.delete(String(messageId));
-          }, 500);
-        }
-        addOptimistic(chatId, result.optimisticMessage);
-      } else if (result?.success && result?.optimisticMessage) {
-        const messageId = result.optimisticMessage.id;
-        if (messageId) {
-          newMessageIdsRef.current.add(String(messageId));
-          setTimeout(() => {
-            newMessageIdsRef.current.delete(String(messageId));
-          }, 500);
+          }, NEW_MESSAGE_ID_REMOVE_DELAY);
         }
         addOptimistic(chatId, result.optimisticMessage);
       }
 
-      return { result, uploadResponse };
-    } catch (error) {
-      throw error;
-    }
-  }, [chatId, user, sendMessageHook, addOptimistic, newMessageIdsRef]);
+      return result;
+    },
+    [chatId, user, sendMessageHook, addOptimistic, newMessageIdsRef]
+  );
+
+  const sendFileMessage = useCallback(
+    async (file, content = '', replyToId = null, onProgress = null) => {
+      if (!file || !user || !chatId) return null;
+
+      try {
+        const isImage = file.type.startsWith('image/');
+        const uploadResponse = isImage
+          ? await chatAPI.uploadImageFile(chatId, file, onProgress)
+          : await chatAPI.uploadFile(chatId, file, onProgress);
+
+        if (!uploadResponse?.fileUrl) {
+          throw new Error('Не удалось загрузить файл: fileUrl не получен от сервера');
+        }
+
+        const fileSize = uploadResponse.fileSize || file.size;
+        const mimeType = uploadResponse.mimeType || file.type;
+        const fileName = file.name;
+
+        const result = await sendMessageHook(
+          content || '',
+          isImage ? 'IMAGE' : 'FILE',
+          uploadResponse.fileUrl,
+          null,
+          null,
+          null,
+          replyToId,
+          fileName,
+          fileSize,
+          mimeType
+        );
+
+        if (typeof window !== 'undefined' && uploadResponse.fileUrl) {
+          const fileMetadata = {
+            fileSize,
+            fileName,
+            mimeType,
+            timestamp: Date.now(),
+          };
+          localStorage.setItem(
+            `file_metadata_${uploadResponse.fileUrl}`,
+            JSON.stringify(fileMetadata)
+          );
+        }
+
+        if (result?.serverMessage) {
+          const messageId = result.serverMessage.id;
+          if (messageId) {
+            newMessageIdsRef.current.add(String(messageId));
+            setTimeout(() => {
+              newMessageIdsRef.current.delete(String(messageId));
+            }, 500);
+          }
+          addOptimistic(chatId, {
+            ...result.serverMessage,
+            status: MESSAGE_STATUS.SENT,
+            isOptimistic: false,
+          });
+        } else if (result?.optimisticMessage) {
+          const messageId = result.optimisticMessage.id;
+          if (messageId) {
+            newMessageIdsRef.current.add(String(messageId));
+            setTimeout(() => {
+              newMessageIdsRef.current.delete(String(messageId));
+            }, 500);
+          }
+          addOptimistic(chatId, result.optimisticMessage);
+        } else if (result?.success && result?.optimisticMessage) {
+          const messageId = result.optimisticMessage.id;
+          if (messageId) {
+            newMessageIdsRef.current.add(String(messageId));
+            setTimeout(() => {
+              newMessageIdsRef.current.delete(String(messageId));
+            }, 500);
+          }
+          addOptimistic(chatId, result.optimisticMessage);
+        }
+
+        return { result, uploadResponse };
+      } catch (error) {
+        throw error;
+      }
+    },
+    [chatId, user, sendMessageHook, addOptimistic, newMessageIdsRef]
+  );
 
   const prepareScrollForSending = useCallback(() => {
     if (messagesContainerRef?.current) {
@@ -127,47 +152,56 @@ export const useMessageSending = ({
       shouldAutoScrollRef.current = wasAtBottom;
     }
     saveScrollPosition();
-  }, [messagesContainerRef, scrollHeightBeforeMessageRef, checkIsAtBottom, wasAtBottomBeforeMessageRef, shouldAutoScrollRef, saveScrollPosition]);
-
-  const sendMessage = useCallback(async (e, messageData = null) => {
-    e?.preventDefault();
-    e?.stopPropagation();
-
-    if (messagesContainerRef?.current) {
-      scrollHeightBeforeMessageRef.current = messagesContainerRef.current.scrollHeight;
-      const wasAtBottom = checkIsAtBottom(CHECK_BOTTOM_DEFAULT_THRESHOLD);
-      wasAtBottomBeforeMessageRef.current = wasAtBottom;
-      shouldAutoScrollRef.current = wasAtBottom;
-    }
-
-    saveScrollPosition();
-
-    if (messageData) {
-      const { content, file, replyToId, onProgress } = messageData;
-      
-      if (file) {
-        return await sendFileMessage(file, content, replyToId, onProgress);
-      } else if (content) {
-        return await sendTextMessage(content, replyToId);
-      }
-    }
-
-    return { sendTextMessage, sendFileMessage };
   }, [
-    checkIsAtBottom,
-    saveScrollPosition,
+    messagesContainerRef,
     scrollHeightBeforeMessageRef,
+    checkIsAtBottom,
     wasAtBottomBeforeMessageRef,
     shouldAutoScrollRef,
-    messagesContainerRef,
-    sendTextMessage,
-    sendFileMessage
+    saveScrollPosition,
   ]);
+
+  const _sendMessage = useCallback(
+    async (e, messageData = null) => {
+      e?.preventDefault();
+      e?.stopPropagation();
+
+      if (messagesContainerRef?.current) {
+        scrollHeightBeforeMessageRef.current = messagesContainerRef.current.scrollHeight;
+        const wasAtBottom = checkIsAtBottom(CHECK_BOTTOM_DEFAULT_THRESHOLD);
+        wasAtBottomBeforeMessageRef.current = wasAtBottom;
+        shouldAutoScrollRef.current = wasAtBottom;
+      }
+
+      saveScrollPosition();
+
+      if (messageData) {
+        const { content, file, replyToId, onProgress } = messageData;
+
+        if (file) {
+          return await sendFileMessage(file, content, replyToId, onProgress);
+        } else if (content) {
+          return await sendTextMessage(content, replyToId);
+        }
+      }
+
+      return { sendTextMessage, sendFileMessage };
+    },
+    [
+      checkIsAtBottom,
+      saveScrollPosition,
+      scrollHeightBeforeMessageRef,
+      wasAtBottomBeforeMessageRef,
+      shouldAutoScrollRef,
+      messagesContainerRef,
+      sendTextMessage,
+      sendFileMessage,
+    ]
+  );
 
   return {
     sendTextMessage,
     sendFileMessage,
-    prepareScrollForSending
+    prepareScrollForSending,
   };
 };
-

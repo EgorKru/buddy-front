@@ -1,11 +1,15 @@
 import { useEffect } from 'react';
-import { CHECK_BOTTOM_AUTO_SCROLL_THRESHOLD, AUTO_SCROLL_DELAY, CHECK_BOTTOM_DEFAULT_THRESHOLD } from '../constants/chat';
+import {
+  CHECK_BOTTOM_AUTO_SCROLL_THRESHOLD,
+  AUTO_SCROLL_DELAY,
+  CHECK_BOTTOM_DEFAULT_THRESHOLD,
+} from '../constants/chat';
 
 export const useMessageEffects = ({
   messages,
   scrollPositionSavedRef,
   messagesContainerRef,
-  isLoadingInitialRef,
+  isLoadingInitialRef: _isLoadingInitialRef,
   shouldRestorePositionRef,
   restoreScrollPosition,
   scrollHeightBeforeMessageRef,
@@ -15,14 +19,13 @@ export const useMessageEffects = ({
   scrollToBottom,
   userScrolledToBottomRef,
   isUserScrollingUpRef,
-  lastScrollTopRef
+  lastScrollTopRef,
 }) => {
   useEffect(() => {
     if (messages.length > 0 && !scrollPositionSavedRef.current && messagesContainerRef.current) {
       const container = messagesContainerRef.current;
 
       if (!shouldRestorePositionRef.current) {
-        
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             const targetScrollTop = container.scrollHeight;
@@ -37,12 +40,20 @@ export const useMessageEffects = ({
         });
       }
     }
-  }, [messages.length, scrollPositionSavedRef, messagesContainerRef, shouldRestorePositionRef, userScrolledToBottomRef, isUserScrollingUpRef, lastScrollTopRef]);
+  }, [
+    messages.length,
+    scrollPositionSavedRef,
+    messagesContainerRef,
+    shouldRestorePositionRef,
+    userScrolledToBottomRef,
+    isUserScrollingUpRef,
+    lastScrollTopRef,
+  ]);
 
   useEffect(() => {
     if (messages.length > 0 && messagesContainerRef.current && !scrollPositionSavedRef.current) {
       const container = messagesContainerRef.current;
-      
+
       const performScroll = () => {
         if (shouldRestorePositionRef.current) {
           restoreScrollPosition();
@@ -61,7 +72,7 @@ export const useMessageEffects = ({
       const attemptScroll = (attempt = 0) => {
         if (container.scrollHeight > container.clientHeight) {
           performScroll();
-          
+
           setTimeout(() => {
             const currentScrollTop = container.scrollTop;
             const maxScrollTop = container.scrollHeight - container.clientHeight;
@@ -70,7 +81,6 @@ export const useMessageEffects = ({
             }
           }, 100);
         } else if (attempt < 20) {
-          
           setTimeout(() => {
             if (!scrollPositionSavedRef.current) {
               attemptScroll(attempt + 1);
@@ -85,16 +95,28 @@ export const useMessageEffects = ({
         });
       });
     }
-  }, [messages.length, scrollPositionSavedRef, messagesContainerRef, shouldRestorePositionRef, restoreScrollPosition, userScrolledToBottomRef, isUserScrollingUpRef, lastScrollTopRef]);
+  }, [
+    messages.length,
+    scrollPositionSavedRef,
+    messagesContainerRef,
+    shouldRestorePositionRef,
+    restoreScrollPosition,
+    userScrolledToBottomRef,
+    isUserScrollingUpRef,
+    lastScrollTopRef,
+  ]);
 
   useEffect(() => {
     if (!messagesContainerRef.current || messages.length === 0) return;
     if (!scrollPositionSavedRef.current) return;
-    
+
     const container = messagesContainerRef.current;
     const currentScrollHeight = container.scrollHeight;
-    
-    if (scrollHeightBeforeMessageRef.current > 0 && currentScrollHeight > scrollHeightBeforeMessageRef.current) {
+
+    if (
+      scrollHeightBeforeMessageRef.current > 0 &&
+      currentScrollHeight > scrollHeightBeforeMessageRef.current
+    ) {
       if (wasAtBottomBeforeMessageRef.current || shouldAutoScrollRef.current) {
         requestAnimationFrame(() => {
           setTimeout(() => {
@@ -130,8 +152,17 @@ export const useMessageEffects = ({
         shouldAutoScrollRef.current = false;
       }
     }
-    
-    scrollHeightBeforeMessageRef.current = currentScrollHeight;
-  }, [messages.length, checkIsAtBottom, messagesContainerRef, scrollPositionSavedRef, scrollHeightBeforeMessageRef, wasAtBottomBeforeMessageRef, shouldAutoScrollRef, scrollToBottom, userScrolledToBottomRef]);
-};
 
+    scrollHeightBeforeMessageRef.current = currentScrollHeight;
+  }, [
+    messages.length,
+    checkIsAtBottom,
+    messagesContainerRef,
+    scrollPositionSavedRef,
+    scrollHeightBeforeMessageRef,
+    wasAtBottomBeforeMessageRef,
+    shouldAutoScrollRef,
+    scrollToBottom,
+    userScrolledToBottomRef,
+  ]);
+};

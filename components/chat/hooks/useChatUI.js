@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 
 export const useChatUI = () => {
   const [newMessage, setNewMessage] = useState('');
@@ -7,7 +7,7 @@ export const useChatUI = () => {
   const [imageModal, setImageModal] = useState(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [scrollButtonReady, setScrollButtonReady] = useState(false);
-  
+
   return {
     newMessage,
     setNewMessage,
@@ -20,7 +20,6 @@ export const useChatUI = () => {
     showScrollToBottom,
     setShowScrollToBottom,
     scrollButtonReady,
-    setScrollButtonReady
+    setScrollButtonReady,
   };
 };
-

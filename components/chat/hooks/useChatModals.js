@@ -26,7 +26,6 @@ export const useChatModals = () => {
     setDeleteForAll,
     forwardModal,
     setForwardModal,
-    closeAllModals
+    closeAllModals,
   };
 };
-

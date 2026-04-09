@@ -1,18 +1,9 @@
 .homeContainer {
   min-height: 100vh;
-  background: #ffffff;
+  background: var(--home-bg);
   display: flex;
   position: relative;
   animation: fadeIn 0.3s ease-out;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
 }
 
 .header {
@@ -22,21 +13,20 @@
   align-items: center;
   margin-bottom: 40px;
   padding: 20px 24px;
-  background: #ffffff;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--home-border);
   gap: 16px;
   position: sticky;
   top: 0;
   z-index: 10;
   backdrop-filter: blur(10px);
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--home-surface);
 }
 
 .header h1 {
   margin: 0;
   font-size: 24px;
   font-weight: 600;
-  color: #111827;
+  color: var(--home-text-primary);
   letter-spacing: -0.3px;
   text-align: center;
   justify-self: center;
@@ -48,7 +38,7 @@
     gap: 12px;
     margin-bottom: 24px;
   }
-  
+
   .header h1 {
     font-size: 20px;
     text-align: left;
@@ -62,7 +52,7 @@
     gap: 8px;
     margin-bottom: 20px;
   }
-  
+
   .header h1 {
     font-size: 18px;
   }
@@ -77,7 +67,7 @@
 }
 
 .userInfo span {
-  color: #6b7280;
+  color: var(--home-text-secondary);
   font-size: 15px;
   font-weight: 500;
   white-space: nowrap;
@@ -87,7 +77,7 @@
   .userInfo {
     gap: 8px;
   }
-  
+
   .userInfo span {
     font-size: 14px;
   }
@@ -105,12 +95,13 @@
   }
 }
 
+/* Кнопка «Настройки»: на мобильных только иконка — нужен aria-label в разметке */
 .settingsButton {
   padding: 10px 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
   border: none;
   border-radius: 8px;
-  color: #ffffff;
+  color: var(--text-light);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -142,7 +133,7 @@
 
 .settingsButton:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(103, 126, 234, 0.3);
+  box-shadow: 0 4px 12px var(--primary-shadow-color);
 }
 
 .settingsButton:active {
@@ -151,10 +142,10 @@
 
 .logoutButton {
   padding: 10px 20px;
-  background: #f3f4f6;
-  border: 1px solid #e5e7eb;
+  background: var(--home-btn-outline-bg);
+  border: 1px solid var(--home-border);
   border-radius: 8px;
-  color: #374151;
+  color: var(--home-btn-outline-text);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -177,9 +168,9 @@
 }
 
 .logoutButton:hover {
-  background: #e5e7eb;
-  border-color: #d1d5db;
-  color: #111827;
+  background: var(--home-btn-outline-hover-bg);
+  border-color: var(--home-border-hover);
+  color: var(--home-text-primary);
 }
 
 .sidebarOverlay {
@@ -222,16 +213,19 @@
   .mainContent {
     margin-left: 320px;
     width: calc(100% - 320px);
-    transition: margin-left 0.3s ease-out, margin-right 0.3s ease-out, width 0.3s ease-out;
+    transition:
+      margin-left 0.3s ease-out,
+      margin-right 0.3s ease-out,
+      width 0.3s ease-out;
   }
-  
-  body[data-sidebar-position="right"] .mainContent {
+
+  body[data-sidebar-position='right'] .mainContent {
     margin-left: 0;
     margin-right: var(--sidebar-width, 320px);
     width: calc(100% - var(--sidebar-width, 320px));
   }
-  
-  body[data-sidebar-position="left"] .mainContent {
+
+  body[data-sidebar-position='left'] .mainContent {
     margin-left: var(--sidebar-width, 320px);
     margin-right: 0;
     width: calc(100% - var(--sidebar-width, 320px));
@@ -244,19 +238,19 @@
   justify-content: center;
   width: 40px;
   height: 40px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--home-border);
   background: transparent;
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
-  color: #374151;
+  color: var(--home-btn-outline-text);
   margin-right: 16px;
 }
 
 .menuButton:hover {
-  background: #f9fafb;
-  border-color: #d1d5db;
-  color: #111827;
+  background: var(--home-menu-hover-bg);
+  border-color: var(--home-border-hover);
+  color: var(--home-text-primary);
 }
 
 @media (min-width: 769px) {
@@ -274,7 +268,7 @@
   width: 100%;
   max-width: 100%;
   margin: 0;
-  background: #ffffff;
+  background: var(--home-bg);
   border: none;
   border-radius: 0;
   padding: 40px 24px;
@@ -297,17 +291,6 @@
   }
 }
 
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 .createSection {
   display: flex;
   flex-direction: column;
@@ -327,10 +310,10 @@
 .createButton {
   width: 100%;
   padding: 14px 24px;
-  background: #6b6b6b;
+  background: var(--home-btn-neutral);
   border: none;
   border-radius: 12px;
-  color: #ffffff;
+  color: var(--text-light);
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
@@ -358,7 +341,7 @@
 }
 
 .createButton:hover:not(:disabled) {
-  background: #5a5a5a;
+  background: var(--home-btn-neutral-hover);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
@@ -374,7 +357,7 @@
 
 .createHint {
   text-align: center;
-  color: #9ca3af;
+  color: var(--home-text-muted);
   font-size: 13px;
   margin: 0;
   line-height: 1.5;
@@ -392,11 +375,11 @@
   content: '';
   flex: 1;
   height: 1px;
-  background: #e5e7eb;
+  background: var(--home-border);
 }
 
 .separator span {
-  color: #9ca3af;
+  color: var(--home-text-muted);
   font-size: 13px;
   text-transform: lowercase;
   font-weight: 500;
@@ -421,7 +404,7 @@
   margin: 0;
   font-size: 15px;
   font-weight: 600;
-  color: #374151;
+  color: var(--home-btn-outline-text);
   text-align: center;
   letter-spacing: 0.3px;
 }
@@ -442,7 +425,7 @@
 .inputIcon {
   position: absolute;
   left: 16px;
-  color: #9ca3af;
+  color: var(--home-text-muted);
   pointer-events: none;
   transition: color 0.2s ease;
   z-index: 1;
@@ -451,48 +434,48 @@
 .enterRoom input {
   width: 100%;
   padding: 12px 16px 12px 46px;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: var(--home-input-bg);
+  border: 1px solid var(--home-border);
   border-radius: 10px;
   font-size: 15px;
-  color: #111827;
+  color: var(--home-text-primary);
   font-family: inherit;
   transition: all 0.2s ease;
   box-sizing: border-box;
 }
 
 .enterRoom input::placeholder {
-  color: #9ca3af;
+  color: var(--home-text-muted);
 }
 
 .enterRoom input:hover {
-  border-color: #d1d5db;
-  background: #fafafa;
+  border-color: var(--home-border-hover);
+  background: var(--home-input-hover-bg);
 }
 
 .inputWrapper:focus-within .inputIcon {
-  color: #6b6b6b;
+  color: var(--home-btn-neutral);
 }
 
 .enterRoom input:focus {
   outline: none;
-  border-color: #6b6b6b;
-  background: #ffffff;
-  box-shadow: 0 0 0 2px rgba(107, 107, 107, 0.1);
+  border-color: var(--home-btn-neutral);
+  background: var(--home-input-bg);
+  box-shadow: 0 0 0 2px var(--home-focus-ring);
 }
 
-.inputWrapperError input {
-  border-color: #ef4444 !important;
-  background: rgba(239, 68, 68, 0.05) !important;
+.inputWrapper.inputWrapperError .inputIcon {
+  color: var(--error-text);
 }
 
-.inputWrapperError .inputIcon {
-  color: #ef4444 !important;
+.inputWrapper.inputWrapperError input {
+  border-color: var(--error-text);
+  background: var(--home-error-input-bg);
 }
 
-.inputWrapperError input:focus {
-  border-color: #ef4444 !important;
-  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.1) !important;
+.inputWrapper.inputWrapperError input:focus {
+  border-color: var(--error-text);
+  box-shadow: 0 0 0 2px var(--error-border);
 }
 
 @media (max-width: 768px) {
@@ -500,7 +483,7 @@
     padding: 10px 14px 10px 44px;
     font-size: 16px;
   }
-  
+
   .inputIcon {
     left: 14px;
   }
@@ -511,7 +494,7 @@
     padding: 10px 12px 10px 42px;
     font-size: 16px;
   }
-  
+
   .inputIcon {
     left: 12px;
   }
@@ -521,12 +504,12 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #ef4444;
+  color: var(--error-text);
   font-size: 13px;
   padding: 8px 12px;
-  background: rgba(239, 68, 68, 0.1);
+  background: var(--error-bg);
   border-radius: 8px;
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  border: 1px solid var(--error-border);
 }
 
 .errorMessage svg {
@@ -536,10 +519,10 @@
 .joinButton {
   width: 100%;
   padding: 12px 24px;
-  background: #6b6b6b;
+  background: var(--home-btn-neutral);
   border: none;
   border-radius: 10px;
-  color: #ffffff;
+  color: var(--text-light);
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
@@ -567,7 +550,7 @@
 }
 
 .joinButton:hover:not(:disabled) {
-  background: #5a5a5a;
+  background: var(--home-btn-neutral-hover);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
@@ -583,13 +566,4 @@
 
 .spinner {
   animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
 }

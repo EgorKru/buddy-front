@@ -40,7 +40,6 @@ export default function FileViewerModal({ fileUrl, fileName, mimeType, onClose }
         const text = await response.text();
         setContent(text);
       } catch (err) {
-        
         setError('Не удалось загрузить файл');
       } finally {
         setLoading(false);
@@ -102,7 +101,6 @@ export default function FileViewerModal({ fileUrl, fileName, mimeType, onClose }
       document.body.removeChild(link);
       URL.revokeObjectURL(blobUrl);
     } catch (error) {
-      
       alert('Не удалось скачать файл');
     }
   };
@@ -123,12 +121,7 @@ export default function FileViewerModal({ fileUrl, fileName, mimeType, onClose }
             >
               <Download size={20} />
             </button>
-            <button
-              type="button"
-              className={styles.closeButton}
-              onClick={onClose}
-              title="Закрыть"
-            >
+            <button type="button" className={styles.closeButton} onClick={onClose} title="Закрыть">
               <X size={24} />
             </button>
           </div>
@@ -154,4 +147,3 @@ export default function FileViewerModal({ fileUrl, fileName, mimeType, onClose }
     </div>
   );
 }
-

@@ -1,16 +1,27 @@
-import cx from "classnames";
-import { Mic, Video, PhoneOff, MicOff, VideoOff, Users, Hand, Monitor, MonitorOff, Settings } from "lucide-react";
+import cx from 'classnames';
+import {
+  Mic,
+  Video,
+  PhoneOff,
+  MicOff,
+  VideoOff,
+  Users,
+  Hand,
+  Monitor,
+  MonitorOff,
+  Settings,
+} from 'lucide-react';
 
-import styles from "@/component/Bottom/index.module.css";
+import styles from '@/component/Bottom/index.module.css';
 
 const Bottom = (props) => {
-  const { 
-    muted, 
-    playing, 
-    toggleAudio, 
-    toggleVideo, 
-    leaveRoom, 
-    participantCount, 
+  const {
+    muted,
+    playing,
+    toggleAudio,
+    toggleVideo,
+    leaveRoom,
+    participantCount,
     onParticipantsClick,
     handRaised,
     onRaiseHand,
@@ -25,73 +36,67 @@ const Bottom = (props) => {
   const handleToggleAudio = (e) => {
     e?.preventDefault?.();
     e?.stopPropagation?.();
-    
+
     if (toggleAudio) {
       toggleAudio();
     } else {
-      
     }
   };
-  
+
   const handleToggleVideo = (e) => {
     e?.preventDefault?.();
     e?.stopPropagation?.();
-    
+
     if (toggleVideo) {
       toggleVideo();
     } else {
-      
     }
   };
-  
+
   const handleLeaveRoom = (e) => {
     e?.preventDefault?.();
     e?.stopPropagation?.();
-    
+
     if (leaveRoom) {
       leaveRoom();
     } else {
-      
     }
   };
-  
+
   const handleRaiseHand = (e) => {
     e?.preventDefault?.();
     e?.stopPropagation?.();
-    
+
     if (onRaiseHand) {
       onRaiseHand();
     } else {
-      
     }
   };
-  
+
   const handleToggleScreenShare = (e) => {
     e?.preventDefault?.();
     e?.stopPropagation?.();
-    
+
     if (onToggleScreenShare) {
       onToggleScreenShare();
     } else {
-      
     }
   };
-  
+
   const handleParticipantsClick = (e) => {
     e?.preventDefault?.();
     e?.stopPropagation?.();
-    
+
     if (onParticipantsClick) {
       onParticipantsClick();
     } else {
-      
     }
   };
 
   const handleSettingsClick = (e) => {
     e?.preventDefault?.();
     e?.stopPropagation?.();
-    
+
     if (onSettingsClick) {
       onSettingsClick();
     }
@@ -100,7 +105,7 @@ const Bottom = (props) => {
   return (
     <div className={styles.bottomMenu}>
       <div className={styles.leftSection}>
-        <button 
+        <button
           className={styles.participantButton}
           onClick={handleParticipantsClick}
           title="Показать участников"
@@ -110,7 +115,7 @@ const Bottom = (props) => {
           <span>{participantCount || 1}</span>
         </button>
       </div>
-      
+
       <div className={styles.centerSection}>
         {isMuted ? (
           <button
@@ -150,27 +155,27 @@ const Bottom = (props) => {
             <VideoOff size={22} />
           </button>
         )}
-        
+
         {}
         <button
           className={cx(styles.icon, { [styles.handRaised]: handRaised })}
-          title={handRaised ? "Опустить руку" : "Поднять руку"}
+          title={handRaised ? 'Опустить руку' : 'Поднять руку'}
           onClick={handleRaiseHand}
           type="button"
         >
           <Hand size={22} />
         </button>
-        
+
         {}
         <button
           className={cx(styles.icon, { [styles.screenSharing]: isScreenSharing })}
-          title={isScreenSharing ? "Остановить демонстрацию" : "Показать экран"}
+          title={isScreenSharing ? 'Остановить демонстрацию' : 'Показать экран'}
           onClick={handleToggleScreenShare}
           type="button"
         >
           {isScreenSharing ? <MonitorOff size={22} /> : <Monitor size={22} />}
         </button>
-        
+
         {}
         <button
           className={styles.icon}
@@ -180,7 +185,7 @@ const Bottom = (props) => {
         >
           <Settings size={22} />
         </button>
-        
+
         <button
           className={cx(styles.icon, styles.leaveButton)}
           title="Покинуть встречу"
@@ -190,7 +195,7 @@ const Bottom = (props) => {
           <PhoneOff size={22} />
         </button>
       </div>
-      
+
       <div className={styles.rightSection}></div>
     </div>
   );

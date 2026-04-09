@@ -21,7 +21,6 @@ export const useFileUpload = () => {
     setSelectedFile,
     selectedFileUrlRef,
     fileInputRef,
-    clearSelectedFile
+    clearSelectedFile,
   };
 };
-

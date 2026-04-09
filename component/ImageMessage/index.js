@@ -3,7 +3,15 @@ import { Download } from 'lucide-react';
 import { chatAPI } from '@/utils/api';
 import styles from './index.module.css';
 
-export default function ImageMessage({ fileUrl, content, messageTime, isOwn, statusIcon, isPinned, onImageClick }) {
+export default function ImageMessage({
+  fileUrl,
+  content,
+  messageTime,
+  isOwn,
+  statusIcon,
+  isPinned,
+  onImageClick,
+}) {
   const [imageUrl, setImageUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -101,7 +109,6 @@ export default function ImageMessage({ fileUrl, content, messageTime, isOwn, sta
         img.src = blobUrl;
       } catch (err) {
         if (!cancelled) {
-          
           setError('Не удалось загрузить изображение');
           setLoading(false);
         }
@@ -121,9 +128,9 @@ export default function ImageMessage({ fileUrl, content, messageTime, isOwn, sta
   const handleImageClick = (e) => {
     e.stopPropagation();
     e.preventDefault();
-    
+
     if (!onImageClick || !fileUrl) return;
-    
+
     if (imageUrl) {
       onImageClick(imageUrl, fileUrl);
     } else {
@@ -133,19 +140,17 @@ export default function ImageMessage({ fileUrl, content, messageTime, isOwn, sta
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
-      
+
       fetch(url, { headers })
-        .then(response => {
+        .then((response) => {
           if (!response.ok) throw new Error('Failed to load image');
           return response.blob();
         })
-        .then(blob => {
+        .then((blob) => {
           const blobUrl = URL.createObjectURL(blob);
           onImageClick(blobUrl, fileUrl);
         })
-        .catch(err => {
-          
-        });
+        .catch((err) => {});
     }
   };
 
@@ -186,7 +191,6 @@ export default function ImageMessage({ fileUrl, content, messageTime, isOwn, sta
       document.body.removeChild(link);
       URL.revokeObjectURL(blobUrl);
     } catch (error) {
-      
       alert('Не удалось скачать изображение');
     }
   };
@@ -202,9 +206,12 @@ export default function ImageMessage({ fileUrl, content, messageTime, isOwn, sta
   }
 
   const isEmbedded = !messageTime;
-  
+
   return (
-    <div className={`${styles.imageMessage} ${isOwn ? styles.ownMessage : ''} ${isEmbedded ? styles.embedded : ''}`} ref={containerRef}>
+    <div
+      className={`${styles.imageMessage} ${isOwn ? styles.ownMessage : ''} ${isEmbedded ? styles.embedded : ''}`}
+      ref={containerRef}
+    >
       <div className={`${styles.imageContainer} ${isEmbedded ? styles.embeddedContainer : ''}`}>
         {loading && shouldLoad && (
           <div className={styles.loadingOverlay}>
@@ -243,23 +250,18 @@ export default function ImageMessage({ fileUrl, content, messageTime, isOwn, sta
           </>
         )}
       </div>
-      {content && content.trim() && (
-        <div className={styles.imageCaption}>
-          {content}
-        </div>
-      )}
+      {content && content.trim() && <div className={styles.imageCaption}>{content}</div>}
       {messageTime && (
         <div className={styles.imageMeta}>
           {isPinned && (
-            <span className={styles.pinnedIcon} title="Закреплено">📌</span>
+            <span className={styles.pinnedIcon} title="Закреплено">
+              📌
+            </span>
           )}
           <span className={styles.messageTime}>{messageTime}</span>
-          {statusIcon && (
-            <span className={styles.statusIcon}>{statusIcon}</span>
-          )}
+          {statusIcon && <span className={styles.statusIcon}>{statusIcon}</span>}
         </div>
       )}
     </div>
   );
 }
-

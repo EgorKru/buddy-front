@@ -13,15 +13,19 @@ const needsLastMessage = (chat) => {
 };
 
 const processFileMetadata = (lastMessage) => {
-  if ((lastMessage.type === 'FILE' || lastMessage.type === 'IMAGE') && lastMessage.fileUrl && typeof window !== 'undefined') {
+  if (
+    (lastMessage.type === 'FILE' || lastMessage.type === 'IMAGE') &&
+    lastMessage.fileUrl &&
+    typeof window !== 'undefined'
+  ) {
     const metadataKey = `file_metadata_${lastMessage.fileUrl}`;
-    
+
     if (lastMessage.fileSize && lastMessage.fileName && lastMessage.mimeType) {
       const fileMetadata = {
         fileSize: lastMessage.fileSize,
         fileName: lastMessage.fileName,
         mimeType: lastMessage.mimeType,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
       localStorage.setItem(metadataKey, JSON.stringify(fileMetadata));
     } else {
@@ -38,14 +42,20 @@ const processFileMetadata = (lastMessage) => {
           if (!lastMessage.mimeType && metadata.mimeType) {
             lastMessage.mimeType = metadata.mimeType;
           }
-        } catch (e) {
-        }
+        } catch (e) {}
       }
     }
   }
 };
 
-export const useLastMessagesLoader = (chats, loading, currentChatId, upsertMessage, upsertChat, refreshChats) => {
+export const useLastMessagesLoader = (
+  chats,
+  loading,
+  currentChatId,
+  upsertMessage,
+  upsertChat,
+  refreshChats
+) => {
   const loadingLastMessagesRef = useRef(new Set());
   const hasLoadedLastMessagesRef = useRef(false);
 
@@ -57,8 +67,8 @@ export const useLastMessagesLoader = (chats, loading, currentChatId, upsertMessa
 
   const loadLastMessages = useCallback(async () => {
     if (!chats || chats.length === 0 || loading) return;
-    
-    const chatsToLoad = chats.filter(chat => {
+
+    const chatsToLoad = chats.filter((chat) => {
       const chatId = String(chat.id);
       if (currentChatId && String(currentChatId) === chatId) return false;
       if (loadingLastMessagesRef.current.has(chatId)) return false;
@@ -72,20 +82,18 @@ export const useLastMessagesLoader = (chats, loading, currentChatId, upsertMessa
 
     const promises = chatsToLoad.map(async (chat) => {
       const chatId = String(chat.id);
-      
+
       if (currentChatId && String(currentChatId) === chatId) {
         return;
       }
-      
+
       if (loadingLastMessagesRef.current.has(chatId)) return;
-      
+
       loadingLastMessagesRef.current.add(chatId);
       try {
         const response = await chatAPI.getMessages(chatId, { page: 0, size: 20 });
         if (response?.content && Array.isArray(response.content) && response.content.length > 0) {
-          const nonDeleted = response.content.find(
-            (m) => !m.deletedForMe && !m.deletedForAll
-          );
+          const nonDeleted = response.content.find((m) => !m.deletedForMe && !m.deletedForAll);
 
           if (!nonDeleted) {
             return;
@@ -93,17 +101,20 @@ export const useLastMessagesLoader = (chats, loading, currentChatId, upsertMessa
 
           const lastMessage = nonDeleted;
           processFileMetadata(lastMessage);
-          
+
           if (upsertMessage) {
-            upsertMessage({
-              ...lastMessage,
-              status: 'SENT',
-              isOptimistic: false,
-              deletedForMe: lastMessage.deletedForMe || false,
-              deletedForAll: lastMessage.deletedForAll || false,
-            }, { unreadDelta: 0 });
+            upsertMessage(
+              {
+                ...lastMessage,
+                status: 'SENT',
+                isOptimistic: false,
+                deletedForMe: lastMessage.deletedForMe || false,
+                deletedForAll: lastMessage.deletedForAll || false,
+              },
+              { unreadDelta: 0 }
+            );
           }
-          
+
           if (upsertChat) {
             upsertChat({
               id: chat.id,
@@ -119,7 +130,7 @@ export const useLastMessagesLoader = (chats, loading, currentChatId, upsertMessa
     });
 
     await Promise.all(promises);
-    
+
     setTimeout(() => {
       const currentChats = chats;
       if (currentChats && currentChats.length > 0) {
@@ -145,4 +156,3 @@ export const useLastMessagesLoader = (chats, loading, currentChatId, upsertMessa
 
   return { loadLastMessages };
 };
-

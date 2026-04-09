@@ -2,49 +2,23 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Image from 'next/image';
-import { MessageCircle, Search, ArrowLeft, Plus, X, Loader2, Check, CheckCheck, UserPlus } from 'lucide-react';
+import {
+  MessageCircle,
+  Search,
+  ArrowLeft,
+  Plus,
+  X,
+  Loader2,
+  Check,
+  CheckCheck,
+  UserPlus,
+} from 'lucide-react';
 import { getCurrentUser, isAuthenticated } from '@/utils/api';
 import { useCreateChat } from '@/hooks/useCreateChat';
 import { getChatName, getChatAvatar } from '@/utils/chatHelpers';
-import { formatChatListTime } from '@/utils/dateHelpers';
+import { formatChatListTime, parseServerDate } from '@/utils/dateHelpers';
 import styles from '@/styles/chats.module.css';
 import { useChats, getChatTime } from '@/context/messaging';
-
-// Функция для парсинга дат с бэкенда (включая Java LocalDateTime массив)
-const parseServerDate = (dateString) => {
-  if (!dateString) return null;
-  
-  if (typeof dateString === 'number') {
-    return new Date(dateString);
-  }
-  
-  if (dateString instanceof Date) {
-    return dateString;
-  }
-  
-  // Если это массив (Java LocalDateTime) - УСТАРЕЛО после перехода на UTC
-  // Оставлено для обратной совместимости
-  if (Array.isArray(dateString) && dateString.length >= 3) {
-    const [year, month, day, hour = 0, minute = 0, second = 0, nanosecond = 0] = dateString;
-    const millisecond = Math.floor(nanosecond / 1000000);
-    return new Date(Date.UTC(year, month - 1, day, hour, minute, second, millisecond));
-  }
-  
-  let str = String(dateString).trim();
-  
-  if (/^\d+$/.test(str)) {
-    const timestamp = parseInt(str, 10);
-    if (timestamp > 1000000000000) {
-      return new Date(timestamp);
-    }
-    if (timestamp > 1000000000) {
-      return new Date(timestamp * 1000);
-    }
-  }
-  
-  // Бэкенд отправляет ISO с Z суффиксом (UTC)
-  return new Date(str);
-};
 
 export default function Chats() {
   const router = useRouter();
@@ -52,7 +26,7 @@ export default function Chats() {
   const { chats, loading, refreshChats, readReceiptsByChatId } = useChats();
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  
+
   const createChat = useCreateChat();
 
   useEffect(() => {
@@ -65,7 +39,11 @@ export default function Chats() {
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (createChat.showSearchResults && createChat.searchInputRef.current && !createChat.searchInputRef.current.contains(event.target)) {
+      if (
+        createChat.showSearchResults &&
+        createChat.searchInputRef.current &&
+        !createChat.searchInputRef.current.contains(event.target)
+      ) {
         const searchResults = document.querySelector(`.${styles.searchResults}`);
         if (searchResults && !searchResults.contains(event.target)) {
           createChat.setShowSearchResults(false);
@@ -86,8 +64,7 @@ export default function Chats() {
         await refreshChats();
         handleCloseModal();
       });
-    } catch (error) {
-    }
+    } catch (error) {}
   };
 
   const handleCloseModal = () => {
@@ -97,7 +74,7 @@ export default function Chats() {
 
   const sortedChats = useMemo(() => {
     if (!chats || chats.length === 0) return [];
-    
+
     return [...chats].sort((a, b) => {
       const timeA = getChatTime(a);
       const timeB = getChatTime(b);
@@ -106,21 +83,22 @@ export default function Chats() {
     });
   }, [chats]);
 
-  const filteredChats = sortedChats.filter(chat => {
+  const filteredChats = sortedChats.filter((chat) => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
       chat.name?.toLowerCase().includes(query) ||
-      chat.participants?.some(p => 
-        p.displayName?.toLowerCase().includes(query) ||
-        p.username?.toLowerCase().includes(query)
+      chat.participants?.some(
+        (p) =>
+          p.displayName?.toLowerCase().includes(query) || p.username?.toLowerCase().includes(query)
       )
     );
   });
 
   const getLastMessageReadMeta = (chat) => {
     const lastMessage = chat?.lastMessage;
-    if (!lastMessage?.createdAt || !user?.id) return { isRead: false, readCount: 0, totalOthers: 0 };
+    if (!lastMessage?.createdAt || !user?.id)
+      return { isRead: false, readCount: 0, totalOthers: 0 };
 
     const chatReadMap = readReceiptsByChatId?.[String(chat.id)] || {};
     const msgDate = parseServerDate(lastMessage.createdAt);
@@ -128,7 +106,7 @@ export default function Chats() {
     if (Number.isNaN(msgTime)) return { isRead: false, readCount: 0, totalOthers: 0 };
 
     const participantIds = Array.isArray(chat?.participants)
-      ? chat.participants.map(p => Number(p?.id)).filter(n => Number.isFinite(n))
+      ? chat.participants.map((p) => Number(p?.id)).filter((n) => Number.isFinite(n))
       : [];
     const uniqueParticipantIds = Array.from(new Set(participantIds));
     const totalOthers = Math.max(0, (uniqueParticipantIds.length || 0) - 1);
@@ -139,9 +117,12 @@ export default function Chats() {
         const readDate = parseServerDate(readAt);
         return readDate ? readDate.getTime() : NaN;
       })
-      .filter(t => !Number.isNaN(t));
+      .filter((t) => !Number.isNaN(t));
 
-    const readCount = otherReaders.reduce((acc, readAtTime) => (readAtTime >= msgTime ? acc + 1 : acc), 0);
+    const readCount = otherReaders.reduce(
+      (acc, readAtTime) => (readAtTime >= msgTime ? acc + 1 : acc),
+      0
+    );
     return { isRead: readCount > 0, readCount, totalOthers };
   };
 
@@ -196,63 +177,75 @@ export default function Chats() {
               href={`/chat/${chat.id}`}
               style={{ textDecoration: 'none', color: 'inherit' }}
             >
-            <div
-              className={styles.chatItem}
-            >
-              <div className={styles.chatAvatar}>
-                {getChatAvatar(chat, user) ? (
-                  <Image src={getChatAvatar(chat, user)} alt="" width={32} height={32} unoptimized />
-                ) : (
-                  <MessageCircle size={24} />
-                )}
-              </div>
-              <div className={styles.chatInfo}>
-                <div className={styles.chatHeader}>
-                  <span className={styles.chatName}>{getChatName(chat, user)}</span>
-                  {chat.lastMessage && (
-                    <span className={styles.chatTime}>
-                      {formatChatListTime(chat.lastMessage.createdAt)}
-                    </span>
+              <div className={styles.chatItem}>
+                <div className={styles.chatAvatar}>
+                  {getChatAvatar(chat, user) ? (
+                    <Image
+                      src={getChatAvatar(chat, user)}
+                      alt=""
+                      width={32}
+                      height={32}
+                      unoptimized
+                    />
+                  ) : (
+                    <MessageCircle size={24} />
                   )}
                 </div>
-                {chat.lastMessage && (
-                  <div className={styles.lastMessage}>
-                    <span className={styles.lastMessageSender}>
-                      {Number(chat.lastMessage.senderId) === Number(user?.id) ? (
-                        <span title={(() => {
-                          const meta = getLastMessageReadMeta(chat);
-                          if (!meta.readCount) return 'Отправлено';
-                          return meta.totalOthers > 1 ? `Прочитали ${meta.readCount}/${meta.totalOthers}` : 'Прочитано';
-                        })()} style={{ display: 'inline-flex', alignItems: 'center', marginRight: 6 }}>
-                          {(() => {
-                            const meta = getLastMessageReadMeta(chat);
-                            return meta.isRead ? <CheckCheck size={14} /> : <Check size={14} />;
-                          })()}
-                        </span>
-                      ) : (
-                        `${chat.lastMessage.senderDisplayName || chat.lastMessage.senderUsername}:`
-                      )}
-                    </span>
-                    <span className={styles.lastMessageText}>
-                      {chat.lastMessage.content ? (
-                        <>
-                          {chat.lastMessage.content.substring(0, 50)}
-                          {chat.lastMessage.content.length > 50 ? '...' : ''}
-                        </>
-                      ) : (
-                        chat.lastMessage.type === 'IMAGE' ? '📷 Изображение' :
-                        chat.lastMessage.type === 'FILE' ? '📎 Файл' :
-                        chat.lastMessage.type === 'VOICE' ? '🎤 Голосовое сообщение' :
-                        'Сообщение'
-                      )}
-                    </span>
+                <div className={styles.chatInfo}>
+                  <div className={styles.chatHeader}>
+                    <span className={styles.chatName}>{getChatName(chat, user)}</span>
+                    {chat.lastMessage && (
+                      <span className={styles.chatTime}>
+                        {formatChatListTime(chat.lastMessage.createdAt)}
+                      </span>
+                    )}
                   </div>
-                )}
-                {chat.unreadCount > 0 && (
-                  <div className={styles.unreadBadge}>{chat.unreadCount}</div>
-                )}
+                  {chat.lastMessage && (
+                    <div className={styles.lastMessage}>
+                      <span className={styles.lastMessageSender}>
+                        {Number(chat.lastMessage.senderId) === Number(user?.id) ? (
+                          <span
+                            title={(() => {
+                              const meta = getLastMessageReadMeta(chat);
+                              if (!meta.readCount) return 'Отправлено';
+                              return meta.totalOthers > 1
+                                ? `Прочитали ${meta.readCount}/${meta.totalOthers}`
+                                : 'Прочитано';
+                            })()}
+                            style={{ display: 'inline-flex', alignItems: 'center', marginRight: 6 }}
+                          >
+                            {(() => {
+                              const meta = getLastMessageReadMeta(chat);
+                              return meta.isRead ? <CheckCheck size={14} /> : <Check size={14} />;
+                            })()}
+                          </span>
+                        ) : (
+                          `${chat.lastMessage.senderDisplayName || chat.lastMessage.senderUsername}:`
+                        )}
+                      </span>
+                      <span className={styles.lastMessageText}>
+                        {chat.lastMessage.content ? (
+                          <>
+                            {chat.lastMessage.content.substring(0, 50)}
+                            {chat.lastMessage.content.length > 50 ? '...' : ''}
+                          </>
+                        ) : chat.lastMessage.type === 'IMAGE' ? (
+                          '📷 Изображение'
+                        ) : chat.lastMessage.type === 'FILE' ? (
+                          '📎 Файл'
+                        ) : chat.lastMessage.type === 'VOICE' ? (
+                          '🎤 Голосовое сообщение'
+                        ) : (
+                          'Сообщение'
+                        )}
+                      </span>
+                    </div>
+                  )}
+                  {chat.unreadCount > 0 && (
+                    <div className={styles.unreadBadge}>{chat.unreadCount}</div>
+                  )}
+                </div>
               </div>
-            </div>
             </Link>
           ))
         )}
@@ -296,9 +289,7 @@ export default function Chats() {
 
               <div className={styles.formGroup}>
                 <label>
-                  {createChat.chatType === 'DIRECT' 
-                    ? 'Поиск пользователя *' 
-                    : 'Поиск участников *'}
+                  {createChat.chatType === 'DIRECT' ? 'Поиск пользователя *' : 'Поиск участников *'}
                 </label>
                 <div style={{ position: 'relative' }}>
                   <input
@@ -313,19 +304,23 @@ export default function Chats() {
                         createChat.setShowSearchResults(true);
                       }
                     }}
-                    placeholder={createChat.chatType === 'DIRECT' 
-                      ? 'Введите username или email...' 
-                      : 'Введите username или email участников...'}
+                    placeholder={
+                      createChat.chatType === 'DIRECT'
+                        ? 'Введите username или email...'
+                        : 'Введите username или email участников...'
+                    }
                     className={styles.input}
                   />
                   {createChat.searching && (
-                    <div style={{ 
-                      position: 'absolute', 
-                      right: '10px', 
-                      top: '50%', 
-                      transform: 'translateY(-50%)',
-                      color: '#666'
-                    }}>
+                    <div
+                      style={{
+                        position: 'absolute',
+                        right: '10px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        color: '#666',
+                      }}
+                    >
                       <Loader2 size={16} className={styles.spinner} />
                     </div>
                   )}
@@ -339,7 +334,13 @@ export default function Chats() {
                         >
                           <div className={styles.searchResultAvatar}>
                             {user.avatarUrl ? (
-                              <Image src={user.avatarUrl} alt="" width={32} height={32} unoptimized />
+                              <Image
+                                src={user.avatarUrl}
+                                alt=""
+                                width={32}
+                                height={32}
+                                unoptimized
+                              />
                             ) : (
                               <div className={styles.searchResultAvatarPlaceholder}>
                                 {user.displayName?.[0] || user.username?.[0] || '?'}
@@ -353,7 +354,9 @@ export default function Chats() {
                             <div className={styles.searchResultUsername}>
                               @{user.username}
                               {user.email && (
-                                <span style={{ marginLeft: '8px', color: '#888', fontSize: '12px' }}>
+                                <span
+                                  style={{ marginLeft: '8px', color: '#888', fontSize: '12px' }}
+                                >
                                   • {user.email}
                                 </span>
                               )}
@@ -364,13 +367,14 @@ export default function Chats() {
                       ))}
                     </div>
                   )}
-                  {createChat.showSearchResults && createChat.searchResults.length === 0 && createChat.participantUsernames.length >= 2 && !createChat.searching && (
-                    <div className={styles.searchResults}>
-                      <div className={styles.searchResultEmpty}>
-                        Пользователи не найдены
+                  {createChat.showSearchResults &&
+                    createChat.searchResults.length === 0 &&
+                    createChat.participantUsernames.length >= 2 &&
+                    !createChat.searching && (
+                      <div className={styles.searchResults}>
+                        <div className={styles.searchResultEmpty}>Пользователи не найдены</div>
                       </div>
-                    </div>
-                  )}
+                    )}
                 </div>
                 <small className={styles.hint}>
                   {createChat.chatType === 'DIRECT'
@@ -427,4 +431,3 @@ export default function Chats() {
     </div>
   );
 }
-

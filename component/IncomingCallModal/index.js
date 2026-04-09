@@ -1,15 +1,15 @@
-import { useEffect, useState } from "react";
-import { Phone, PhoneOff, Video, X } from "lucide-react";
-import styles from "./index.module.css";
+import { useEffect, useState } from 'react';
+import { Phone, PhoneOff, Video, X } from 'lucide-react';
+import styles from './index.module.css';
 
 const IncomingCallModal = ({ call, onAccept, onReject, onBusy }) => {
   const [elapsedTime, setElapsedTime] = useState(0);
 
   useEffect(() => {
     if (!call) return;
-    
+
     const interval = setInterval(() => {
-      setElapsedTime(prev => prev + 1);
+      setElapsedTime((prev) => prev + 1);
     }, 1000);
 
     const timeout = setTimeout(() => {
@@ -30,8 +30,8 @@ const IncomingCallModal = ({ call, onAccept, onReject, onBusy }) => {
   const isVideo = call.type === 'VIDEO';
 
   const getInitials = (name) => {
-    if (!name) return "?";
-    const parts = name.trim().split(" ");
+    if (!name) return '?';
+    const parts = name.trim().split(' ');
     if (parts.length >= 2) {
       return (parts[0][0] + parts[1][0]).toUpperCase();
     }
@@ -50,9 +50,7 @@ const IncomingCallModal = ({ call, onAccept, onReject, onBusy }) => {
 
         {}
         <div className={styles.avatarContainer}>
-          <div className={styles.avatar}>
-            {getInitials(callerName)}
-          </div>
+          <div className={styles.avatar}>{getInitials(callerName)}</div>
         </div>
 
         {}
@@ -76,15 +74,15 @@ const IncomingCallModal = ({ call, onAccept, onReject, onBusy }) => {
 
         {}
         <div className={styles.actions}>
-          <button 
+          <button
             className={styles.rejectButton}
             onClick={() => onReject?.(call.id)}
             title="Отклонить"
           >
             <PhoneOff size={28} />
           </button>
-          
-          <button 
+
+          <button
             className={styles.acceptButton}
             onClick={() => onAccept?.(call.id)}
             title="Принять"
@@ -94,10 +92,7 @@ const IncomingCallModal = ({ call, onAccept, onReject, onBusy }) => {
         </div>
 
         {}
-        <button 
-          className={styles.busyButton}
-          onClick={() => onBusy?.(call.id)}
-        >
+        <button className={styles.busyButton} onClick={() => onBusy?.(call.id)}>
           Ответить позже
         </button>
       </div>

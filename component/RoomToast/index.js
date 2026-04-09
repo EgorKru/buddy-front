@@ -1,14 +1,14 @@
-import { useEffect, useState } from "react";
-import { UserPlus, UserMinus, X } from "lucide-react";
-import styles from "./index.module.css";
+import { useEffect, useState } from 'react';
+import { UserPlus, UserMinus, X } from 'lucide-react';
+import styles from './index.module.css';
 
 const RoomToast = ({ notifications, onDismiss }) => {
   return (
     <div className={styles.toastContainer}>
       {notifications.map((notification) => (
-        <ToastItem 
-          key={notification.id} 
-          notification={notification} 
+        <ToastItem
+          key={notification.id}
+          notification={notification}
           onDismiss={() => onDismiss(notification.id)}
         />
       ))}
@@ -23,7 +23,7 @@ const ToastItem = ({ notification, onDismiss }) => {
     const timer = setTimeout(() => {
       setIsExiting(true);
       setTimeout(onDismiss, 300);
-    }, 2500); 
+    }, 2500);
 
     return () => clearTimeout(timer);
   }, [onDismiss]);
@@ -37,7 +37,9 @@ const ToastItem = ({ notification, onDismiss }) => {
   const Icon = isJoin ? UserPlus : UserMinus;
 
   return (
-    <div className={`${styles.toast} ${isExiting ? styles.exiting : ''} ${isJoin ? styles.joinToast : styles.leaveToast}`}>
+    <div
+      className={`${styles.toast} ${isExiting ? styles.exiting : ''} ${isJoin ? styles.joinToast : styles.leaveToast}`}
+    >
       <div className={styles.iconWrapper}>
         <Icon size={18} />
       </div>

@@ -3,7 +3,7 @@ import styles from '@/styles/chat.module.css';
 
 export default function ReplyMessage({ replyTo, onNavigate }) {
   return (
-    <div 
+    <div
       className={styles.messageReply}
       onClick={async (e) => {
         e.stopPropagation();
@@ -14,11 +14,8 @@ export default function ReplyMessage({ replyTo, onNavigate }) {
         <div className={styles.messageReplyAuthor}>
           {replyTo.senderDisplayName || replyTo.senderUsername}
         </div>
-        <div className={styles.messageReplyText}>
-          {getReplyContentPreview(replyTo)}
-        </div>
+        <div className={styles.messageReplyText}>{getReplyContentPreview(replyTo)}</div>
       </div>
     </div>
   );
 }
-

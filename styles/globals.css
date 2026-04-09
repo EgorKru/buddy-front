@@ -11,6 +11,81 @@
   --primary-hover-rgb: 88, 110, 220;
   --text-secondary-rgb: 180, 180, 190;
   --border-rgb: 50, 50, 60;
+
+  /* Палитра для страниц настроек, карточек, сообщений */
+  --primary: #667eea;
+  --primary-dark: #764ba2;
+  --primary-hover: #7c8aee;
+  --bg-dark: #0f0f14;
+  --bg-dark-end: #1a1a23;
+  --card-bg: rgba(30, 30, 35, 0.95);
+  --card-border: rgba(103, 126, 234, 0.2);
+  --text-light: #fff;
+  --text-muted: #9ca3af;
+  --text-label: #e0e0e0;
+  --input-placeholder: #6b7280;
+  --input-bg: rgba(30, 30, 35, 0.6);
+  --input-border: rgba(103, 126, 234, 0.3);
+  --input-focus-shadow: rgba(103, 126, 234, 0.1);
+  --avatar-bg: rgba(103, 126, 234, 0.1);
+  --avatar-border: rgba(103, 126, 234, 0.3);
+  --primary-shadow-color: rgba(103, 126, 234, 0.3);
+  --error-bg: rgba(239, 68, 68, 0.1);
+  --error-border: rgba(239, 68, 68, 0.3);
+  --error-text: #ef4444;
+  --success-bg: rgba(16, 185, 129, 0.1);
+  --success-border: rgba(16, 185, 129, 0.3);
+  --success-text: #10b981;
+
+  /* Комната / видеозвонки */
+  --bg-main: rgb(18, 18, 22);
+  --surface: rgba(25, 25, 30, 0.95);
+  --text-primary: white;
+  --text-secondary: rgba(255, 255, 255, 0.6);
+  --text-muted: rgba(255, 255, 255, 0.5);
+  --border-light: rgba(255, 255, 255, 0.06);
+  --primary-button-hover: rgb(90, 110, 220);
+  --danger: rgb(255, 100, 100);
+  --success-accent: rgb(76, 217, 100);
+  --success-glow: rgba(76, 217, 100, 0.3);
+  --success-badge-bg: rgba(76, 217, 100, 0.9);
+  --success-badge-shadow: rgba(76, 217, 100, 0.4);
+  --room-code-bg: rgba(255, 255, 255, 0.1);
+  --loader-track: rgba(102, 126, 234, 0.2);
+  --video-item-bg: rgb(25, 25, 30);
+  --screen-bg: rgb(20, 20, 25);
+  --screen-video-bg: rgb(15, 15, 18);
+  --secondary-button-border: rgba(255, 255, 255, 0.2);
+  --secondary-button-hover-bg: rgba(255, 255, 255, 0.05);
+  --secondary-button-hover-border: rgba(255, 255, 255, 0.3);
+
+  /* Home / светлая тема */
+  --home-bg: #ffffff;
+  --home-surface: rgba(255, 255, 255, 0.95);
+  --home-border: #e5e7eb;
+  --home-border-hover: #d1d5db;
+  --home-text-primary: #111827;
+  --home-text-secondary: #6b7280;
+  --home-text-muted: #9ca3af;
+  --home-btn-neutral: #6b6b6b;
+  --home-btn-neutral-hover: #5a5a5a;
+  --home-btn-outline-bg: #f3f4f6;
+  --home-btn-outline-hover-bg: #e5e7eb;
+  --home-btn-outline-text: #374151;
+  --home-input-bg: #ffffff;
+  --home-input-hover-bg: #fafafa;
+  --home-focus-ring: rgba(107, 107, 107, 0.1);
+  --home-menu-hover-bg: #f9fafb;
+  --home-error-input-bg: rgba(239, 68, 68, 0.05);
+
+  /* Акцентный синий: ссылки, кнопки, выделение в чате */
+  --accent-blue: #4a9eff;
+  --accent-blue-hover: #3a8eef;
+  --accent-blue-light: #dbeafe;
+  --accent-blue-muted-bg: #e0e6f0;
+  --accent-blue-text: #1976d2;
+  --accent-blue-selected-bg: rgba(59, 130, 246, 0.08);
+  --accent-blue-focus-ring: rgba(59, 130, 246, 0.1);
 }
 
 * {
@@ -22,7 +97,6 @@
 html,
 body {
   height: 100%;
-  overflow: hidden;
   -webkit-text-size-adjust: 100%;
   -moz-text-size-adjust: 100%;
   -ms-text-size-adjust: 100%;
@@ -32,13 +106,15 @@ body {
 body {
   color: rgb(var(--foreground-rgb));
   background: rgb(var(--background-rgb));
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell',
+    'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Скролл на уровне контейнера приложения — страницы (home и др.) могут прокручиваться */
 #__next {
   height: 100%;
+  overflow-y: auto;
 }

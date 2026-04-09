@@ -12,7 +12,7 @@ export function useMediaDevices() {
   const [permissionGranted, setPermissionGranted] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
   const [isMicWorking, setIsMicWorking] = useState(false);
-  
+
   const streamRef = useRef(null);
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
@@ -21,19 +21,19 @@ export function useMediaDevices() {
   const getDevices = useCallback(async () => {
     try {
       const deviceList = await navigator.mediaDevices.enumerateDevices();
-      const cameras = deviceList.filter(d => d.kind === 'videoinput');
-      const microphones = deviceList.filter(d => d.kind === 'audioinput');
-      const speakers = deviceList.filter(d => d.kind === 'audiooutput');
-      
+      const cameras = deviceList.filter((d) => d.kind === 'videoinput');
+      const microphones = deviceList.filter((d) => d.kind === 'audioinput');
+      const speakers = deviceList.filter((d) => d.kind === 'audiooutput');
+
       setDevices({ cameras, microphones, speakers });
-      
+
       if (cameras.length > 0 && !selectedCamera) {
         setSelectedCamera(cameras[0].deviceId);
       }
       if (microphones.length > 0 && !selectedMicrophone) {
         setSelectedMicrophone(microphones[0].deviceId);
       }
-      
+
       return { cameras, microphones, speakers };
     } catch (err) {
       setError('Не удалось получить список устройств');
@@ -41,60 +41,67 @@ export function useMediaDevices() {
     }
   }, [selectedCamera, selectedMicrophone]);
 
-  const startPreview = useCallback(async (video = false, audio = false) => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
+  const startPreview = useCallback(
+    async (video = false, audio = false) => {
+      setIsLoading(true);
+      setError(null);
 
-      const constraints = {
-        video: video ? {
-          deviceId: selectedCamera ? { exact: selectedCamera } : undefined,
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          facingMode: 'user'
-        } : false,
-        audio: audio ? {
-          deviceId: selectedMicrophone ? { exact: selectedMicrophone } : undefined,
-          echoCancellation: true,
-          noiseSuppression: true,
-        } : false,
-      };
+      try {
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop());
+        }
 
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      
-      streamRef.current = stream;
-      setPermissionGranted(true);
-      setVideoEnabled(video);
-      setAudioEnabled(audio);
-      
-      await getDevices();
-      
-      setLocalStream(stream);
-      
-      return stream;
-    } catch (err) {
-      let errorMessage = 'Не удалось получить доступ к устройствам';
-      if (err.name === 'NotAllowedError') {
-        errorMessage = 'Доступ к устройствам запрещён. Разрешите доступ в настройках браузера.';
-      } else if (err.name === 'NotFoundError') {
-        errorMessage = 'Устройство не найдено.';
-      } else if (err.name === 'NotReadableError') {
-        errorMessage = 'Устройство уже используется другим приложением.';
+        const constraints = {
+          video: video
+            ? {
+                deviceId: selectedCamera ? { exact: selectedCamera } : undefined,
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+                facingMode: 'user',
+              }
+            : false,
+          audio: audio
+            ? {
+                deviceId: selectedMicrophone ? { exact: selectedMicrophone } : undefined,
+                echoCancellation: true,
+                noiseSuppression: true,
+              }
+            : false,
+        };
+
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+        streamRef.current = stream;
+        setPermissionGranted(true);
+        setVideoEnabled(video);
+        setAudioEnabled(audio);
+
+        await getDevices();
+
+        setLocalStream(stream);
+
+        return stream;
+      } catch (err) {
+        let errorMessage = 'Не удалось получить доступ к устройствам';
+        if (err.name === 'NotAllowedError') {
+          errorMessage = 'Доступ к устройствам запрещён. Разрешите доступ в настройках браузера.';
+        } else if (err.name === 'NotFoundError') {
+          errorMessage = 'Устройство не найдено.';
+        } else if (err.name === 'NotReadableError') {
+          errorMessage = 'Устройство уже используется другим приложением.';
+        }
+        setError(errorMessage);
+        throw new Error(errorMessage);
+      } finally {
+        setIsLoading(false);
       }
-      setError(errorMessage);
-      throw new Error(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [selectedCamera, selectedMicrophone, getDevices]);
+    },
+    [selectedCamera, selectedMicrophone, getDevices]
+  );
 
   const stopPreview = useCallback(() => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
     setLocalStream(null);
@@ -106,7 +113,7 @@ export function useMediaDevices() {
     if (!newAudioEnabled) {
       if (localStream) {
         const audioTracks = localStream.getAudioTracks();
-        audioTracks.forEach(track => {
+        audioTracks.forEach((track) => {
           track.enabled = false;
         });
       }
@@ -115,7 +122,6 @@ export function useMediaDevices() {
     }
 
     if (!localStream) {
-      
       try {
         setIsLoading(true);
         setError(null);
@@ -127,7 +133,7 @@ export function useMediaDevices() {
             noiseSuppression: true,
           },
         });
-        
+
         streamRef.current = audioStream;
         setLocalStream(audioStream);
         setPermissionGranted(true);
@@ -151,13 +157,11 @@ export function useMediaDevices() {
 
     const audioTracks = localStream.getAudioTracks();
     if (audioTracks.length > 0) {
-      
-      audioTracks.forEach(track => {
+      audioTracks.forEach((track) => {
         track.enabled = true;
       });
       setAudioEnabled(true);
     } else {
-      
       try {
         setIsLoading(true);
         setError(null);
@@ -169,7 +173,7 @@ export function useMediaDevices() {
             noiseSuppression: true,
           },
         });
-        
+
         const audioTrack = audioStream.getAudioTracks()[0];
         const videoTracks = localStream.getVideoTracks();
         if (audioTrack) {
@@ -178,14 +182,14 @@ export function useMediaDevices() {
           streamRef.current = updatedStream;
           setAudioEnabled(true);
           setLocalStream(updatedStream);
-          
-          audioStream.getTracks().forEach(track => {
+
+          audioStream.getTracks().forEach((track) => {
             if (track !== audioTrack) {
               track.stop();
             }
           });
         } else {
-          audioStream.getTracks().forEach(track => track.stop());
+          audioStream.getTracks().forEach((track) => track.stop());
         }
       } catch (err) {
         setError('Не удалось включить микрофон');
@@ -201,11 +205,11 @@ export function useMediaDevices() {
     if (!newVideoEnabled) {
       if (localStream) {
         const videoTracks = localStream.getVideoTracks();
-        videoTracks.forEach(track => {
+        videoTracks.forEach((track) => {
           track.stop();
           localStream.removeTrack(track);
         });
-        
+
         if (localStream.getTracks().length > 0) {
           const updatedStream = new MediaStream(localStream.getTracks());
           streamRef.current = updatedStream;
@@ -220,7 +224,6 @@ export function useMediaDevices() {
     }
 
     if (!localStream) {
-      
       try {
         setIsLoading(true);
         setError(null);
@@ -229,11 +232,11 @@ export function useMediaDevices() {
             deviceId: selectedCamera ? { exact: selectedCamera } : undefined,
             width: { ideal: 1280 },
             height: { ideal: 720 },
-            facingMode: 'user'
+            facingMode: 'user',
           },
           audio: false,
         });
-        
+
         streamRef.current = videoStream;
         setLocalStream(videoStream);
         setPermissionGranted(true);
@@ -257,9 +260,9 @@ export function useMediaDevices() {
 
     const videoTracks = localStream.getVideoTracks();
     if (videoTracks.length > 0) {
-      const allEnabled = videoTracks.every(track => track.enabled);
+      const allEnabled = videoTracks.every((track) => track.enabled);
       if (!allEnabled) {
-        videoTracks.forEach(track => {
+        videoTracks.forEach((track) => {
           track.enabled = true;
         });
       }
@@ -268,7 +271,6 @@ export function useMediaDevices() {
       streamRef.current = updatedStream;
       setLocalStream(updatedStream);
     } else {
-      
       try {
         setIsLoading(true);
         setError(null);
@@ -277,11 +279,11 @@ export function useMediaDevices() {
             deviceId: selectedCamera ? { exact: selectedCamera } : undefined,
             width: { ideal: 1280 },
             height: { ideal: 720 },
-            facingMode: 'user'
+            facingMode: 'user',
           },
           audio: false,
         });
-        
+
         const videoTrack = videoStream.getVideoTracks()[0];
         const audioTracks = localStream.getAudioTracks();
         if (videoTrack) {
@@ -290,14 +292,14 @@ export function useMediaDevices() {
           streamRef.current = updatedStream;
           setVideoEnabled(true);
           setLocalStream(updatedStream);
-          
-          videoStream.getTracks().forEach(track => {
+
+          videoStream.getTracks().forEach((track) => {
             if (track !== videoTrack) {
               track.stop();
             }
           });
         } else {
-          videoStream.getTracks().forEach(track => track.stop());
+          videoStream.getTracks().forEach((track) => track.stop());
         }
       } catch (err) {
         setError('Не удалось включить камеру');
@@ -307,94 +309,100 @@ export function useMediaDevices() {
     }
   }, [localStream, videoEnabled, selectedCamera, getDevices]);
 
-  const switchCamera = useCallback(async (deviceId) => {
-    setSelectedCamera(deviceId);
-    if (localStream && videoEnabled) {
-      try {
-        const newStream = await navigator.mediaDevices.getUserMedia({
-          video: { 
-            deviceId: { exact: deviceId },
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          },
-          audio: false,
-        });
-        
-        const oldVideoTrack = localStream.getVideoTracks()[0];
-        const newVideoTrack = newStream.getVideoTracks()[0];
-        const audioTracks = localStream.getAudioTracks();
-        
-        if (!newVideoTrack) {
-          newStream.getTracks().forEach(track => track.stop());
-          setError('Не удалось получить видео трек с новой камеры');
-          return;
-        }
-        
-        if (oldVideoTrack) {
-          oldVideoTrack.stop();
-        }
-        
-        const allTracks = [newVideoTrack, ...audioTracks].filter(Boolean);
-        const updatedStream = new MediaStream(allTracks);
-        streamRef.current = updatedStream;
-        setLocalStream(updatedStream);
-        
-        newStream.getTracks().forEach(track => {
-          if (track !== newVideoTrack) {
-            track.stop();
-          }
-        });
-      } catch (err) {
-        console.error('Ошибка переключения камеры:', err);
-        setError('Не удалось переключить камеру');
-      }
-    }
-  }, [localStream, videoEnabled]);
+  const switchCamera = useCallback(
+    async (deviceId) => {
+      setSelectedCamera(deviceId);
+      if (localStream && videoEnabled) {
+        try {
+          const newStream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              deviceId: { exact: deviceId },
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
+            audio: false,
+          });
 
-  const switchMicrophone = useCallback(async (deviceId) => {
-    setSelectedMicrophone(deviceId);
-    if (localStream && audioEnabled) {
-      try {
-        const newStream = await navigator.mediaDevices.getUserMedia({
-          video: false,
-          audio: { 
-            deviceId: { exact: deviceId },
-            echoCancellation: true,
-            noiseSuppression: true,
-          },
-        });
-        
-        const oldAudioTrack = localStream.getAudioTracks()[0];
-        const newAudioTrack = newStream.getAudioTracks()[0];
-        const videoTracks = localStream.getVideoTracks();
-        
-        if (!newAudioTrack) {
-          newStream.getTracks().forEach(track => track.stop());
-          setError('Не удалось получить аудио трек с нового микрофона');
-          return;
-        }
-        
-        if (oldAudioTrack) {
-          localStream.removeTrack(oldAudioTrack);
-          oldAudioTrack.stop();
-        }
-        
-        localStream.addTrack(newAudioTrack);
-        streamRef.current = localStream;
-        
-        setLocalStream(localStream);
-        
-        newStream.getTracks().forEach(track => {
-          if (track !== newAudioTrack) {
-            track.stop();
+          const oldVideoTrack = localStream.getVideoTracks()[0];
+          const newVideoTrack = newStream.getVideoTracks()[0];
+          const audioTracks = localStream.getAudioTracks();
+
+          if (!newVideoTrack) {
+            newStream.getTracks().forEach((track) => track.stop());
+            setError('Не удалось получить видео трек с новой камеры');
+            return;
           }
-        });
-      } catch (err) {
-        console.error('Ошибка переключения микрофона:', err);
-        setError('Не удалось переключить микрофон');
+
+          if (oldVideoTrack) {
+            oldVideoTrack.stop();
+          }
+
+          const allTracks = [newVideoTrack, ...audioTracks].filter(Boolean);
+          const updatedStream = new MediaStream(allTracks);
+          streamRef.current = updatedStream;
+          setLocalStream(updatedStream);
+
+          newStream.getTracks().forEach((track) => {
+            if (track !== newVideoTrack) {
+              track.stop();
+            }
+          });
+        } catch (err) {
+          console.error('Ошибка переключения камеры:', err);
+          setError('Не удалось переключить камеру');
+        }
       }
-    }
-  }, [localStream, audioEnabled]);
+    },
+    [localStream, videoEnabled]
+  );
+
+  const switchMicrophone = useCallback(
+    async (deviceId) => {
+      setSelectedMicrophone(deviceId);
+      if (localStream && audioEnabled) {
+        try {
+          const newStream = await navigator.mediaDevices.getUserMedia({
+            video: false,
+            audio: {
+              deviceId: { exact: deviceId },
+              echoCancellation: true,
+              noiseSuppression: true,
+            },
+          });
+
+          const oldAudioTrack = localStream.getAudioTracks()[0];
+          const newAudioTrack = newStream.getAudioTracks()[0];
+          const videoTracks = localStream.getVideoTracks();
+
+          if (!newAudioTrack) {
+            newStream.getTracks().forEach((track) => track.stop());
+            setError('Не удалось получить аудио трек с нового микрофона');
+            return;
+          }
+
+          if (oldAudioTrack) {
+            localStream.removeTrack(oldAudioTrack);
+            oldAudioTrack.stop();
+          }
+
+          localStream.addTrack(newAudioTrack);
+          streamRef.current = localStream;
+
+          setLocalStream(localStream);
+
+          newStream.getTracks().forEach((track) => {
+            if (track !== newAudioTrack) {
+              track.stop();
+            }
+          });
+        } catch (err) {
+          console.error('Ошибка переключения микрофона:', err);
+          setError('Не удалось переключить микрофон');
+        }
+      }
+    },
+    [localStream, audioEnabled]
+  );
 
   const getStream = useCallback(() => {
     return streamRef.current;
@@ -405,24 +413,24 @@ export function useMediaDevices() {
       if (audioContextRef.current) {
         audioContextRef.current.close();
       }
-      
+
       const audioContext = new (window.AudioContext || window.webkitAudioContext)();
       audioContextRef.current = audioContext;
-      
+
       const analyser = audioContext.createAnalyser();
       analyser.fftSize = 256;
       analyser.smoothingTimeConstant = 0.8;
       analyserRef.current = analyser;
-      
+
       const source = audioContext.createMediaStreamSource(stream);
       source.connect(analyser);
-      
+
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
       let peakDetected = false;
-      
+
       const checkAudioLevel = () => {
         if (!analyserRef.current) return;
-        
+
         analyserRef.current.getByteFrequencyData(dataArray);
 
         let sum = 0;
@@ -438,14 +446,12 @@ export function useMediaDevices() {
           peakDetected = true;
           setIsMicWorking(true);
         }
-        
+
         animationFrameRef.current = requestAnimationFrame(checkAudioLevel);
       };
-      
+
       checkAudioLevel();
-    } catch (err) {
-      
-    }
+    } catch (err) {}
   }, []);
 
   const stopAudioAnalysis = useCallback(() => {
@@ -471,7 +477,7 @@ export function useMediaDevices() {
     } else {
       stopAudioAnalysis();
     }
-    
+
     return () => {
       stopAudioAnalysis();
     };
@@ -481,7 +487,7 @@ export function useMediaDevices() {
     return () => {
       stopAudioAnalysis();
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current.getTracks().forEach((track) => track.stop());
       }
     };
   }, [stopAudioAnalysis]);
@@ -509,4 +515,3 @@ export function useMediaDevices() {
     setError,
   };
 }
-

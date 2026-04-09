@@ -17,8 +17,8 @@ export default function ChatHeader({
   onCloseSearch,
   onSearchSubmit,
   onSearchTextChange,
-  onMenuClick,
-  onStartCall,  
+  onMenuClick: _onMenuClick,
+  onStartCall,
 }) {
   const router = useRouter();
   const { canInitiateCall } = useCall();
@@ -27,17 +27,15 @@ export default function ChatHeader({
 
   const getCallTarget = () => {
     if (!chat?.participants || !user?.id) {
-      
       return null;
     }
 
-    const other = chat.participants.find(p => {
+    const other = chat.participants.find((p) => {
       const participantId = p.user?.id || p.id;
       return Number(participantId) !== Number(user.id);
     });
-    
+
     if (!other) {
-      
       return null;
     }
 
@@ -58,9 +56,10 @@ export default function ChatHeader({
 
   const getOtherParticipantStatus = () => {
     if (!chat?.participants || !user?.id) return { text: '', online: false };
-    if (chat.type !== 'DIRECT') return { text: `${chat.participants?.length || 0} участников`, online: false };
-    
-    const other = chat.participants.find(p => Number(p.id) !== Number(user.id));
+    if (chat.type !== 'DIRECT')
+      return { text: `${chat.participants?.length || 0} участников`, online: false };
+
+    const other = chat.participants.find((p) => Number(p.id) !== Number(user.id));
     return getOnlineStatus(other, user.id);
   };
 
@@ -72,14 +71,10 @@ export default function ChatHeader({
 
   return (
     <div className={styles.header}>
-      <button 
-        onClick={handleBack} 
-        className={styles.backButton}
-        title="Назад"
-      >
+      <button onClick={handleBack} className={styles.backButton} title="Назад">
         <ArrowLeft size={20} />
       </button>
-      
+
       <div className={styles.chatInfo}>
         <h1>{getDisplayChatName()}</h1>
         {status.text && (
@@ -91,7 +86,7 @@ export default function ChatHeader({
           </div>
         )}
       </div>
-      
+
       <div className={styles.headerActions}>
         {}
         {chat?.type === 'DIRECT' && (
@@ -104,15 +99,13 @@ export default function ChatHeader({
             }}
             className={styles.callButton}
             disabled={!canCall}
-            title={canCall ? "Позвонить" : "Вы уже в активном звонке"}
+            title={canCall ? 'Позвонить' : 'Вы уже в активном звонке'}
           >
             <Phone size={20} />
           </button>
         )}
-        
-        {chat && chat.id && (
-          <RoomControls chatId={chat.id} chatType={chat.type} />
-        )}
+
+        {chat && chat.id && <RoomControls chatId={chat.id} chatType={chat.type} />}
         <div className={styles.searchWrapper}>
           {!searchOpen ? (
             <button
@@ -155,4 +148,3 @@ export default function ChatHeader({
     </div>
   );
 }
-

@@ -11,8 +11,7 @@
   width: 100%;
   height: 100%;
   clip-path: polygon(50% 4%, 6% 96%, 94% 96%);
-  background:
-    radial-gradient(circle at 50% 0%, #1e293b 0%, #020617 45%, #020617 100%);
+  background: radial-gradient(circle at 50% 0%, #1e293b 0%, #020617 45%, #020617 100%);
   border: 2px solid #c4f1be;
   box-shadow:
     0 10px 26px rgba(0, 0, 0, 0.7),
@@ -29,15 +28,22 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.2s ease, opacity 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    opacity 0.2s ease;
 }
 
 .iris {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background:
-    radial-gradient(circle at 25% 25%, #f9fafb 0%, #6ee7b7 25%, #047857 60%, #020617 100%);
+  background: radial-gradient(
+    circle at 25% 25%,
+    #f9fafb 0%,
+    #6ee7b7 25%,
+    #047857 60%,
+    #020617 100%
+  );
   box-shadow:
     0 0 0 2px rgba(15, 23, 42, 1),
     0 0 16px rgba(52, 211, 153, 0.5);
@@ -100,5 +106,3 @@
 .closed .lidBottom {
   transform: translateY(0);
 }
-
-

@@ -22,7 +22,7 @@ const useMediaStream = () => {
 
     const stopStream = (s) => {
       if (!s) return;
-      s.getTracks().forEach(t => t.stop());
+      s.getTracks().forEach((t) => t.stop());
     };
 
     const init = async () => {

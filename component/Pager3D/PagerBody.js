@@ -9,20 +9,19 @@ export default function PagerBody() {
           <div className={styles.screenLine}>READY</div>
         </div>
       </div>
-      
+
       <div className={styles.buttons}>
         <div className={styles.button}></div>
         <div className={styles.button}></div>
         <div className={styles.button}></div>
       </div>
-      
+
       <div className={styles.antenna}>
         <div className={styles.antennaBase}></div>
         <div className={styles.antennaTop}></div>
       </div>
-      
+
       <div className={styles.led}></div>
     </div>
   );
 }
-

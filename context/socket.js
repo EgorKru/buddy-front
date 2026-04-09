@@ -1,8 +1,8 @@
-import { createContext, useContext, useEffect, useState, useRef } from "react";
+import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { Client } from '@stomp/stompjs';
-import { getToken } from "@/utils/api";
-import { config } from "@/utils/config";
-import { safeJsonParse } from "@/utils/safe";
+import { getToken } from '@/utils/api';
+import { config } from '@/utils/config';
+import { safeJsonParse } from '@/utils/safe';
 
 const StompContext = createContext(null);
 
@@ -16,10 +16,11 @@ export const useSocket = () => {
 };
 
 const isAuthError = (message) => {
-  return message && (
-    message.includes('аутентификации') ||
-    message.includes('не аутентифицирован') ||
-    message.includes('Unauthorized')
+  return (
+    message &&
+    (message.includes('аутентификации') ||
+      message.includes('не аутентифицирован') ||
+      message.includes('Unauthorized'))
   );
 };
 
@@ -107,7 +108,6 @@ export const StompProvider = (props) => {
             stompClient.subscribe('/user/queue/state-sync', (message) => {
               const stateData = safeJsonParse(message.body);
               if (stateData && stateData.eventType === 'STATE_SYNC') {
-                
                 if (typeof window !== 'undefined') {
                   window.dispatchEvent(new CustomEvent('state-sync', { detail: stateData }));
                 }
@@ -152,7 +152,8 @@ export const StompProvider = (props) => {
     };
 
     const ensureConnection = () => {
-      const disableWebSocket = typeof window !== 'undefined' && localStorage.getItem('disable_websocket') === 'true';
+      const disableWebSocket =
+        typeof window !== 'undefined' && localStorage.getItem('disable_websocket') === 'true';
       if (disableWebSocket) {
         disconnect();
         tokenRef.current = getToken();
@@ -187,9 +188,5 @@ export const StompProvider = (props) => {
     };
   }, []);
 
-  return (
-    <StompContext.Provider value={{ client, connected }}>
-      {children}
-    </StompContext.Provider>
-  );
+  return <StompContext.Provider value={{ client, connected }}>{children}</StompContext.Provider>;
 };

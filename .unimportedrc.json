@@ -1,0 +1,10 @@
+{
+  "ignoreUnimported": [
+    "next.config.js",
+    "postcss.config.js",
+    "tailwind.config.js",
+    "public/sw.js",
+    "public/workers/audio-worker.js"
+  ],
+  "ignoreUnused": []
+}

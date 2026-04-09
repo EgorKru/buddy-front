@@ -1,13 +1,18 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
-import { isAtBottom, findFirstVisibleMessage, saveScrollPositionToStorage, loadScrollPositionFromStorage, countMessagesBelowViewport } from '../utils/scrollHelpers';
-import { 
-  SCROLL_RESTORE_TIMEOUT, 
+import {
+  isAtBottom,
+  findFirstVisibleMessage,
+  saveScrollPositionToStorage,
+  loadScrollPositionFromStorage,
+  countMessagesBelowViewport,
+} from '../utils/scrollHelpers';
+import {
   LOAD_MORE_THRESHOLD,
   CHECK_BOTTOM_DEFAULT_THRESHOLD,
   CHECK_BOTTOM_STRICT_THRESHOLD,
   RESTORE_POSITION_DELAY,
   CHECK_BOTTOM_AUTO_SCROLL_THRESHOLD,
-  AUTO_SCROLL_DELAY
+  AUTO_SCROLL_DELAY,
 } from '../constants/chat';
 import { useInfiniteScroll } from './useInfiniteScroll';
 
@@ -20,9 +25,8 @@ export const useScrollManagement = ({
   loadingMore,
   oldestMessageId,
   onLoadOlderMessages,
-  setShowScrollToBottom
+  setShowScrollToBottom: _setShowScrollToBottom,
 }) => {
-  
   const scrollPositionSavedRef = useRef(false);
   const shouldRestorePositionRef = useRef(true);
   const userScrolledToBottomRef = useRef(false);
@@ -42,20 +46,22 @@ export const useScrollManagement = ({
 
   const getIsRestoringScroll = () => isRestoringScrollRef.current;
 
-  const checkIsAtBottom = useCallback((threshold = CHECK_BOTTOM_DEFAULT_THRESHOLD) => {
-    if (!messagesContainerRef.current) return false;
-    return isAtBottom(messagesContainerRef.current, threshold);
-  }, [messagesContainerRef]);
+  const checkIsAtBottom = useCallback(
+    (threshold = CHECK_BOTTOM_DEFAULT_THRESHOLD) => {
+      if (!messagesContainerRef.current) return false;
+      return isAtBottom(messagesContainerRef.current, threshold);
+    },
+    [messagesContainerRef]
+  );
 
   const updateUnreadCount = useCallback(() => {
     if (!messagesContainerRef.current || !messages || messages.length === 0) {
       setUnreadCount(0);
       return;
     }
-    
+
     const isAtBottomNow = checkIsAtBottom(50);
     if (isAtBottomNow) {
-      
       const sortedMessages = [...messages].sort((a, b) => {
         const timeA = new Date(a.createdAt || 0).getTime();
         const timeB = new Date(b.createdAt || 0).getTime();
@@ -70,7 +76,6 @@ export const useScrollManagement = ({
     }
 
     if (!lastReadMessageIdRef.current) {
-      
       const count = countMessagesBelowViewport(messagesContainerRef.current);
       setUnreadCount(count);
       return;
@@ -81,26 +86,26 @@ export const useScrollManagement = ({
     const messageElements = messagesContainerRef.current.querySelectorAll('[data-message-id]');
     let count = 0;
     let foundLastRead = false;
-    
+
     for (const msgEl of messageElements) {
       const messageId = msgEl.getAttribute('data-message-id');
       if (messageId && String(messageId) === String(lastReadMessageIdRef.current)) {
         foundLastRead = true;
         continue;
       }
-      
+
       if (foundLastRead) {
         const msgRect = msgEl.getBoundingClientRect();
-        
+
         if (msgRect.top > viewportBottom) {
           count++;
         }
       }
     }
-    
+
     setUnreadCount(count);
   }, [checkIsAtBottom, messages, messagesContainerRef]);
-  
+
   useInfiniteScroll({
     containerRef: messagesContainerRef,
     hasMore,
@@ -111,10 +116,10 @@ export const useScrollManagement = ({
     onLoadMore: onLoadOlderMessages,
     rootMargin: `${LOAD_MORE_THRESHOLD}px 0px 0px 0px`,
     sentinelId: `messages-load-sentinel-${chatId}`,
-    updateSentinelOnScroll: true
+    updateSentinelOnScroll: true,
   });
 
-  const loadMoreObserverRef = useRef(null); 
+  const _loadMoreObserverRef = useRef(null);
 
   useEffect(() => {
     if (!chatId) return;
@@ -126,32 +131,70 @@ export const useScrollManagement = ({
     lastReadMessageIdRef.current = null;
   }, [chatId]);
 
-  const saveScrollPosition = useCallback((force = false) => {
-    if (!messagesContainerRef.current || !chatId) return;
-    
-    const container = messagesContainerRef.current;
-    const scrollTop = container.scrollTop;
-    const scrollHeight = container.scrollHeight;
-    const isBottom = checkIsAtBottom(CHECK_BOTTOM_STRICT_THRESHOLD);
+  const saveScrollPosition = useCallback(
+    (_force = false) => {
+      if (!messagesContainerRef.current || !chatId) return;
 
-    let messageId = null;
-    if (!isBottom) {
-      const firstVisible = findFirstVisibleMessage(container);
-      if (firstVisible) {
-        messageId = firstVisible.getAttribute('data-message-id');
+      const container = messagesContainerRef.current;
+      const scrollTop = container.scrollTop;
+      const scrollHeight = container.scrollHeight;
+      const isBottom = checkIsAtBottom(CHECK_BOTTOM_STRICT_THRESHOLD);
+
+      let messageId = null;
+      if (!isBottom) {
+        const firstVisible = findFirstVisibleMessage(container);
+        if (firstVisible) {
+          messageId = firstVisible.getAttribute('data-message-id');
+        }
       }
-    }
-    
-    saveScrollPositionToStorage(chatId, {
-      scrollTop,
-      scrollHeight,
-      isBottom,
-      messageId
-    });
-    
-    if (isBottom) {
+
+      saveScrollPositionToStorage(chatId, {
+        scrollTop,
+        scrollHeight,
+        isBottom,
+        messageId,
+      });
+
+      if (isBottom) {
+        userScrolledToBottomRef.current = true;
+
+        if (messages && messages.length > 0) {
+          const sortedMessages = [...messages].sort((a, b) => {
+            const timeA = new Date(a.createdAt || 0).getTime();
+            const timeB = new Date(b.createdAt || 0).getTime();
+            return timeB - timeA;
+          });
+          if (sortedMessages.length > 0) {
+            lastReadMessageIdRef.current = sortedMessages[0].id;
+          }
+        }
+        setUnreadCount(0);
+      }
+    },
+    [chatId, checkIsAtBottom, messages, messagesContainerRef]
+  );
+
+  const scrollToBottom = useCallback(
+    (behavior = 'auto') => {
+      if (!messagesContainerRef.current) return;
+
+      const container = messagesContainerRef.current;
+      const targetScrollTop = container.scrollHeight;
+
+      const validBehavior =
+        typeof behavior === 'string' && (behavior === 'auto' || behavior === 'smooth')
+          ? behavior
+          : 'auto';
+
+      container.scrollTo({
+        top: targetScrollTop,
+        behavior: validBehavior,
+      });
+
+      lastScrollTopRef.current = targetScrollTop;
       userScrolledToBottomRef.current = true;
-      
+      isUserScrollingUpRef.current = false;
+
       if (messages && messages.length > 0) {
         const sortedMessages = [...messages].sort((a, b) => {
           const timeA = new Date(a.createdAt || 0).getTime();
@@ -163,44 +206,13 @@ export const useScrollManagement = ({
         }
       }
       setUnreadCount(0);
-    }
-  }, [chatId, checkIsAtBottom, messages, messagesContainerRef]);
-
-  const scrollToBottom = useCallback((behavior = 'auto') => {
-    if (!messagesContainerRef.current) return;
-    
-    const container = messagesContainerRef.current;
-    const targetScrollTop = container.scrollHeight;
-
-    const validBehavior = (typeof behavior === 'string' && (behavior === 'auto' || behavior === 'smooth')) 
-      ? behavior 
-      : 'auto';
-    
-    container.scrollTo({
-      top: targetScrollTop,
-      behavior: validBehavior
-    });
-    
-    lastScrollTopRef.current = targetScrollTop;
-    userScrolledToBottomRef.current = true;
-    isUserScrollingUpRef.current = false;
-
-    if (messages && messages.length > 0) {
-      const sortedMessages = [...messages].sort((a, b) => {
-        const timeA = new Date(a.createdAt || 0).getTime();
-        const timeB = new Date(b.createdAt || 0).getTime();
-        return timeB - timeA;
-      });
-      if (sortedMessages.length > 0) {
-        lastReadMessageIdRef.current = sortedMessages[0].id;
-      }
-    }
-    setUnreadCount(0);
-  }, [messages, messagesContainerRef]);
+    },
+    [messages, messagesContainerRef]
+  );
 
   const restoreScrollPosition = useCallback(() => {
     if (!messagesContainerRef.current || !chatId || messages.length === 0) return;
-    
+
     const saved = loadScrollPositionFromStorage(chatId);
 
     if (!shouldRestorePositionRef.current) {
@@ -280,7 +292,7 @@ export const useScrollManagement = ({
           }
         }
       };
-      
+
       setTimeout(attemptRestore, RESTORE_POSITION_DELAY);
     } catch (e) {
       scrollToBottom('auto');
@@ -292,7 +304,7 @@ export const useScrollManagement = ({
   useEffect(() => {
     if (messages.length > 0 && !scrollPositionSavedRef.current && messagesContainerRef.current) {
       const container = messagesContainerRef.current;
-      
+
       if (isLoadingInitial && !shouldRestorePositionRef.current) {
         const targetScrollTop = container.scrollHeight;
         if (targetScrollTop > 0) {
@@ -329,11 +341,14 @@ export const useScrollManagement = ({
   useEffect(() => {
     if (!messagesContainerRef.current || messages.length === 0) return;
     if (!scrollPositionSavedRef.current) return;
-    
+
     const container = messagesContainerRef.current;
     const currentScrollHeight = container.scrollHeight;
-    
-    if (scrollHeightBeforeMessageRef.current > 0 && currentScrollHeight > scrollHeightBeforeMessageRef.current) {
+
+    if (
+      scrollHeightBeforeMessageRef.current > 0 &&
+      currentScrollHeight > scrollHeightBeforeMessageRef.current
+    ) {
       if (wasAtBottomBeforeMessageRef.current || shouldAutoScrollRef.current) {
         requestAnimationFrame(() => {
           setTimeout(() => {
@@ -354,25 +369,25 @@ export const useScrollManagement = ({
     } else {
       updateUnreadCount();
     }
-    
+
     scrollHeightBeforeMessageRef.current = currentScrollHeight;
   }, [messages.length, checkIsAtBottom, scrollToBottom, updateUnreadCount, messagesContainerRef]);
 
   useEffect(() => {
     if (!messagesContainerRef.current) return;
-    
+
     const container = messagesContainerRef.current;
-    
+
     const handleScroll = () => {
       if (unreadCountUpdateTimeoutRef.current) {
         clearTimeout(unreadCountUpdateTimeoutRef.current);
       }
-      
+
       unreadCountUpdateTimeoutRef.current = setTimeout(() => {
         updateUnreadCount();
       }, 100);
     };
-    
+
     container.addEventListener('scroll', handleScroll, { passive: true });
 
     const resizeObserver = new ResizeObserver(() => {
@@ -381,7 +396,7 @@ export const useScrollManagement = ({
     resizeObserver.observe(container);
 
     updateUnreadCount();
-    
+
     return () => {
       container.removeEventListener('scroll', handleScroll);
       resizeObserver.disconnect();
@@ -392,7 +407,6 @@ export const useScrollManagement = ({
   }, [updateUnreadCount, messages.length, messagesContainerRef]);
 
   return {
-    
     saveScrollPosition,
     restoreScrollPosition,
     scrollToBottom,
@@ -412,7 +426,6 @@ export const useScrollManagement = ({
     shouldRestorePositionRef,
     scrollTimeoutRef,
     loadMoreTimeoutRef,
-    isUserScrollingRef
+    isUserScrollingRef,
   };
 };
-

@@ -8,6 +8,9 @@ import { useMessageStatus } from '@/components/chat/hooks/useMessageStatus';
 import { useChatKeyboard } from '@/components/chat/hooks/useChatKeyboard';
 import { useVoiceMessageHandling } from '@/components/chat/hooks/useVoiceMessageHandling';
 import { useScrollHandlers } from '@/components/chat/hooks/useScrollHandlers';
+import { useAudioPreviewSync } from '@/components/chat/hooks/useAudioPreviewSync';
+import { useMessageSubmit } from '@/components/chat/hooks/useMessageSubmit';
+import { useVoiceSendAndStop } from '@/components/chat/hooks/useVoiceSendAndStop';
 import { useChatModals } from '@/components/chat/hooks/useChatModals';
 import { useChatContextMenu } from '@/components/chat/hooks/useChatContextMenu';
 import { useChatSelection } from '@/components/chat/hooks/useChatSelection';
@@ -17,36 +20,38 @@ import CallTypeModal from '@/component/CallTypeModal';
 import ChatPresenter from './ChatPresenter';
 
 const ChatContainer = ({ chatId }) => {
-  const router = useRouter();
+  const _router = useRouter();
   const user = getCurrentUser();
 
   const callContext = useCall();
   const { initiateCall } = callContext;
   const [showCallTypeModal, setShowCallTypeModal] = useState(false);
   const [pendingCallTarget, setPendingCallTarget] = useState(null);
-  
+
   const handleOpenCallModal = useCallback((targetUserId, chatIdForCall, targetUserInfo) => {
     if (!targetUserId) {
-      
       return;
     }
     setPendingCallTarget({ targetUserId, chatIdForCall, targetUserInfo });
     setShowCallTypeModal(true);
   }, []);
-  
-  const handleSelectCallType = useCallback((callType) => {
-    if (!pendingCallTarget) return;
-    
-    const { targetUserId, chatIdForCall, targetUserInfo } = pendingCallTarget;
-    
-    if (typeof initiateCall === 'function') {
-      initiateCall(targetUserId, callType, chatIdForCall, targetUserInfo);
-    }
-    
-    setPendingCallTarget(null);
-    setShowCallTypeModal(false);
-  }, [pendingCallTarget, initiateCall]);
-  
+
+  const handleSelectCallType = useCallback(
+    (callType) => {
+      if (!pendingCallTarget) return;
+
+      const { targetUserId, chatIdForCall, targetUserInfo } = pendingCallTarget;
+
+      if (typeof initiateCall === 'function') {
+        initiateCall(targetUserId, callType, chatIdForCall, targetUserInfo);
+      }
+
+      setPendingCallTarget(null);
+      setShowCallTypeModal(false);
+    },
+    [pendingCallTarget, initiateCall]
+  );
+
   const {
     imageModal,
     setImageModal,
@@ -57,7 +62,7 @@ const ChatContainer = ({ chatId }) => {
     deleteForAll,
     setDeleteForAll,
     forwardModal,
-    setForwardModal
+    setForwardModal,
   } = useChatModals();
 
   const chatHook = useChat(chatId, {
@@ -66,9 +71,9 @@ const ChatContainer = ({ chatId }) => {
     deleteForAll,
     setDeleteForAll,
     forwardModal,
-    setForwardModal
+    setForwardModal,
   });
-  
+
   const {
     chatContext,
     chat,
@@ -107,7 +112,7 @@ const ChatContainer = ({ chatId }) => {
     searchText,
     setSearchText,
     searchResults,
-    isSearching,
+    isSearching: _isSearching,
     searchMode,
     searchOpen,
     searchInputRef,
@@ -139,9 +144,9 @@ const ChatContainer = ({ chatId }) => {
     scrollTimeoutRef,
     loadMoreTimeoutRef,
     isUserScrollingRef,
-    prepareScrollForSending
+    prepareScrollForSending,
   } = chatHook;
-  
+
   const {
     newMessage,
     setNewMessage,
@@ -152,21 +157,21 @@ const ChatContainer = ({ chatId }) => {
     showScrollToBottom,
     setShowScrollToBottom,
     scrollButtonReady,
-    setScrollButtonReady
+    setScrollButtonReady,
   } = useChatUI();
 
   useEffect(() => {
     setContextMenuRef.current = setContextMenu;
   }, [setContextMenu, setContextMenuRef]);
-  
+
   const {
     editingMessageId,
     editingContent,
     replyingToMessageId,
     replyingToMessage,
-    setEditingContent
+    setEditingContent,
   } = messageActions;
-  
+
   const {
     uploadingFile,
     setUploadingFile,
@@ -174,52 +179,51 @@ const ChatContainer = ({ chatId }) => {
     setSelectedFile,
     selectedFileUrlRef,
     fileInputRef,
-    clearSelectedFile
+    clearSelectedFile,
   } = fileUpload;
-  
-  const { 
-    connected, 
-    readAtByChatIdByUserId, 
-    addOptimistic, 
-    chats, 
-    upsertMessage
+
+  const {
+    connected,
+    readAtByChatIdByUserId,
+    addOptimistic,
+    chats,
+    upsertMessage: _upsertMessage,
   } = chatContext;
 
   // Typing indicator
-  const { 
-    startTyping, 
-    stopTyping, 
-    typingUserIds 
-  } = useTypingIndicator(chatId);
+  const { startTyping, stopTyping, typingUserIds } = useTypingIndicator(chatId);
 
   // Таймер для остановки typing indicator
   const typingTimeoutRef = useRef(null);
 
   // Обертка для setNewMessage с typing indicator
-  const handleNewMessageChange = useCallback((value) => {
-    setNewMessage(value);
-    
-    // Если есть текст, отправляем typing indicator
-    if (value && value.trim()) {
-      startTyping();
-      
-      // Сбросить предыдущий таймаут
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-      
-      // Остановить typing indicator через 3 секунды
-      typingTimeoutRef.current = setTimeout(() => {
+  const handleNewMessageChange = useCallback(
+    (value) => {
+      setNewMessage(value);
+
+      // Если есть текст, отправляем typing indicator
+      if (value && value.trim()) {
+        startTyping();
+
+        // Сбросить предыдущий таймаут
+        if (typingTimeoutRef.current) {
+          clearTimeout(typingTimeoutRef.current);
+        }
+
+        // Остановить typing indicator через 3 секунды
+        typingTimeoutRef.current = setTimeout(() => {
+          stopTyping();
+        }, 3000);
+      } else {
+        // Если текст пустой, сразу останавливаем typing
+        if (typingTimeoutRef.current) {
+          clearTimeout(typingTimeoutRef.current);
+        }
         stopTyping();
-      }, 3000);
-    } else {
-      // Если текст пустой, сразу останавливаем typing
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
       }
-      stopTyping();
-    }
-  }, [setNewMessage, startTyping, stopTyping]);
+    },
+    [setNewMessage, startTyping, stopTyping]
+  );
 
   // Остановить typing при размонтировании
   useEffect(() => {
@@ -245,7 +249,7 @@ const ChatContainer = ({ chatId }) => {
     scrollToBottom,
     userScrolledToBottomRef,
     isUserScrollingUpRef,
-    lastScrollTopRef
+    lastScrollTopRef,
   });
 
   const {
@@ -269,11 +273,11 @@ const ChatContainer = ({ chatId }) => {
     handlePauseRecording,
     handleResumeRecording,
     handleStopRecording,
-    handleCancelRecording,
+    handleCancelRecording: _handleCancelRecording,
     handlePlayPreview,
     cancelRecording,
     reset: resetVoice,
-    convertToBase64
+    convertToBase64: _convertToBase64,
   } = voiceRecording;
 
   useEffect(() => {
@@ -282,10 +286,10 @@ const ChatContainer = ({ chatId }) => {
     }
   }, [connected, chatId, syncQueue]);
 
-  const {
-    handleContextMenu,
-    handleCloseContextMenu
-  } = useChatContextMenu(setContextMenu, messageActions);
+  const { handleContextMenu, handleCloseContextMenu } = useChatContextMenu(
+    setContextMenu,
+    messageActions
+  );
 
   const handleCopyMessage = messageActions.handleCopyMessage;
   const handleDeleteMessage = messageActions.handleDeleteMessage;
@@ -300,59 +304,7 @@ const ChatContainer = ({ chatId }) => {
   const handleForwardMessage = messageActions.handleForwardMessage;
   const handleConfirmForward = messageActions.handleConfirmForward;
 
-  const sendMessage = useCallback(async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (editingMessageId) {
-      await handleSaveEdit();
-      return;
-    }
-    
-    if ((!newMessage.trim() && !selectedFile) || !user || sending || uploadingFile) return;
-    
-    const messageText = newMessage.trimEnd();
-    const replyToId = replyingToMessageId;
-    const fileToSend = selectedFile;
-    
-    setNewMessage('');
-
-    prepareScrollForSending();
-
-    if (fileToSend) {
-      setUploadingFile(true);
-      try {
-        await sendFileMessage(fileToSend, messageText, replyToId);
-        clearSelectedFile();
-        if (messageActions.setReplyingToMessageId) {
-          messageActions.setReplyingToMessageId(null);
-        }
-        if (messageActions.setReplyingToMessage) {
-          messageActions.setReplyingToMessage(null);
-        }
-      } catch (error) {
-        
-        alert(`Не удалось отправить файл: ${error.message || 'Неизвестная ошибка'}`);
-        setSelectedFile(fileToSend);
-        if (fileToSend && fileToSend.type.startsWith('image/') && !selectedFileUrlRef.current) {
-          selectedFileUrlRef.current = URL.createObjectURL(fileToSend);
-        }
-      } finally {
-        setUploadingFile(false);
-      }
-      return;
-    }
-
-    if (messageText) {
-      await sendTextMessage(messageText, replyToId);
-      if (messageActions.setReplyingToMessageId) {
-        messageActions.setReplyingToMessageId(null);
-      }
-      if (messageActions.setReplyingToMessage) {
-        messageActions.setReplyingToMessage(null);
-      }
-    }
-  }, [
+  const sendMessage = useMessageSubmit({
     editingMessageId,
     handleSaveEdit,
     newMessage,
@@ -369,8 +321,8 @@ const ChatContainer = ({ chatId }) => {
     clearSelectedFile,
     setSelectedFile,
     setUploadingFile,
-    selectedFileUrlRef
-  ]);
+    selectedFileUrlRef,
+  });
 
   const { handleKeyDown } = useChatKeyboard({
     editingMessageId,
@@ -381,13 +333,10 @@ const ChatContainer = ({ chatId }) => {
     selectedFile,
     handleSaveEdit,
     handleCancelEdit,
-    sendMessage
+    sendMessage,
   });
 
-  const {
-    handleSelectMessage,
-    handleSelectAll
-  } = useChatSelection({
+  const { handleSelectMessage, handleSelectAll } = useChatSelection({
     selectionMode,
     selectedMessages,
     handleSelectMessageBase,
@@ -395,190 +344,15 @@ const ChatContainer = ({ chatId }) => {
     handleSelectAllBase,
     exitSelectionMode,
     messages,
-    setContextMenu
+    setContextMenu,
   });
 
-  useEffect(() => {
-    if (audioPreviewRef.current && isRecording && isLocked) {
-      let currentBlobUrl = null;
-      let lastChunksCount = 0;
-      let lastBlobSize = 0;
-      const revokedUrls = new Set();
-      
-      const updateAudioSrc = () => {
-        if (!audioPreviewRef.current) return;
-        
-        const audio = audioPreviewRef.current;
-        const isCurrentlyPlaying = !audio.paused && 
-                                   !audio.ended && 
-                                   audio.currentTime > 0 &&
-                                   audio.readyState > 2;
-        
-        if (isCurrentlyPlaying || isPlayingPreview) {
-          return;
-        }
-        
-        const audioChunksRef = voiceRecording.audioChunksRef || { current: [] };
-        if (audioChunksRef.current && audioChunksRef.current.length > 0) {
-          const currentSize = audioChunksRef.current.reduce((sum, chunk) => sum + (chunk.size || 0), 0);
-          if (audioChunksRef.current.length === lastChunksCount && currentSize === lastBlobSize) {
-            return;
-          }
-          lastChunksCount = audioChunksRef.current.length;
-          lastBlobSize = currentSize;
-          
-          try {
-            const allChunks = Array.from(audioChunksRef.current);
-            const previewBlob = new Blob(allChunks, { type: 'audio/webm' });
-            if (previewBlob && previewBlob.size > 0) {
-              const url = URL.createObjectURL(previewBlob);
-              const oldSrc = audio.src;
-              
-              audio.src = url;
-              
-              if (oldSrc && oldSrc.startsWith('blob:') && oldSrc !== url && !revokedUrls.has(oldSrc)) {
-                revokedUrls.add(oldSrc);
-                audio.addEventListener('loadeddata', () => {
-                  if (!revokedUrls.has(oldSrc)) {
-                    revokedUrls.add(oldSrc);
-                    setTimeout(() => {
-                      try {
-                        URL.revokeObjectURL(oldSrc);
-                      } catch (e) {
-                      }
-                    }, 500);
-                  }
-                }, { once: true });
-              }
-              
-              if (currentBlobUrl && currentBlobUrl.startsWith('blob:') && currentBlobUrl !== url && !revokedUrls.has(currentBlobUrl)) {
-                revokedUrls.add(currentBlobUrl);
-                setTimeout(() => {
-                  try {
-                    URL.revokeObjectURL(currentBlobUrl);
-                  } catch (e) {
-                  }
-                }, 500);
-              }
-              
-              currentBlobUrl = url;
-              
-              if (audio.readyState === 0) {
-                audio.load();
-              }
-            }
-          } catch (error) {
-          }
-        } else if (previewBlob && previewBlob.size > 0) {
-          if (!currentBlobUrl || !audio.src || !audio.src.startsWith('blob:')) {
-            try {
-              const url = URL.createObjectURL(previewBlob);
-              const oldSrc = audio.src;
-              
-              audio.src = url;
-              
-              if (oldSrc && oldSrc.startsWith('blob:') && oldSrc !== url && !revokedUrls.has(oldSrc)) {
-                revokedUrls.add(oldSrc);
-                audio.addEventListener('loadeddata', () => {
-                  if (!revokedUrls.has(oldSrc)) {
-                    revokedUrls.add(oldSrc);
-                    setTimeout(() => {
-                      try {
-                        URL.revokeObjectURL(oldSrc);
-                      } catch (e) {
-                      }
-                    }, 500);
-                  }
-                }, { once: true });
-              }
-              
-              if (currentBlobUrl && currentBlobUrl.startsWith('blob:') && currentBlobUrl !== url && !revokedUrls.has(currentBlobUrl)) {
-                revokedUrls.add(currentBlobUrl);
-                setTimeout(() => {
-                  try {
-                    URL.revokeObjectURL(currentBlobUrl);
-                  } catch (e) {
-                  }
-                }, 500);
-              }
-              
-              currentBlobUrl = url;
-              
-              if (audio.readyState === 0) {
-                audio.load();
-              }
-            } catch (error) {
-            }
-          }
-        } else if (audioBlob && audioBlob.size > 0) {
-          if (!currentBlobUrl || !audio.src || !audio.src.startsWith('blob:')) {
-            try {
-              const url = URL.createObjectURL(audioBlob);
-              const oldSrc = audio.src;
-              
-              audio.src = url;
-              
-              if (oldSrc && oldSrc.startsWith('blob:') && oldSrc !== url && !revokedUrls.has(oldSrc)) {
-                revokedUrls.add(oldSrc);
-                audio.addEventListener('loadeddata', () => {
-                  if (!revokedUrls.has(oldSrc)) {
-                    revokedUrls.add(oldSrc);
-                    setTimeout(() => {
-                      try {
-                        URL.revokeObjectURL(oldSrc);
-                      } catch (e) {
-                      }
-                    }, 500);
-                  }
-                }, { once: true });
-              }
-              
-              if (currentBlobUrl && currentBlobUrl.startsWith('blob:') && currentBlobUrl !== url && !revokedUrls.has(currentBlobUrl)) {
-                revokedUrls.add(currentBlobUrl);
-                setTimeout(() => {
-                  try {
-                    URL.revokeObjectURL(currentBlobUrl);
-                  } catch (e) {
-                  }
-                }, 500);
-              }
-              
-              currentBlobUrl = url;
-              
-              if (audio.readyState === 0) {
-                audio.load();
-              }
-            } catch (error) {
-            }
-          }
-        }
-      };
-      
-      updateAudioSrc();
-      
-      const interval = setInterval(() => {
-        if (!audioPreviewRef.current) return;
-        updateAudioSrc();
-      }, 1000);
-      
-      return () => {
-        clearInterval(interval);
-        if (currentBlobUrl && currentBlobUrl.startsWith('blob:') && !revokedUrls.has(currentBlobUrl)) {
-          setTimeout(() => {
-            try {
-              URL.revokeObjectURL(currentBlobUrl);
-            } catch (e) {
-            }
-          }, 1000);
-        }
-      };
-    }
-  }, [previewBlob, audioBlob, isRecording, isLocked, audioPreviewRef, voiceRecording, isPlayingPreview]);
+  useAudioPreviewSync(audioPreviewRef, isRecording, isLocked, voiceRecording, isPlayingPreview);
 
   const {
     handleVoiceSendSimple,
-    handleVoiceSend,
-    handleVoiceCancel
+    handleVoiceSend: _handleVoiceSend,
+    handleVoiceCancel: _handleVoiceCancel,
   } = useVoiceMessageHandling({
     audioBlob,
     user,
@@ -599,7 +373,7 @@ const ChatContainer = ({ chatId }) => {
     isLocked,
     voiceError,
     cancelRecording,
-    voiceRecording
+    voiceRecording,
   });
 
   useEffect(() => {
@@ -610,104 +384,14 @@ const ChatContainer = ({ chatId }) => {
     };
   }, [handleVoiceSendSimple, onAutoSendRef]);
 
-  const audioBlobRef = useRef(audioBlob);
-  const previewBlobRef = useRef(previewBlob);
-  useEffect(() => {
-    audioBlobRef.current = audioBlob;
-  }, [audioBlob]);
-  useEffect(() => {
-    previewBlobRef.current = previewBlob;
-  }, [previewBlob]);
-
-  const handleVoiceSendAndStop = useCallback(async () => {
-    if (isRecording) {
-      // Останавливаем запись
-      handleStopRecording();
-      
-      // Ждем пока запись остановится и blob будет готов
-      // MediaRecorder.onstop вызывается асинхронно, поэтому нужно подождать
-      let attempts = 0;
-      const maxAttempts = 50;
-      let finalBlob = null;
-      
-      while (attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Сначала проверяем готовый audioBlob (создается в onstop)
-        if (audioBlobRef.current && audioBlobRef.current.size > 0) {
-          finalBlob = audioBlobRef.current;
-          break;
-        }
-        
-        // Затем проверяем audioChunksRef напрямую (если onstop еще не вызвался)
-        const audioChunksRef = voiceRecording.audioChunksRef || { current: [] };
-        if (audioChunksRef.current && audioChunksRef.current.length > 0) {
-          try {
-            const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-            if (blob && blob.size > 0) {
-              finalBlob = blob;
-              // Не break сразу, продолжаем проверять audioBlob (он приоритетнее)
-            }
-          } catch (error) {
-            console.error('Error creating blob from chunks:', error);
-          }
-        }
-        
-        // Проверяем previewBlob как запасной вариант
-        if (!finalBlob && previewBlobRef.current && previewBlobRef.current.size > 0) {
-          finalBlob = previewBlobRef.current;
-        }
-        
-        if (!finalBlob && previewBlob && previewBlob.size > 0) {
-          finalBlob = previewBlob;
-        }
-        
-        if (!finalBlob && audioBlob && audioBlob.size > 0) {
-          finalBlob = audioBlob;
-        }
-        
-        // Если запись остановилась и есть blob, можно отправлять
-        // Проверяем через voiceRecording.isRecording для актуального состояния
-        const stillRecording = voiceRecording?.isRecording || false;
-        if (finalBlob && finalBlob.size > 0 && !stillRecording) {
-          break;
-        }
-        
-        attempts++;
-      }
-      
-      // Если все еще нет blob, пробуем создать из чанков в последний раз
-      if (!finalBlob) {
-        const audioChunksRef = voiceRecording.audioChunksRef || { current: [] };
-        if (audioChunksRef.current && audioChunksRef.current.length > 0) {
-          try {
-            const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-            if (blob && blob.size > 0) {
-              finalBlob = blob;
-            }
-          } catch (error) {
-            console.error('Error creating final blob from chunks:', error);
-          }
-        }
-      }
-      
-      // Отправляем blob
-      if (finalBlob && finalBlob.size > 0) {
-        await handleVoiceSendSimple(finalBlob);
-      } else {
-        // Если blob не найден, пробуем отправить что есть (handleVoiceSendSimple проверит)
-        await handleVoiceSendSimple();
-      }
-    } else {
-      // Если запись уже остановлена, просто отправляем
-      const currentBlob = audioBlobRef.current || previewBlobRef.current || audioBlob || previewBlob;
-      if (currentBlob && currentBlob.size > 0) {
-        await handleVoiceSendSimple(currentBlob);
-      } else {
-        await handleVoiceSendSimple();
-      }
-    }
-  }, [isRecording, audioBlob, previewBlob, handleStopRecording, handleVoiceSendSimple, voiceRecording]);
+  const handleVoiceSendAndStop = useVoiceSendAndStop({
+    isRecording,
+    handleStopRecording,
+    handleVoiceSendSimple,
+    voiceRecording,
+    audioBlob,
+    previewBlob,
+  });
 
   useEffect(() => {
     scrollStateRef.current = { hasMore, loadingMore, oldestMessageId };
@@ -735,141 +419,140 @@ const ChatContainer = ({ chatId }) => {
     isRestoringScrollRef,
     isUserScrollingRef,
     scrollTimeoutRef,
-    loadMoreTimeoutRef
+    loadMoreTimeoutRef,
   });
 
   const { getReadMetaForMessage, getMessageStatusIcon } = useMessageStatus({
     chatId,
     chat,
     readAtByChatIdByUserId,
-    user
+    user,
   });
 
   return (
     <>
-    <ChatPresenter
-      chat={chat}
-      messages={messages}
-      messagesLoading={messagesLoading}
-      loadingMore={loadingMore}
-      user={user}
-      chatId={chatId}
-      sidebarOpen={sidebarOpen}
-      setSidebarOpen={setSidebarOpen}
-      contextMenu={contextMenu}
-      handleContextMenu={handleContextMenu}
-      handleCloseContextMenu={handleCloseContextMenu}
-      selectionMode={selectionMode}
-      selectedMessages={selectedMessages}
-      handleSelectAll={handleSelectAll}
-      exitSelectionMode={exitSelectionMode}
-      handleForwardSelected={handleForwardSelected}
-      handlePinSelected={handlePinSelected}
-      handleUnpinSelected={handleUnpinSelected}
-      handleDeleteSelected={handleDeleteSelected}
-      pinnedMessages={pinnedMessages}
-      viewedPinnedMessageId={viewedPinnedMessageId}
-      setViewedPinnedMessageId={setViewedPinnedMessageId}
-      handleUnpinMessage={handleUnpinMessage}
-      handleNavigateToMessage={handleNavigateToMessage}
-      messagesContainerRef={messagesContainerRef}
-      handleScrollThrottled={handleScrollThrottled}
-      scrollButtonReady={scrollButtonReady}
-      showScrollToBottom={showScrollToBottom}
-      scrollToBottom={scrollToBottom}
-      unreadCount={unreadCount}
-      toggleMessageSelection={toggleMessageSelection}
-      getReadMetaForMessage={getReadMetaForMessage}
-      getMessageStatusIcon={getMessageStatusIcon}
-      searchOpen={searchOpen}
-      searchText={searchText}
-      searchMode={searchMode}
-      searchResults={searchResults}
-      handleOpenSearch={handleOpenSearch}
-      handleCloseSearch={handleCloseSearch}
-      handleSearchSubmit={handleSearchSubmit}
-      setSearchText={setSearchText}
-      handleNavigateToSearchResult={handleNavigateToSearchResult}
-      searchInputRef={searchInputRef}
-      newMessageIdsRef={newMessageIdsRef}
-      loadedMessageIdsRef={loadedMessageIdsRef}
-      imageModal={imageModal}
-      setImageModal={setImageModal}
-      fileViewerModal={fileViewerModal}
-      setFileViewerModal={setFileViewerModal}
-      voiceError={voiceError}
-      newMessage={newMessage}
-      setNewMessage={handleNewMessageChange}
-      editingMessageId={editingMessageId}
-      editingContent={editingContent}
-      setEditingContent={setEditingContent}
-      replyingToMessage={replyingToMessage}
-      selectedFile={selectedFile}
-      setSelectedFile={setSelectedFile}
-      selectedFileUrlRef={selectedFileUrlRef}
-      isRecording={isRecording}
-      isLocked={isLocked}
-      isHolding={isHolding}
-      dragDistance={dragDistance}
-      reachedLockThreshold={reachedLockThreshold}
-      lockThreshold={lockThreshold}
-      isPaused={isPaused}
-      isPlayingPreview={isPlayingPreview}
-      sending={sending}
-      uploadingFile={uploadingFile}
-      messageInputRef={messageInputRef}
-      fileInputRef={fileInputRef}
-      buttonRef={buttonRef}
-      audioPreviewRef={audioPreviewRef}
-      sendMessage={sendMessage}
-      handleSaveEdit={handleSaveEdit}
-      handleCancelEdit={handleCancelEdit}
-      handleCancelReply={handleCancelReply}
-      handleMouseDown={handleMouseDown}
-      handleTouchStart={handleTouchStart}
-      handleKeyDown={handleKeyDown}
-      pauseRecording={handlePauseRecording}
-      resumeRecording={handleResumeRecording}
-      handleVoiceSendSimple={handleVoiceSendAndStop}
-      cancelRecording={cancelRecording}
-      handlePlayPreview={handlePlayPreview}
-      recordingTime={recordingTime}
-      audioLevel={audioLevel}
-      clearSelectedFile={clearSelectedFile}
-      deleteConfirm={deleteConfirm}
-      setDeleteConfirm={setDeleteConfirm}
-      deleteForAll={deleteForAll}
-      setDeleteForAll={setDeleteForAll}
-      handleConfirmDelete={handleConfirmDelete}
-      forwardModal={forwardModal}
-      setForwardModal={setForwardModal}
-      chats={chats}
-      handleConfirmForward={handleConfirmForward}
-      handleCopyMessage={handleCopyMessage}
-      handleDeleteMessage={handleDeleteMessage}
-      handleEditMessage={handleEditMessage}
-      handleReplyMessage={handleReplyMessage}
-      handlePinMessage={handlePinMessage}
-      handleForwardMessage={handleForwardMessage}
-      handleSelectMessage={handleSelectMessage}
-      onStartCall={handleOpenCallModal}
-      typingUserIds={typingUserIds}
-    />
-    
-    {}
-    <CallTypeModal
-      isOpen={showCallTypeModal}
-      onClose={() => {
-        setShowCallTypeModal(false);
-        setPendingCallTarget(null);
-      }}
-      targetUser={pendingCallTarget?.targetUserInfo}
-      onSelectAudio={() => handleSelectCallType('AUDIO')}
-      onSelectVideo={() => handleSelectCallType('VIDEO')}
-    />
+      <ChatPresenter
+        chat={chat}
+        messages={messages}
+        messagesLoading={messagesLoading}
+        loadingMore={loadingMore}
+        user={user}
+        chatId={chatId}
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+        contextMenu={contextMenu}
+        handleContextMenu={handleContextMenu}
+        handleCloseContextMenu={handleCloseContextMenu}
+        selectionMode={selectionMode}
+        selectedMessages={selectedMessages}
+        handleSelectAll={handleSelectAll}
+        exitSelectionMode={exitSelectionMode}
+        handleForwardSelected={handleForwardSelected}
+        handlePinSelected={handlePinSelected}
+        handleUnpinSelected={handleUnpinSelected}
+        handleDeleteSelected={handleDeleteSelected}
+        pinnedMessages={pinnedMessages}
+        viewedPinnedMessageId={viewedPinnedMessageId}
+        setViewedPinnedMessageId={setViewedPinnedMessageId}
+        handleUnpinMessage={handleUnpinMessage}
+        handleNavigateToMessage={handleNavigateToMessage}
+        messagesContainerRef={messagesContainerRef}
+        handleScrollThrottled={handleScrollThrottled}
+        scrollButtonReady={scrollButtonReady}
+        showScrollToBottom={showScrollToBottom}
+        scrollToBottom={scrollToBottom}
+        unreadCount={unreadCount}
+        toggleMessageSelection={toggleMessageSelection}
+        getReadMetaForMessage={getReadMetaForMessage}
+        getMessageStatusIcon={getMessageStatusIcon}
+        searchOpen={searchOpen}
+        searchText={searchText}
+        searchMode={searchMode}
+        searchResults={searchResults}
+        handleOpenSearch={handleOpenSearch}
+        handleCloseSearch={handleCloseSearch}
+        handleSearchSubmit={handleSearchSubmit}
+        setSearchText={setSearchText}
+        handleNavigateToSearchResult={handleNavigateToSearchResult}
+        searchInputRef={searchInputRef}
+        newMessageIdsRef={newMessageIdsRef}
+        loadedMessageIdsRef={loadedMessageIdsRef}
+        imageModal={imageModal}
+        setImageModal={setImageModal}
+        fileViewerModal={fileViewerModal}
+        setFileViewerModal={setFileViewerModal}
+        voiceError={voiceError}
+        newMessage={newMessage}
+        setNewMessage={handleNewMessageChange}
+        editingMessageId={editingMessageId}
+        editingContent={editingContent}
+        setEditingContent={setEditingContent}
+        replyingToMessage={replyingToMessage}
+        selectedFile={selectedFile}
+        setSelectedFile={setSelectedFile}
+        selectedFileUrlRef={selectedFileUrlRef}
+        isRecording={isRecording}
+        isLocked={isLocked}
+        isHolding={isHolding}
+        dragDistance={dragDistance}
+        reachedLockThreshold={reachedLockThreshold}
+        lockThreshold={lockThreshold}
+        isPaused={isPaused}
+        isPlayingPreview={isPlayingPreview}
+        sending={sending}
+        uploadingFile={uploadingFile}
+        messageInputRef={messageInputRef}
+        fileInputRef={fileInputRef}
+        buttonRef={buttonRef}
+        audioPreviewRef={audioPreviewRef}
+        sendMessage={sendMessage}
+        handleSaveEdit={handleSaveEdit}
+        handleCancelEdit={handleCancelEdit}
+        handleCancelReply={handleCancelReply}
+        handleMouseDown={handleMouseDown}
+        handleTouchStart={handleTouchStart}
+        handleKeyDown={handleKeyDown}
+        pauseRecording={handlePauseRecording}
+        resumeRecording={handleResumeRecording}
+        handleVoiceSendSimple={handleVoiceSendAndStop}
+        cancelRecording={cancelRecording}
+        handlePlayPreview={handlePlayPreview}
+        recordingTime={recordingTime}
+        audioLevel={audioLevel}
+        clearSelectedFile={clearSelectedFile}
+        deleteConfirm={deleteConfirm}
+        setDeleteConfirm={setDeleteConfirm}
+        deleteForAll={deleteForAll}
+        setDeleteForAll={setDeleteForAll}
+        handleConfirmDelete={handleConfirmDelete}
+        forwardModal={forwardModal}
+        setForwardModal={setForwardModal}
+        chats={chats}
+        handleConfirmForward={handleConfirmForward}
+        handleCopyMessage={handleCopyMessage}
+        handleDeleteMessage={handleDeleteMessage}
+        handleEditMessage={handleEditMessage}
+        handleReplyMessage={handleReplyMessage}
+        handlePinMessage={handlePinMessage}
+        handleForwardMessage={handleForwardMessage}
+        handleSelectMessage={handleSelectMessage}
+        onStartCall={handleOpenCallModal}
+        typingUserIds={typingUserIds}
+      />
+
+      {}
+      <CallTypeModal
+        isOpen={showCallTypeModal}
+        onClose={() => {
+          setShowCallTypeModal(false);
+          setPendingCallTarget(null);
+        }}
+        targetUser={pendingCallTarget?.targetUserInfo}
+        onSelectAudio={() => handleSelectCallType('AUDIO')}
+        onSelectVideo={() => handleSelectCallType('VIDEO')}
+      />
     </>
   );
 };
 
 export default ChatContainer;
-

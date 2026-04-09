@@ -1,4 +1,4 @@
-import { useMemo, useRef, useCallback } from 'react';
+import { useMemo, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { getCurrentUser, isAuthenticated } from '@/utils/api';
 import { useChats, useChatMessages } from '@/context/messaging';
@@ -7,7 +7,6 @@ import { useChatRealtime } from '@/hooks/useChatRealtime';
 import { usePinnedMessages } from '@/hooks/usePinnedMessages';
 import { useMessageSelection } from '@/hooks/useMessageSelection';
 import { useMessageSender } from '@/hooks/useMessageSender';
-import { MESSAGE_STATUS } from '@/utils/messageQueue';
 import { useChatMessages as useChatMessagesHook } from './useChatMessages';
 import { useScrollManagement } from './useScrollManagement';
 import { useMessageActions } from './useMessageActions';
@@ -27,20 +26,28 @@ export const useChat = (chatId, modals = {}) => {
     deleteForAll = false,
     setDeleteForAll = null,
     forwardModal = null,
-    setForwardModal = null
+    setForwardModal = null,
   } = modals;
   const router = useRouter();
   const user = getCurrentUser();
-  
+
   const chatContext = useChats();
   const { client, localSeqRef, localPtsRef, gapRecoveryInProgressRef } = useStomp();
   const messages = useChatMessages(chatId);
-  
+
   const chat = useMemo(() => {
     if (!chatId) return null;
-    return chatContext.chats.find(c => String(c?.id) === String(chatId)) || null;
+    return chatContext.chats.find((c) => String(c?.id) === String(chatId)) || null;
   }, [chatId, chatContext.chats]);
-  
+
+  const directPeerUserId = useMemo(() => {
+    if (!chat || chat.type !== 'DIRECT' || !user?.id || !Array.isArray(chat.participants)) {
+      return null;
+    }
+    const other = chat.participants.find((p) => Number(p.id) !== Number(user.id));
+    return other?.id != null ? Number(other.id) : null;
+  }, [chat, user]);
+
   const messagesContainerRef = useRef(null);
   const messageInputRef = useRef(null);
   const sentAudioBlobRef = useRef(null);
@@ -53,7 +60,7 @@ export const useChat = (chatId, modals = {}) => {
   const correctionTimeoutRef = useRef(null);
   const scrollStateRef = useRef({ hasMore: false, loadingMore: false, oldestMessageId: null });
   const abortControllerRef = useRef(null);
-  
+
   const {
     loading: messagesLoading,
     loadingMore,
@@ -63,16 +70,16 @@ export const useChat = (chatId, modals = {}) => {
     loadMessages,
     loadChatStateFull,
     loadOlderMessages,
-    isLoadingInitialRef
+    isLoadingInitialRef,
   } = useChatMessagesHook({
     chatId,
     upsertMessage: chatContext.upsertMessage,
     refreshChats: chatContext.refreshChats,
     localPtsRef,
     localSeqRef,
-    setReadReceiptsForChat: chatContext.setReadReceiptsForChat
+    setReadReceiptsForChat: chatContext.setReadReceiptsForChat,
   });
-  
+
   const {
     pinnedMessages,
     viewedPinnedMessageId,
@@ -80,7 +87,7 @@ export const useChat = (chatId, modals = {}) => {
     setPinnedMessages,
     loadPinnedMessages,
   } = usePinnedMessages(chatId, messages);
-  
+
   const {
     selectionMode,
     selectedMessages,
@@ -89,7 +96,7 @@ export const useChat = (chatId, modals = {}) => {
     handleSelectAll: handleSelectAllBase,
     exitSelectionMode,
   } = useMessageSelection();
-  
+
   const scrollManagement = useScrollManagement({
     chatId,
     messages,
@@ -99,9 +106,9 @@ export const useChat = (chatId, modals = {}) => {
     loadingMore,
     oldestMessageId,
     onLoadOlderMessages: loadOlderMessages,
-    setShowScrollToBottom: null
+    setShowScrollToBottom: null,
   });
-  
+
   const {
     scrollPositionSavedRef,
     userScrolledToBottomRef,
@@ -115,24 +122,25 @@ export const useChat = (chatId, modals = {}) => {
     unreadCount,
     ...restScrollManagement
   } = scrollManagement;
-  
+
   const { handleNavigateToMessage } = useMessageNavigation({
     chatId,
     upsertMessage: chatContext.upsertMessage,
-    isRestoringScrollRef: scrollManagement.isRestoringScrollRef
+    isRestoringScrollRef: scrollManagement.isRestoringScrollRef,
   });
-  
+
   const messageSearch = useMessageSearch({
     chatId,
     onNavigateToMessage: handleNavigateToMessage,
-    upsertMessage: chatContext.upsertMessage
+    upsertMessage: chatContext.upsertMessage,
   });
-  
+
   const setContextMenuRef = useRef(null);
   const onAutoSendRef = useRef(null);
-  
+
   const messageActions = useMessageActions({
     chatId,
+    directPeerUserId,
     messages,
     pinnedMessages,
     setPinnedMessages,
@@ -154,18 +162,18 @@ export const useChat = (chatId, modals = {}) => {
     deleteForAll,
     setDeleteForAll,
     forwardModal,
-    setForwardModal
+    setForwardModal,
   });
-  
-  const voiceRecording = useVoiceRecordingUI({ 
+
+  const voiceRecording = useVoiceRecordingUI({
     onAutoSend: (blob) => {
       if (onAutoSendRef.current) {
         onAutoSendRef.current(blob);
       }
-    }
+    },
   });
   const fileUpload = useFileUpload();
-  
+
   const bulkMessageActions = useBulkMessageActions({
     chatId,
     messages,
@@ -175,16 +183,16 @@ export const useChat = (chatId, modals = {}) => {
     loadPinnedMessages,
     exitSelectionMode,
     setDeleteConfirm,
-    setForwardModal
+    setForwardModal,
   });
-  
+
   useChatRealtime(chatId);
-  
+
   useStateSync({
     upsertMessage: chatContext.upsertMessage,
     localSeqRef,
     localPtsRef,
-    gapRecoveryInProgressRef
+    gapRecoveryInProgressRef,
   });
 
   useChatInitialization({
@@ -202,11 +210,17 @@ export const useChat = (chatId, modals = {}) => {
     shouldRestorePositionRef,
     lastScrollTopRef,
     isUserScrollingUpRef,
-    isLoadingInitialRef
+    isLoadingInitialRef,
   });
-  
-  const { sendMessage: sendMessageHook, sending, syncQueue } = useMessageSender(chatId);
-  
+
+  const {
+    sendMessage: sendMessageHook,
+    sending,
+    syncQueue,
+  } = useMessageSender(chatId, undefined, {
+    directPeerUserId,
+  });
+
   const messageSending = useMessageSending({
     chatId,
     user,
@@ -218,9 +232,9 @@ export const useChat = (chatId, modals = {}) => {
     wasAtBottomBeforeMessageRef: restScrollManagement.wasAtBottomBeforeMessageRef,
     shouldAutoScrollRef: restScrollManagement.shouldAutoScrollRef,
     newMessageIdsRef,
-    messagesContainerRef
+    messagesContainerRef,
   });
-  
+
   return {
     chatContext,
     user,
@@ -298,7 +312,6 @@ export const useChat = (chatId, modals = {}) => {
     onAutoSendRef,
     scrollTimeoutRef,
     loadMoreTimeoutRef,
-    isUserScrollingRef
+    isUserScrollingRef,
   };
 };
-

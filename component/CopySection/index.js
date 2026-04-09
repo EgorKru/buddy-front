@@ -1,8 +1,8 @@
-import { CopyToClipboard } from "react-copy-to-clipboard";
-import { Copy, Check } from "lucide-react";
-import { useState, useEffect } from "react";
+import { CopyToClipboard } from 'react-copy-to-clipboard';
+import { Copy, Check } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
-import styles from "@/component/CopySection/index.module.css";
+import styles from '@/component/CopySection/index.module.css';
 
 const CopySection = (props) => {
   const { roomId } = props;
@@ -17,7 +17,7 @@ const CopySection = (props) => {
 
     const hideTimer = setTimeout(() => {
       setVisible(false);
-    }, 6000); 
+    }, 6000);
 
     return () => {
       clearTimeout(fadeTimer);
@@ -34,7 +34,8 @@ const CopySection = (props) => {
 
   if (!roomId || !visible) return null;
 
-  const meetingLink = typeof window !== 'undefined' ? `${window.location.origin}/room/${roomId}` : roomId;
+  const meetingLink =
+    typeof window !== 'undefined' ? `${window.location.origin}/room/${roomId}` : roomId;
 
   return (
     <div className={`${styles.copyContainer} ${fading ? styles.fading : ''}`}>
@@ -43,11 +44,7 @@ const CopySection = (props) => {
         <span className={styles.roomId}>{roomId}</span>
         <CopyToClipboard text={meetingLink} onCopy={handleCopy}>
           <button className={styles.copyButton}>
-            {copied ? (
-              <Check size={18} className={styles.checkIcon} />
-            ) : (
-              <Copy size={18} />
-            )}
+            {copied ? <Check size={18} className={styles.checkIcon} /> : <Copy size={18} />}
           </button>
         </CopyToClipboard>
       </div>

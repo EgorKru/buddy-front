@@ -14,11 +14,11 @@ const InteractiveBackground = () => {
 
     const ctx = canvas.getContext('2d');
     const dpr = window.devicePixelRatio || 1;
-    
+
     class Particle {
       constructor() {
-        this.x = Math.random() * canvas.width / dpr;
-        this.y = Math.random() * canvas.height / dpr;
+        this.x = (Math.random() * canvas.width) / dpr;
+        this.y = (Math.random() * canvas.height) / dpr;
         this.size = Math.random() * 3 + 1;
         this.speedX = (Math.random() - 0.5) * 0.5;
         this.speedY = (Math.random() - 0.5) * 0.5;
@@ -28,7 +28,7 @@ const InteractiveBackground = () => {
         const colors = [
           [102, 126, 234],
           [140, 100, 200],
-          [59, 130, 246]
+          [59, 130, 246],
         ];
         this.colorRGB = colors[this.colorIndex];
         this.pulse = Math.random() * Math.PI * 2;
@@ -57,10 +57,10 @@ const InteractiveBackground = () => {
           const distance = Math.sqrt(distanceSq);
           const force = (200 - distance) / 200;
           const angle = Math.atan2(dy, dx);
-          
+
           this.speedX -= Math.cos(angle) * force * 2 * 0.1;
           this.speedY -= Math.sin(angle) * force * 2 * 0.1;
-          
+
           this.opacity = Math.min(1, this.baseOpacity + force * 0.3);
         } else {
           this.opacity = this.baseOpacity;
@@ -70,18 +70,18 @@ const InteractiveBackground = () => {
         if (now - this.lastInteractionCheck > 100) {
           let nearbyCount = 0;
           const maxNearby = 5;
-          
+
           for (let i = 0; i < particlesRef.current.length && nearbyCount < maxNearby; i++) {
             const other = particlesRef.current[i];
             if (other === this) continue;
-            
+
             const dx = other.x - this.x;
             const dy = other.y - this.y;
             const distSq = dx * dx + dy * dy;
-            
+
             if (distSq < 6400) {
               const dist = Math.sqrt(distSq);
-              const force = (80 - dist) / 80 * 0.008;
+              const force = ((80 - dist) / 80) * 0.008;
               const angle = Math.atan2(dy, dx);
               this.speedX += Math.cos(angle) * force;
               this.speedY += Math.sin(angle) * force;
@@ -126,7 +126,7 @@ const InteractiveBackground = () => {
         ctx.arc(this.x, this.y, size, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(${this.colorRGB.join(',')}, ${this.opacity})`;
         ctx.fill();
-        
+
         if (this.opacity > 0.5) {
           ctx.beginPath();
           ctx.arc(this.x, this.y, size * 2, 0, Math.PI * 2);
@@ -135,18 +135,18 @@ const InteractiveBackground = () => {
         }
       }
     }
-    
+
     const getParticleCount = () => {
       return Math.min(80, Math.floor((window.innerWidth * window.innerHeight) / 20000));
     };
-    
+
     const resizeCanvas = () => {
       canvas.width = window.innerWidth * dpr;
       canvas.height = window.innerHeight * dpr;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       canvas.style.width = window.innerWidth + 'px';
       canvas.style.height = window.innerHeight + 'px';
-      
+
       const particleCount = getParticleCount();
       particlesRef.current = [];
       for (let i = 0; i < particleCount; i++) {
@@ -161,7 +161,7 @@ const InteractiveBackground = () => {
       const now = performance.now();
       if (now - lastMouseUpdateRef.current < 16) return;
       lastMouseUpdateRef.current = now;
-      
+
       mouseRef.current.x = e.clientX;
       mouseRef.current.y = e.clientY;
     };
@@ -174,21 +174,21 @@ const InteractiveBackground = () => {
 
     const animate = (currentTime) => {
       const elapsed = currentTime - lastTime;
-      
+
       if (elapsed >= frameInterval) {
         lastTime = currentTime - (elapsed % frameInterval);
-        
+
         ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
-        
+
         const connectionDistance = 120;
         const connectionDistanceSq = connectionDistance * connectionDistance;
-        
+
         for (let i = 0; i < particlesRef.current.length; i++) {
           const particle = particlesRef.current[i];
-          
+
           let checked = 0;
           const maxChecks = 8;
-          
+
           for (let j = i + 1; j < particlesRef.current.length && checked < maxChecks; j++) {
             const other = particlesRef.current[j];
             const dx = particle.x - other.x;
@@ -198,7 +198,7 @@ const InteractiveBackground = () => {
             if (distSq < connectionDistanceSq) {
               const dist = Math.sqrt(distSq);
               const opacity = 0.2 * (1 - dist / connectionDistance);
-              
+
               ctx.beginPath();
               ctx.strokeStyle = `rgba(${particle.colorRGB.join(',')}, ${opacity})`;
               ctx.lineWidth = 1;
@@ -210,15 +210,15 @@ const InteractiveBackground = () => {
           }
         }
 
-        particlesRef.current.forEach(particle => {
+        particlesRef.current.forEach((particle) => {
           particle.update();
         });
 
-        particlesRef.current.forEach(particle => {
+        particlesRef.current.forEach((particle) => {
           particle.draw();
         });
 
-        particlesRef.current.forEach(particle => {
+        particlesRef.current.forEach((particle) => {
           const dx = mouseRef.current.x - particle.x;
           const dy = mouseRef.current.y - particle.y;
           const distSq = dx * dx + dy * dy;
@@ -227,7 +227,7 @@ const InteractiveBackground = () => {
           if (distSq < maxDistSq) {
             const dist = Math.sqrt(distSq);
             const opacity = 0.4 * (1 - dist / 150);
-            
+
             ctx.beginPath();
             ctx.strokeStyle = `rgba(102, 126, 234, ${opacity})`;
             ctx.lineWidth = 1.5;

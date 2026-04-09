@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
-import { Clock, Link2, Settings, MoreVertical, Play } from "lucide-react";
-import { CopyToClipboard } from "react-copy-to-clipboard";
-import { formatMeetingTime } from "@/utils/dateHelpers";
-import styles from "@/component/TopBar/index.module.css";
+import { useState, useEffect } from 'react';
+import { Clock, Link2, Settings, MoreVertical, Play } from 'lucide-react';
+import { CopyToClipboard } from 'react-copy-to-clipboard';
+import { formatMeetingTime } from '@/utils/dateHelpers';
+import styles from '@/component/TopBar/index.module.css';
 
 const TopBar = ({ roomId, onStart }) => {
   const [meetingTime, setMeetingTime] = useState(0);
@@ -33,9 +33,8 @@ const TopBar = ({ roomId, onStart }) => {
     }, 2000);
   };
 
-  const meetingLink = roomId && typeof window !== 'undefined' 
-    ? `${window.location.origin}/${roomId}` 
-    : '';
+  const meetingLink =
+    roomId && typeof window !== 'undefined' ? `${window.location.origin}/${roomId}` : '';
 
   return (
     <div className={styles.topBar}>
@@ -57,9 +56,9 @@ const TopBar = ({ roomId, onStart }) => {
       </div>
       <div className={styles.rightSection}>
         <CopyToClipboard text={meetingLink} onCopy={handleCopy}>
-          <button 
-            className={styles.iconButton} 
-            title={copied ? "Скопировано!" : "Скопировать ссылку"}
+          <button
+            className={styles.iconButton}
+            title={copied ? 'Скопировано!' : 'Скопировать ссылку'}
           >
             <Link2 size={20} />
           </button>
@@ -76,4 +75,3 @@ const TopBar = ({ roomId, onStart }) => {
 };
 
 export default TopBar;
-

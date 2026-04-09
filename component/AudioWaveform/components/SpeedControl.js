@@ -4,11 +4,7 @@
 
 import React from 'react';
 
-export const SpeedControl = ({
-  playbackRate,
-  themeStyles,
-  toggleSpeed
-}) => {
+export const SpeedControl = ({ playbackRate, themeStyles, toggleSpeed }) => {
   return (
     <span
       style={{

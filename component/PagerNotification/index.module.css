@@ -42,15 +42,16 @@
   width: 48px;
   height: 48px;
   border-radius: 12px;
-  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.12), rgba(0, 0, 0, 0.4)),
-              linear-gradient(135deg, rgb(80, 90, 120), rgb(45, 45, 55));
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.12), rgba(0, 0, 0, 0.4)),
+    linear-gradient(135deg, rgb(80, 90, 120), rgb(45, 45, 55));
   display: flex;
   align-items: center;
   justify-content: center;
   color: rgba(230, 230, 235, 0.95);
   box-shadow:
     0 6px 14px rgba(0, 0, 0, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.10);
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .unreadBadge {
@@ -72,7 +73,8 @@
 }
 
 @keyframes badgePulse {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
   }
   50% {
@@ -113,7 +115,9 @@
 .notificationText {
   flex: 1;
   min-width: 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+    monospace;
 }
 
 .notificationTitle {
@@ -315,4 +319,3 @@
     max-width: 360px;
   }
 }
-

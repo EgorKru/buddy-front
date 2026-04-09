@@ -26,7 +26,7 @@ const cleanupCache = () => {
     let removed = 0;
     for (const [fileUrl, blobUrl] of blobUrlCache.entries()) {
       if (removed >= entriesToRemove) break;
-      
+
       const count = blobUrlRefCount.get(blobUrl) || 0;
       if (count === 0) {
         // Можно безопасно удалить
@@ -39,13 +39,20 @@ const cleanupCache = () => {
   }
 };
 
-export default function VoiceMessagePlayer({ fileUrl, duration: propDuration, messageTime, isOwn, statusIcon, isPinned }) {
+export default function VoiceMessagePlayer({
+  fileUrl,
+  duration: propDuration,
+  messageTime,
+  isOwn,
+  statusIcon,
+  isPinned,
+}) {
   const [audioUrl, setAudioUrl] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const audioRef = useRef(null);
   const blobUrlRef = useRef(null);
-  
+
   const playerIdRef = useRef(fileUrl || `player-${Date.now()}-${Math.random()}`);
   const { activePlayerId, registerPlayer, unregisterPlayer } = useVoicePlayer();
 
@@ -78,18 +85,18 @@ export default function VoiceMessagePlayer({ fileUrl, duration: propDuration, me
     while (loadQueue.length > 0 && currentLoads < MAX_CONCURRENT_LOADS) {
       const { fileUrl: queuedFileUrl, url: fetchUrl, token, resolve } = loadQueue.shift();
       currentLoads++;
-      
+
       fetch(fetchUrl, {
         method: 'GET',
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
-        .then(response => {
+        .then((response) => {
           if (!response.ok) {
             throw new Error(`Failed to load audio: ${response.status}`);
           }
           return response.blob();
         })
-        .then(blob => {
+        .then((blob) => {
           const blobUrl = URL.createObjectURL(blob);
           blobUrlCache.set(queuedFileUrl, blobUrl);
           blobUrlRefCount.set(blobUrl, 0); // Будет увеличен при использовании
@@ -98,7 +105,7 @@ export default function VoiceMessagePlayer({ fileUrl, duration: propDuration, me
           resolve(blobUrl);
           processLoadQueue(); // Обрабатываем следующую в очереди
         })
-        .catch(err => {
+        .catch((err) => {
           currentLoads--;
           resolve(null);
           processLoadQueue(); // Обрабатываем следующую в очереди
@@ -114,15 +121,15 @@ export default function VoiceMessagePlayer({ fileUrl, duration: propDuration, me
       const cachedBlobUrl = blobUrlCache.get(fileUrl);
       blobUrlRef.current = cachedBlobUrl;
       setAudioUrl(cachedBlobUrl);
-      
+
       // Увеличиваем счетчик ссылок
       const count = blobUrlRefCount.get(cachedBlobUrl) || 0;
       blobUrlRefCount.set(cachedBlobUrl, count + 1);
-      
+
       if (audioRef.current) {
         audioRef.current.src = cachedBlobUrl;
       }
-      
+
       return cachedBlobUrl;
     }
 
@@ -158,15 +165,15 @@ export default function VoiceMessagePlayer({ fileUrl, duration: propDuration, me
         currentLoads++;
         fetch(fetchUrl, {
           method: 'GET',
-          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
         })
-          .then(response => {
+          .then((response) => {
             if (!response.ok) {
               throw new Error(`Failed to load audio: ${response.status}`);
             }
             return response.blob();
           })
-          .then(blob => {
+          .then((blob) => {
             const blobUrl = URL.createObjectURL(blob);
             blobUrlCache.set(fileUrl, blobUrl);
             blobUrlRefCount.set(blobUrl, 0); // Будет увеличен при использовании
@@ -175,7 +182,7 @@ export default function VoiceMessagePlayer({ fileUrl, duration: propDuration, me
             resolve(blobUrl);
             processLoadQueue(); // Обрабатываем следующую в очереди
           })
-          .catch(err => {
+          .catch((err) => {
             currentLoads--;
             resolve(null);
             processLoadQueue(); // Обрабатываем следующую в очереди
@@ -196,21 +203,21 @@ export default function VoiceMessagePlayer({ fileUrl, duration: propDuration, me
     try {
       const blobUrl = await loadPromise;
       loadingPromises.delete(fileUrl);
-      
+
       if (blobUrl) {
         blobUrlRef.current = blobUrl;
         setAudioUrl(blobUrl);
         const count = blobUrlRefCount.get(blobUrl) || 0;
         blobUrlRefCount.set(blobUrl, count + 1);
-        
+
         if (audioRef.current) {
           audioRef.current.src = blobUrl;
         }
-        
+
         setIsLoading(false);
         return blobUrl;
       }
-      
+
       setIsLoading(false);
       return null;
     } catch (err) {
@@ -228,7 +235,7 @@ export default function VoiceMessagePlayer({ fileUrl, duration: propDuration, me
       const timeoutId = setTimeout(() => {
         loadAudioWithAuth().catch(() => {});
       }, 100);
-      
+
       return () => clearTimeout(timeoutId);
     }
   }, [fileUrl]);
@@ -246,13 +253,13 @@ export default function VoiceMessagePlayer({ fileUrl, duration: propDuration, me
         return;
       }
     }
-    
+
     if (activePlayerId && activePlayerId !== playerIdRef.current) {
       return;
     }
 
     registerPlayer(playerIdRef.current, stopPlayback);
-    
+
     try {
       // Убеждаемся, что src установлен
       if (audioRef.current && !audioRef.current.src && blobUrlRef.current) {
@@ -313,17 +320,13 @@ export default function VoiceMessagePlayer({ fileUrl, duration: propDuration, me
           externalAudioRef={audioRef}
         />
       </div>
-      
+
       <div className={styles.messageMeta}>
-        {isPinned && (
-          <Pin size={12} className={styles.pinnedIcon} title="Закреплено" />
-        )}
-        {messageTime && (
-          <span className={styles.messageTime}>{messageTime}</span>
-        )}
+        {isPinned && <Pin size={12} className={styles.pinnedIcon} title="Закреплено" />}
+        {messageTime && <span className={styles.messageTime}>{messageTime}</span>}
         {isOwn && statusIcon}
       </div>
-      
+
       <audio ref={audioRef} preload="none" />
     </div>
   );

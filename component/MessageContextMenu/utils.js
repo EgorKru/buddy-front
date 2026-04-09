@@ -1,4 +1,14 @@
-import { Reply, Pin, PinOff, Copy, Forward, Trash2, CheckCircle2, Edit, ArrowRight } from 'lucide-react';
+import {
+  Reply,
+  Pin,
+  PinOff,
+  Copy,
+  Forward,
+  Trash2,
+  CheckCircle2,
+  Edit,
+  ArrowRight,
+} from 'lucide-react';
 
 export const adjustMenuPosition = (menuElement, position) => {
   if (!menuElement || !position) return null;
@@ -30,43 +40,34 @@ export const adjustMenuPosition = (menuElement, position) => {
 };
 
 export const getMenuItems = (message, isOwn, isPinned, handlers, isSearchResult = false) => {
-  const {
-    onReply,
-    onPin,
-    onCopy,
-    onForward,
-    onEdit,
-    onDelete,
-    onSelect,
-    onNavigate
-  } = handlers;
+  const { onReply, onPin, onCopy, onForward, onEdit, onDelete, onSelect, onNavigate } = handlers;
 
   const items = [
     { icon: Reply, label: 'Ответить', onClick: onReply, show: true },
-    { 
-      icon: isPinned ? PinOff : Pin, 
-      label: isPinned ? 'Открепить' : 'Закрепить', 
-      onClick: onPin, 
-      show: true 
+    {
+      icon: isPinned ? PinOff : Pin,
+      label: isPinned ? 'Открепить' : 'Закрепить',
+      onClick: onPin,
+      show: true,
     },
-    { 
-      icon: Copy, 
-      label: 'Копировать текст', 
-      onClick: onCopy, 
-      show: message.type === 'TEXT' 
+    {
+      icon: Copy,
+      label: 'Копировать текст',
+      onClick: onCopy,
+      show: message.type === 'TEXT',
     },
     { icon: Forward, label: 'Переслать', onClick: onForward, show: true },
-    { 
-      icon: Edit, 
-      label: 'Редактировать', 
-      onClick: onEdit, 
-      show: isOwn && message.type === 'TEXT' && !message.isOptimistic 
+    {
+      icon: Edit,
+      label: 'Редактировать',
+      onClick: onEdit,
+      show: isOwn && message.type === 'TEXT' && !message.isOptimistic,
     },
-    { 
-      icon: Trash2, 
-      label: 'Удалить', 
-      onClick: onDelete, 
-      show: !message.isOptimistic 
+    {
+      icon: Trash2,
+      label: 'Удалить',
+      onClick: onDelete,
+      show: !message.isOptimistic,
     },
     { icon: CheckCircle2, label: 'Выделить', onClick: onSelect, show: true },
     // Показываем кнопку "Перейти к сообщению" только для найденных сообщений
@@ -74,11 +75,11 @@ export const getMenuItems = (message, isOwn, isPinned, handlers, isSearchResult 
       icon: ArrowRight,
       label: 'Перейти к сообщению',
       onClick: onNavigate || (() => {}),
-      show: isSearchResult && !!onNavigate
+      show: isSearchResult && !!onNavigate,
     },
   ];
 
-  const filteredItems = items.filter(item => item.show);
-  
+  const filteredItems = items.filter((item) => item.show);
+
   return filteredItems;
 };

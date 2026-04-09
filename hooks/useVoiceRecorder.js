@@ -5,9 +5,9 @@ export const useVoiceRecorder = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [audioBlob, setAudioBlob] = useState(null);
-  const [previewBlob, setPreviewBlob] = useState(null); 
+  const [previewBlob, setPreviewBlob] = useState(null);
   const [error, setError] = useState(null);
-  const [audioLevel, setAudioLevel] = useState(0); 
+  const [audioLevel, setAudioLevel] = useState(0);
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -32,11 +32,11 @@ export const useVoiceRecorder = () => {
       const audioContext = new (window.AudioContext || window.webkitAudioContext)();
       const analyser = audioContext.createAnalyser();
       const microphone = audioContext.createMediaStreamSource(stream);
-      
+
       analyser.fftSize = 256;
       analyser.smoothingTimeConstant = 0.8;
       microphone.connect(analyser);
-      
+
       audioContextRef.current = audioContext;
       analyserRef.current = analyser;
 
@@ -50,7 +50,7 @@ export const useVoiceRecorder = () => {
 
         const average = dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length;
         const normalizedLevel = Math.min(100, (average / 255) * 100);
-        
+
         setAudioLevel(normalizedLevel);
         animationFrameRef.current = requestAnimationFrame(updateAudioLevel);
       };
@@ -65,10 +65,10 @@ export const useVoiceRecorder = () => {
         const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         setAudioBlob(blob);
         if (streamRef.current) {
-          streamRef.current.getTracks().forEach(track => track.stop());
+          streamRef.current.getTracks().forEach((track) => track.stop());
           streamRef.current = null;
         }
-        
+
         if (audioContextRef.current) {
           audioContextRef.current.close();
           audioContextRef.current = null;
@@ -89,7 +89,7 @@ export const useVoiceRecorder = () => {
       setRecordingTime(0);
 
       timerRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 1);
+        setRecordingTime((prev) => prev + 1);
       }, 1000);
 
       updateAudioLevel();
@@ -103,7 +103,7 @@ export const useVoiceRecorder = () => {
     if (!mediaRecorderRef.current || !isRecording || isPaused) {
       return;
     }
-    
+
     if (mediaRecorderRef.current.state === 'recording') {
       try {
         mediaRecorderRef.current.requestData();
@@ -135,14 +135,14 @@ export const useVoiceRecorder = () => {
     if (!mediaRecorderRef.current || !isRecording || !isPaused) {
       return;
     }
-    
+
     if (mediaRecorderRef.current.state === 'paused') {
       try {
         mediaRecorderRef.current.resume();
         setIsPaused(false);
-        setPreviewBlob(null); 
+        setPreviewBlob(null);
         timerRef.current = setInterval(() => {
-          setRecordingTime(prev => prev + 1);
+          setRecordingTime((prev) => prev + 1);
         }, 1000);
 
         const updateAudioLevel = () => {
@@ -165,18 +165,21 @@ export const useVoiceRecorder = () => {
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && isRecording) {
-      if (mediaRecorderRef.current.state === 'recording' || mediaRecorderRef.current.state === 'paused') {
+      if (
+        mediaRecorderRef.current.state === 'recording' ||
+        mediaRecorderRef.current.state === 'paused'
+      ) {
         try {
           mediaRecorderRef.current.requestData();
         } catch (error) {
           console.error('Error requesting data before stop:', error);
         }
       }
-      
+
       if (mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop();
       }
-      
+
       setIsRecording(false);
       setIsPaused(false);
       if (timerRef.current) {
@@ -200,23 +203,23 @@ export const useVoiceRecorder = () => {
       } catch (error) {
         console.error('Error stopping recorder:', error);
       }
-      
+
       mediaRecorderRef.current.onstop = null;
-      
+
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => {
+        streamRef.current.getTracks().forEach((track) => {
           track.stop();
         });
         streamRef.current = null;
       }
-      
+
       setIsRecording(false);
       setIsPaused(false);
       setRecordingTime(0);
       setAudioBlob(null);
       setPreviewBlob(null);
       audioChunksRef.current = [];
-      
+
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
@@ -225,7 +228,7 @@ export const useVoiceRecorder = () => {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
       }
-      
+
       if (audioContextRef.current) {
         try {
           audioContextRef.current.close();
@@ -234,9 +237,13 @@ export const useVoiceRecorder = () => {
         }
         audioContextRef.current = null;
       }
-      
+
       setAudioLevel(0);
-    } else if (audioBlob || previewBlob || (audioChunksRef.current && audioChunksRef.current.length > 0)) {
+    } else if (
+      audioBlob ||
+      previewBlob ||
+      (audioChunksRef.current && audioChunksRef.current.length > 0)
+    ) {
       setAudioBlob(null);
       setPreviewBlob(null);
       audioChunksRef.current = [];
@@ -246,24 +253,27 @@ export const useVoiceRecorder = () => {
   const reset = useCallback(() => {
     if (isRecording && mediaRecorderRef.current) {
       try {
-        if (mediaRecorderRef.current.state === 'recording' || mediaRecorderRef.current.state === 'paused') {
+        if (
+          mediaRecorderRef.current.state === 'recording' ||
+          mediaRecorderRef.current.state === 'paused'
+        ) {
           mediaRecorderRef.current.stop();
         }
       } catch (error) {
         console.error('Error stopping recorder in reset:', error);
       }
-      
+
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => {
+        streamRef.current.getTracks().forEach((track) => {
           track.stop();
         });
         streamRef.current = null;
       }
-      
+
       setIsRecording(false);
       setIsPaused(false);
     }
-    
+
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
@@ -272,7 +282,7 @@ export const useVoiceRecorder = () => {
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
     }
-    
+
     if (audioContextRef.current) {
       try {
         audioContextRef.current.close();
@@ -281,7 +291,7 @@ export const useVoiceRecorder = () => {
       }
       audioContextRef.current = null;
     }
-    
+
     setAudioBlob(null);
     setPreviewBlob(null);
     setRecordingTime(0);
@@ -307,7 +317,7 @@ export const useVoiceRecorder = () => {
     isPaused,
     recordingTime,
     audioBlob,
-    previewBlob, 
+    previewBlob,
     error,
     audioLevel,
     audioChunksRef,
@@ -321,4 +331,3 @@ export const useVoiceRecorder = () => {
     convertToBase64,
   };
 };
-

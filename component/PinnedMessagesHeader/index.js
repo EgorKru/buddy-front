@@ -14,22 +14,22 @@ export default function PinnedMessagesHeader({
 }) {
   if (pinnedMessages.length === 0) return null;
 
-  const visiblePinnedMessages = pinnedMessages.filter(p => {
+  const visiblePinnedMessages = pinnedMessages.filter((p) => {
     const msgId = p.message?.id;
     if (!msgId) return false;
-    const msg = messages.find(m => Number(m.id) === Number(msgId));
+    const msg = messages.find((m) => Number(m.id) === Number(msgId));
     if (msg && (msg.deletedForMe || msg.deletedForAll)) {
       return false;
     }
     return true;
   });
-  
+
   if (visiblePinnedMessages.length === 0) return null;
-  
+
   let messageToShow = null;
-  
+
   if (viewedPinnedMessageId) {
-    const viewedIndex = visiblePinnedMessages.findIndex(p => {
+    const viewedIndex = visiblePinnedMessages.findIndex((p) => {
       const msgId = p.message?.id;
       return msgId && Number(msgId) === Number(viewedPinnedMessageId);
     });
@@ -45,7 +45,7 @@ export default function PinnedMessagesHeader({
   if (!messageToShow) return null;
 
   const msg = messageToShow.message || messageToShow;
-  
+
   const handleClick = async () => {
     if (onNavigateToMessage) {
       await onNavigateToMessage(msg.id);
@@ -64,20 +64,14 @@ export default function PinnedMessagesHeader({
           await chatAPI.getMessage(chatId, msg.id);
           messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
           onViewedChange(msg.id);
-        } catch (error) {
-          
-        }
+        } catch (error) {}
       }
     }
   };
 
   return (
     <div className={styles.pinnedMessagesContainer}>
-      <div
-        key={messageToShow.id || msg.id}
-        className={styles.pinnedMessage}
-        onClick={handleClick}
-      >
+      <div key={messageToShow.id || msg.id} className={styles.pinnedMessage} onClick={handleClick}>
         <div className={styles.pinnedMessageLine} />
         <div className={styles.pinnedMessageContent}>
           <div className={styles.pinnedMessageHeader}>
@@ -97,7 +91,9 @@ export default function PinnedMessagesHeader({
             {msg.type === 'VOICE' ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Mic size={14} style={{ color: '#6b7280', flexShrink: 0 }} />
-                <span>Голосовое сообщение {msg.duration ? `(${Math.round(msg.duration)}с)` : ''}</span>
+                <span>
+                  Голосовое сообщение {msg.duration ? `(${Math.round(msg.duration)}с)` : ''}
+                </span>
               </div>
             ) : msg.type === 'IMAGE' ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -118,4 +114,3 @@ export default function PinnedMessagesHeader({
     </div>
   );
 }
-

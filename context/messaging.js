@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+} from 'react';
 import { chatAPI, getCurrentUser, isAuthenticated, getToken } from '@/utils/api';
 import { useStomp } from '@/context/socket';
 import { safeJsonParse, safeUnsubscribe } from '@/utils/safe';
@@ -33,8 +41,7 @@ const loadReadReceiptsFromStorage = () => {
     if (stored) {
       return JSON.parse(stored);
     }
-  } catch (e) {
-  }
+  } catch (e) {}
   return {};
 };
 
@@ -65,7 +72,7 @@ const ensureArray = (v) => (Array.isArray(v) ? v : []);
 
 const upsertOrder = (order, chatId) => {
   const id = String(chatId);
-  const filtered = order.filter(x => String(x) !== id);
+  const filtered = order.filter((x) => String(x) !== id);
   return [id, ...filtered];
 };
 
@@ -73,9 +80,9 @@ export const getChatTime = (chat) => {
   const updatedAt = chat?.updatedAt;
   const lastMessageTime = chat?.lastMessage?.createdAt;
   const createdAt = chat?.createdAt;
-  
+
   let time = null;
-  
+
   if (updatedAt && lastMessageTime) {
     const updatedDate = new Date(updatedAt);
     const lastMsgDate = new Date(lastMessageTime);
@@ -87,7 +94,7 @@ export const getChatTime = (chat) => {
   } else if (createdAt) {
     time = createdAt;
   }
-  
+
   if (!time) return 0;
   try {
     const date = new Date(time);
@@ -117,15 +124,13 @@ const reducer = (state, action) => {
         if (!c?.id) continue;
         const id = String(c.id);
         const existingChat = state.chatsById[id];
-        
-        const newLastMessageValid = c.lastMessage && 
-                                   c.lastMessage.id && 
-                                   c.lastMessage.createdAt;
-        
+
+        const newLastMessageValid = c.lastMessage && c.lastMessage.id && c.lastMessage.createdAt;
+
         const normalizedChat = {
           ...c,
           updatedAt: c.updatedAt ?? c.lastMessage?.createdAt ?? c.createdAt,
-          lastMessage: newLastMessageValid ? c.lastMessage : (existingChat?.lastMessage || null),
+          lastMessage: newLastMessageValid ? c.lastMessage : existingChat?.lastMessage || null,
         };
         chatsById[id] = normalizedChat;
       }
@@ -140,21 +145,20 @@ const reducer = (state, action) => {
       if (!chat?.id) return state;
       const id = String(chat.id);
       const existing = state.chatsById[id] || {};
-      
-      const newLastMessageValid = chat.lastMessage && 
-                                  chat.lastMessage.id && 
-                                  chat.lastMessage.createdAt;
-      
-      const merged = { 
-        ...existing, 
+
+      const newLastMessageValid =
+        chat.lastMessage && chat.lastMessage.id && chat.lastMessage.createdAt;
+
+      const merged = {
+        ...existing,
         ...chat,
-        lastMessage: newLastMessageValid ? chat.lastMessage : (existing.lastMessage || null),
+        lastMessage: newLastMessageValid ? chat.lastMessage : existing.lastMessage || null,
         updatedAt: chat.updatedAt || existing.updatedAt || null,
       };
       const updatedChatsById = { ...state.chatsById, [id]: merged };
-      
+
       const chatOrder = sortChatsByTime(updatedChatsById);
-      
+
       return {
         ...state,
         chatsById: updatedChatsById,
@@ -165,16 +169,16 @@ const reducer = (state, action) => {
     case actionTypes.SET_ACTIVE_CHAT: {
       const newActiveChatId = action.payload?.chatId ? String(action.payload.chatId) : null;
       const chatsById = { ...state.chatsById };
-      
+
       if (newActiveChatId && chatsById[newActiveChatId]) {
         chatsById[newActiveChatId] = {
           ...chatsById[newActiveChatId],
           unreadCount: 0,
         };
       }
-      
-      return { 
-        ...state, 
+
+      return {
+        ...state,
         activeChatId: newActiveChatId,
         chatsById,
       };
@@ -191,7 +195,7 @@ const reducer = (state, action) => {
       const mergedMessage = existingMessage ? { ...existingMessage, ...message } : message;
       const messagesById = { ...state.messagesById, [mid]: mergedMessage };
       const existingIds = ensureArray(state.messageIdsByChatId[cid]);
-      const has = existingIds.some(x => String(x) === mid);
+      const has = existingIds.some((x) => String(x) === mid);
       const nextIds = has ? existingIds : [...existingIds, mid];
       nextIds.sort((a, b) => {
         const ma = messagesById[String(a)];
@@ -204,17 +208,17 @@ const reducer = (state, action) => {
       const isActiveChat = state.activeChatId && String(state.activeChatId) === cid;
       const isVisible = typeof window !== 'undefined' && document.visibilityState === 'visible';
       const shouldResetUnread = isActiveChat && isVisible;
-      
+
       if (chat) {
         const last = chat?.lastMessage;
         const isLastMessage = last?.id && String(last.id) === mid;
         if (!last?.createdAt || isNewer(message.createdAt, last.createdAt) || isLastMessage) {
-          const newUnreadCount = shouldResetUnread 
-            ? 0 
-            : (action.payload?.unreadDelta != null
+          const newUnreadCount = shouldResetUnread
+            ? 0
+            : action.payload?.unreadDelta != null
               ? Math.max(0, Number(chat.unreadCount || 0) + Number(action.payload.unreadDelta))
-              : chat.unreadCount);
-          
+              : chat.unreadCount;
+
           chatsById[cid] = {
             ...chat,
             lastMessage: message,
@@ -222,10 +226,10 @@ const reducer = (state, action) => {
             unreadCount: newUnreadCount,
           };
         } else if (action.payload?.unreadDelta != null) {
-          const newUnreadCount = shouldResetUnread 
-            ? 0 
+          const newUnreadCount = shouldResetUnread
+            ? 0
             : Math.max(0, Number(chat.unreadCount || 0) + Number(action.payload.unreadDelta));
-          
+
           chatsById[cid] = {
             ...chat,
             unreadCount: newUnreadCount,
@@ -242,7 +246,7 @@ const reducer = (state, action) => {
       const currentFirstChatId = currentChatOrder[0];
       const chatTime = getChatTime(chatsById[cid]);
       const firstChatTime = currentFirstChatId ? getChatTime(chatsById[currentFirstChatId]) : 0;
-      
+
       let chatOrder = currentChatOrder;
       if (String(currentFirstChatId) !== cid && chatTime > firstChatTime) {
         chatOrder = sortChatsByTime(chatsById);
@@ -267,7 +271,7 @@ const reducer = (state, action) => {
       const mid = String(messageId);
 
       const existingIds = ensureArray(state.messageIdsByChatId[cid]);
-      const nextIds = existingIds.filter(id => String(id) !== mid);
+      const nextIds = existingIds.filter((id) => String(id) !== mid);
       const messageIdsByChatId = { ...state.messageIdsByChatId, [cid]: nextIds };
 
       const messagesById = { ...state.messagesById };
@@ -290,7 +294,9 @@ const reducer = (state, action) => {
       const mid = String(message.id);
       const messagesById = { ...state.messagesById, [mid]: message };
       const existingIds = ensureArray(state.messageIdsByChatId[cid]);
-      const nextIds = existingIds.some(x => String(x) === mid) ? existingIds : [...existingIds, mid];
+      const nextIds = existingIds.some((x) => String(x) === mid)
+        ? existingIds
+        : [...existingIds, mid];
 
       const chatsById = { ...state.chatsById };
       const chat = chatsById[cid];
@@ -321,9 +327,9 @@ const reducer = (state, action) => {
       const mid = String(message.id);
 
       const existingIds = ensureArray(state.messageIdsByChatId[cid]);
-      const idx = existingIds.findIndex(x => String(x) === tid);
-      const idsWithoutTemp = existingIds.filter(x => String(x) !== tid);
-      const withReal = idsWithoutTemp.some(x => String(x) === mid)
+      const idx = existingIds.findIndex((x) => String(x) === tid);
+      const idsWithoutTemp = existingIds.filter((x) => String(x) !== tid);
+      const withReal = idsWithoutTemp.some((x) => String(x) === mid)
         ? idsWithoutTemp
         : idx === -1
           ? [...idsWithoutTemp, mid]
@@ -332,7 +338,7 @@ const reducer = (state, action) => {
       const messagesById = { ...state.messagesById };
       const optimisticMsg = messagesById[tid];
       delete messagesById[tid];
-      
+
       const finalMessage = { ...message, status, isOptimistic: false };
       if (optimisticMsg) {
         if (!finalMessage.fileSize && optimisticMsg.fileSize) {
@@ -356,10 +362,11 @@ const reducer = (state, action) => {
       const chatsById = { ...state.chatsById };
       const chat = chatsById[cid];
       if (chat?.lastMessage?.id && String(chat.lastMessage.id) === tid) {
-        chatsById[cid] = { 
-          ...chat, 
+        chatsById[cid] = {
+          ...chat,
           lastMessage: messagesById[mid],
-          updatedAt: toIso(messagesById[mid]?.createdAt) ?? chat.updatedAt ?? new Date().toISOString(),
+          updatedAt:
+            toIso(messagesById[mid]?.createdAt) ?? chat.updatedAt ?? new Date().toISOString(),
         };
       }
 
@@ -367,7 +374,7 @@ const reducer = (state, action) => {
       const currentFirstChatId = currentChatOrder[0];
       const chatTime = getChatTime(chatsById[cid]);
       const firstChatTime = currentFirstChatId ? getChatTime(chatsById[currentFirstChatId]) : 0;
-      
+
       let chatOrder = currentChatOrder;
       if (String(currentFirstChatId) !== cid && chatTime > firstChatTime) {
         chatOrder = sortChatsByTime(chatsById);
@@ -393,7 +400,7 @@ const reducer = (state, action) => {
       if (!iso) return state;
       const current = state.readAtByChatIdByUserId[cid]?.[rid];
       if (current && !isNewer(iso, current)) return state;
-      
+
       const newReadAtByChatIdByUserId = {
         ...state.readAtByChatIdByUserId,
         [cid]: {
@@ -401,14 +408,13 @@ const reducer = (state, action) => {
           [rid]: iso,
         },
       };
-      
+
       if (typeof window !== 'undefined') {
         try {
           localStorage.setItem('readReceipts', JSON.stringify(newReadAtByChatIdByUserId));
-        } catch (e) {
-        }
+        } catch (e) {}
       }
-      
+
       return {
         ...state,
         readAtByChatIdByUserId: newReadAtByChatIdByUserId,
@@ -423,7 +429,7 @@ const reducer = (state, action) => {
         ...state.readAtByChatIdByUserId,
         [cid]: {},
       };
-      
+
       for (const [readerId, readAt] of Object.entries(readReceipts)) {
         if (!readerId || !readAt) continue;
         const rid = String(readerId);
@@ -434,13 +440,13 @@ const reducer = (state, action) => {
           newReadAtByChatIdByUserId[cid][rid] = iso;
         }
       }
-      
+
       if (typeof window !== 'undefined') {
         try {
           localStorage.setItem('readReceipts', JSON.stringify(newReadAtByChatIdByUserId));
         } catch (e) {}
       }
-      
+
       return {
         ...state,
         readAtByChatIdByUserId: newReadAtByChatIdByUserId,
@@ -470,7 +476,7 @@ const reducer = (state, action) => {
 
       for (const [cid, chat] of Object.entries(chatsById)) {
         if (!chat?.participants) continue;
-        const participants = chat.participants.map(p => {
+        const participants = chat.participants.map((p) => {
           if (String(p.id) !== uid) return p;
           return {
             ...p,
@@ -478,7 +484,13 @@ const reducer = (state, action) => {
             lastSeenAt: lastSeenAt ?? p.lastSeenAt,
           };
         });
-        if (participants.some((p, i) => p.online !== chat.participants[i]?.online || p.lastSeenAt !== chat.participants[i]?.lastSeenAt)) {
+        if (
+          participants.some(
+            (p, i) =>
+              p.online !== chat.participants[i]?.online ||
+              p.lastSeenAt !== chat.participants[i]?.lastSeenAt
+          )
+        ) {
           chatsById[cid] = { ...chat, participants };
           updated = true;
         }
@@ -522,7 +534,7 @@ export const useChatMessages = (chatId) => {
   const cid = chatId ? String(chatId) : null;
   return useMemo(() => {
     const ids = cid ? ensureArray(messageIdsByChatId[cid]) : [];
-    return ids.map(id => messagesById[String(id)]).filter(Boolean);
+    return ids.map((id) => messagesById[String(id)]).filter(Boolean);
   }, [cid, messageIdsByChatId, messagesById]);
 };
 
@@ -544,12 +556,12 @@ export const MessagingProvider = ({ children }) => {
     try {
       const data = await chatAPI.getChats();
       dispatch({ type: actionTypes.SET_CHATS, payload: { chats: data } });
-      
+
       if (Array.isArray(data) && data.length > 0) {
         const processReadReceipts = (chats) => {
           for (const chat of chats) {
             if (!chat?.id || !chat.readReceipts) continue;
-            
+
             if (typeof chat.readReceipts === 'object') {
               const readReceipts = {};
               for (const [userId, lastReadAt] of Object.entries(chat.readReceipts)) {
@@ -558,24 +570,24 @@ export const MessagingProvider = ({ children }) => {
                 }
               }
               if (Object.keys(readReceipts).length > 0) {
-                dispatch({ 
-                  type: actionTypes.SET_READ_RECEIPTS_FOR_CHAT, 
-                  payload: { chatId: chat.id, readReceipts } 
+                dispatch({
+                  type: actionTypes.SET_READ_RECEIPTS_FOR_CHAT,
+                  payload: { chatId: chat.id, readReceipts },
                 });
               }
             }
           }
         };
-        
+
         if (data.length > 20) {
           const BATCH_SIZE = 20;
           let index = 0;
-          
+
           const processBatch = () => {
             const batch = data.slice(index, index + BATCH_SIZE);
             processReadReceipts(batch);
             index += BATCH_SIZE;
-            
+
             if (index < data.length) {
               if (typeof window !== 'undefined' && window.requestIdleCallback) {
                 window.requestIdleCallback(processBatch, { timeout: 50 });
@@ -584,7 +596,7 @@ export const MessagingProvider = ({ children }) => {
               }
             }
           };
-          
+
           processBatch();
         } else {
           processReadReceipts(data);
@@ -610,15 +622,15 @@ export const MessagingProvider = ({ children }) => {
       lastTokenRef.current = null;
       return;
     }
-    
+
     const token = getToken();
     const tokenChanged = lastTokenRef.current !== token;
-    
+
     if (tokenChanged) {
       lastTokenRef.current = token;
       hasInitialLoadRef.current = false;
     }
-    
+
     if (connected && !lastConnectedRef.current) {
       lastConnectedRef.current = true;
       if (!hasInitialLoadRef.current) {
@@ -689,46 +701,49 @@ export const MessagingProvider = ({ children }) => {
     dispatch({ type: actionTypes.SET_ACTIVE_CHAT, payload: { chatId } });
   }, []);
 
-  const markChatAsRead = useCallback(async (chatId) => {
-    if (!chatId) return;
-    const currentUser = getCurrentUser();
-    const cid = String(chatId);
-    
-    // Получаем последнее сообщение для отправки read receipt
-    const messageIds = state.messageIdsByChatId[cid] || [];
-    const lastReadMessageId = messageIds.length > 0 ? messageIds[messageIds.length - 1] : null;
-    
-    // Отправляем через WebSocket
-    if (client && connected && lastReadMessageId) {
-      try {
-        client.publish({
-          destination: '/app/chat.markRead',
-          body: JSON.stringify({
-            chatId: parseInt(chatId),
-            lastReadMessageId: parseInt(lastReadMessageId),
-          }),
-        });
-      } catch (e) {
-        console.error('Failed to send markRead via WebSocket:', e);
+  const markChatAsRead = useCallback(
+    async (chatId) => {
+      if (!chatId) return;
+      const currentUser = getCurrentUser();
+      const cid = String(chatId);
+
+      // Получаем последнее сообщение для отправки read receipt
+      const messageIds = state.messageIdsByChatId[cid] || [];
+      const lastReadMessageId = messageIds.length > 0 ? messageIds[messageIds.length - 1] : null;
+
+      // Отправляем через WebSocket
+      if (client && connected && lastReadMessageId) {
+        try {
+          client.publish({
+            destination: '/app/chat.markRead',
+            body: JSON.stringify({
+              chatId: parseInt(chatId),
+              lastReadMessageId: parseInt(lastReadMessageId),
+            }),
+          });
+        } catch (e) {
+          console.error('Failed to send markRead via WebSocket:', e);
+        }
       }
-    }
-    
-    // Обновляем локальное состояние
-    if (currentUser?.id) {
-      const now = new Date().toISOString();
-      dispatch({ 
-        type: actionTypes.APPLY_READ_RECEIPT, 
-        payload: { chatId, readerId: currentUser.id, readAt: now } 
-      });
-    }
-    
-    dispatch({ type: actionTypes.MARK_CHAT_READ_LOCAL, payload: { chatId } });
-    
-    // Fallback на REST API
-    try {
-      await chatAPI.markChatAsRead(chatId);
-    } catch (e) {}
-  }, [client, connected, state.messageIdsByChatId]);
+
+      // Обновляем локальное состояние
+      if (currentUser?.id) {
+        const now = new Date().toISOString();
+        dispatch({
+          type: actionTypes.APPLY_READ_RECEIPT,
+          payload: { chatId, readerId: currentUser.id, readAt: now },
+        });
+      }
+
+      dispatch({ type: actionTypes.MARK_CHAT_READ_LOCAL, payload: { chatId } });
+
+      // Fallback на REST API
+      try {
+        await chatAPI.markChatAsRead(chatId);
+      } catch (e) {}
+    },
+    [client, connected, state.messageIdsByChatId]
+  );
 
   const upsertReadReceipt = useCallback((chatId, readerId, readAt) => {
     dispatch({ type: actionTypes.APPLY_READ_RECEIPT, payload: { chatId, readerId, readAt } });
@@ -738,69 +753,80 @@ export const MessagingProvider = ({ children }) => {
     dispatch({ type: actionTypes.SET_READ_RECEIPTS_FOR_CHAT, payload: { chatId, readReceipts } });
   }, []);
 
-  const upsertMessage = useCallback((message, meta = {}) => {
-    if (!message?.id || !message?.chatId) return;
-    const mid = String(message.id);
-    if (processedMessageIdsRef.current.has(mid)) return;
-    
-    const currentUser = getCurrentUser();
-    const isOwn = currentUser?.id && message?.senderId && Number(currentUser.id) === Number(message.senderId);
-    
-    if (isOwn) {
-      const cid = String(message.chatId);
-      const existingIds = ensureArray(state.messageIdsByChatId[cid]);
-      const existingMessages = existingIds
-        .map(id => state.messagesById[String(id)])
-        .filter(Boolean);
+  const upsertMessage = useCallback(
+    (message, meta = {}) => {
+      if (!message?.id || !message?.chatId) return;
+      const mid = String(message.id);
+      if (processedMessageIdsRef.current.has(mid)) return;
 
-      const isDuplicate = existingMessages.some(existing => {
-        if (!existing || !existing.id) return false;
-        if (String(existing.id) === mid) return true;
-        return false;
-      });
-      
-      if (isDuplicate) {
-        processedMessageIdsRef.current.add(mid);
-        return;
+      const currentUser = getCurrentUser();
+      const isOwn =
+        currentUser?.id && message?.senderId && Number(currentUser.id) === Number(message.senderId);
+
+      if (isOwn) {
+        const cid = String(message.chatId);
+        const existingIds = ensureArray(state.messageIdsByChatId[cid]);
+        const existingMessages = existingIds
+          .map((id) => state.messagesById[String(id)])
+          .filter(Boolean);
+
+        const isDuplicate = existingMessages.some((existing) => {
+          if (!existing || !existing.id) return false;
+          if (String(existing.id) === mid) return true;
+          return false;
+        });
+
+        if (isDuplicate) {
+          processedMessageIdsRef.current.add(mid);
+          return;
+        }
       }
-    }
-    
-    processedMessageIdsRef.current.add(mid);
 
-    const isVisible = typeof document !== 'undefined' && document.visibilityState === 'visible';
-    const active = state.activeChatId && String(state.activeChatId) === String(message.chatId);
-    const unreadDelta = isOwn ? 0 : (active && isVisible ? 0 : 1);
+      processedMessageIdsRef.current.add(mid);
 
-    dispatch({
-      type: actionTypes.UPSERT_MESSAGE,
-      payload: { message, chatId: message.chatId, unreadDelta: meta.unreadDelta ?? unreadDelta },
-    });
-  }, [state.activeChatId, state.messageIdsByChatId, state.messagesById]);
+      const isVisible = typeof document !== 'undefined' && document.visibilityState === 'visible';
+      const active = state.activeChatId && String(state.activeChatId) === String(message.chatId);
+      const unreadDelta = isOwn ? 0 : active && isVisible ? 0 : 1;
 
-  const updateMessage = useCallback((message, meta = {}) => {
-    if (!message?.id || !message?.chatId) return;
-    const mid = String(message.id);
-    processedMessageIdsRef.current.delete(mid);
+      dispatch({
+        type: actionTypes.UPSERT_MESSAGE,
+        payload: { message, chatId: message.chatId, unreadDelta: meta.unreadDelta ?? unreadDelta },
+      });
+    },
+    [state.activeChatId, state.messageIdsByChatId, state.messagesById]
+  );
 
-    const currentUser = getCurrentUser();
-    const isVisible = typeof document !== 'undefined' && document.visibilityState === 'visible';
-    const active = state.activeChatId && String(state.activeChatId) === String(message.chatId);
-    const isOwn = currentUser?.id && message?.senderId && Number(currentUser.id) === Number(message.senderId);
-    const unreadDelta = isOwn ? 0 : (active && isVisible ? 0 : 1);
+  const updateMessage = useCallback(
+    (message, meta = {}) => {
+      if (!message?.id || !message?.chatId) return;
+      const mid = String(message.id);
+      processedMessageIdsRef.current.delete(mid);
 
-    dispatch({
-      type: actionTypes.UPSERT_MESSAGE,
-      payload: { message, chatId: message.chatId, unreadDelta: meta.unreadDelta ?? unreadDelta },
-    });
-  }, [state.activeChatId]);
+      const currentUser = getCurrentUser();
+      const isVisible = typeof document !== 'undefined' && document.visibilityState === 'visible';
+      const active = state.activeChatId && String(state.activeChatId) === String(message.chatId);
+      const isOwn =
+        currentUser?.id && message?.senderId && Number(currentUser.id) === Number(message.senderId);
+      const unreadDelta = isOwn ? 0 : active && isVisible ? 0 : 1;
 
-  const removeMessage = useCallback((chatId, messageId, deletedForMe = false, deletedForAll = false) => {
-    if (!chatId || !messageId) return;
-    dispatch({
-      type: actionTypes.REMOVE_MESSAGE,
-      payload: { chatId, messageId, deletedForMe, deletedForAll },
-    });
-  }, []);
+      dispatch({
+        type: actionTypes.UPSERT_MESSAGE,
+        payload: { message, chatId: message.chatId, unreadDelta: meta.unreadDelta ?? unreadDelta },
+      });
+    },
+    [state.activeChatId]
+  );
+
+  const removeMessage = useCallback(
+    (chatId, messageId, deletedForMe = false, deletedForAll = false) => {
+      if (!chatId || !messageId) return;
+      dispatch({
+        type: actionTypes.REMOVE_MESSAGE,
+        payload: { chatId, messageId, deletedForMe, deletedForAll },
+      });
+    },
+    []
+  );
 
   const addOptimistic = useCallback((chatId, optimisticMessage) => {
     dispatch({ type: actionTypes.ADD_OPTIMISTIC, payload: { chatId, message: optimisticMessage } });
@@ -811,31 +837,38 @@ export const MessagingProvider = ({ children }) => {
       const mid = String(serverMessage.id);
       processedMessageIdsRef.current.add(mid);
     }
-    dispatch({ type: actionTypes.REPLACE_OPTIMISTIC, payload: { chatId, tempId, message: serverMessage, status } });
+    dispatch({
+      type: actionTypes.REPLACE_OPTIMISTIC,
+      payload: { chatId, tempId, message: serverMessage, status },
+    });
   }, []);
 
-  const maybeSound = useCallback((notification) => {
-    try {
-      if (typeof window === 'undefined') return;
-      const disabled = localStorage.getItem('disable_notification_sound') === 'true';
-      if (disabled) return;
+  const maybeSound = useCallback(
+    (notification) => {
+      try {
+        if (typeof window === 'undefined') return;
+        const disabled = localStorage.getItem('disable_notification_sound') === 'true';
+        if (disabled) return;
 
-      const msg = getNotificationMessage(notification);
-      const cid = getNotificationChatId(notification);
-      if (!msg || !cid) return;
-      const currentUser = getCurrentUser();
-      const isOwn = currentUser?.id && msg?.senderId && Number(currentUser.id) === Number(msg.senderId);
-      if (isOwn) return;
+        const msg = getNotificationMessage(notification);
+        const cid = getNotificationChatId(notification);
+        if (!msg || !cid) return;
+        const currentUser = getCurrentUser();
+        const isOwn =
+          currentUser?.id && msg?.senderId && Number(currentUser.id) === Number(msg.senderId);
+        if (isOwn) return;
 
-      const active = state.activeChatId && String(state.activeChatId) === String(cid);
-      if (active) return;
+        const active = state.activeChatId && String(state.activeChatId) === String(cid);
+        if (active) return;
 
-      const now = Date.now();
-      if (now - lastSoundAtRef.current < 500) return;
-      lastSoundAtRef.current = now;
-      playPagerNotificationSound({ pattern: 'pager' });
-    } catch (e) {    }
-  }, [state.activeChatId]);
+        const now = Date.now();
+        if (now - lastSoundAtRef.current < 500) return;
+        lastSoundAtRef.current = now;
+        playPagerNotificationSound({ pattern: 'pager' });
+      } catch (e) {}
+    },
+    [state.activeChatId]
+  );
 
   useEffect(() => {
     if (!state.activeChatId) return;
@@ -851,14 +884,17 @@ export const MessagingProvider = ({ children }) => {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    
+
     const handleVisibilityChange = () => {
       if (!state.activeChatId) return;
       const isVisible = document.visibilityState === 'visible';
       if (isVisible) {
         const activeChat = state.chatsById[String(state.activeChatId)];
         if (activeChat && activeChat.unreadCount > 0) {
-          dispatch({ type: actionTypes.MARK_CHAT_READ_LOCAL, payload: { chatId: state.activeChatId } });
+          dispatch({
+            type: actionTypes.MARK_CHAT_READ_LOCAL,
+            payload: { chatId: state.activeChatId },
+          });
           markChatAsRead(state.activeChatId);
         }
       }
@@ -949,9 +985,7 @@ export const MessagingProvider = ({ children }) => {
           upsertReadReceipt(ev.chatId, ev.readerId, ev.readAt);
         });
         readSubsRef.current.set(cid, sub);
-      } catch (e) {
-        
-      }
+      } catch (e) {}
     }
 
     return () => {};
@@ -968,7 +1002,7 @@ export const MessagingProvider = ({ children }) => {
   }, []);
 
   const chats = useMemo(() => {
-    return state.chatOrder.map(id => state.chatsById[id]).filter(Boolean);
+    return state.chatOrder.map((id) => state.chatsById[id]).filter(Boolean);
   }, [state.chatOrder, state.chatsById]);
 
   const updateFaviconBadge = useCallback((count) => {
@@ -1081,10 +1115,5 @@ export const MessagingProvider = ({ children }) => {
     upsertChat,
   ]);
 
-  return (
-    <MessagingContext.Provider value={value}>
-      {children}
-    </MessagingContext.Provider>
-  );
+  return <MessagingContext.Provider value={value}>{children}</MessagingContext.Provider>;
 };
-

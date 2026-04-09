@@ -1,12 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, Video, VideoOff, Mic, MicOff, Settings, ChevronDown, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import {
+  X,
+  Video,
+  VideoOff,
+  Mic,
+  MicOff,
+  Settings,
+  ChevronDown,
+  Loader2,
+  CheckCircle,
+  AlertCircle,
+} from 'lucide-react';
 import { useMediaDevices } from '@/hooks/useMediaDevices';
 import styles from './MediaPreviewModal.module.css';
 
-export default function MediaPreviewModal({ 
-  isOpen, 
-  onClose, 
-  onConfirm, 
+export default function MediaPreviewModal({
+  isOpen,
+  onClose,
+  onConfirm,
   title = 'Настройка камеры и микрофона',
   confirmText = 'Присоединиться',
   isCreating = false,
@@ -16,7 +27,7 @@ export default function MediaPreviewModal({
   const previousVideoTrackIdRef = useRef(null);
   const isUpdatingRef = useRef(false);
   const [showSettings, setShowSettings] = useState(false);
-  
+
   const {
     devices,
     selectedCamera,
@@ -73,79 +84,87 @@ export default function MediaPreviewModal({
       isUpdatingRef.current = false;
       return;
     }
-    
+
     if (isUpdatingRef.current) {
       return;
     }
-    
+
     const currentVideoTracks = localStream.getVideoTracks();
     if (currentVideoTracks.length === 0 || !currentVideoTracks[0].enabled) {
       isUpdatingRef.current = false;
       return;
     }
-    
+
     const updateVideo = () => {
       if (!videoRef.current) {
         setTimeout(updateVideo, 50);
         return;
       }
-      
+
       const video = videoRef.current;
       const videoTracks = localStream.getVideoTracks();
-      
+
       if (videoTracks.length > 0 && videoTracks[0].enabled) {
         const currentVideoTrackId = videoTracks[0].id;
         const currentSrcObject = video.srcObject;
-        
+
         const videoTrackChanged = previousVideoTrackIdRef.current !== currentVideoTrackId;
         const hasNoPreviousTrack = previousVideoTrackIdRef.current === null;
         const streamChanged = previousStreamRef.current !== localStream;
-        const hasNoVideoInCurrentSrc = !currentSrcObject || currentSrcObject.getVideoTracks().length === 0;
+        const hasNoVideoInCurrentSrc =
+          !currentSrcObject || currentSrcObject.getVideoTracks().length === 0;
         const srcObjectDifferent = currentSrcObject !== localStream;
-        
-        const isSameTrackAndStream = currentSrcObject === localStream && 
-                                     previousVideoTrackIdRef.current === currentVideoTrackId &&
-                                     previousStreamRef.current === localStream;
-        
+
+        const isSameTrackAndStream =
+          currentSrcObject === localStream &&
+          previousVideoTrackIdRef.current === currentVideoTrackId &&
+          previousStreamRef.current === localStream;
+
         if (!isSameTrackAndStream) {
-          if (srcObjectDifferent || videoTrackChanged || hasNoPreviousTrack || hasNoVideoInCurrentSrc || streamChanged) {
+          if (
+            srcObjectDifferent ||
+            videoTrackChanged ||
+            hasNoPreviousTrack ||
+            hasNoVideoInCurrentSrc ||
+            streamChanged
+          ) {
             isUpdatingRef.current = true;
-            
+
             if (video.srcObject !== localStream) {
               video.srcObject = localStream;
             }
-            
+
             previousVideoTrackIdRef.current = currentVideoTrackId;
             previousStreamRef.current = localStream;
-            
-            setTimeout(() => {
-              if (videoRef.current && videoRef.current.srcObject === localStream) {
-                isUpdatingRef.current = false;
-              } else {
+
             setTimeout(() => {
               if (videoRef.current && videoRef.current.srcObject === localStream) {
                 isUpdatingRef.current = false;
               } else {
                 setTimeout(() => {
-                  isUpdatingRef.current = false;
-                }, 100);
-              }
-            }, 300);
+                  if (videoRef.current && videoRef.current.srcObject === localStream) {
+                    isUpdatingRef.current = false;
+                  } else {
+                    setTimeout(() => {
+                      isUpdatingRef.current = false;
+                    }, 100);
+                  }
+                }, 300);
               }
             }, 300);
           }
         } else {
           previousStreamRef.current = localStream;
         }
-        
+
         const tryPlay = () => {
           if (!videoRef.current) return;
-          
+
           const currentVideo = videoRef.current;
           if (currentVideo.srcObject === localStream) {
             const playPromise = currentVideo.play();
             if (playPromise !== undefined) {
-              playPromise.catch((err) => {
+              playPromise.catch((_err) => {
                 setTimeout(() => {
                   if (currentVideo && currentVideo.srcObject === localStream) {
                     currentVideo.play().catch(() => {});
@@ -155,23 +174,23 @@ export default function MediaPreviewModal({
             }
           }
         };
-        
+
         const onCanPlay = () => {
           tryPlay();
         };
-        
+
         const onLoadedMetadata = () => {
           tryPlay();
         };
-        
+
         const onLoadedData = () => {
           tryPlay();
         };
-        
+
         video.removeEventListener('canplay', onCanPlay);
         video.removeEventListener('loadedmetadata', onLoadedMetadata);
         video.removeEventListener('loadeddata', onLoadedData);
-        
+
         if (video.readyState >= 2) {
           setTimeout(tryPlay, 10);
         } else {
@@ -179,10 +198,10 @@ export default function MediaPreviewModal({
           video.addEventListener('loadedmetadata', onLoadedMetadata, { once: true });
           video.addEventListener('loadeddata', onLoadedData, { once: true });
         }
-        
+
         setTimeout(tryPlay, 50);
         setTimeout(tryPlay, 150);
-        
+
         return () => {
           video.removeEventListener('canplay', onCanPlay);
           video.removeEventListener('loadedmetadata', onLoadedMetadata);
@@ -197,15 +216,14 @@ export default function MediaPreviewModal({
         isUpdatingRef.current = false;
       }
     };
-    
+
     updateVideo();
   }, [localStream, videoEnabled]);
 
   const handleConfirm = () => {
-
     const finalAudio = audioEnabled || (!audioEnabled && !videoEnabled);
     const finalVideo = videoEnabled;
-    
+
     const stream = getStream();
     onConfirm({
       stream,
@@ -228,7 +246,7 @@ export default function MediaPreviewModal({
 
   return (
     <div className={styles.overlay} onClick={handleClose}>
-      <div className={styles.modal} onClick={e => e.stopPropagation()}>
+      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <div className={styles.header}>
           <h2 className={styles.title}>{title}</h2>
           <button className={styles.closeButton} onClick={handleClose}>
@@ -251,20 +269,17 @@ export default function MediaPreviewModal({
                   Попробовать снова
                 </button>
               </div>
-            ) : !videoEnabled || !localStream || !localStream.getVideoTracks().length || (localStream.getVideoTracks()[0] && !localStream.getVideoTracks()[0].enabled) ? (
+            ) : !videoEnabled ||
+              !localStream ||
+              !localStream.getVideoTracks().length ||
+              (localStream.getVideoTracks()[0] && !localStream.getVideoTracks()[0].enabled) ? (
               <div className={styles.cameraOff}>
                 <VideoOff size={64} />
                 <p>Камера выключена</p>
               </div>
             ) : (
               <>
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className={styles.video}
-                />
+                <video ref={videoRef} autoPlay playsInline muted className={styles.video} />
               </>
             )}
           </div>
@@ -327,9 +342,9 @@ export default function MediaPreviewModal({
             >
               <Settings size={24} />
               <span>Настройки</span>
-              <ChevronDown 
-                size={16} 
-                className={`${styles.chevron} ${showSettings ? styles.chevronOpen : ''}`} 
+              <ChevronDown
+                size={16}
+                className={`${styles.chevron} ${showSettings ? styles.chevronOpen : ''}`}
               />
             </button>
           </div>
@@ -343,7 +358,7 @@ export default function MediaPreviewModal({
                   value={selectedCamera}
                   onChange={(e) => switchCamera(e.target.value)}
                 >
-                  {devices.cameras.map(device => (
+                  {devices.cameras.map((device) => (
                     <option key={device.deviceId} value={device.deviceId}>
                       {device.label || `Камера ${devices.cameras.indexOf(device) + 1}`}
                     </option>
@@ -358,7 +373,7 @@ export default function MediaPreviewModal({
                   value={selectedMicrophone}
                   onChange={(e) => switchMicrophone(e.target.value)}
                 >
-                  {devices.microphones.map(device => (
+                  {devices.microphones.map((device) => (
                     <option key={device.deviceId} value={device.deviceId}>
                       {device.label || `Микрофон ${devices.microphones.indexOf(device) + 1}`}
                     </option>
@@ -373,11 +388,7 @@ export default function MediaPreviewModal({
           <button className={styles.cancelButton} onClick={handleClose}>
             Отмена
           </button>
-          <button 
-            className={styles.confirmButton} 
-            onClick={handleConfirm}
-            disabled={isCreating}
-          >
+          <button className={styles.confirmButton} onClick={handleConfirm} disabled={isCreating}>
             {isCreating ? (
               <>
                 <Loader2 className={styles.buttonSpinner} size={18} />
@@ -392,4 +403,3 @@ export default function MediaPreviewModal({
     </div>
   );
 }
-

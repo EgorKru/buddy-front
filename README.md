@@ -1,112 +1,48 @@
 # Pager Frontend
 
-Frontend приложение для платформы Pager с поддержкой real-time мессенджера, видеозвонков и системы контроля состояния.
+Клиент мессенджера и видеозвонков на **Next.js 13** и **React 18**. API и WebSocket ходят на бэкенд Pager (см. репозиторий backend).
 
-## Версия 2.0 MVP
+## Требования
 
-**Что нового:**
-- Система регистрации с подтверждением email (6-значный код)
-- Улучшенный UI/UX с интерактивным фоном и отслеживанием курсора
-- API проксирование через Next.js для решения CORS
-- Оптимизация производительности интерактивного фона
-- Улучшенные формы с валидацией и модальным окном
+- **Node.js 20** (рекомендуется LTS)
+- npm 9+
 
-## Технологический стек
-
-- Next.js 13.5, React 18
-- WebSocket (STOMP) - Native + SockJS fallback
-- Service Worker для кеширования
-- PeerJS для WebRTC видеозвонков
-- Tailwind CSS, CSS Modules
-- Lucide React для иконок
-
-## Архитектура
-
-- REST API для HTTP операций
-- WebSocket для real-time обновлений
-- Система последовательностей (seq/pts) для контроля целостности
-- Service Worker для кеширования медиа
-- Курсорная пагинация для истории сообщений
-
-## Запуск
-
-### Development
+## Быстрый старт
 
 ```bash
-npm install
+cp .env.example .env.local
+npm ci
 npm run dev
 ```
 
-Frontend запустится на `http://localhost:3000`
+Открой [http://localhost:3000](http://localhost:3000). URL API и WebSocket задаются в `.env.local` (`NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_WS_URL`); подробности — в **`.env.example`**.
 
-### Production
+## Скрипты
 
-```bash
-npm run build
-npm start
-```
+| Команда           | Назначение                       |
+| ----------------- | -------------------------------- |
+| `npm run dev`     | Режим разработки                 |
+| `npm run build`   | Продакшен-сборка                 |
+| `npm run start`   | Запуск после `build`             |
+| `npm run lint`    | ESLint (Next.js)                 |
+| `npm test`        | Jest, локально                   |
+| `npm run test:ci` | Jest для CI (`--ci --forceExit`) |
 
-### Docker
+## Сквозное шифрование (E2EE)
 
-```bash
-docker-compose up -d
-```
+Включение: в `.env.local` задать **`NEXT_PUBLIC_E2EE_ENABLED=true`**. Нужен бэкенд с миграцией **V3**, эндпоинтами **`/api/crypto/*`** и поддержкой **`encryptionVersion`** у сообщений.
 
-## Конфигурация
+- Шифруется **текст** в **личных (DIRECT) чатах** на клиенте (Web Crypto: ECDH P-256, HKDF, AES-GCM). Приватный ключ хранится в **IndexedDB**; на сервер уходит публичный ключ и opaque `content`.
+- **Групповые чаты** и **вложения/медиа** этим флагом не охватываются.
 
-Создайте файл `.env.local`:
+Подробности переменных — в **`.env.example`**.
 
-```bash
-NEXT_PUBLIC_API_URL=https://pager.website/api
-NEXT_PUBLIC_WS_NATIVE_URL=wss://pager.website/ws-native
-NEXT_PUBLIC_WS_SOCKJS_URL=https://pager.website/ws
-NODE_ENV=development
-```
+## CI
 
-**Разработка:**
-```bash
-NEXT_PUBLIC_API_URL=http://localhost:8080/api
-NEXT_PUBLIC_WS_NATIVE_URL=ws://localhost:8080/ws-native
-```
+В репозитории настроен GitHub Actions workflow **Frontend CI**: `npm ci`, тесты, лint, `next build` (с тестовыми `NEXT_PUBLIC_*` для сборки).
 
-**Продакшн:**
-```bash
-NEXT_PUBLIC_API_URL=https://pager.website/api
-NEXT_PUBLIC_WS_NATIVE_URL=wss://pager.website/ws-native
-```
+## Структура
 
-## Структура проекта
-
-```
-buddy-front/
-├── pages/              # Next.js страницы
-├── component/          # React компоненты
-├── context/            # State Management
-├── hooks/              # Custom hooks
-├── utils/              # Утилиты и API
-├── styles/             # CSS модули
-└── public/             # Статические файлы (SW, workers)
-```
-
-## Основные страницы
-
-- `/` - Главная (видеокомнаты)
-- `/login` - Вход
-- `/register` - Регистрация с подтверждением email
-- `/chats` - Список чатов
-- `/chat/[chatId]` - Чат с сообщениями
-- `/[roomId]` - Видеокомната
-
-## Функциональность
-
-- Real-time мессенджер с WebSocket
-- Отправка текстовых, файловых и голосовых сообщений
-- Редактирование и удаление сообщений
-- Закрепление сообщений
-- Поиск в чатах и сообщениях
-- Видеозвонки через WebRTC
-- Уведомления и онлайн-статус
-
-## Лицензия
-
-Apache 2.0
+- **`pages/`** — маршруты Next.js (Pages Router)
+- **`components/`**, **`component/`** — UI чата, комнат, сообщений
+- **`src/shared/`** — API-клиент, конфиг, утилиты, модуль **`src/shared/lib/e2ee/`**

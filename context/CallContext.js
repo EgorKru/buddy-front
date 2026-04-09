@@ -6,11 +6,7 @@ const CallContext = createContext(null);
 export const CallProvider = ({ children }) => {
   const callProtocol = useCallProtocol();
 
-  return (
-    <CallContext.Provider value={callProtocol}>
-      {children}
-    </CallContext.Provider>
-  );
+  return <CallContext.Provider value={callProtocol}>{children}</CallContext.Provider>;
 };
 
 CallProvider.displayName = 'CallProvider';
@@ -41,7 +37,7 @@ const noopCall = {
 
 export const useCall = () => {
   const context = useContext(CallContext);
-  
+
   if (!context) {
     return noopCall;
   }

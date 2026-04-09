@@ -1,21 +1,35 @@
-import { useState } from "react";
-import { X, Mic, MicOff, Video, VideoOff, Crown, Shield, User, Hand, MoreVertical, UserMinus, VolumeX, UserPlus } from "lucide-react";
-import styles from "./index.module.css";
+import { useState } from 'react';
+import {
+  X,
+  Mic,
+  MicOff,
+  Video,
+  VideoOff,
+  Crown,
+  Shield,
+  User,
+  Hand,
+  MoreVertical,
+  UserMinus,
+  VolumeX,
+  UserPlus,
+} from 'lucide-react';
+import styles from './index.module.css';
 
-const ParticipantsModal = ({ 
-  isOpen, 
-  onClose, 
-  participants, 
+const ParticipantsModal = ({
+  isOpen,
+  onClose,
+  participants,
   currentUserId,
   isHost,
   isCoHost,
   onPromote,
   onDemote,
   onMute,
-  onKick
+  onKick,
 }) => {
   const [menuOpenFor, setMenuOpenFor] = useState(null);
-  
+
   if (!isOpen) return null;
 
   const canManage = isHost || isCoHost;
@@ -43,8 +57,8 @@ const ParticipantsModal = ({
   };
 
   const getInitials = (name) => {
-    if (!name) return "?";
-    const parts = name.trim().split(" ");
+    if (!name) return '?';
+    const parts = name.trim().split(' ');
     if (parts.length >= 2) {
       return (parts[0][0] + parts[1][0]).toUpperCase();
     }
@@ -56,7 +70,7 @@ const ParticipantsModal = ({
     const roleA = roleOrder[a.role] ?? 2;
     const roleB = roleOrder[b.role] ?? 2;
     if (roleA !== roleB) return roleA - roleB;
-    
+
     if (a.handRaised && !b.handRaised) return -1;
     if (!a.handRaised && b.handRaised) return 1;
     return 0;
@@ -76,9 +90,7 @@ const ParticipantsModal = ({
     <div className={styles.overlay} onClick={onClose}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <div className={styles.header}>
-          <h2 className={styles.title}>
-            Участники ({participants?.length || 0})
-          </h2>
+          <h2 className={styles.title}>Участники ({participants?.length || 0})</h2>
           <button className={styles.closeButton} onClick={onClose}>
             <X size={20} />
           </button>
@@ -93,26 +105,22 @@ const ParticipantsModal = ({
             const isParticipantHost = participant.role === 'HOST';
             const isParticipantCoHost = participant.role === 'CO_HOST';
             const canManageThis = canManage && !isMe && !isParticipantHost;
-            
+
             return (
-              <div 
-                key={participant.id || userId} 
+              <div
+                key={participant.id || userId}
                 className={`${styles.participantItem} ${isMe ? styles.isMe : ''} ${participant.handRaised ? styles.handRaised : ''}`}
               >
                 <div className={styles.avatarWrapper}>
-                  <div className={styles.avatar}>
-                    {getInitials(displayName)}
-                  </div>
-                  {participant.isActive !== false && (
-                    <div className={styles.onlineIndicator} />
-                  )}
+                  <div className={styles.avatar}>{getInitials(displayName)}</div>
+                  {participant.isActive !== false && <div className={styles.onlineIndicator} />}
                   {participant.handRaised && (
                     <div className={styles.handRaisedBadge}>
                       <Hand size={10} />
                     </div>
                   )}
                 </div>
-                
+
                 <div className={styles.participantInfo}>
                   <div className={styles.nameRow}>
                     <span className={styles.name}>
@@ -126,7 +134,9 @@ const ParticipantsModal = ({
                   </div>
                   <span className={styles.role}>
                     {getRoleLabel(participant.role)}
-                    {participant.screenSharing && <span className={styles.sharingLabel}> • Показывает экран</span>}
+                    {participant.screenSharing && (
+                      <span className={styles.sharingLabel}> • Показывает экран</span>
+                    )}
                   </span>
                 </div>
 
@@ -146,17 +156,17 @@ const ParticipantsModal = ({
                 {}
                 {canManageThis && (
                   <div className={styles.actionMenu}>
-                    <button 
+                    <button
                       className={styles.menuButton}
                       onClick={(e) => handleMenuClick(e, participant.id || userId)}
                     >
                       <MoreVertical size={18} />
                     </button>
-                    
+
                     {menuOpenFor === (participant.id || userId) && (
                       <div className={styles.dropdown}>
                         {participant.audioEnabled !== false && onMute && (
-                          <button 
+                          <button
                             className={styles.dropdownItem}
                             onClick={() => handleAction(onMute, userId)}
                           >
@@ -164,9 +174,9 @@ const ParticipantsModal = ({
                             <span>Выключить микрофон</span>
                           </button>
                         )}
-                        
+
                         {isHost && !isParticipantCoHost && onPromote && (
-                          <button 
+                          <button
                             className={styles.dropdownItem}
                             onClick={() => handleAction(onPromote, userId)}
                           >
@@ -174,9 +184,9 @@ const ParticipantsModal = ({
                             <span>Сделать со-организатором</span>
                           </button>
                         )}
-                        
+
                         {isHost && isParticipantCoHost && onDemote && (
-                          <button 
+                          <button
                             className={styles.dropdownItem}
                             onClick={() => handleAction(onDemote, userId)}
                           >
@@ -184,9 +194,9 @@ const ParticipantsModal = ({
                             <span>Убрать со-организатора</span>
                           </button>
                         )}
-                        
+
                         {onKick && (
-                          <button 
+                          <button
                             className={`${styles.dropdownItem} ${styles.danger}`}
                             onClick={() => handleAction(onKick, userId)}
                           >

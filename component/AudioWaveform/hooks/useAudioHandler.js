@@ -31,23 +31,23 @@ export const useAudioHandlers = (
       if (audio && isPlayingRef.current) {
         const currentTime = audio.currentTime;
         const dur = audio.duration;
-        
+
         setCurrentTime(currentTime);
-        
+
         // Используем duration из audio если он валидный, иначе используем initialDuration из ref
         let effectiveDuration = dur && isFinite(dur) && dur > 0 ? dur : durationRef.current;
-        
+
         if (dur && isFinite(dur) && dur > 0) {
           durationRef.current = dur;
           setDuration(dur);
         } else if (durationRef.current > 0) {
           setDuration(durationRef.current);
         }
-        
+
         if (effectiveDuration > 0) {
           setProgress(currentTime / effectiveDuration);
         }
-        
+
         animationFrameRef.current = requestAnimationFrame(updateProgress);
       }
     };
@@ -68,17 +68,17 @@ export const useAudioHandlers = (
       const currentTime = audio.currentTime;
       const dur = audio.duration;
       setCurrentTime(currentTime);
-      
+
       // Используем duration из audio если он валидный, иначе используем initialDuration из ref
       let effectiveDuration = dur && isFinite(dur) && dur > 0 ? dur : durationRef.current;
-      
+
       if (dur && isFinite(dur) && dur > 0) {
         durationRef.current = dur;
         setDuration(dur);
       } else if (durationRef.current > 0) {
         setDuration(durationRef.current);
       }
-      
+
       if (effectiveDuration > 0) {
         setProgress(currentTime / effectiveDuration);
       }
@@ -146,7 +146,7 @@ export const useAudioHandlers = (
       audio.removeEventListener('ended', onEnded);
       audio.removeEventListener('pause', onPause);
       audio.removeEventListener('play', onPlay);
-      
+
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;

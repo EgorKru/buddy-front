@@ -12,12 +12,12 @@ export const getFileName = (fileUrl, originalFileName) => {
     if (lastDotIndex > 0) {
       return {
         name: originalFileName.substring(0, lastDotIndex),
-        extension: originalFileName.substring(lastDotIndex + 1)
+        extension: originalFileName.substring(lastDotIndex + 1),
       };
     }
     return { name: originalFileName, extension: '' };
   }
-  
+
   if (!fileUrl) return { name: 'Файл', extension: '' };
   const parts = fileUrl.split('/');
   const lastPart = parts[parts.length - 1];
@@ -42,4 +42,3 @@ export const canViewInBrowser = (mimeType) => {
     mime.includes('javascript')
   );
 };
-

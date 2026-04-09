@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { SCROLL_RESTORE_TIMEOUT, INITIALIZATION_CHECK_DELAY, INITIALIZATION_CHECK_RETRY_DELAY } from '../constants/chat';
+import { INITIALIZATION_CHECK_DELAY, INITIALIZATION_CHECK_RETRY_DELAY } from '../constants/chat';
 
 export const useChatInitialization = ({
   chatId,
@@ -10,17 +10,17 @@ export const useChatInitialization = ({
   loadPinnedMessages,
   chat,
   clearSelectedFile,
-  
+
   scrollPositionSavedRef,
   userScrolledToBottomRef,
   restoreAttemptsRef,
   shouldRestorePositionRef,
   lastScrollTopRef,
   isUserScrollingUpRef,
-  isLoadingInitialRef
+  isLoadingInitialRef,
 }) => {
   const [scrollButtonReady, setScrollButtonReady] = useState(false);
-  
+
   const loadedChatIdRef = useRef(null);
   const loadedMessagesRef = useRef(false);
   const loadedPinnedRef = useRef(false);
@@ -79,7 +79,9 @@ export const useChatInitialization = ({
 
     if (typeof window !== 'undefined') {
       const checkReady = () => {
-        const sidebarWidth = getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width');
+        const sidebarWidth = getComputedStyle(document.documentElement).getPropertyValue(
+          '--sidebar-width'
+        );
         if (sidebarWidth || document.body.hasAttribute('data-sidebar-position')) {
           setScrollButtonReady(true);
         } else {
@@ -89,8 +91,7 @@ export const useChatInitialization = ({
       setTimeout(checkReady, INITIALIZATION_CHECK_RETRY_DELAY);
     }
 
-    return () => {
-    };
+    return () => {};
   }, [
     chatId,
     router,
@@ -106,14 +107,13 @@ export const useChatInitialization = ({
     shouldRestorePositionRef,
     lastScrollTopRef,
     isUserScrollingUpRef,
-    isLoadingInitialRef
+    isLoadingInitialRef,
   ]);
 
   return {
     scrollButtonReady,
     loadedChatIdRef,
     loadedMessagesRef,
-    loadedPinnedRef
+    loadedPinnedRef,
   };
 };
-

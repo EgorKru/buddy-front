@@ -1,50 +1,24 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { chatAPI, getCurrentUser } from '@/utils/api';
 import { useStomp } from '@/context/socket';
 import { safeJsonParse, safeUnsubscribe } from '@/utils/safe';
 import { playPagerNotificationSound } from '@/utils/pagerSound';
+import { parseServerDate } from '@/utils/dateHelpers';
 
 const ChatsContext = createContext(null);
-
-const parseServerDate = (dateString) => {
-  if (!dateString) return null;
-  
-  if (typeof dateString === 'number') {
-    return new Date(dateString);
-  }
-  
-  if (dateString instanceof Date) {
-    return dateString;
-  }
-  
-  // Если это массив (Java LocalDateTime) - УСТАРЕЛО после перехода на UTC
-  // Оставлено для обратной совместимости
-  if (Array.isArray(dateString) && dateString.length >= 3) {
-    const [year, month, day, hour = 0, minute = 0, second = 0, nanosecond = 0] = dateString;
-    const millisecond = Math.floor(nanosecond / 1000000);
-    return new Date(Date.UTC(year, month - 1, day, hour, minute, second, millisecond));
-  }
-  
-  let str = String(dateString).trim();
-  
-  if (/^\d+$/.test(str)) {
-    const timestamp = parseInt(str, 10);
-    if (timestamp > 1000000000000) {
-      return new Date(timestamp);
-    }
-    if (timestamp > 1000000000) {
-      return new Date(timestamp * 1000);
-    }
-  }
-  
-  // Бэкенд отправляет ISO с Z суффиксом (UTC)
-  return new Date(str);
-};
 
 const toIso = (value) => {
   if (!value) return null;
   const date = parseServerDate(value);
-  return (date && !Number.isNaN(date.getTime())) ? date.toISOString() : null;
+  return date && !Number.isNaN(date.getTime()) ? date.toISOString() : null;
 };
 
 const getNotificationChatId = (n) => {
@@ -74,17 +48,19 @@ const sortChatsByLastActivity = (list) => {
 
 export const useChats = () => {
   const ctx = useContext(ChatsContext);
-  return ctx || {
-    chats: [],
-    loading: false,
-    refreshChats: async () => {},
-    activeChatId: null,
-    setActiveChatId: () => {},
-    markChatAsRead: async () => {},
-    readReceiptsByChatId: {},
-    bumpChatLastMessage: () => {},
-    upsertReadReceipt: () => {},
-  };
+  return (
+    ctx || {
+      chats: [],
+      loading: false,
+      refreshChats: async () => {},
+      activeChatId: null,
+      setActiveChatId: () => {},
+      markChatAsRead: async () => {},
+      readReceiptsByChatId: {},
+      bumpChatLastMessage: () => {},
+      upsertReadReceipt: () => {},
+    }
+  );
 };
 
 export const ChatsProvider = ({ children }) => {
@@ -121,16 +97,17 @@ export const ChatsProvider = ({ children }) => {
           if (!byMessageId || byMessageId.size === 0) continue;
 
           const messages = Array.from(byMessageId.values())
-            .filter(m => m?.id != null)
+            .filter((m) => m?.id != null)
             .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
           for (const msg of messages) {
             const messageId = String(msg.id);
             if (processedNotificationMessageIdsRef.current.has(messageId)) continue;
 
-            const isOwn = currentUser?.id && msg?.senderId && Number(currentUser.id) === Number(msg.senderId);
+            const isOwn =
+              currentUser?.id && msg?.senderId && Number(currentUser.id) === Number(msg.senderId);
             const isActive = activeId && activeId === cid;
-            const unreadInc = isOwn ? 0 : (isActive && isVisible ? 0 : 1);
+            const unreadInc = isOwn ? 0 : isActive && isVisible ? 0 : 1;
 
             chat.lastMessage = { ...(chat.lastMessage || {}), ...msg };
             chat.updatedAt = toIso(msg.createdAt) || chat.updatedAt;
@@ -166,44 +143,47 @@ export const ChatsProvider = ({ children }) => {
     setActiveChatIdState(chatId ? String(chatId) : null);
   }, []);
 
-  const markChatAsRead = useCallback(async (chatId) => {
-    if (!chatId) return;
-    const key = String(chatId);
-    const now = Date.now();
-    const last = lastReadAtRef.current.get(key) || 0;
-    if (now - last < 1000) return;
-    lastReadAtRef.current.set(key, now);
+  const markChatAsRead = useCallback(
+    async (chatId) => {
+      if (!chatId) return;
+      const key = String(chatId);
+      const now = Date.now();
+      const last = lastReadAtRef.current.get(key) || 0;
+      if (now - last < 1000) return;
+      lastReadAtRef.current.set(key, now);
 
-    setChats(prev =>
-      prev.map(c => {
-        if (String(c.id) !== key) return c;
-        // Получить lastReadMessageId из lastMessage чата
-        const lastReadMessageId = c.lastMessage?.id;
-        
-        // Отправить через WebSocket если есть lastReadMessageId
-        if (client && connected && lastReadMessageId) {
-          try {
-            client.publish({
-              destination: '/app/chat.markRead',
-              body: JSON.stringify({
-                chatId: parseInt(key),
-                lastReadMessageId: parseInt(lastReadMessageId),
-              }),
-            });
-          } catch (e) {
-            console.error('Failed to send markRead via WebSocket:', e);
+      setChats((prev) =>
+        prev.map((c) => {
+          if (String(c.id) !== key) return c;
+          // Получить lastReadMessageId из lastMessage чата
+          const lastReadMessageId = c.lastMessage?.id;
+
+          // Отправить через WebSocket если есть lastReadMessageId
+          if (client && connected && lastReadMessageId) {
+            try {
+              client.publish({
+                destination: '/app/chat.markRead',
+                body: JSON.stringify({
+                  chatId: parseInt(key),
+                  lastReadMessageId: parseInt(lastReadMessageId),
+                }),
+              });
+            } catch (e) {
+              console.error('Failed to send markRead via WebSocket:', e);
+            }
           }
-        }
-        
-        return { ...c, unreadCount: 0 };
-      })
-    );
 
-    // Fallback на REST API
-    try {
-      await chatAPI.markChatAsRead(key);
-    } catch (e) {}
-  }, [client, connected]);
+          return { ...c, unreadCount: 0 };
+        })
+      );
+
+      // Fallback на REST API
+      try {
+        await chatAPI.markChatAsRead(key);
+      } catch (e) {}
+    },
+    [client, connected]
+  );
 
   const upsertReadReceipt = useCallback((chatId, readerId, readAt) => {
     const cid = String(chatId);
@@ -211,7 +191,7 @@ export const ChatsProvider = ({ children }) => {
     const iso = toIso(readAt);
     if (!cid || !rid || !iso) return;
 
-    setReadReceiptsByChatId(prev => {
+    setReadReceiptsByChatId((prev) => {
       const currentChatMap = prev[cid] || {};
       const existing = currentChatMap[rid];
       if (existing && new Date(existing).getTime() >= new Date(iso).getTime()) {
@@ -227,100 +207,115 @@ export const ChatsProvider = ({ children }) => {
     });
   }, []);
 
-  const handleNotification = useCallback((notification) => {
-    const chatId = getNotificationChatId(notification);
-    if (!chatId) return;
+  const handleNotification = useCallback(
+    (notification) => {
+      const chatId = getNotificationChatId(notification);
+      if (!chatId) return;
 
-    const message = getNotificationMessage(notification);
-    const currentUser = getCurrentUser();
-    const isOwnMessage = currentUser?.id && message?.senderId && Number(currentUser.id) === Number(message.senderId);
-    const messageId = message?.id != null ? String(message.id) : null;
-    const nextLastMessage = {
-      ...(message?.id ? { id: message.id } : null),
-      ...(message?.senderId ? { senderId: message.senderId } : null),
-      ...(message?.senderUsername ? { senderUsername: message.senderUsername } : null),
-      ...(message?.senderDisplayName ? { senderDisplayName: message.senderDisplayName } : null),
-      ...(message?.content ? { content: message.content } : null),
-      ...(message?.type ? { type: message.type } : null),
-      ...(toIso(message?.createdAt || notification?.createdAt) ? { createdAt: toIso(message?.createdAt || notification?.createdAt) } : null),
-    };
-
-    const isVisible = typeof document !== 'undefined' && document.visibilityState === 'visible';
-    const isActive = activeChatId && String(activeChatId) === String(chatId);
-    const shouldSound = !isOwnMessage && (!isActive || !isVisible);
-
-    setChats(prev => {
-      const idx = prev.findIndex(c => String(c.id) === String(chatId));
-      if (idx === -1) {
-        if (messageId) {
-          const cid = String(chatId);
-          const byMessageId = pendingByChatIdRef.current.get(cid) || new Map();
-          if (!byMessageId.has(messageId) && !processedNotificationMessageIdsRef.current.has(messageId)) {
-            byMessageId.set(messageId, {
-              id: message?.id,
-              chatId: message?.chatId || chatId,
-              senderId: message?.senderId,
-              senderUsername: message?.senderUsername,
-              senderDisplayName: message?.senderDisplayName,
-              content: message?.content,
-              type: message?.type,
-              createdAt: message?.createdAt || notification?.createdAt || new Date().toISOString(),
-            });
-            pendingByChatIdRef.current.set(cid, byMessageId);
-          }
-        }
-        refreshChatsThrottled();
-        return prev;
-      }
-
-      if (messageId) {
-        if (processedNotificationMessageIdsRef.current.has(messageId)) return prev;
-        processedNotificationMessageIdsRef.current.add(messageId);
-      }
-
-      const current = prev[idx];
-      const unreadInc = isOwnMessage ? 0 : (isActive && isVisible ? 0 : 1);
-      const mergedLastMessage = Object.keys(nextLastMessage).length
-        ? { ...(current.lastMessage || {}), ...nextLastMessage }
-        : current.lastMessage;
-
-      const updatedChat = {
-        ...current,
-        lastMessage: mergedLastMessage,
-        updatedAt: toIso(mergedLastMessage?.createdAt || current.updatedAt || new Date().toISOString()) || current.updatedAt,
-        unreadCount: Math.max(0, Number(current.unreadCount || 0) + unreadInc),
+      const message = getNotificationMessage(notification);
+      const currentUser = getCurrentUser();
+      const isOwnMessage =
+        currentUser?.id && message?.senderId && Number(currentUser.id) === Number(message.senderId);
+      const messageId = message?.id != null ? String(message.id) : null;
+      const nextLastMessage = {
+        ...(message?.id ? { id: message.id } : null),
+        ...(message?.senderId ? { senderId: message.senderId } : null),
+        ...(message?.senderUsername ? { senderUsername: message.senderUsername } : null),
+        ...(message?.senderDisplayName ? { senderDisplayName: message.senderDisplayName } : null),
+        ...(message?.content ? { content: message.content } : null),
+        ...(message?.type ? { type: message.type } : null),
+        ...(toIso(message?.createdAt || notification?.createdAt)
+          ? { createdAt: toIso(message?.createdAt || notification?.createdAt) }
+          : null),
       };
 
-      const next = [...prev];
-      next.splice(idx, 1);
-      next.unshift(updatedChat);
-      return next;
-    });
+      const isVisible = typeof document !== 'undefined' && document.visibilityState === 'visible';
+      const isActive = activeChatId && String(activeChatId) === String(chatId);
+      const shouldSound = !isOwnMessage && (!isActive || !isVisible);
 
-    if (isActive && isVisible) {
-      markChatAsRead(chatId);
-    }
-
-    if (shouldSound) {
-      try {
-        if (typeof window !== 'undefined') {
-          const disabled = localStorage.getItem('disable_notification_sound') === 'true';
-          const now = Date.now();
-          if (!disabled && now - lastSoundAtRef.current > 500) {
-            lastSoundAtRef.current = now;
-            playPagerNotificationSound({ pattern: 'pager' });
+      setChats((prev) => {
+        const idx = prev.findIndex((c) => String(c.id) === String(chatId));
+        if (idx === -1) {
+          if (messageId) {
+            const cid = String(chatId);
+            const byMessageId = pendingByChatIdRef.current.get(cid) || new Map();
+            if (
+              !byMessageId.has(messageId) &&
+              !processedNotificationMessageIdsRef.current.has(messageId)
+            ) {
+              byMessageId.set(messageId, {
+                id: message?.id,
+                chatId: message?.chatId || chatId,
+                senderId: message?.senderId,
+                senderUsername: message?.senderUsername,
+                senderDisplayName: message?.senderDisplayName,
+                content: message?.content,
+                type: message?.type,
+                createdAt:
+                  message?.createdAt || notification?.createdAt || new Date().toISOString(),
+              });
+              pendingByChatIdRef.current.set(cid, byMessageId);
+            }
           }
+          refreshChatsThrottled();
+          return prev;
         }
-      } catch (e) {}
-    }
-  }, [activeChatId, markChatAsRead, refreshChatsThrottled]);
+
+        if (messageId) {
+          if (processedNotificationMessageIdsRef.current.has(messageId)) return prev;
+          processedNotificationMessageIdsRef.current.add(messageId);
+        }
+
+        const current = prev[idx];
+        const unreadInc = isOwnMessage ? 0 : isActive && isVisible ? 0 : 1;
+        const mergedLastMessage = Object.keys(nextLastMessage).length
+          ? { ...(current.lastMessage || {}), ...nextLastMessage }
+          : current.lastMessage;
+
+        const updatedChat = {
+          ...current,
+          lastMessage: mergedLastMessage,
+          updatedAt:
+            toIso(mergedLastMessage?.createdAt || current.updatedAt || new Date().toISOString()) ||
+            current.updatedAt,
+          unreadCount: Math.max(0, Number(current.unreadCount || 0) + unreadInc),
+        };
+
+        const next = [...prev];
+        next.splice(idx, 1);
+        next.unshift(updatedChat);
+        return next;
+      });
+
+      if (isActive && isVisible) {
+        markChatAsRead(chatId);
+      }
+
+      if (shouldSound) {
+        try {
+          if (typeof window !== 'undefined') {
+            const disabled = localStorage.getItem('disable_notification_sound') === 'true';
+            const now = Date.now();
+            if (!disabled && now - lastSoundAtRef.current > 500) {
+              lastSoundAtRef.current = now;
+              playPagerNotificationSound({ pattern: 'pager' });
+            }
+          }
+        } catch (e) {}
+      }
+    },
+    [activeChatId, markChatAsRead, refreshChatsThrottled]
+  );
 
   useEffect(() => {
-    processedCleanupRef.current = setInterval(() => {
-      if (processedNotificationMessageIdsRef.current.size > 2000) {
-        processedNotificationMessageIdsRef.current.clear();
-      }
-    }, 5 * 60 * 1000);
+    processedCleanupRef.current = setInterval(
+      () => {
+        if (processedNotificationMessageIdsRef.current.size > 2000) {
+          processedNotificationMessageIdsRef.current.clear();
+        }
+      },
+      5 * 60 * 1000
+    );
     return () => {
       if (processedCleanupRef.current) {
         clearInterval(processedCleanupRef.current);
@@ -330,11 +325,14 @@ export const ChatsProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    pendingCleanupRef.current = setInterval(() => {
-      if (pendingByChatIdRef.current.size > 200) {
-        pendingByChatIdRef.current.clear();
-      }
-    }, 10 * 60 * 1000);
+    pendingCleanupRef.current = setInterval(
+      () => {
+        if (pendingByChatIdRef.current.size > 200) {
+          pendingByChatIdRef.current.clear();
+        }
+      },
+      10 * 60 * 1000
+    );
     return () => {
       if (pendingCleanupRef.current) {
         clearInterval(pendingCleanupRef.current);
@@ -343,40 +341,49 @@ export const ChatsProvider = ({ children }) => {
     };
   }, []);
 
-  const bumpChatLastMessage = useCallback((chatId, message, currentUserId) => {
-    if (!chatId || !message) return;
-    const cid = String(chatId);
+  const bumpChatLastMessage = useCallback(
+    (chatId, message, currentUserId) => {
+      if (!chatId || !message) return;
+      const cid = String(chatId);
 
-    const nextLastMessage = {
-      ...(message?.id ? { id: message.id } : null),
-      ...(message?.senderId ? { senderId: message.senderId } : (currentUserId ? { senderId: currentUserId } : null)),
-      ...(message?.senderUsername ? { senderUsername: message.senderUsername } : null),
-      ...(message?.senderDisplayName ? { senderDisplayName: message.senderDisplayName } : null),
-      ...(message?.content ? { content: message.content } : null),
-      ...(message?.type ? { type: message.type } : null),
-      ...(toIso(message?.createdAt) ? { createdAt: toIso(message.createdAt) } : { createdAt: new Date().toISOString() }),
-    };
-
-    setChats(prev => {
-      const idx = prev.findIndex(c => String(c.id) === cid);
-      if (idx === -1) {
-        refreshChatsThrottled();
-        return prev;
-      }
-
-      const current = prev[idx];
-      const updatedChat = {
-        ...current,
-        lastMessage: { ...(current.lastMessage || {}), ...nextLastMessage },
-        updatedAt: toIso(nextLastMessage.createdAt) || current.updatedAt,
+      const nextLastMessage = {
+        ...(message?.id ? { id: message.id } : null),
+        ...(message?.senderId
+          ? { senderId: message.senderId }
+          : currentUserId
+            ? { senderId: currentUserId }
+            : null),
+        ...(message?.senderUsername ? { senderUsername: message.senderUsername } : null),
+        ...(message?.senderDisplayName ? { senderDisplayName: message.senderDisplayName } : null),
+        ...(message?.content ? { content: message.content } : null),
+        ...(message?.type ? { type: message.type } : null),
+        ...(toIso(message?.createdAt)
+          ? { createdAt: toIso(message.createdAt) }
+          : { createdAt: new Date().toISOString() }),
       };
 
-      const next = [...prev];
-      next.splice(idx, 1);
-      next.unshift(updatedChat);
-      return next;
-    });
-  }, [refreshChatsThrottled]);
+      setChats((prev) => {
+        const idx = prev.findIndex((c) => String(c.id) === cid);
+        if (idx === -1) {
+          refreshChatsThrottled();
+          return prev;
+        }
+
+        const current = prev[idx];
+        const updatedChat = {
+          ...current,
+          lastMessage: { ...(current.lastMessage || {}), ...nextLastMessage },
+          updatedAt: toIso(nextLastMessage.createdAt) || current.updatedAt,
+        };
+
+        const next = [...prev];
+        next.splice(idx, 1);
+        next.unshift(updatedChat);
+        return next;
+      });
+    },
+    [refreshChatsThrottled]
+  );
 
   useEffect(() => {
     if (!client || !connected || !client.connected || !client.active) return;
@@ -424,7 +431,7 @@ export const ChatsProvider = ({ children }) => {
   useEffect(() => {
     if (!client || !connected || !client.connected || !client.active) return;
 
-    const nextChatIds = new Set(chats.map(c => String(c.id)));
+    const nextChatIds = new Set(chats.map((c) => String(c.id)));
 
     for (const [chatId, sub] of readSubscriptionsRef.current.entries()) {
       if (!nextChatIds.has(chatId)) {
@@ -487,12 +494,17 @@ export const ChatsProvider = ({ children }) => {
       bumpChatLastMessage,
       upsertReadReceipt,
     };
-  }, [chats, loading, refreshChats, activeChatId, setActiveChatId, markChatAsRead, readReceiptsByChatId, bumpChatLastMessage, upsertReadReceipt]);
+  }, [
+    chats,
+    loading,
+    refreshChats,
+    activeChatId,
+    setActiveChatId,
+    markChatAsRead,
+    readReceiptsByChatId,
+    bumpChatLastMessage,
+    upsertReadReceipt,
+  ]);
 
-  return (
-    <ChatsContext.Provider value={value}>
-      {children}
-    </ChatsContext.Provider>
-  );
+  return <ChatsContext.Provider value={value}>{children}</ChatsContext.Provider>;
 };
-

@@ -26,95 +26,96 @@ export const useChatRealtime = (chatId) => {
   const markReadTimeoutRef = useRef(null);
   const loadingInitialRef = useRef(false);
   const lastLoadedChatIdRef = useRef(null);
-  
+
   const localSeqRef = useRef(0);
   const localPtsRef = useRef(new Map());
   const gapRecoveryInProgressRef = useRef(new Set());
 
-  const handleGapRecovery = useCallback(async (chatId, fromPts, toPts) => {
-    try {
-      const updates = await chatAPI.getChatUpdates(chatId, fromPts, 100);
-      if (!updates?.updates || !Array.isArray(updates.updates)) return;
-      
-      const sortedUpdates = updates.updates.sort((a, b) => a.pts - b.pts);
-      
-      for (const update of sortedUpdates) {
-        const eventData = update.eventData;
-        if (!eventData) continue;
-        
-        switch (update.eventType) {
-          case 'MESSAGE_NEW':
-            if (eventData.message) {
-              upsertMessage(
-                { ...eventData.message, status: MESSAGE_STATUS.SENT, isOptimistic: false },
-                { unreadDelta: 0 }
-              );
-            }
-            break;
-          case 'MESSAGE_EDITED':
-            if (eventData.message) {
-              updateMessage(
-                { ...eventData.message, status: MESSAGE_STATUS.SENT, isOptimistic: false },
-                { unreadDelta: 0 }
-              );
-            }
-            break;
-          case 'MESSAGE_DELETED_FOR_ALL':
-            if (eventData.messageId) {
-              removeMessage(eventData.messageId);
-            }
-            break;
-          case 'MESSAGE_DELETED_FOR_ME':
-            if (eventData.messageId) {
-              removeMessage(eventData.messageId);
-            }
-            break;
-          case 'MESSAGE_PINNED':
-            if (eventData.message) {
-              updateMessage(
-                { ...eventData.message, status: MESSAGE_STATUS.SENT, isOptimistic: false },
-                { unreadDelta: 0 }
-              );
-            }
-            break;
-          case 'MESSAGE_UNPINNED':
-            if (eventData.message) {
-              updateMessage(
-                { ...eventData.message, status: MESSAGE_STATUS.SENT, isOptimistic: false },
-                { unreadDelta: 0 }
-              );
-            }
-            break;
+  const handleGapRecovery = useCallback(
+    async (chatId, fromPts, toPts) => {
+      try {
+        const updates = await chatAPI.getChatUpdates(chatId, fromPts, 100);
+        if (!updates?.updates || !Array.isArray(updates.updates)) return;
+
+        const sortedUpdates = updates.updates.sort((a, b) => a.pts - b.pts);
+
+        for (const update of sortedUpdates) {
+          const eventData = update.eventData;
+          if (!eventData) continue;
+
+          switch (update.eventType) {
+            case 'MESSAGE_NEW':
+              if (eventData.message) {
+                upsertMessage(
+                  { ...eventData.message, status: MESSAGE_STATUS.SENT, isOptimistic: false },
+                  { unreadDelta: 0 }
+                );
+              }
+              break;
+            case 'MESSAGE_EDITED':
+              if (eventData.message) {
+                updateMessage(
+                  { ...eventData.message, status: MESSAGE_STATUS.SENT, isOptimistic: false },
+                  { unreadDelta: 0 }
+                );
+              }
+              break;
+            case 'MESSAGE_DELETED_FOR_ALL':
+              if (eventData.messageId) {
+                removeMessage(eventData.messageId);
+              }
+              break;
+            case 'MESSAGE_DELETED_FOR_ME':
+              if (eventData.messageId) {
+                removeMessage(eventData.messageId);
+              }
+              break;
+            case 'MESSAGE_PINNED':
+              if (eventData.message) {
+                updateMessage(
+                  { ...eventData.message, status: MESSAGE_STATUS.SENT, isOptimistic: false },
+                  { unreadDelta: 0 }
+                );
+              }
+              break;
+            case 'MESSAGE_UNPINNED':
+              if (eventData.message) {
+                updateMessage(
+                  { ...eventData.message, status: MESSAGE_STATUS.SENT, isOptimistic: false },
+                  { unreadDelta: 0 }
+                );
+              }
+              break;
+          }
+
+          const chatIdStr = String(chatId);
+          localPtsRef.current.set(chatIdStr, update.pts);
         }
-        
-        const chatIdStr = String(chatId);
-        localPtsRef.current.set(chatIdStr, update.pts);
-      }
-    } catch (error) {
-      
-    }
-  }, [upsertMessage, updateMessage, removeMessage]);
+      } catch (error) {}
+    },
+    [upsertMessage, updateMessage, removeMessage]
+  );
 
   const loadInitial = useCallback(async () => {
     if (!chatId) return;
     const chatIdStr = String(chatId);
-    
+
     if (loadingInitialRef.current && lastLoadedChatIdRef.current === chatIdStr) {
       return;
     }
-    
+
     loadingInitialRef.current = true;
     lastLoadedChatIdRef.current = chatIdStr;
-    
+
     try {
       const chatState = await chatAPI.getChatState(chatId);
       if (chatState?.pts !== undefined) {
         localPtsRef.current.set(chatIdStr, chatState.pts);
       }
-      
+
       if (setReadReceiptsForChat && chatState) {
         const readReceipts = {};
-        
+
         if (chatState.readReceipts && typeof chatState.readReceipts === 'object') {
           for (const [userId, lastReadAt] of Object.entries(chatState.readReceipts)) {
             if (userId && lastReadAt != null) {
@@ -122,35 +123,42 @@ export const useChatRealtime = (chatId) => {
             }
           }
         }
-        
+
         if (chatState.lastReadAt) {
           const currentUser = getCurrentUser();
           if (currentUser?.id) {
             const currentUserId = String(currentUser.id);
-            if (!readReceipts[currentUserId] || chatState.lastReadAt > readReceipts[currentUserId]) {
+            if (
+              !readReceipts[currentUserId] ||
+              chatState.lastReadAt > readReceipts[currentUserId]
+            ) {
               readReceipts[currentUserId] = chatState.lastReadAt;
             }
           }
         }
-        
+
         if (Object.keys(readReceipts).length > 0) {
           setReadReceiptsForChat(chatId, readReceipts);
         }
       }
-      
+
       const response = await chatAPI.getMessages(chatId, { page: 0, size: 50 });
       const list = Array.isArray(response?.content) ? response.content : [];
       const ordered = [...list].reverse();
       for (const m of ordered) {
-        if ((m.type === 'FILE' || m.type === 'IMAGE') && m.fileUrl && typeof window !== 'undefined') {
+        if (
+          (m.type === 'FILE' || m.type === 'IMAGE') &&
+          m.fileUrl &&
+          typeof window !== 'undefined'
+        ) {
           const metadataKey = `file_metadata_${m.fileUrl}`;
-          
+
           if (m.fileSize && m.fileName && m.mimeType) {
             const fileMetadata = {
               fileSize: m.fileSize,
               fileName: m.fileName,
               mimeType: m.mimeType,
-              timestamp: Date.now()
+              timestamp: Date.now(),
             };
             localStorage.setItem(metadataKey, JSON.stringify(fileMetadata));
           } else {
@@ -167,14 +175,17 @@ export const useChatRealtime = (chatId) => {
                 if (!m.mimeType && metadata.mimeType) {
                   m.mimeType = metadata.mimeType;
                 }
-              } catch (e) {
-              }
+              } catch (e) {}
             }
           }
         }
-        upsertMessage({ ...m, status: MESSAGE_STATUS.SENT, isOptimistic: false }, { unreadDelta: 0 });
+        upsertMessage(
+          { ...m, status: MESSAGE_STATUS.SENT, isOptimistic: false },
+          { unreadDelta: 0 }
+        );
       }
-    } catch (e) {} finally {
+    } catch (e) {
+    } finally {
       loadingInitialRef.current = false;
     }
   }, [chatId, upsertMessage]);
@@ -183,10 +194,10 @@ export const useChatRealtime = (chatId) => {
     if (!chatId) return;
     const chatIdStr = String(chatId);
     setActiveChatId(chatId);
-    
+
     // НЕ вызываем markChatAsRead при открытии - Intersection Observer сделает это автоматически
     // когда сообщения станут видимыми
-    
+
     return () => setActiveChatId(null);
   }, [chatId, setActiveChatId]);
 
@@ -222,7 +233,7 @@ export const useChatRealtime = (chatId) => {
         const receivedPtsCount = data.ptsCount || 1;
         const chatIdStr = String(chatId);
         const currentLocalPts = localPtsRef.current.get(chatIdStr) || 0;
-        
+
         if (receivedPts !== undefined && receivedPts > currentLocalPts + receivedPtsCount) {
           const gapKey = `${chatIdStr}_${currentLocalPts}`;
           if (!gapRecoveryInProgressRef.current.has(gapKey)) {
@@ -232,11 +243,11 @@ export const useChatRealtime = (chatId) => {
             });
           }
         }
-        
+
         if (receivedPts !== undefined) {
           localPtsRef.current.set(chatIdStr, receivedPts);
         }
-        
+
         if (data.seq !== undefined && data.seq > localSeqRef.current) {
           localSeqRef.current = data.seq;
         }
@@ -246,11 +257,19 @@ export const useChatRealtime = (chatId) => {
           if (!editedMessage) return;
           if (Number(editedMessage.chatId) !== Number(chatId)) return;
 
-          const updatedMessage = { ...editedMessage, status: MESSAGE_STATUS.SENT, isOptimistic: false };
-          
-          if ((updatedMessage.type === 'FILE' || updatedMessage.type === 'IMAGE') && updatedMessage.fileUrl && typeof window !== 'undefined') {
+          const updatedMessage = {
+            ...editedMessage,
+            status: MESSAGE_STATUS.SENT,
+            isOptimistic: false,
+          };
+
+          if (
+            (updatedMessage.type === 'FILE' || updatedMessage.type === 'IMAGE') &&
+            updatedMessage.fileUrl &&
+            typeof window !== 'undefined'
+          ) {
             const metadataKey = `file_metadata_${updatedMessage.fileUrl}`;
-            
+
             if (!updatedMessage.fileSize || !updatedMessage.fileName || !updatedMessage.mimeType) {
               const savedMetadata = localStorage.getItem(metadataKey);
               if (savedMetadata) {
@@ -265,15 +284,14 @@ export const useChatRealtime = (chatId) => {
                   if (!updatedMessage.mimeType && metadata.mimeType) {
                     updatedMessage.mimeType = metadata.mimeType;
                   }
-                } catch (e) {
-                }
+                } catch (e) {}
               }
             } else {
               const fileMetadata = {
                 fileSize: updatedMessage.fileSize,
                 fileName: updatedMessage.fileName,
                 mimeType: updatedMessage.mimeType,
-                timestamp: Date.now()
+                timestamp: Date.now(),
               };
               localStorage.setItem(metadataKey, JSON.stringify(fileMetadata));
             }
@@ -283,7 +301,10 @@ export const useChatRealtime = (chatId) => {
           return;
         }
 
-        if (data.eventType === 'MESSAGE_DELETED_FOR_ALL' || data.eventType === 'MESSAGE_DELETED_FOR_ME') {
+        if (
+          data.eventType === 'MESSAGE_DELETED_FOR_ALL' ||
+          data.eventType === 'MESSAGE_DELETED_FOR_ME'
+        ) {
           if (data.messageId) {
             removeMessage(data.messageId);
           }
@@ -304,7 +325,7 @@ export const useChatRealtime = (chatId) => {
 
         if (dto.type === 'SYSTEM') {
           if (Number(dto.chatId) !== Number(chatId)) return;
-          
+
           // Добавляем системное сообщение без задержки
           upsertMessage(
             { ...dto, status: MESSAGE_STATUS.SENT, isOptimistic: false },
@@ -312,84 +333,93 @@ export const useChatRealtime = (chatId) => {
           );
           return;
         }
-        
+
         const processMessage = () => {
           if (Number(dto.chatId) !== Number(chatId)) return;
 
-        const currentUser = getCurrentUser();
-        const isOwn = currentUser?.id && dto?.senderId && Number(currentUser.id) === Number(dto.senderId);
-        
-        if (isOwn && dto.id) {
-          const cid = String(chatId);
-          const messageIds = messageIdsByChatId?.[cid] || [];
-          
-          let optimisticMessages = messageIds
-            .map(id => messagesById?.[String(id)])
-            .filter(msg => msg && msg.isOptimistic && msg.tempId && msg.type === dto.type);
-          
-          if (dto.type === 'FILE' || dto.type === 'IMAGE') {
-            if (dto.fileUrl) {
-              optimisticMessages = optimisticMessages.filter(msg => msg.fileUrl === dto.fileUrl);
-            }
-          }
-          
-          optimisticMessages.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-          
-          if (optimisticMessages.length > 0) {
-            const latestOptimistic = optimisticMessages[0];
-            const now = Date.now();
-            const optimisticTime = new Date(latestOptimistic.createdAt || Date.now()).getTime();
-            const timeDiff = now - optimisticTime;
-            
-            if (timeDiff < 30000) {
-              replaceOptimistic(chatId, latestOptimistic.tempId, dto, MESSAGE_STATUS.SENT);
-              return;
-            }
-          }
-          
-          return;
-        }
+          const currentUser = getCurrentUser();
+          const isOwn =
+            currentUser?.id && dto?.senderId && Number(currentUser.id) === Number(dto.senderId);
 
-        if ((dto.type === 'FILE' || dto.type === 'IMAGE') && dto.fileUrl && typeof window !== 'undefined') {
-          const metadataKey = `file_metadata_${dto.fileUrl}`;
-          
-          if (dto.fileSize && dto.fileName && dto.mimeType) {
-            const fileMetadata = {
-              fileSize: dto.fileSize,
-              fileName: dto.fileName,
-              mimeType: dto.mimeType,
-              timestamp: Date.now()
-            };
-            localStorage.setItem(metadataKey, JSON.stringify(fileMetadata));
-          } else {
-            const savedMetadata = localStorage.getItem(metadataKey);
-            if (savedMetadata) {
-              try {
-                const metadata = JSON.parse(savedMetadata);
-                if (!dto.fileSize && metadata.fileSize) {
-                  dto.fileSize = metadata.fileSize;
-                }
-                if (!dto.fileName && metadata.fileName) {
-                  dto.fileName = metadata.fileName;
-                }
-                if (!dto.mimeType && metadata.mimeType) {
-                  dto.mimeType = metadata.mimeType;
-                }
-              } catch (e) {
+          if (isOwn && dto.id) {
+            const cid = String(chatId);
+            const messageIds = messageIdsByChatId?.[cid] || [];
+
+            let optimisticMessages = messageIds
+              .map((id) => messagesById?.[String(id)])
+              .filter((msg) => msg && msg.isOptimistic && msg.tempId && msg.type === dto.type);
+
+            if (dto.type === 'FILE' || dto.type === 'IMAGE') {
+              if (dto.fileUrl) {
+                optimisticMessages = optimisticMessages.filter(
+                  (msg) => msg.fileUrl === dto.fileUrl
+                );
+              }
+            }
+
+            optimisticMessages.sort(
+              (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            );
+
+            if (optimisticMessages.length > 0) {
+              const latestOptimistic = optimisticMessages[0];
+              const now = Date.now();
+              const optimisticTime = new Date(latestOptimistic.createdAt || Date.now()).getTime();
+              const timeDiff = now - optimisticTime;
+
+              if (timeDiff < 30000) {
+                replaceOptimistic(chatId, latestOptimistic.tempId, dto, MESSAGE_STATUS.SENT);
+                return;
+              }
+            }
+
+            return;
+          }
+
+          if (
+            (dto.type === 'FILE' || dto.type === 'IMAGE') &&
+            dto.fileUrl &&
+            typeof window !== 'undefined'
+          ) {
+            const metadataKey = `file_metadata_${dto.fileUrl}`;
+
+            if (dto.fileSize && dto.fileName && dto.mimeType) {
+              const fileMetadata = {
+                fileSize: dto.fileSize,
+                fileName: dto.fileName,
+                mimeType: dto.mimeType,
+                timestamp: Date.now(),
+              };
+              localStorage.setItem(metadataKey, JSON.stringify(fileMetadata));
+            } else {
+              const savedMetadata = localStorage.getItem(metadataKey);
+              if (savedMetadata) {
+                try {
+                  const metadata = JSON.parse(savedMetadata);
+                  if (!dto.fileSize && metadata.fileSize) {
+                    dto.fileSize = metadata.fileSize;
+                  }
+                  if (!dto.fileName && metadata.fileName) {
+                    dto.fileName = metadata.fileName;
+                  }
+                  if (!dto.mimeType && metadata.mimeType) {
+                    dto.mimeType = metadata.mimeType;
+                  }
+                } catch (e) {}
               }
             }
           }
-        }
 
-        const isVisible = typeof document !== 'undefined' && document.visibilityState === 'visible';
-        upsertMessage(
-          { ...dto, status: MESSAGE_STATUS.SENT, isOptimistic: false },
-          { unreadDelta: isVisible ? 0 : undefined }
-        );
-        
-        // НЕ вызываем markChatAsRead - за это отвечает Intersection Observer
+          const isVisible =
+            typeof document !== 'undefined' && document.visibilityState === 'visible';
+          upsertMessage(
+            { ...dto, status: MESSAGE_STATUS.SENT, isOptimistic: false },
+            { unreadDelta: isVisible ? 0 : undefined }
+          );
+
+          // НЕ вызываем markChatAsRead - за это отвечает Intersection Observer
         };
-        
+
         if (typeof window !== 'undefined' && window.requestIdleCallback) {
           window.requestIdleCallback(processMessage, { timeout: 1000 });
         } else {
@@ -408,14 +438,15 @@ export const useChatRealtime = (chatId) => {
 
           if (data.audioData) {
             try {
-              const audioBlob = new Blob([
-                Uint8Array.from(atob(data.audioData), c => c.charCodeAt(0))
-              ], { type: 'audio/webm' });
-              
+              const audioBlob = new Blob(
+                [Uint8Array.from(atob(data.audioData), (c) => c.charCodeAt(0))],
+                { type: 'audio/webm' }
+              );
+
               const audioUrl = URL.createObjectURL(audioBlob);
               const audio = new Audio(audioUrl);
               audio.play().catch(() => {});
-              
+
               audio.onended = () => {
                 URL.revokeObjectURL(audioUrl);
               };
@@ -440,6 +471,15 @@ export const useChatRealtime = (chatId) => {
         markReadTimeoutRef.current = null;
       }
     };
-  }, [chatId, client, connected, upsertMessage, updateMessage, markChatAsRead, replaceOptimistic, messageIdsByChatId, messagesById]);
+  }, [
+    chatId,
+    client,
+    connected,
+    upsertMessage,
+    updateMessage,
+    markChatAsRead,
+    replaceOptimistic,
+    messageIdsByChatId,
+    messagesById,
+  ]);
 };
-

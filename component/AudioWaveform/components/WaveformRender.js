@@ -20,33 +20,24 @@ export const renderWaveform = (
   // bars width
   let barWidth;
   switch (style) {
-    case "aurevia":
-      barWidth = Math.max(
-        ((width - barSpacing * (barCount - 1)) / barCount) * 2,
-        6
-      );
+    case 'aurevia':
+      barWidth = Math.max(((width - barSpacing * (barCount - 1)) / barCount) * 2, 6);
       break;
-    case "solmara":
-      barWidth = Math.max(
-        ((width - barSpacing * (barCount - 1)) / barCount) * 1.2,
-        3
-      );
+    case 'solmara':
+      barWidth = Math.max(((width - barSpacing * (barCount - 1)) / barCount) * 1.2, 3);
       break;
-    case "viridara":
+    case 'viridara':
       barWidth = Math.max((width - barSpacing * (barCount - 1)) / barCount, 2);
       break;
-    case "minimal":
-      barWidth = Math.max(
-        ((width - barSpacing * (barCount - 1)) / barCount) * 1,
-        1
-      );
+    case 'minimal':
+      barWidth = Math.max(((width - barSpacing * (barCount - 1)) / barCount) * 1, 1);
       break;
     default:
       barWidth = Math.max((width - barSpacing * (barCount - 1)) / barCount, 2);
   }
 
-  const actualSpacing = style === "aurevia" ? barSpacing * 1.5 : barSpacing;
-  const actualBarWidth = style === "aurevia" ? Math.min(barWidth, 8) : barWidth;
+  const actualSpacing = style === 'aurevia' ? barSpacing * 1.5 : barSpacing;
+  const actualBarWidth = style === 'aurevia' ? Math.min(barWidth, 8) : barWidth;
 
   const bars = waveformData.map((value, index) => {
     let barHeight = value * height;
@@ -54,22 +45,22 @@ export const renderWaveform = (
 
     // Увеличиваем коэффициенты высоты для более полных баров
     switch (style) {
-      case "viridara":
+      case 'viridara':
         barHeight = Math.max(barHeight * 1.0, 3); // Было 0.8, стало 1.0
         barY = (height - barHeight) / 2;
         break;
 
-      case "solmara":
+      case 'solmara':
         barHeight = Math.max(barHeight * 1.0, 3); // Было 0.9, стало 1.0
         barY = height - barHeight;
         break;
 
-      case "aurevia":
+      case 'aurevia':
         barHeight = Math.max(barHeight * 1.0, 5); // Было 0.95, стало 1.0
         barY = (height - barHeight) / 2;
         break;
 
-      case "minimal":
+      case 'minimal':
         barHeight = Math.max(barHeight * 0.85, 2); // Было 0.6, стало 0.85
         barY = (height - barHeight) / 2;
         break;
@@ -82,23 +73,22 @@ export const renderWaveform = (
 
     const barStartRatio = xPosition / width;
     const barEndRatio = (xPosition + actualBarWidth) / width;
-    
+
     // Более плавное определение состояния бара
     const isPlayed = progress > barEndRatio;
     const isCurrentProgressBar = progress >= barStartRatio && progress <= barEndRatio;
 
     let barColor = themeStyles.primary;
-    let opacity = style === "minimal" ? 0.5 : 0.7; // Увеличили базовую opacity
+    let opacity = style === 'minimal' ? 0.5 : 0.7; // Увеличили базовую opacity
 
     if (isPlayed) {
       barColor = themeStyles.progress;
       opacity = 1;
     } else if (isCurrentProgressBar) {
       // Более плавный переход внутри текущего бара
-      const barProgress =
-        (progress - barStartRatio) / (barEndRatio - barStartRatio);
+      const barProgress = (progress - barStartRatio) / (barEndRatio - barStartRatio);
       const smoothProgress = Math.max(0, Math.min(1, barProgress));
-      
+
       // Плавный переход цвета и opacity
       barColor = themeStyles.progress;
       opacity = 0.7 + 0.3 * smoothProgress; // Плавный переход от 0.7 до 1.0
@@ -106,16 +96,16 @@ export const renderWaveform = (
 
     let borderRadius = 0;
     switch (style) {
-      case "viridara":
+      case 'viridara':
         borderRadius = actualBarWidth / 2;
         break;
-      case "aurevia":
+      case 'aurevia':
         borderRadius = 2;
         break;
-      case "solmara":
+      case 'solmara':
         borderRadius = 1;
         break;
-      case "minimal":
+      case 'minimal':
         borderRadius = 0;
         break;
     }
@@ -131,9 +121,9 @@ export const renderWaveform = (
         rx={borderRadius}
         opacity={opacity}
         style={{
-          transition: "fill 0.2s ease, opacity 0.2s ease",
-          transformOrigin: "center",
-          willChange: "fill, opacity",
+          transition: 'fill 0.2s ease, opacity 0.2s ease',
+          transformOrigin: 'center',
+          willChange: 'fill, opacity',
         }}
       />
     );

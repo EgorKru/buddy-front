@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
-import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Maximize2, Minimize2 } from "lucide-react";
-import styles from "./index.module.css";
+import { useEffect, useRef, useState } from 'react';
+import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Maximize2, Minimize2 } from 'lucide-react';
+import styles from './index.module.css';
 
 const CallView = ({
   call,
@@ -12,20 +12,20 @@ const CallView = ({
   onToggleAudio,
   onToggleVideo,
   onEndCall,
-  isCallActive = true, 
+  isCallActive = true,
 }) => {
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
-  const remoteAudioRef = useRef(null); 
+  const remoteAudioRef = useRef(null);
   const minimizedRemoteVideoRef = useRef(null);
   const minimizedRef = useRef(null);
   const [callDuration, setCallDuration] = useState(0);
-  const callStartTimeRef = useRef(null); 
-  const callBecameActiveTimeRef = useRef(null); 
+  const callStartTimeRef = useRef(null);
+  const callBecameActiveTimeRef = useRef(null);
   const [isMinimized, setIsMinimized] = useState(false);
-  const [position, setPosition] = useState({ 
-    x: typeof window !== 'undefined' ? window.innerWidth - 320 : 0, 
-    y: typeof window !== 'undefined' ? window.innerHeight - 200 : 0 
+  const [position, setPosition] = useState({
+    x: typeof window !== 'undefined' ? window.innerWidth - 320 : 0,
+    y: typeof window !== 'undefined' ? window.innerHeight - 200 : 0,
   });
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -45,7 +45,6 @@ const CallView = ({
 
   useEffect(() => {
     if (!remoteStream) {
-      
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = null;
       }
@@ -53,7 +52,6 @@ const CallView = ({
     }
 
     if (!remoteAudioRef.current) {
-      
       return;
     }
 
@@ -61,15 +59,14 @@ const CallView = ({
     const audioTracks = remoteStream.getAudioTracks();
 
     if (audioTracks.length > 0) {
-      
       const audioStream = new MediaStream(audioTracks);
 
-      audioTracks.forEach(track => {
+      audioTracks.forEach((track) => {
         if (!track.enabled) {
           track.enabled = true;
         }
       });
-      
+
       remoteAudioRef.current.srcObject = audioStream;
 
       remoteAudioRef.current.muted = false;
@@ -78,22 +75,16 @@ const CallView = ({
       const playPromise = remoteAudioRef.current.play();
       if (playPromise !== undefined) {
         playPromise
-          .then(() => {
-            
-          })
-          .catch(err => {
-
+          .then(() => {})
+          .catch((err) => {
             setTimeout(() => {
               if (remoteAudioRef.current && remoteAudioRef.current.srcObject) {
-                remoteAudioRef.current.play().catch(e => {
-                  
-                });
+                remoteAudioRef.current.play().catch((e) => {});
               }
             }, 500);
           });
       }
     } else {
-
       if (remoteAudioRef.current) {
         remoteAudioRef.current.srcObject = null;
       }
@@ -119,32 +110,31 @@ const CallView = ({
     }
 
     const acceptedAt = call.acceptedAt || call.startedAt;
-    
+
     if (acceptedAt) {
-
       let startTime;
-      
-      try {
 
+      try {
         let dateString = String(acceptedAt).trim();
         const now = Date.now();
-        const minValidTimestamp = now - 86400000 * 365; 
-        const maxValidTimestamp = now + 86400000 * 365; 
+        const minValidTimestamp = now - 86400000 * 365;
+        const maxValidTimestamp = now + 86400000 * 365;
 
         if (/^\d+$/.test(dateString)) {
-          
           startTime = parseInt(dateString, 10);
         } else {
-
           if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(dateString)) {
             throw new Error('Invalid date format');
           }
-          
-          if (!dateString.includes('Z') && !dateString.includes('+') && !dateString.match(/[+-]\d{2}:\d{2}$/)) {
-            
+
+          if (
+            !dateString.includes('Z') &&
+            !dateString.includes('+') &&
+            !dateString.match(/[+-]\d{2}:\d{2}$/)
+          ) {
             dateString = dateString + 'Z';
           }
-          
+
           const parsedDate = new Date(dateString);
           startTime = parsedDate.getTime();
 
@@ -153,11 +143,12 @@ const CallView = ({
           }
         }
 
-        const isValid = !isNaN(startTime) && 
-                       startTime > 0 && 
-                       startTime >= minValidTimestamp && 
-                       startTime <= maxValidTimestamp;
-        
+        const isValid =
+          !isNaN(startTime) &&
+          startTime > 0 &&
+          startTime >= minValidTimestamp &&
+          startTime <= maxValidTimestamp;
+
         if (isValid) {
           if (!callStartTimeRef.current || callStartTimeRef.current !== startTime) {
             callStartTimeRef.current = startTime;
@@ -168,19 +159,16 @@ const CallView = ({
           }
         }
       } catch (e) {
-        
         if (!callStartTimeRef.current) {
           callStartTimeRef.current = callBecameActiveTimeRef.current;
         }
       }
     } else {
-      
       if (!callStartTimeRef.current) {
-        
         callStartTimeRef.current = callBecameActiveTimeRef.current;
       }
     }
-    
+
     const interval = setInterval(() => {
       if (callStartTimeRef.current) {
         const now = Date.now();
@@ -214,7 +202,7 @@ const CallView = ({
 
   const handleMouseUp = () => {
     setIsDragging(false);
-    
+
     setTimeout(() => setHasDragged(false), 100);
   };
 
@@ -232,10 +220,15 @@ const CallView = ({
   if (!call) return null;
 
   const isVideo = call.type === 'VIDEO';
-  const remotePerson = call.caller?.id === call.callee?.id ? call.caller : 
-    (call.caller?.id !== call.callee?.id ? 
-      (call.caller?.displayName ? call.callee : call.caller) : call.callee);
-  
+  const remotePerson =
+    call.caller?.id === call.callee?.id
+      ? call.caller
+      : call.caller?.id !== call.callee?.id
+        ? call.caller?.displayName
+          ? call.callee
+          : call.caller
+        : call.callee;
+
   const remoteUser = call.caller || call.callee;
   const remoteName = remoteUser?.displayName || remoteUser?.username || 'Собеседник';
 
@@ -250,8 +243,8 @@ const CallView = ({
   };
 
   const getInitials = (name) => {
-    if (!name) return "?";
-    const parts = name.trim().split(" ");
+    if (!name) return '?';
+    const parts = name.trim().split(' ');
     if (parts.length >= 2) {
       return (parts[0][0] + parts[1][0]).toUpperCase();
     }
@@ -260,17 +253,20 @@ const CallView = ({
 
   if (isMinimized) {
     return (
-      <div 
+      <div
         className={styles.minimizedContainer}
         style={{ left: `${position.x}px`, top: `${position.y}px` }}
         ref={minimizedRef}
       >
-        <div 
+        <div
           className={`${styles.minimized} ${isDragging ? styles.dragging : ''}`}
           onMouseDown={handleMouseDown}
           onClick={(e) => {
-            
-            if (!hasDragged && !isDragging && !e.target.closest(`.${styles.minimizedControlButton}`)) {
+            if (
+              !hasDragged &&
+              !isDragging &&
+              !e.target.closest(`.${styles.minimizedControlButton}`)
+            ) {
               setIsMinimized(false);
             }
           }}
@@ -286,21 +282,19 @@ const CallView = ({
               />
             </div>
           ) : (
-            <div className={styles.minimizedAvatar}>
-              {getInitials(remoteName)}
-            </div>
+            <div className={styles.minimizedAvatar}>{getInitials(remoteName)}</div>
           )}
-          
+
           {}
           <div className={styles.minimizedInfo}>
             <span className={styles.minimizedName}>{remoteName}</span>
             <span className={styles.minimizedTimer}>{formatDuration(callDuration)}</span>
           </div>
-          
+
           {}
           <div className={styles.minimizedPulse}></div>
         </div>
-        
+
         {}
         <div className={styles.minimizedControls}>
           <button
@@ -313,7 +307,7 @@ const CallView = ({
           >
             {audioEnabled ? <Mic size={16} /> : <MicOff size={16} />}
           </button>
-          
+
           {isVideo && (
             <button
               className={`${styles.minimizedControlButton} ${!videoEnabled ? styles.off : ''}`}
@@ -326,7 +320,7 @@ const CallView = ({
               {videoEnabled ? <Video size={16} /> : <VideoOff size={16} />}
             </button>
           )}
-          
+
           <button
             className={`${styles.minimizedControlButton} ${styles.expandButton}`}
             onClick={(e) => {
@@ -337,7 +331,7 @@ const CallView = ({
           >
             <Maximize2 size={16} />
           </button>
-          
+
           <button
             className={`${styles.minimizedControlButton} ${styles.endCall}`}
             onClick={(e) => {
@@ -358,7 +352,7 @@ const CallView = ({
       <div className={styles.callContainer}>
         {}
         <div className={styles.header}>
-          <button 
+          <button
             className={styles.minimizeButton}
             onClick={() => setIsMinimized(true)}
             title="Свернуть"
@@ -373,29 +367,17 @@ const CallView = ({
 
         {}
         {remoteStream && (
-          <audio
-            ref={remoteAudioRef}
-            autoPlay
-            playsInline
-            style={{ display: 'none' }}
-          />
+          <audio ref={remoteAudioRef} autoPlay playsInline style={{ display: 'none' }} />
         )}
 
         {}
         <div className={styles.videoArea}>
           {}
           {isVideo && remoteStream ? (
-            <video
-              ref={remoteVideoRef}
-              autoPlay
-              playsInline
-              className={styles.remoteVideo}
-            />
+            <video ref={remoteVideoRef} autoPlay playsInline className={styles.remoteVideo} />
           ) : (
             <div className={styles.remoteAvatar}>
-              <div className={styles.avatarCircle}>
-                {getInitials(remoteName)}
-              </div>
+              <div className={styles.avatarCircle}>{getInitials(remoteName)}</div>
               {remoteMuted && (
                 <div className={styles.mutedIndicator}>
                   <MicOff size={16} />
@@ -407,13 +389,7 @@ const CallView = ({
           {}
           {isVideo && localStream && (
             <div className={styles.localVideoContainer}>
-              <video
-                ref={localVideoRef}
-                autoPlay
-                playsInline
-                muted
-                className={styles.localVideo}
-              />
+              <video ref={localVideoRef} autoPlay playsInline muted className={styles.localVideo} />
               {!videoEnabled && (
                 <div className={styles.localVideoOff}>
                   <VideoOff size={24} />

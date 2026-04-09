@@ -18,4 +18,3 @@ export const useAutoResizeTextarea = (textareaRef, value, maxHeight = 120) => {
     }
   }, [value, textareaRef, maxHeight]);
 };
-

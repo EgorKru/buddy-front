@@ -27,7 +27,9 @@
   max-height: 400px;
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .imageContainer:hover {
@@ -110,7 +112,9 @@
   background: rgba(255, 255, 255, 0.9);
   color: #333;
   cursor: pointer;
-  transition: background 0.2s ease, transform 0.2s ease;
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   pointer-events: auto;
 }
@@ -197,4 +201,3 @@
     height: 32px;
   }
 }
-

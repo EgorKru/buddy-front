@@ -14,13 +14,13 @@ export const useSidebarResize = () => {
   const resizeHandleRef = useRef(null);
 
   useEffect(() => {
-    const savedPosition = typeof window !== 'undefined' 
-      ? localStorage.getItem(SIDEBAR_POSITION_KEY) || 'left'
-      : 'left';
+    const savedPosition =
+      typeof window !== 'undefined' ? localStorage.getItem(SIDEBAR_POSITION_KEY) || 'left' : 'left';
     setSidebarPosition(savedPosition);
-    const savedWidth = typeof window !== 'undefined'
-      ? parseInt(localStorage.getItem(SIDEBAR_WIDTH_KEY) || DEFAULT_SIDEBAR_WIDTH, 10)
-      : DEFAULT_SIDEBAR_WIDTH;
+    const savedWidth =
+      typeof window !== 'undefined'
+        ? parseInt(localStorage.getItem(SIDEBAR_WIDTH_KEY) || DEFAULT_SIDEBAR_WIDTH, 10)
+        : DEFAULT_SIDEBAR_WIDTH;
     setSidebarWidth(savedWidth);
     if (typeof window !== 'undefined') {
       document.body.setAttribute('data-sidebar-position', savedPosition);
@@ -38,43 +38,47 @@ export const useSidebarResize = () => {
     }
   }, [sidebarPosition]);
 
-  const handleResizeStart = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsResizing(true);
-    const startX = e.clientX;
-    const startWidth = sidebarWidth;
-    let currentWidth = startWidth;
-    
-    const handleMouseMove = (e) => {
-      const diff = sidebarPosition === 'left' 
-        ? e.clientX - startX 
-        : startX - e.clientX;
-      const newWidth = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, startWidth + diff));
-      currentWidth = newWidth;
-      setSidebarWidth(newWidth);
-      if (typeof window !== 'undefined') {
-        document.body.setAttribute('data-sidebar-width', newWidth);
-        document.documentElement.style.setProperty('--sidebar-width', `${newWidth}px`);
-      }
-    };
-    
-    const handleMouseUp = () => {
-      setIsResizing(false);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(SIDEBAR_WIDTH_KEY, currentWidth.toString());
-      }
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-    
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-  }, [sidebarWidth, sidebarPosition]);
+  const handleResizeStart = useCallback(
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsResizing(true);
+      const startX = e.clientX;
+      const startWidth = sidebarWidth;
+      let currentWidth = startWidth;
+
+      const handleMouseMove = (e) => {
+        const diff = sidebarPosition === 'left' ? e.clientX - startX : startX - e.clientX;
+        const newWidth = Math.max(
+          MIN_SIDEBAR_WIDTH,
+          Math.min(MAX_SIDEBAR_WIDTH, startWidth + diff)
+        );
+        currentWidth = newWidth;
+        setSidebarWidth(newWidth);
+        if (typeof window !== 'undefined') {
+          document.body.setAttribute('data-sidebar-width', newWidth);
+          document.documentElement.style.setProperty('--sidebar-width', `${newWidth}px`);
+        }
+      };
+
+      const handleMouseUp = () => {
+        setIsResizing(false);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(SIDEBAR_WIDTH_KEY, currentWidth.toString());
+        }
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      };
+
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    },
+    [sidebarWidth, sidebarPosition]
+  );
 
   useEffect(() => {
     if (sidebarRef.current) {
@@ -92,4 +96,3 @@ export const useSidebarResize = () => {
     handleResizeStart,
   };
 };
-

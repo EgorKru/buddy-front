@@ -15,15 +15,15 @@ export const usePager3DInteraction = (interactive) => {
 
     const handleMouseMove = (e) => {
       if (!isDragging) return;
-      
+
       const deltaX = e.clientX - lastMousePos.x;
       const deltaY = e.clientY - lastMousePos.y;
-      
-      setRotation(prev => ({
+
+      setRotation((prev) => ({
         y: Math.max(-MAX_ROTATION, Math.min(MAX_ROTATION, prev.y + deltaX * DRAG_SENSITIVITY)),
         x: Math.max(-MAX_ROTATION, Math.min(MAX_ROTATION, prev.x - deltaY * DRAG_SENSITIVITY)),
       }));
-      
+
       setLastMousePos({ x: e.clientX, y: e.clientY });
     };
 
@@ -56,14 +56,14 @@ export const usePager3DInteraction = (interactive) => {
 
   const handleMouseMovePassive = (e) => {
     if (!interactive || isDragging || !containerRef.current) return;
-    
+
     const rect = containerRef.current.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
-    
+
     const deltaX = (e.clientX - centerX) / rect.width;
     const deltaY = (e.clientY - centerY) / rect.height;
-    
+
     setRotation({
       y: deltaX * PASSIVE_ROTATION_FACTOR,
       x: -deltaY * PASSIVE_ROTATION_FACTOR,
@@ -83,4 +83,3 @@ export const usePager3DInteraction = (interactive) => {
     handleMouseLeavePassive,
   };
 };
-

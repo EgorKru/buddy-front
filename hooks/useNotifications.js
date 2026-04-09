@@ -7,7 +7,7 @@ const SUBSCRIPTION_DELAY = 100;
 const DEFAULT_PAGE_SIZE = 50;
 
 const unsubscribeAll = (subscriptions) => {
-  subscriptions.forEach(sub => {
+  subscriptions.forEach((sub) => {
     safeUnsubscribe(sub);
   });
 };
@@ -26,7 +26,7 @@ export const useNotifications = () => {
       setLoading(false);
       return;
     }
-    
+
     if (loadedRef.current || loadingRef.current) {
       return;
     }
@@ -69,11 +69,10 @@ export const useNotifications = () => {
   }, [client, connected]);
 
   const loadNotifications = async () => {
-    
     if (loadingRef.current) {
       return;
     }
-    
+
     loadingRef.current = true;
     setLoading(true);
     try {
@@ -83,8 +82,8 @@ export const useNotifications = () => {
       }
       const data = await notificationAPI.getNotifications(0, DEFAULT_PAGE_SIZE);
       const notificationsList = data.content || data || [];
-      const sorted = notificationsList.sort((a, b) =>
-        new Date(b.createdAt) - new Date(a.createdAt)
+      const sorted = notificationsList.sort(
+        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
       );
       setNotifications(sorted);
       loadedRef.current = true;
@@ -97,45 +96,43 @@ export const useNotifications = () => {
   };
 
   const addNotification = (notification) => {
-    setNotifications(prev => {
-      const exists = prev.find(n => n.id === notification.id);
+    setNotifications((prev) => {
+      const exists = prev.find((n) => n.id === notification.id);
       if (exists) {
-        return prev.map(n => n.id === notification.id ? notification : n);
+        return prev.map((n) => (n.id === notification.id ? notification : n));
       }
       return [notification, ...prev];
     });
   };
 
   const markAsRead = async (notificationId) => {
-    setNotifications(prev =>
-      prev.map(n =>
-        n.id === notificationId ? { ...n, read: true } : n
-      )
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n))
     );
 
     try {
       await notificationAPI.markAsRead(notificationId);
     } catch (error) {
-      setNotifications(prev =>
-        prev.map(n =>
-          n.id === notificationId ? { ...n, read: false } : n
-        )
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notificationId ? { ...n, read: false } : n))
       );
     }
   };
 
   const dismissNotification = async (notificationId) => {
-    const notificationToRemove = notifications.find(n => n.id === notificationId);
+    const notificationToRemove = notifications.find((n) => n.id === notificationId);
 
-    setNotifications(prev => prev.filter(n => n.id !== notificationId));
+    setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
 
     try {
       await notificationAPI.deleteNotification(notificationId);
     } catch (error) {
       if (notificationToRemove) {
-        setNotifications(prev => [...prev, notificationToRemove].sort((a, b) =>
-          new Date(b.createdAt) - new Date(a.createdAt)
-        ));
+        setNotifications((prev) =>
+          [...prev, notificationToRemove].sort(
+            (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+          )
+        );
       }
     }
   };
@@ -146,6 +143,6 @@ export const useNotifications = () => {
     markAsRead,
     dismissNotification,
     refreshNotifications: loadNotifications,
-    unreadCount: notifications.filter(n => !n.read).length,
+    unreadCount: notifications.filter((n) => !n.read).length,
   };
 };

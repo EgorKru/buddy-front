@@ -1,19 +1,27 @@
+import React from 'react';
 import Image from 'next/image';
 import { MessageCircle, CheckCheck, Users } from 'lucide-react';
-import { getChatName, getChatAvatar, getLastMessagePreview, getLastMessageReadMeta, getOtherParticipantOnline } from '@/utils/chatHelpers';
+import {
+  getChatName,
+  getChatAvatar,
+  getLastMessagePreview,
+  getLastMessageReadMeta,
+  getOtherParticipantOnline,
+} from '@/utils/chatHelpers';
 import { formatChatListTime } from '@/utils/dateHelpers';
 import styles from '@/component/ChatSidebar/index.module.css';
 
-export default function ChatListItem({ chat, user, currentChatId, readAtByChatIdByUserId, onChatClick }) {
-
+function ChatListItem({ chat, user, currentChatId, readAtByChatIdByUserId, onChatClick }) {
   const getReadStatusIcon = () => {
     if (Number(chat.lastMessage.senderId) !== Number(user?.id)) return null;
-    
+
     const meta = getLastMessageReadMeta(chat, user, readAtByChatIdByUserId);
-    const title = meta.isRead 
-      ? (meta.totalOthers > 1 ? `Прочитали ${meta.readCount}/${meta.totalOthers}` : 'Прочитано')
+    const title = meta.isRead
+      ? meta.totalOthers > 1
+        ? `Прочитали ${meta.readCount}/${meta.totalOthers}`
+        : 'Прочитано'
       : 'Отправлено';
-    
+
     return (
       <span title={title} style={{ display: 'inline-flex', alignItems: 'center', marginRight: 6 }}>
         {meta.isRead ? (
@@ -29,24 +37,16 @@ export default function ChatListItem({ chat, user, currentChatId, readAtByChatId
     if (!chat.lastMessage) return null;
     if (chat.type !== 'GROUP') return null;
     if (Number(chat.lastMessage.senderId) === Number(user?.id)) return null;
-    
+
     return chat.lastMessage.senderDisplayName || chat.lastMessage.senderUsername || 'Неизвестный';
   };
 
   return (
-    <div
-      className={`${styles.chatItem} ${currentChatId === String(chat.id) ? styles.active : ''}`}
-    >
+    <div className={`${styles.chatItem} ${currentChatId === String(chat.id) ? styles.active : ''}`}>
       <div className={styles.chatAvatarWrapper}>
         <div className={styles.chatAvatar}>
           {getChatAvatar(chat, user) ? (
-            <Image
-              src={getChatAvatar(chat, user)}
-              alt=""
-              width={32}
-              height={32}
-              unoptimized
-            />
+            <Image src={getChatAvatar(chat, user)} alt="" width={32} height={32} unoptimized />
           ) : chat.type === 'GROUP' ? (
             <Users size={20} />
           ) : (
@@ -68,15 +68,18 @@ export default function ChatListItem({ chat, user, currentChatId, readAtByChatId
         </div>
         {chat.type === 'GROUP' && chat.participants && chat.participants.length > 0 && (
           <div className={styles.participantCount}>
-            {chat.participants.length} {chat.participants.length === 1 ? 'участник' : chat.participants.length < 5 ? 'участника' : 'участников'}
+            {chat.participants.length}{' '}
+            {chat.participants.length === 1
+              ? 'участник'
+              : chat.participants.length < 5
+                ? 'участника'
+                : 'участников'}
           </div>
         )}
         {chat.lastMessage && (
           <div className={styles.lastMessage}>
             {getSenderName() && (
-              <span className={styles.lastMessageSender}>
-                {getSenderName()}:
-              </span>
+              <span className={styles.lastMessageSender}>{getSenderName()}:</span>
             )}
             <span className={styles.lastMessageText}>
               {getReadStatusIcon()}
@@ -85,10 +88,9 @@ export default function ChatListItem({ chat, user, currentChatId, readAtByChatId
           </div>
         )}
       </div>
-      {chat.unreadCount > 0 && (
-        <div className={styles.unreadBadge}>{chat.unreadCount}</div>
-      )}
+      {chat.unreadCount > 0 && <div className={styles.unreadBadge}>{chat.unreadCount}</div>}
     </div>
   );
 }
 
+export default React.memo(ChatListItem);

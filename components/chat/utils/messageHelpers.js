@@ -17,14 +17,18 @@ export const formatFileSize = (bytes) => {
 };
 
 export const saveFileMetadata = (message) => {
-  if ((message.type === 'FILE' || message.type === 'IMAGE') && message.fileUrl && typeof window !== 'undefined') {
+  if (
+    (message.type === 'FILE' || message.type === 'IMAGE') &&
+    message.fileUrl &&
+    typeof window !== 'undefined'
+  ) {
     const metadataKey = `file_metadata_${message.fileUrl}`;
     if (message.fileSize && message.fileName && message.mimeType) {
       const fileMetadata = {
         fileSize: message.fileSize,
         fileName: message.fileName,
         mimeType: message.mimeType,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
       localStorage.setItem(metadataKey, JSON.stringify(fileMetadata));
     }
@@ -32,7 +36,11 @@ export const saveFileMetadata = (message) => {
 };
 
 export const restoreFileMetadata = (message) => {
-  if ((message.type === 'FILE' || message.type === 'IMAGE') && message.fileUrl && typeof window !== 'undefined') {
+  if (
+    (message.type === 'FILE' || message.type === 'IMAGE') &&
+    message.fileUrl &&
+    typeof window !== 'undefined'
+  ) {
     const metadataKey = `file_metadata_${message.fileUrl}`;
     const savedMetadata = localStorage.getItem(metadataKey);
     if (savedMetadata && (!message.fileSize || !message.fileName || !message.mimeType)) {
@@ -42,13 +50,10 @@ export const restoreFileMetadata = (message) => {
           ...message,
           fileSize: message.fileSize || metadata.fileSize,
           fileName: message.fileName || metadata.fileName,
-          mimeType: message.mimeType || metadata.mimeType
+          mimeType: message.mimeType || metadata.mimeType,
         };
-      } catch (e) {
-        
-      }
+      } catch (e) {}
     }
   }
   return message;
 };
-

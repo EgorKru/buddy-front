@@ -4,49 +4,32 @@ import Link from 'next/link';
 import { MessageCircle, Search, Plus, X } from 'lucide-react';
 import { getCurrentUser } from '@/utils/api';
 import { useChats, getChatTime } from '@/context/messaging';
+import { parseServerDate } from '@/utils/dateHelpers';
 import { useSidebarResize } from '@/hooks/useSidebarResize';
 import { useLastMessagesLoader } from '@/hooks/useLastMessagesLoader';
 import ChatListItem from '@/component/ChatSidebar/ChatListItem';
 import CreateChatModal from '@/component/ChatSidebar/CreateChatModal';
 import styles from '@/component/ChatSidebar/index.module.css';
 
-const parseServerDate = (dateString) => {
-  if (!dateString) return null;
-  if (typeof dateString === 'number') return new Date(dateString);
-  if (dateString instanceof Date) return dateString;
-  if (Array.isArray(dateString) && dateString.length >= 3) {
-    const [year, month, day, hour = 0, minute = 0, second = 0, nanosecond = 0] = dateString;
-    const millisecond = Math.floor(nanosecond / 1000000);
-    return new Date(Date.UTC(year, month - 1, day, hour, minute, second, millisecond));
-  }
-  let str = String(dateString).trim();
-  if (/^\d+$/.test(str)) {
-    const timestamp = parseInt(str, 10);
-    if (timestamp > 1000000000000) return new Date(timestamp);
-    if (timestamp > 1000000000) return new Date(timestamp * 1000);
-  }
-  return new Date(str);
-};
-
 export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
   const router = useRouter();
   const user = getCurrentUser();
-  const { 
-    chats, 
-    loading, 
-    refreshChats, 
-    readAtByChatIdByUserId, 
-    messageIdsByChatId, 
-    messagesById, 
-    upsertMessage, 
-    upsertChat 
+  const {
+    chats,
+    loading,
+    refreshChats,
+    readAtByChatIdByUserId,
+    messageIdsByChatId,
+    messagesById,
+    upsertMessage,
+    upsertChat,
   } = useChats();
-  
+
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-  
+
   useEffect(() => {
     setIsMounted(true);
     const checkDesktop = () => {
@@ -56,7 +39,7 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
     window.addEventListener('resize', checkDesktop);
     return () => window.removeEventListener('resize', checkDesktop);
   }, []);
-  
+
   const {
     sidebarPosition,
     sidebarWidth,
@@ -66,27 +49,20 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
     handleResizeStart,
   } = useSidebarResize();
 
-  useLastMessagesLoader(
-    chats,
-    loading,
-    currentChatId,
-    upsertMessage,
-    upsertChat,
-    refreshChats
-  );
+  useLastMessagesLoader(chats, loading, currentChatId, upsertMessage, upsertChat, refreshChats);
 
   const sortedChats = useMemo(() => {
     if (!chats || chats.length === 0) return [];
-    
-    const enrichedChats = chats.map(chat => {
+
+    const enrichedChats = chats.map((chat) => {
       if (!chat.lastMessage && messageIdsByChatId && messagesById) {
         const chatId = String(chat.id);
         const messageIds = messageIdsByChatId[chatId] || [];
         if (messageIds.length > 0) {
           const chatMessages = messageIds
-            .map(id => messagesById[String(id)])
+            .map((id) => messagesById[String(id)])
             .filter(Boolean)
-            .filter(msg => !msg.deletedForMe && !msg.deletedForAll)
+            .filter((msg) => !msg.deletedForMe && !msg.deletedForAll)
             .sort((a, b) => {
               const dateA = parseServerDate(a.createdAt);
               const dateB = parseServerDate(b.createdAt);
@@ -94,7 +70,7 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
               const timeB = dateB ? dateB.getTime() : 0;
               return timeB - timeA;
             });
-          
+
           if (chatMessages.length > 0) {
             return {
               ...chat,
@@ -105,7 +81,7 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
       }
       return chat;
     });
-    
+
     return enrichedChats.sort((a, b) => {
       const timeA = getChatTime(a);
       const timeB = getChatTime(b);
@@ -113,24 +89,23 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
     });
   }, [chats, messageIdsByChatId, messagesById]);
 
-  const filteredChats = sortedChats.filter(chat => {
+  const filteredChats = sortedChats.filter((chat) => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
       chat.name?.toLowerCase().includes(query) ||
-      chat.participants?.some(p => 
-        p.displayName?.toLowerCase().includes(query) ||
-        p.username?.toLowerCase().includes(query)
+      chat.participants?.some(
+        (p) =>
+          p.displayName?.toLowerCase().includes(query) || p.username?.toLowerCase().includes(query)
       )
     );
   });
 
   const handleChatClick = (chatId, e) => {
-    
     if (e) {
       e.preventDefault();
     }
-    
+
     router.push(`/chat/${chatId}`, undefined, { shallow: false });
     if (onClose) onClose();
   };
@@ -149,7 +124,7 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
 
   return (
     <>
-      <div 
+      <div
         ref={sidebarRef}
         className={`${styles.sidebar} ${shouldShow ? styles.open : ''} ${styles[sidebarPosition]}`}
         style={{ width: `${sidebarWidth}px` }}
@@ -171,17 +146,64 @@ export default function ChatSidebar({ isOpen, onClose, currentChatId }) {
                 className={styles.positionToggle}
                 title={sidebarPosition === 'left' ? 'Переместить вправо' : 'Переместить влево'}
               >
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect x="1" y="1" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <rect
+                    x="1"
+                    y="1"
+                    width="18"
+                    height="18"
+                    rx="2"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    fill="none"
+                  />
                   {sidebarPosition === 'left' ? (
                     <>
-                      <rect x="2" y="2" width="5" height="16" rx="1" fill="currentColor" opacity="0.4"/>
-                      <rect x="8" y="2" width="10" height="16" rx="1" fill="currentColor" opacity="0.1"/>
+                      <rect
+                        x="2"
+                        y="2"
+                        width="5"
+                        height="16"
+                        rx="1"
+                        fill="currentColor"
+                        opacity="0.4"
+                      />
+                      <rect
+                        x="8"
+                        y="2"
+                        width="10"
+                        height="16"
+                        rx="1"
+                        fill="currentColor"
+                        opacity="0.1"
+                      />
                     </>
                   ) : (
                     <>
-                      <rect x="2" y="2" width="10" height="16" rx="1" fill="currentColor" opacity="0.1"/>
-                      <rect x="13" y="2" width="5" height="16" rx="1" fill="currentColor" opacity="0.4"/>
+                      <rect
+                        x="2"
+                        y="2"
+                        width="10"
+                        height="16"
+                        rx="1"
+                        fill="currentColor"
+                        opacity="0.1"
+                      />
+                      <rect
+                        x="13"
+                        y="2"
+                        width="5"
+                        height="16"
+                        rx="1"
+                        fill="currentColor"
+                        opacity="0.4"
+                      />
                     </>
                   )}
                 </svg>

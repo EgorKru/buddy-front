@@ -1,23 +1,23 @@
 /**
  * AudioWaveform Component
- * A lightweight and customizable React component for rendering 
+ * A lightweight and customizable React component for rendering
  * interactive audio waveform visualizations from audio files.
  */
 
-import React, { useState, useRef, useEffect } from "react";
-import { Play, Pause } from "lucide-react";
-import { formatTime } from "./utils/formatTime";
-import { useAudioHandlers } from "./hooks/useAudioHandler";
-import { useWaveformData } from "./hooks/useWaveFormData";
-import { useSpeedControl } from "./hooks/useSpeedControl";
-import { getThemeStyles } from "./styles/themeStyles";
-import { renderWaveform } from "./components/WaveformRender";
-import { SpeedControl } from "./components/SpeedControl";
+import React, { useState, useRef, useEffect } from 'react';
+import { Play, Pause } from 'lucide-react';
+import { formatTime } from './utils/formatTime';
+import { useAudioHandlers } from './hooks/useAudioHandler';
+import { useWaveformData } from './hooks/useWaveFormData';
+import { useSpeedControl } from './hooks/useSpeedControl';
+import { getThemeStyles } from './styles/themeStyles';
+import { renderWaveform } from './components/WaveformRender';
+import { SpeedControl } from './components/SpeedControl';
 
 const AudioWaveform = ({
   src,
-  style = "viridara",
-  theme = "dark",
+  style = 'viridara',
+  theme = 'dark',
   height = 80,
   width = 600,
   barSpacing = 2,
@@ -28,7 +28,7 @@ const AudioWaveform = ({
   showTimestamp = true,
   showSpeedControl = true,
   showBackground = true,
-  className = "",
+  className = '',
   externalAudioRef,
   initialDuration,
   onPlay,
@@ -43,13 +43,15 @@ const AudioWaveform = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   // Используем initialDuration если он передан, иначе 0
-  const [duration, setDuration] = useState(initialDuration && initialDuration > 0 ? initialDuration : 0);
+  const [duration, setDuration] = useState(
+    initialDuration && initialDuration > 0 ? initialDuration : 0
+  );
   const [progress, setProgress] = useState(0);
 
   // Обновляем duration когда initialDuration меняется (только если duration еще не установлен из audio)
   useEffect(() => {
     if (initialDuration && initialDuration > 0) {
-      setDuration(prevDuration => {
+      setDuration((prevDuration) => {
         // Если duration еще не установлен (0) или равен предыдущему initialDuration, обновляем
         // Но не перезаписываем, если уже есть валидный duration из audio
         if (prevDuration === 0) {
@@ -66,7 +68,7 @@ const AudioWaveform = ({
     const updateScale = () => {
       const screenWidth = window.innerWidth;
       let scale = 1;
-      
+
       if (screenWidth <= 320) {
         // Very small phones
         scale = 0.5;
@@ -80,7 +82,7 @@ const AudioWaveform = ({
         // Tablets
         scale = 0.9;
       }
-      
+
       setScaleFactor(scale);
     };
 
@@ -115,32 +117,37 @@ const AudioWaveform = ({
       const audio = audioRef.current;
       let animationFrameId = null;
       let isPlayingLocal = false;
-      
+
       const updateProgress = () => {
         if (audio && isPlayingLocal) {
           const currentTime = audio.currentTime;
           const dur = audio.duration;
-          
+
           setCurrentTime(currentTime);
-          
+
           // Используем duration из audio если он валидный, иначе используем initialDuration
-          let effectiveDuration = dur && isFinite(dur) && dur > 0 ? dur : (initialDuration && initialDuration > 0 ? initialDuration : 0);
-          
+          let effectiveDuration =
+            dur && isFinite(dur) && dur > 0
+              ? dur
+              : initialDuration && initialDuration > 0
+                ? initialDuration
+                : 0;
+
           if (dur && isFinite(dur) && dur > 0) {
             setDuration(dur);
           } else if (initialDuration && initialDuration > 0) {
             // Сохраняем initialDuration если audio.duration еще не загружен
             setDuration(initialDuration);
           }
-          
+
           if (effectiveDuration > 0) {
             setProgress(currentTime / effectiveDuration);
           }
-          
+
           animationFrameId = requestAnimationFrame(updateProgress);
         }
       };
-      
+
       const handlePlay = () => {
         setIsPlaying(true);
         isPlayingLocal = true;
@@ -149,7 +156,7 @@ const AudioWaveform = ({
         }
         if (onPlay) onPlay();
       };
-      
+
       const handlePause = () => {
         setIsPlaying(false);
         isPlayingLocal = false;
@@ -159,7 +166,7 @@ const AudioWaveform = ({
         }
         if (onPause) onPause();
       };
-      
+
       const handleEnded = () => {
         setIsPlaying(false);
         isPlayingLocal = false;
@@ -177,16 +184,21 @@ const AudioWaveform = ({
         const currentTime = audio.currentTime;
         const dur = audio.duration;
         setCurrentTime(currentTime);
-        
+
         // Используем duration из audio если он валидный, иначе используем initialDuration
-        let effectiveDuration = dur && isFinite(dur) && dur > 0 ? dur : (initialDuration && initialDuration > 0 ? initialDuration : 0);
-        
+        let effectiveDuration =
+          dur && isFinite(dur) && dur > 0
+            ? dur
+            : initialDuration && initialDuration > 0
+              ? initialDuration
+              : 0;
+
         if (dur && isFinite(dur) && dur > 0) {
           setDuration(dur);
         } else if (initialDuration && initialDuration > 0) {
           setDuration(initialDuration);
         }
-        
+
         if (effectiveDuration > 0) {
           setProgress(currentTime / effectiveDuration);
         }
@@ -230,27 +242,30 @@ const AudioWaveform = ({
         audio.removeEventListener('ended', handleEnded);
         audio.removeEventListener('timeupdate', onTimeUpdate);
         audio.removeEventListener('loadedmetadata', onLoadedMetadata);
-        
+
         if (animationFrameId) {
           cancelAnimationFrame(animationFrameId);
           animationFrameId = null;
         }
       };
     }
-  }, [externalAudioRef, onPlay, onPause, onEnded, initialDuration, setCurrentTime, setDuration, setProgress]);
+  }, [
+    externalAudioRef,
+    onPlay,
+    onPause,
+    onEnded,
+    initialDuration,
+    setCurrentTime,
+    setDuration,
+    setProgress,
+  ]);
 
-  const themeStyles = getThemeStyles(
-    style,
-    theme,
-    backgroundColor,
-    primaryColor,
-    progressColor
-  );
+  const themeStyles = getThemeStyles(style, theme, backgroundColor, primaryColor, progressColor);
 
   const togglePlay = async () => {
     const audio = audioRef.current;
     if (!audio) return;
-    
+
     if (externalAudioRef && (onPlay || onPause)) {
       // Use external callbacks
       if (isPlaying) {
@@ -260,7 +275,7 @@ const AudioWaveform = ({
       }
       return;
     }
-    
+
     try {
       if (isPlaying) {
         audio.pause();
@@ -268,7 +283,7 @@ const AudioWaveform = ({
         await audio.play();
       }
     } catch (error) {
-      console.error("Error playing audio:", error);
+      console.error('Error playing audio:', error);
     }
   };
 
@@ -288,35 +303,34 @@ const AudioWaveform = ({
   };
 
   const containerStyle = {
-    backgroundColor: showBackground ? themeStyles.background : "transparent",
+    backgroundColor: showBackground ? themeStyles.background : 'transparent',
     padding: `0 ${Math.floor(2 * scaleFactor)}px`,
     borderRadius: 0,
-    display: "flex",
-    alignItems: "center",
+    display: 'flex',
+    alignItems: 'center',
     gap: `${Math.floor(6 * scaleFactor)}px`,
-    width: "100%",
-    maxWidth: "100%",
-    boxSizing: "border-box",
+    width: '100%',
+    maxWidth: '100%',
+    boxSizing: 'border-box',
     minHeight: scaledHeight,
     maxHeight: scaledHeight,
-    boxShadow: "none",
-    fontFamily:
-      'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-    position: "relative",
+    boxShadow: 'none',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    position: 'relative',
     marginBottom: 0,
-    overflow: "visible",
+    overflow: 'visible',
   };
 
   const waveformContainerStyle = {
-    width: "100%",
+    width: '100%',
     minWidth: 0,
     height: `${scaledHeight}px`,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
     flexShrink: 1,
-    position: "relative",
+    position: 'relative',
     flex: 1,
   };
 
@@ -326,19 +340,19 @@ const AudioWaveform = ({
     height: `${Math.floor(36 * scaleFactor)}px`,
     minWidth: `${Math.floor(36 * scaleFactor)}px`,
     minHeight: `${Math.floor(36 * scaleFactor)}px`,
-    transformOrigin: "center",
-    transition: "transform 0.2s ease",
+    transformOrigin: 'center',
+    transition: 'transform 0.2s ease',
   };
 
   const timestampStyle = {
     ...themeStyles.timestamp,
-    width: "auto",
-    textAlign: "left",
+    width: 'auto',
+    textAlign: 'left',
     flexShrink: 0,
     minWidth: `${Math.floor(35 * scaleFactor)}px`,
     fontSize: `${Math.floor(11 * scaleFactor)}px`,
-    color: "#6b7280",
-    whiteSpace: "nowrap",
+    color: '#6b7280',
+    whiteSpace: 'nowrap',
   };
 
   const iconSize = Math.floor(16 * scaleFactor);
@@ -352,28 +366,22 @@ const AudioWaveform = ({
           onClick={togglePlay}
           style={playButtonStyle}
           onMouseEnter={(e) => {
-            e.currentTarget.style.transform = "scale(1.05)";
+            e.currentTarget.style.transform = 'scale(1.05)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.transform = "scale(1)";
+            e.currentTarget.style.transform = 'scale(1)';
           }}
-          aria-label={isPlaying ? "Pause" : "Play"}
+          aria-label={isPlaying ? 'Pause' : 'Play'}
         >
           {isPlaying ? (
             <Pause size={iconSize} fill={themeStyles.playButtonIcon} />
           ) : (
-            <Play
-              size={iconSize}
-              fill={themeStyles.playButtonIcon}
-              style={{ marginLeft: "1px" }}
-            />
+            <Play size={iconSize} fill={themeStyles.playButtonIcon} style={{ marginLeft: '1px' }} />
           )}
         </button>
       )}
 
-      {showTimestamp && (
-        <div style={timestampStyle}>{formatTime(currentTime)}</div>
-      )}
+      {showTimestamp && <div style={timestampStyle}>{formatTime(currentTime)}</div>}
 
       <div style={waveformContainerStyle}>
         <svg
@@ -382,13 +390,13 @@ const AudioWaveform = ({
           height={scaledHeight}
           viewBox={`0 0 ${scaledWidth} ${scaledHeight}`}
           preserveAspectRatio="none"
-          style={{ cursor: "pointer", display: "block", width: "100%", height: "100%" }}
+          style={{ cursor: 'pointer', display: 'block', width: '100%', height: '100%' }}
           onClick={handleWaveformClick}
           onMouseEnter={(e) => {
-            e.currentTarget.style.opacity = "0.9";
+            e.currentTarget.style.opacity = '0.9';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.opacity = "1";
+            e.currentTarget.style.opacity = '1';
           }}
           role="slider"
           aria-label="Audio progress"
@@ -415,7 +423,7 @@ const AudioWaveform = ({
       )}
 
       {showControls && showSpeedControl && (
-        <div style={{ position: "relative", zIndex: 1000, marginLeft: "auto", flexShrink: 0 }}>
+        <div style={{ position: 'relative', zIndex: 1000, marginLeft: 'auto', flexShrink: 0 }}>
           <SpeedControl
             playbackRate={playbackRate}
             themeStyles={themeStyles}

@@ -1,18 +1,12 @@
-import { Phone, Video, X } from "lucide-react";
-import styles from "./index.module.css";
+import { Phone, Video, X } from 'lucide-react';
+import styles from './index.module.css';
 
-const CallTypeModal = ({ 
-  isOpen, 
-  onClose, 
-  targetUser,
-  onSelectAudio,
-  onSelectVideo,
-}) => {
+const CallTypeModal = ({ isOpen, onClose, targetUser, onSelectAudio, onSelectVideo }) => {
   if (!isOpen) return null;
 
   const getInitials = (name) => {
-    if (!name) return "?";
-    const parts = name.trim().split(" ");
+    if (!name) return '?';
+    const parts = name.trim().split(' ');
     if (parts.length >= 2) {
       return (parts[0][0] + parts[1][0]).toUpperCase();
     }
@@ -27,9 +21,7 @@ const CallTypeModal = ({
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         {}
         <div className={styles.avatarContainer}>
-          <div className={styles.avatar}>
-            {initials}
-          </div>
+          <div className={styles.avatar}>{initials}</div>
         </div>
 
         {}
@@ -54,11 +46,7 @@ const CallTypeModal = ({
             <span>Вкл. видео</span>
           </button>
 
-          <button
-            className={styles.cancelButton}
-            onClick={onClose}
-            title="Отменить"
-          >
+          <button className={styles.cancelButton} onClick={onClose} title="Отменить">
             <X size={24} />
             <span>Отменить</span>
           </button>

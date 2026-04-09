@@ -14,23 +14,24 @@ const SystemCallMessage = ({ message, chatId, chats }) => {
 
     const match = message.content.match(/от (.+)$/);
     if (!match) return;
-    
+
     const callerName = match[1].trim();
 
     if (!chatId || !chats) return;
-    
-    const chat = chats.find(c => c.id === chatId);
+
+    const chat = chats.find((c) => c.id === chatId);
     if (!chat || !chat.participants) return;
 
     const targetUser = chat.participants.find(
-      p => (p.displayName === callerName || p.username === callerName) && p.id !== message.senderId
+      (p) =>
+        (p.displayName === callerName || p.username === callerName) && p.id !== message.senderId
     );
-    
+
     if (targetUser) {
       const targetUserInfo = {
         id: targetUser.id,
         username: targetUser.username,
-        displayName: targetUser.displayName || targetUser.username
+        displayName: targetUser.displayName || targetUser.username,
       };
 
       if (typeof initiateCall === 'function') {
@@ -38,7 +39,7 @@ const SystemCallMessage = ({ message, chatId, chats }) => {
       }
     }
   };
-  
+
   return (
     <div className={styles.systemCallMessage}>
       <Phone size={16} className={styles.callIcon} />
@@ -47,11 +48,7 @@ const SystemCallMessage = ({ message, chatId, chats }) => {
         <span className={styles.callTime}>{formatChatTime(message.createdAt)}</span>
       )}
       {isMissedCall && (
-        <button
-          className={styles.callBackButton}
-          onClick={handleCallBack}
-          title="Перезвонить"
-        >
+        <button className={styles.callBackButton} onClick={handleCallBack} title="Перезвонить">
           Перезвонить
         </button>
       )}

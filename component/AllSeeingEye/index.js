@@ -31,10 +31,7 @@ export default function AllSeeingEye({ closed = false }) {
   }, [closed]);
 
   return (
-    <div
-      ref={eyeRef}
-      className={`${styles.eyeWrapper} ${closed ? styles.closed : ''}`}
-    >
+    <div ref={eyeRef} className={`${styles.eyeWrapper} ${closed ? styles.closed : ''}`}>
       <div className={styles.triangle}>
         <div className={styles.eye}>
           <div className={styles.iris}>
@@ -53,4 +50,3 @@ export default function AllSeeingEye({ closed = false }) {
     </div>
   );
 }
-

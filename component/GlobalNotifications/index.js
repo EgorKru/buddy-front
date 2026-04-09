@@ -11,12 +11,12 @@ export default function GlobalNotifications() {
     const cid = chatId ? String(chatId) : null;
     if (!cid) return;
 
-    const toMark = notifications.filter(n => {
+    const toMark = notifications.filter((n) => {
       const nChatId = n?.chatId ?? n?.message?.chatId;
       return !n.read && nChatId != null && String(nChatId) === cid;
     });
 
-    toMark.forEach(n => {
+    toMark.forEach((n) => {
       if (n?.id) markAsRead(n.id);
     });
   };
@@ -45,4 +45,3 @@ export default function GlobalNotifications() {
     />
   );
 }
-

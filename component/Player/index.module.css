@@ -127,7 +127,7 @@
 /* Voice Activity Detection - подсветка при говорении */
 .speaking {
   border: 3px solid rgb(76, 217, 100) !important;
-  box-shadow: 
+  box-shadow:
     0 0 30px rgba(76, 217, 100, 0.6),
     0 0 60px rgba(76, 217, 100, 0.3),
     inset 0 0 20px rgba(76, 217, 100, 0.1) !important;
@@ -135,20 +135,21 @@
 }
 
 @keyframes speakingGlow {
-  0%, 100% {
-    box-shadow: 
+  0%,
+  100% {
+    box-shadow:
       0 0 30px rgba(76, 217, 100, 0.6),
       0 0 60px rgba(76, 217, 100, 0.3);
   }
   50% {
-    box-shadow: 
+    box-shadow:
       0 0 40px rgba(76, 217, 100, 0.8),
       0 0 80px rgba(76, 217, 100, 0.5);
   }
 }
 
 .avatarSpeaking {
-  box-shadow: 
+  box-shadow:
     0 0 40px rgba(76, 217, 100, 0.7),
     0 0 80px rgba(76, 217, 100, 0.4),
     0 8px 24px rgba(102, 126, 234, 0.3);
@@ -156,15 +157,16 @@
 }
 
 @keyframes avatarPulse {
-  0%, 100% {
-    box-shadow: 
+  0%,
+  100% {
+    box-shadow:
       0 0 30px rgba(76, 217, 100, 0.5),
       0 0 60px rgba(76, 217, 100, 0.3),
       0 8px 24px rgba(102, 126, 234, 0.3);
     transform: scale(1);
   }
   50% {
-    box-shadow: 
+    box-shadow:
       0 0 50px rgba(76, 217, 100, 0.8),
       0 0 100px rgba(76, 217, 100, 0.5),
       0 8px 24px rgba(102, 126, 234, 0.3);
@@ -179,7 +181,8 @@
 }
 
 @keyframes micPulse {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
     box-shadow: 0 0 10px rgba(76, 217, 100, 0.6);
   }
@@ -196,8 +199,13 @@
 }
 
 @keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 /* Поднятая рука */
@@ -219,9 +227,16 @@
 }
 
 @keyframes handWave {
-  0%, 100% { transform: rotate(0deg) scale(1); }
-  25% { transform: rotate(15deg) scale(1.1); }
-  75% { transform: rotate(-15deg) scale(1.1); }
+  0%,
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+  25% {
+    transform: rotate(15deg) scale(1.1);
+  }
+  75% {
+    transform: rotate(-15deg) scale(1.1);
+  }
 }
 
 /* Демонстрация экрана */

@@ -6,16 +6,14 @@ export const useAudioWorker = () => {
   const taskIdRef = useRef(0);
 
   useEffect(() => {
-    
     if (typeof Worker !== 'undefined' && !workerRef.current) {
       try {
         workerRef.current = new Worker('/workers/audio-worker.js');
-        
+
         workerRef.current.addEventListener('message', (event) => {
           const { id, type, data, error } = event.data;
-          
+
           if (type === 'READY') {
-            
             return;
           }
 
@@ -29,13 +27,9 @@ export const useAudioWorker = () => {
             callbacksRef.current.delete(id);
           }
         });
-        
-        workerRef.current.addEventListener('error', (error) => {
-          
-        });
-      } catch (error) {
-        
-      }
+
+        workerRef.current.addEventListener('error', (error) => {});
+      } catch (error) {}
     }
 
     return () => {
@@ -53,14 +47,14 @@ export const useAudioWorker = () => {
         reject(new Error('Audio Worker not available'));
         return;
       }
-      
+
       const id = taskIdRef.current++;
       callbacksRef.current.set(id, { resolve, reject });
-      
+
       workerRef.current.postMessage({
         id,
         type,
-        payload
+        payload,
       });
 
       setTimeout(() => {
@@ -68,56 +62,63 @@ export const useAudioWorker = () => {
           callbacksRef.current.delete(id);
           reject(new Error('Audio Worker task timeout'));
         }
-      }, 30000); 
+      }, 30000);
     });
   }, []);
 
-  const encodeAudio = useCallback(async (audioBuffer, format = 'webm') => {
-    try {
-      const result = await sendTask('ENCODE_AUDIO', { audioBuffer, format });
-      return result;
-    } catch (error) {
-      
-      throw error;
-    }
-  }, [sendTask]);
+  const encodeAudio = useCallback(
+    async (audioBuffer, format = 'webm') => {
+      try {
+        const result = await sendTask('ENCODE_AUDIO', { audioBuffer, format });
+        return result;
+      } catch (error) {
+        throw error;
+      }
+    },
+    [sendTask]
+  );
 
-  const decodeAudio = useCallback(async (audioData) => {
-    try {
-      const result = await sendTask('DECODE_AUDIO', { audioData });
-      return result;
-    } catch (error) {
-      
-      throw error;
-    }
-  }, [sendTask]);
+  const decodeAudio = useCallback(
+    async (audioData) => {
+      try {
+        const result = await sendTask('DECODE_AUDIO', { audioData });
+        return result;
+      } catch (error) {
+        throw error;
+      }
+    },
+    [sendTask]
+  );
 
-  const analyzeAudio = useCallback(async (audioBuffer) => {
-    try {
-      const result = await sendTask('ANALYZE_AUDIO', { audioBuffer });
-      return result;
-    } catch (error) {
-      
-      throw error;
-    }
-  }, [sendTask]);
+  const analyzeAudio = useCallback(
+    async (audioBuffer) => {
+      try {
+        const result = await sendTask('ANALYZE_AUDIO', { audioBuffer });
+        return result;
+      } catch (error) {
+        throw error;
+      }
+    },
+    [sendTask]
+  );
 
-  const compressAudio = useCallback(async (audioData, quality = 0.7) => {
-    try {
-      const result = await sendTask('COMPRESS_AUDIO', { audioData, quality });
-      return result;
-    } catch (error) {
-      
-      throw error;
-    }
-  }, [sendTask]);
+  const compressAudio = useCallback(
+    async (audioData, quality = 0.7) => {
+      try {
+        const result = await sendTask('COMPRESS_AUDIO', { audioData, quality });
+        return result;
+      } catch (error) {
+        throw error;
+      }
+    },
+    [sendTask]
+  );
 
   return {
     encodeAudio,
     decodeAudio,
     analyzeAudio,
     compressAudio,
-    isAvailable: workerRef.current !== null
+    isAvailable: workerRef.current !== null,
   };
 };
-

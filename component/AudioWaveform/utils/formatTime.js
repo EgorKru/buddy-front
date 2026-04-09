@@ -27,7 +27,7 @@ export const analyzeAudioFile = async (audioUrl, samples = 90) => {
     for (let i = 0; i < samples; i++) {
       const start = i * blockSize;
       let sum = 0;
-      let count = 0; 
+      let count = 0;
 
       for (let j = start; j < start + blockSize && j < channelData.length; j++) {
         sum += Math.abs(channelData[j]); // Use absolute value for amplitude
@@ -40,8 +40,7 @@ export const analyzeAudioFile = async (audioUrl, samples = 90) => {
 
     // Normalize the data to a 0-1 range
     const max = Math.max(...waveformData);
-    return waveformData.map(value => max > 0 ? value / max : 0);
-
+    return waveformData.map((value) => (max > 0 ? value / max : 0));
   } catch (error) {
     console.error('Error analyzing audio file:', error);
     // Return a default waveform or throw an error based on your error handling strategy

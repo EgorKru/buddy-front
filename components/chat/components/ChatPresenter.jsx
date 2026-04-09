@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import ChatSidebar from '@/component/ChatSidebar';
 import MessageContextMenu from '@/component/MessageContextMenu';
 import ImageModal from '@/component/ImageModal';
@@ -18,7 +17,7 @@ import TypingIndicator from '@/components/chat/components/TypingIndicator';
 const ChatPresenter = ({
   chat,
   messages,
-  messagesLoading,
+  messagesLoading: _messagesLoading,
   loadingMore,
   user,
   chatId,
@@ -99,7 +98,7 @@ const ChatPresenter = ({
   handlePlayPreview,
   recordingTime,
   audioLevel,
-  clearSelectedFile,
+  clearSelectedFile: _clearSelectedFile,
   deleteConfirm,
   setDeleteConfirm,
   deleteForAll,
@@ -123,39 +122,44 @@ const ChatPresenter = ({
   onStartCall,
   typingUserIds,
 }) => {
-
-  const selectedMessagesList = selectionMode 
-    ? Array.from(selectedMessages).map(id => 
-        messages.find(m => Number(m.id) === Number(id))
-      ).filter(Boolean)
+  const selectedMessagesList = selectionMode
+    ? Array.from(selectedMessages)
+        .map((id) => messages.find((m) => Number(m.id) === Number(id)))
+        .filter(Boolean)
     : [];
 
-  const allPinned = selectedMessagesList.length > 0 && selectedMessagesList.every(msg => {
-    const isPinnedInList = pinnedMessages.some(p => {
-      const pinnedMsgId = p.message?.id;
-      return pinnedMsgId && Number(pinnedMsgId) === Number(msg.id);
+  const allPinned =
+    selectedMessagesList.length > 0 &&
+    selectedMessagesList.every((msg) => {
+      const isPinnedInList = pinnedMessages.some((p) => {
+        const pinnedMsgId = p.message?.id;
+        return pinnedMsgId && Number(pinnedMsgId) === Number(msg.id);
+      });
+      return msg.isPinned || isPinnedInList;
     });
-    return msg.isPinned || isPinnedInList;
-  });
 
-  const allUnpinned = selectedMessagesList.length > 0 && selectedMessagesList.every(msg => {
-    const isPinnedInList = pinnedMessages.some(p => {
-      const pinnedMsgId = p.message?.id;
-      return pinnedMsgId && Number(pinnedMsgId) === Number(msg.id);
+  const allUnpinned =
+    selectedMessagesList.length > 0 &&
+    selectedMessagesList.every((msg) => {
+      const isPinnedInList = pinnedMessages.some((p) => {
+        const pinnedMsgId = p.message?.id;
+        return pinnedMsgId && Number(pinnedMsgId) === Number(msg.id);
+      });
+      return !msg.isPinned && !isPinnedInList;
     });
-    return !msg.isPinned && !isPinnedInList;
-  });
 
   return (
     <div className={styles.container}>
-      <ChatSidebar 
-        isOpen={sidebarOpen} 
+      <ChatSidebar
+        isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         currentChatId={chatId}
       />
-      
-      {sidebarOpen && <div className={styles.sidebarOverlay} onClick={() => setSidebarOpen(false)} />}
-      
+
+      {sidebarOpen && (
+        <div className={styles.sidebarOverlay} onClick={() => setSidebarOpen(false)} />
+      )}
+
       <div className={styles.mainContent}>
         {selectionMode ? (
           <SelectionHeader
@@ -185,7 +189,7 @@ const ChatPresenter = ({
             onStartCall={onStartCall}
           />
         )}
-        
+
         {searchOpen && (
           <SearchBar
             searchMode={searchMode}
@@ -196,7 +200,7 @@ const ChatPresenter = ({
             onCloseSearch={handleCloseSearch}
           />
         )}
-        
+
         {searchMode && searchText.trim() && (
           <div className={styles.searchResultsHeader}>
             <span className={styles.searchResultsCount}>
@@ -255,9 +259,7 @@ const ChatPresenter = ({
           chatId={chatId}
         />
 
-        {voiceError && (
-          <ErrorMessage>{voiceError}</ErrorMessage>
-        )}
+        {voiceError && <ErrorMessage>{voiceError}</ErrorMessage>}
 
         <TypingIndicator
           participants={chat?.participants || []}
@@ -332,7 +334,7 @@ const ChatPresenter = ({
           message={contextMenu.message}
           position={contextMenu.position}
           isOwn={contextMenu.message.senderId === user?.id}
-          isPinned={pinnedMessages.some(p => {
+          isPinned={pinnedMessages.some((p) => {
             const pinnedMsgId = p.message?.id;
             return pinnedMsgId && Number(pinnedMsgId) === Number(contextMenu.message.id);
           })}
@@ -362,7 +364,10 @@ const ChatPresenter = ({
         messages={messages}
         user={user}
         chat={chat}
-        onClose={() => { setDeleteConfirm(null); setDeleteForAll(false); }}
+        onClose={() => {
+          setDeleteConfirm(null);
+          setDeleteForAll(false);
+        }}
         onConfirm={handleConfirmDelete}
         onDeleteForAllChange={setDeleteForAll}
       />
@@ -374,8 +379,8 @@ const ChatPresenter = ({
         user={user}
         onClose={() => setForwardModal(null)}
         onConfirm={handleConfirmForward}
-        onChatSelect={(chatId) => setForwardModal(prev => ({ ...prev, selectedChatId: chatId }))}
-        onCommentChange={(comment) => setForwardModal(prev => ({ ...prev, comment }))}
+        onChatSelect={(chatId) => setForwardModal((prev) => ({ ...prev, selectedChatId: chatId }))}
+        onCommentChange={(comment) => setForwardModal((prev) => ({ ...prev, comment }))}
       />
 
       {imageModal && (
@@ -399,4 +404,3 @@ const ChatPresenter = ({
 };
 
 export default ChatPresenter;
-

@@ -13,8 +13,12 @@
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .container {
@@ -169,27 +173,27 @@
   .container {
     padding: 24px;
   }
-  
+
   .avatar {
     width: 120px;
     height: 120px;
     font-size: 40px;
   }
-  
+
   .calleeName {
     font-size: 24px;
   }
-  
+
   .controls {
     gap: 20px;
     padding-bottom: 40px;
   }
-  
+
   .controlButton {
     width: 52px;
     height: 52px;
   }
-  
+
   .minimizeButton {
     top: 16px;
     right: 16px;
@@ -290,11 +294,12 @@
 }
 
 @keyframes pulse {
-  0%, 100% { 
+  0%,
+  100% {
     opacity: 1;
     transform: scale(1);
   }
-  50% { 
+  50% {
     opacity: 0.6;
     transform: scale(1.3);
   }
@@ -369,12 +374,12 @@
     bottom: 16px !important;
     top: auto !important;
   }
-  
+
   .minimized {
     min-width: auto;
     width: 100%;
   }
-  
+
   .minimizedControls {
     width: 100%;
   }

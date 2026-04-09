@@ -4,7 +4,7 @@
   align-items: center;
   justify-content: center;
   background: #0a0a0f;
-  background-image: 
+  background-image:
     radial-gradient(circle at 20% 30%, rgba(102, 126, 234, 0.08) 0%, transparent 50%),
     radial-gradient(circle at 80% 70%, rgba(140, 100, 200, 0.08) 0%, transparent 50%),
     radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.05) 0%, transparent 50%);
@@ -66,7 +66,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: 
+  background:
     linear-gradient(45deg, transparent 30%, rgba(102, 126, 234, 0.03) 50%, transparent 70%),
     linear-gradient(-45deg, transparent 30%, rgba(140, 100, 200, 0.03) 50%, transparent 70%);
   background-size: 200% 200%;
@@ -75,7 +75,8 @@
 }
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1) rotate(0deg);
     opacity: 0.4;
   }
@@ -86,7 +87,8 @@
 }
 
 @keyframes gradientShift {
-  0%, 100% {
+  0%,
+  100% {
     background-position: 0% 50%;
   }
   50% {
@@ -101,7 +103,7 @@
   padding: 56px 48px;
   border-radius: 24px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 
+  box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.4),
     0 0 0 1px rgba(255, 255, 255, 0.05),
     inset 0 1px 0 rgba(255, 255, 255, 0.1),
@@ -163,17 +165,19 @@
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(90deg, 
-    transparent, 
-    rgba(102, 126, 234, 0.5), 
-    rgba(140, 100, 200, 0.5), 
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(102, 126, 234, 0.5),
+    rgba(140, 100, 200, 0.5),
     transparent
   );
   animation: shimmer 3s ease-in-out infinite;
 }
 
 @keyframes shimmer {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.3;
   }
   50% {
@@ -199,8 +203,9 @@
   font-size: 36px;
   font-weight: 800;
   letter-spacing: -1px;
-  background: linear-gradient(135deg, 
-    rgb(255, 255, 255) 0%, 
+  background: linear-gradient(
+    135deg,
+    rgb(255, 255, 255) 0%,
     rgba(255, 255, 255, 0.95) 25%,
     rgba(200, 200, 255, 0.9) 50%,
     rgba(255, 255, 255, 0.95) 75%,
@@ -254,17 +259,19 @@
   transform: translateX(-50%);
   width: 60px;
   height: 3px;
-  background: linear-gradient(90deg, 
-    transparent, 
-    rgb(102, 126, 234), 
-    rgb(140, 100, 200), 
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(102, 126, 234),
+    rgb(140, 100, 200),
     transparent
   );
   border-radius: 2px;
 }
 
 @keyframes gradientText {
-  0%, 100% {
+  0%,
+  100% {
     background-position: 0% 50%;
   }
   50% {
@@ -296,10 +303,18 @@
   }
 }
 
-.formGroup:nth-child(1) { animation-delay: 0.1s; }
-.formGroup:nth-child(2) { animation-delay: 0.2s; }
-.formGroup:nth-child(3) { animation-delay: 0.3s; }
-.formGroup:nth-child(4) { animation-delay: 0.4s; }
+.formGroup:nth-child(1) {
+  animation-delay: 0.1s;
+}
+.formGroup:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.formGroup:nth-child(3) {
+  animation-delay: 0.3s;
+}
+.formGroup:nth-child(4) {
+  animation-delay: 0.4s;
+}
 
 @keyframes fadeInUp {
   from {
@@ -390,7 +405,7 @@
   outline: none;
   border-color: rgb(102, 126, 234);
   background: rgba(25, 25, 30, 0.9);
-  box-shadow: 
+  box-shadow:
     0 0 0 4px rgba(102, 126, 234, 0.15),
     0 8px 24px rgba(102, 126, 234, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
@@ -400,8 +415,9 @@
 .button {
   width: 100%;
   padding: 18px 24px;
-  background: linear-gradient(135deg, 
-    rgb(102, 126, 234) 0%, 
+  background: linear-gradient(
+    135deg,
+    rgb(102, 126, 234) 0%,
     rgb(88, 110, 220) 50%,
     rgb(140, 100, 200) 100%
   );
@@ -417,7 +433,7 @@
   margin-top: 12px;
   position: relative;
   overflow: hidden;
-  box-shadow: 
+  box-shadow:
     0 8px 24px rgba(102, 126, 234, 0.4),
     0 0 0 1px rgba(255, 255, 255, 0.1) inset,
     0 1px 0 rgba(255, 255, 255, 0.2) inset;
@@ -437,7 +453,8 @@
 }
 
 @keyframes buttonGradient {
-  0%, 100% {
+  0%,
+  100% {
     background-position: 0% 50%;
   }
   50% {
@@ -462,7 +479,7 @@
 
 .button:hover:not(:disabled) {
   transform: translateY(-3px) scale(1.01);
-  box-shadow: 
+  box-shadow:
     0 12px 32px rgba(102, 126, 234, 0.5),
     0 0 0 1px rgba(255, 255, 255, 0.15) inset,
     0 1px 0 rgba(255, 255, 255, 0.3) inset;
@@ -492,9 +509,16 @@
 }
 
 @keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-8px); }
-  75% { transform: translateX(8px); }
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-8px);
+  }
+  75% {
+    transform: translateX(8px);
+  }
 }
 
 .link {
@@ -598,7 +622,8 @@
 }
 
 @keyframes float {
-  0%, 100% {
+  0%,
+  100% {
     transform: translate(0, 0) scale(1);
     opacity: 0.3;
   }
@@ -659,7 +684,7 @@
   height: 80px;
   background: linear-gradient(135deg, rgb(102, 126, 234), rgb(140, 100, 200));
   border-radius: 20px;
-  box-shadow: 
+  box-shadow:
     0 8px 24px rgba(102, 126, 234, 0.4),
     0 0 0 1px rgba(255, 255, 255, 0.1) inset,
     0 1px 0 rgba(255, 255, 255, 0.2) inset;
@@ -675,15 +700,16 @@
 }
 
 @keyframes logoPulse {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
-    box-shadow: 
+    box-shadow:
       0 8px 24px rgba(102, 126, 234, 0.4),
       0 0 0 1px rgba(255, 255, 255, 0.1) inset;
   }
   50% {
     transform: scale(1.05);
-    box-shadow: 
+    box-shadow:
       0 12px 32px rgba(102, 126, 234, 0.6),
       0 0 0 1px rgba(255, 255, 255, 0.15) inset;
   }
@@ -748,8 +774,9 @@
 .logoText {
   font-size: 32px;
   font-weight: 800;
-  background: linear-gradient(135deg, 
-    rgb(255, 255, 255) 0%, 
+  background: linear-gradient(
+    135deg,
+    rgb(255, 255, 255) 0%,
     rgba(200, 200, 255, 0.95) 50%,
     rgb(255, 255, 255) 100%
   );
@@ -763,7 +790,8 @@
 }
 
 @keyframes logoTextShine {
-  0%, 100% {
+  0%,
+  100% {
     background-position: 0% 50%;
   }
   50% {
@@ -813,7 +841,9 @@
   box-shadow:
     0 0 0 1px rgba(15, 15, 20, 1),
     0 0 10px rgba(102, 126, 234, 0.9);
-  transition: transform 0.06s linear, opacity 0.2s ease;
+  transition:
+    transform 0.06s linear,
+    opacity 0.2s ease;
 }
 
 .pagerEyesClosed .pagerEye {
@@ -826,10 +856,13 @@
 }
 
 @keyframes eyeBlink {
-  0%, 90%, 100% {
+  0%,
+  90%,
+  100% {
     transform: scaleY(1);
   }
-  92%, 94% {
+  92%,
+  94% {
     transform: scaleY(0.3);
   }
 }
@@ -839,7 +872,7 @@
   position: fixed;
   inset: 0;
   background: #0a0a0f;
-  background-image: 
+  background-image:
     radial-gradient(circle at 20% 30%, rgba(102, 126, 234, 0.08) 0%, transparent 50%),
     radial-gradient(circle at 80% 70%, rgba(140, 100, 200, 0.08) 0%, transparent 50%),
     radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.05) 0%, transparent 50%);
@@ -873,7 +906,7 @@
   width: 24px;
   height: 24px;
   border-radius: 6px;
-  box-shadow: 
+  box-shadow:
     0 0 0 2px rgba(102, 126, 234, 0.8),
     0 0 20px rgba(102, 126, 234, 0.4);
 }
@@ -905,7 +938,7 @@
   padding: 32px;
   max-width: 400px;
   width: 90%;
-  box-shadow: 
+  box-shadow:
     0 20px 60px rgba(0, 0, 0, 0.5),
     0 0 40px rgba(102, 126, 234, 0.1);
   animation: slideUp 0.3s ease;
@@ -991,6 +1024,74 @@
   outline: none;
   transition: all 0.2s ease;
   box-sizing: border-box;
+}
+
+.verificationCodeInput:focus {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.codeModalHint {
+  color: #9ca3af;
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+.codeModalTimer {
+  color: #10b981;
+  font-size: 12px;
+  margin-bottom: 16px;
+}
+
+.codeModalResendWait {
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 20px;
+}
+
+.codeModalResendButton {
+  font-size: 14px;
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid #3b82f6;
+  color: #3b82f6;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-bottom: 20px;
+  transition: opacity 0.2s;
+}
+
+.codeModalResendButton:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.codeModalResendButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.codeModalCancelButton {
+  margin-top: 12px;
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 8px;
+}
+
+.codeModalCancelButton:hover {
+  color: #d1d5db;
+}
+
+.codeModalButtonFull {
+  width: 100%;
+}
+
+.passwordError {
+  font-size: 12px;
+  color: #ef4444;
+  margin-top: 4px;
 }
 
 @media (max-width: 480px) {
