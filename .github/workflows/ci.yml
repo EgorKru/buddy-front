@@ -1,14 +1,20 @@
-name: Frontend CI
+name: CI/CD Pipeline
 
 on:
   push:
     branches: [main, develop]
   pull_request:
-    branches: [main, develop]
+    branches: [main]
+
+env:
+  NODE_VERSION: '20'
 
 jobs:
-  test-and-build:
-    name: Test, lint, build
+  # ===========================================
+  # Build and Test
+  # ===========================================
+  test:
+    name: Build & Test
     runs-on: ubuntu-latest
 
     env:
@@ -17,26 +23,147 @@ jobs:
       NEXT_TELEMETRY_DISABLED: '1'
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v6
 
-      - name: Use Node.js
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Unit tests
+      - name: Run tests with coverage
         run: npm run test:ci
+
+      - name: Test summary (GitHub Job Summary)
+        if: always()
+        run: |
+          python3 << 'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          import os
+
+          path = "coverage/jest-results.json"
+          print("## Тесты (Jest)\n")
+          if not os.path.isfile(path):
+              print("_Файл `coverage/jest-results.json` не найден (тесты не дошли до записи отчёта)._\n")
+          else:
+              try:
+                  with open(path, encoding="utf-8") as f:
+                      d = json.load(f)
+                  total = int(d.get("numTotalTests", 0) or 0)
+                  passed = int(d.get("numPassedTests", 0) or 0)
+                  failed = int(d.get("numFailedTests", 0) or 0)
+                  pending = int(d.get("numPendingTests", 0) or 0)
+                  ok = bool(d.get("success", False)) and failed == 0
+                  status = "✅ **Все тесты прошли**" if ok else "❌ **Есть падения или ошибки**"
+                  print(f"{status}\n")
+                  print("| | |")
+                  print("|:---|--:|")
+                  print(f"| **Всего** | {total} |")
+                  print(f"| **Успешно** | {passed} |")
+                  print(f"| **Упало** | {failed} |")
+                  print(f"| **В ожидании** | {pending} |")
+                  print()
+              except (json.JSONDecodeError, OSError, TypeError, ValueError) as e:
+                  print(f"_Не удалось разобрать отчёт: `{e}`_\n")
+          PY
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v6
+        with:
+          files: coverage/lcov.info
+          flags: frontend
+          fail_ci_if_error: false
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: frontend-test-results
+          path: |
+            coverage/jest-results.json
+            coverage/lcov.info
+            coverage/coverage-summary.json
+
+  # ===========================================
+  # Code Quality
+  # ===========================================
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    needs: test
+
+    env:
+      HUSKY: '0'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: ESLint
         run: npm run lint
 
+      - name: Prettier (format check)
+        run: npm run format:check
+
+  # ===========================================
+  # Production build (аналог сборки артефакта на бэке)
+  # ===========================================
+  build:
+    name: Production build
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    env:
+      HUSKY: '0'
+      CI: true
+      NEXT_TELEMETRY_DISABLED: '1'
+      NEXT_PUBLIC_API_URL: http://localhost:8080/api
+      NEXT_PUBLIC_WS_URL: http://localhost:8080/ws
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Next.js build
         run: npm run build
-        env:
-          NEXT_PUBLIC_API_URL: http://localhost:8080/api
-          NEXT_PUBLIC_WS_URL: http://localhost:8080/ws
+
+  # ===========================================
+  # Deploy (заглушка — как на бэке; реальный деплой см. deploy.yml)
+  # ===========================================
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build, code-quality]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+      - name: Deploy notification
+        run: |
+          echo "Сборка и проверки прошли. Реальный деплой на сервер — workflow deploy.yml (SSH + docker-compose)."

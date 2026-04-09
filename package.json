@@ -14,9 +14,10 @@
     "audit:bundle": "npm run build && npx source-map-explorer .next/static/chunks/*.js --html docs/bundle-report.html",
     "find-deadcode": "npx unimported",
     "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "prepare": "husky",
     "test": "jest",
-    "test:ci": "jest --ci --forceExit",
+    "test:ci": "jest --ci --forceExit --coverage --coverageDirectory=coverage --coverageReporters=lcov --coverageReporters=json-summary --json --outputFile=coverage/jest-results.json",
     "test:watch": "jest --watch"
   },
   "dependencies": {

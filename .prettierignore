@@ -5,3 +5,7 @@ out
 *.min.js
 package-lock.json
 public
+.github/
+docker-compose.yml
+.prettierrc
+coverage

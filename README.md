@@ -19,14 +19,15 @@ npm run dev
 
 ## Скрипты
 
-| Команда           | Назначение                       |
-| ----------------- | -------------------------------- |
-| `npm run dev`     | Режим разработки                 |
-| `npm run build`   | Продакшен-сборка                 |
-| `npm run start`   | Запуск после `build`             |
-| `npm run lint`    | ESLint (Next.js)                 |
-| `npm test`        | Jest, локально                   |
-| `npm run test:ci` | Jest для CI (`--ci --forceExit`) |
+| Команда                | Назначение                                          |
+| ---------------------- | --------------------------------------------------- |
+| `npm run dev`          | Режим разработки                                    |
+| `npm run build`        | Продакшен-сборка                                    |
+| `npm run start`        | Запуск после `build`                                |
+| `npm run lint`         | ESLint (Next.js)                                    |
+| `npm run format:check` | Prettier без записи (как в CI)                      |
+| `npm test`             | Jest, локально                                      |
+| `npm run test:ci`      | Jest для CI: coverage, `coverage/jest-results.json` |
 
 ## Сквозное шифрование (E2EE)
 
@@ -37,9 +38,14 @@ npm run dev
 
 Подробности переменных — в **`.env.example`**.
 
-## CI
+## CI/CD
 
-В репозитории настроен GitHub Actions workflow **Frontend CI**: `npm ci`, тесты, лint, `next build` (с тестовыми `NEXT_PUBLIC_*` для сборки).
+Workflow **`CI/CD Pipeline`** (`.github/workflows/ci.yml`) по структуре близок к бэкенду:
+
+1. **Build & Test** — `npm ci`, `npm run test:ci` (покрытие, отчёт в артефакты), сводка в GitHub Job Summary, загрузка покрытия в Codecov (`flag: frontend`).
+2. **Code Quality** — после тестов: `npm run lint`, `npm run format:check`.
+3. **Production build** — только на push в `main`: `npm run build` с тестовыми `NEXT_PUBLIC_*`.
+4. **Deploy to Production** — заглушка (как на бэке); реальный выклад на сервер — отдельный **`.github/workflows/deploy.yml`** (SSH + docker-compose).
 
 ## Структура
 
