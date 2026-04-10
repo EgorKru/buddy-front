@@ -4,11 +4,10 @@
  * @param {Error} error
  * @returns {string}
  */
+import { sanitizeApiErrorMessage } from '@/shared/lib/sanitizeApiErrorMessage';
+
 export function getErrorMessage(error) {
   const message = error?.message || '';
-  if (message.includes('500') || message.includes('Internal server error')) {
-    return 'Сервер временно недоступен. Попробуйте позже.';
-  }
   if (message.includes('401') || message.includes('Unauthorized')) {
     return 'Необходима авторизация';
   }
@@ -18,5 +17,5 @@ export function getErrorMessage(error) {
   if (message.includes('404') || message.includes('Not found')) {
     return 'Не найдено';
   }
-  return message || 'Произошла ошибка';
+  return sanitizeApiErrorMessage(message) || 'Произошла ошибка';
 }

@@ -1,9 +1,11 @@
 /**
  * Хук логики входа: форма, отправка, загрузчик, редирект. FSD: features/auth
  */
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import { authAPI, setCurrentUser } from '@/shared/api';
+import { sanitizeApiErrorMessage } from '@/shared/lib/sanitizeApiErrorMessage';
+import { getLoginUsernameError, getLoginPasswordError } from './loginFieldValidation';
 
 const LOADER_DURATION_MS = 2000;
 
@@ -12,7 +14,7 @@ function getLoginErrorMessage(err) {
   if (msg.includes('подключиться') || msg.includes('fetch') || msg.includes('Network')) {
     return 'Не удалось подключиться к серверу. Проверьте подключение к интернету.';
   }
-  return msg || 'Неверное имя пользователя или пароль';
+  return sanitizeApiErrorMessage(msg) || 'Неверное имя пользователя или пароль';
 }
 
 export function useLogin() {
@@ -23,6 +25,8 @@ export function useLogin() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showLoader, setShowLoader] = useState(false);
+  const [touched, setTouched] = useState({ username: false, password: false });
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -31,24 +35,44 @@ export function useLogin() {
     };
   }, []);
 
+  const requireUsernameEmpty = touched.username || attemptedSubmit;
+  const requirePasswordEmpty = touched.password || attemptedSubmit;
+
+  const usernameError = useMemo(
+    () => getLoginUsernameError(formData.username, { requireNonEmpty: requireUsernameEmpty }),
+    [formData.username, requireUsernameEmpty]
+  );
+
+  const passwordError = useMemo(
+    () => getLoginPasswordError(formData.password, { requireNonEmpty: requirePasswordEmpty }),
+    [formData.password, requirePasswordEmpty]
+  );
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     setError('');
   };
 
+  const handleBlur = (e) => {
+    const { name } = e.target;
+    if (name === 'username' || name === 'password') {
+      setTouched((prev) => ({ ...prev, [name]: true }));
+    }
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
+    setAttemptedSubmit(true);
+    setTouched({ username: true, password: true });
 
     const username = formData.username.trim();
     const password = formData.password;
-    if (!username) {
-      setError('Введите имя пользователя');
-      return;
-    }
-    if (!password) {
-      setError('Введите пароль');
+
+    const uErr = getLoginUsernameError(formData.username, { requireNonEmpty: true });
+    const pErr = getLoginPasswordError(password, { requireNonEmpty: true });
+    if (uErr || pErr) {
       return;
     }
 
@@ -81,7 +105,10 @@ export function useLogin() {
     error,
     loading,
     showLoader,
+    usernameError,
+    passwordError,
     handleChange,
+    handleBlur,
     handleLogin,
   };
 }

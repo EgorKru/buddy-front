@@ -3,6 +3,7 @@
  * FSD: shared/api
  */
 import { getApiUrl } from '../config';
+import { sanitizeApiErrorMessage } from '../lib/sanitizeApiErrorMessage';
 
 function handleUnauthorized() {
   if (typeof window !== 'undefined') {
@@ -50,7 +51,7 @@ export const apiRequest = async (endpoint, options = {}) => {
       if (token) {
         handleUnauthorized();
       }
-      throw new Error(errorMessage);
+      throw new Error(sanitizeApiErrorMessage(errorMessage, response.status));
     }
 
     if (!response.ok) {
@@ -65,7 +66,7 @@ export const apiRequest = async (endpoint, options = {}) => {
           errorMessage = 'Not found';
         }
       }
-      throw new Error(errorMessage);
+      throw new Error(sanitizeApiErrorMessage(errorMessage, response.status));
     }
 
     const contentType = response.headers.get('content-type');
@@ -115,9 +116,20 @@ export async function uploadFileToEndpoint(chatId, formData, pathSuffix, onProgr
         } else {
           try {
             const error = JSON.parse(xhr.responseText);
-            reject(new Error(error.message || `Upload failed with status ${xhr.status}`));
+            reject(
+              new Error(
+                sanitizeApiErrorMessage(
+                  error.message || `Upload failed with status ${xhr.status}`,
+                  xhr.status
+                )
+              )
+            );
           } catch {
-            reject(new Error(`Upload failed with status ${xhr.status}`));
+            reject(
+              new Error(
+                sanitizeApiErrorMessage(`Upload failed with status ${xhr.status}`, xhr.status)
+              )
+            );
           }
         }
       });
@@ -135,7 +147,12 @@ export async function uploadFileToEndpoint(chatId, formData, pathSuffix, onProgr
   }
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: 'Upload failed' }));
-    throw new Error(error.message || `Upload failed with status ${response.status}`);
+    throw new Error(
+      sanitizeApiErrorMessage(
+        error.message || `Upload failed with status ${response.status}`,
+        response.status
+      )
+    );
   }
   return response.json();
 }

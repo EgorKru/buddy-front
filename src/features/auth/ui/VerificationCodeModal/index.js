@@ -15,8 +15,10 @@ export function VerificationCodeModal({
   resendTimer,
   verificationCode,
   onChange,
+  onVerificationCodeBlur,
   formatTime,
   error,
+  verificationCodeError,
 }) {
   const inputRef = useRef(null);
 
@@ -29,7 +31,10 @@ export function VerificationCodeModal({
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && verificationCode.length === 6) onSubmit();
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      onSubmit();
+    }
   };
 
   return (
@@ -49,13 +54,34 @@ export function VerificationCodeModal({
             name="verificationCode"
             value={verificationCode}
             onChange={onChange}
+            onBlur={onVerificationCodeBlur}
             maxLength={6}
             placeholder="000000"
-            className={styles.verificationCodeInput}
+            className={`${styles.verificationCodeInput}${
+              verificationCodeError ? ` ${styles.inputInvalid}` : ''
+            }`}
             onKeyDown={handleKeyDown}
             aria-label="Код подтверждения из email"
+            aria-invalid={verificationCodeError ? 'true' : 'false'}
+            aria-describedby={
+              [
+                verificationCodeError ? 'register-verification-code-error' : null,
+                error ? 'register-code-api-error' : null,
+              ]
+                .filter(Boolean)
+                .join(' ') || undefined
+            }
           />
-          {error && <div className={styles.error}>{error}</div>}
+          {verificationCodeError ? (
+            <p id="register-verification-code-error" className={styles.fieldError} role="alert">
+              {verificationCodeError}
+            </p>
+          ) : null}
+          {error ? (
+            <div id="register-code-api-error" className={styles.error} role="alert">
+              {error}
+            </div>
+          ) : null}
           {resendTimer > 0 ? (
             <p className={styles.codeModalResendWait}>Отправить повторно через {resendTimer}с</p>
           ) : (
@@ -71,7 +97,7 @@ export function VerificationCodeModal({
           <button
             type="button"
             onClick={onSubmit}
-            disabled={loading || verificationCode.length !== 6}
+            disabled={loading}
             className={`${styles.button} ${styles.codeModalButtonFull}`}
           >
             {loading ? 'Регистрация...' : 'Подтвердить'}

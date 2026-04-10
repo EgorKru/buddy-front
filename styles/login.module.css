@@ -412,6 +412,28 @@
   transform: translateY(-2px);
 }
 
+.formGroup input.inputInvalid {
+  border-color: rgba(217, 4, 41, 0.55);
+  box-shadow:
+    0 0 0 3px rgba(217, 4, 41, 0.12),
+    0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.formGroup input.inputInvalid:focus {
+  border-color: rgba(255, 100, 120, 0.85);
+  box-shadow:
+    0 0 0 4px rgba(217, 4, 41, 0.18),
+    0 8px 24px rgba(217, 4, 41, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.fieldError {
+  font-size: 13px;
+  color: rgb(255, 140, 150);
+  margin-top: 8px;
+  line-height: 1.45;
+}
+
 .button {
   width: 100%;
   padding: 18px 24px;
@@ -1029,6 +1051,11 @@
 .verificationCodeInput:focus {
   border-color: #60a5fa;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.verificationCodeInput.inputInvalid {
+  border-color: rgba(239, 68, 68, 0.95);
+  box-shadow: 0 0 0 3px rgba(217, 4, 41, 0.25);
 }
 
 .codeModalHint {

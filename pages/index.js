@@ -14,6 +14,7 @@ const ROOM_ID_REGEX = /^[A-Z0-9]{6,12}$/;
 export default function Home() {
   const router = useRouter();
   const { user, isAuthenticated, logout } = useAuth();
+  const [hasMounted, setHasMounted] = useState(false);
   const [roomId, setRoomId] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [inputError, setInputError] = useState('');
@@ -21,6 +22,10 @@ export default function Home() {
   const roomInputRef = useRef(null);
 
   const { createRoom, isCreating, error: createError } = useCreateRoom();
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -90,6 +95,11 @@ export default function Home() {
   }, [logout, router]);
 
   const displayError = inputError || createError;
+
+  // SSR и первый кадр клиента без чтения localStorage — иначе сервер отдаёт Loader, а клиент сразу «дом» → hydration mismatch
+  if (!hasMounted) {
+    return <Loader fullPage text="Загрузка..." />;
+  }
 
   if (!user) {
     return <Loader fullPage text="Загрузка..." />;
