@@ -7,6 +7,7 @@ import { INITIAL_MESSAGES_LIMIT, OLDER_MESSAGES_LIMIT } from '../constants/chat'
 export const useChatMessages = ({
   chatId,
   upsertMessage,
+  upsertChat,
   refreshChats,
   localPtsRef,
   localSeqRef,
@@ -40,6 +41,9 @@ export const useChatMessages = ({
 
         if (state) {
           if (state.chat) {
+            if (typeof upsertChat === 'function') {
+              upsertChat(state.chat);
+            }
             refreshChats();
           }
 
@@ -116,7 +120,7 @@ export const useChatMessages = ({
         }
       }
     },
-    [upsertMessage, refreshChats, localPtsRef, localSeqRef, setReadReceiptsForChat]
+    [upsertMessage, upsertChat, refreshChats, localPtsRef, localSeqRef, setReadReceiptsForChat]
   );
 
   const loadOlderMessages = useCallback(

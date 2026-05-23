@@ -79,9 +79,18 @@ describe('directTextE2ee', () => {
     process.env.NEXT_PUBLIC_E2EE_ENABLED = prevE2ee;
   });
 
-  it('isE2eeEnabled is false without env flag', () => {
+  it('isE2eeEnabled is false without env flag (NODE_ENV=test)', () => {
     process.env.NEXT_PUBLIC_E2EE_ENABLED = '';
     expect(isE2eeEnabled()).toBe(false);
+  });
+
+  it('isE2eeEnabled is true in development when env unset', () => {
+    const prevNode = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'development';
+    delete process.env.NEXT_PUBLIC_E2EE_ENABLED;
+    expect(isE2eeEnabled()).toBe(true);
+    process.env.NODE_ENV = prevNode;
+    process.env.NEXT_PUBLIC_E2EE_ENABLED = 'true';
   });
 
   it('isE2eeEnabled is true when flag is "true"', () => {
@@ -102,6 +111,23 @@ describe('directTextE2ee', () => {
 
     const out = await encryptDirectText(502, 'hi');
     expect(out).toBeNull();
+  });
+
+  it('encrypted payload is not equal to plaintext (opaque envelope in DB)', async () => {
+    const alice = await createEcdhRecord();
+    const bob = await createEcdhRecord();
+    await seedIdentity(801, alice);
+    await seedIdentity(802, bob);
+    cryptoAPI.getUserIdentityKey.mockImplementation((uid) =>
+      Promise.resolve({ identityKeyPublic: uid === 801 ? alice.spkiB64 : bob.spkiB64 })
+    );
+    localStorage.setItem('user', JSON.stringify({ id: 801 }));
+    const plain = 'visible-in-db-would-be-bad';
+    const encrypted = await encryptDirectText(802, plain);
+    expect(encrypted).not.toBeNull();
+    expect(encrypted.content).not.toBe(plain);
+    expect(encrypted.content.includes(plain)).toBe(false);
+    expect(encrypted.encryptionVersion).toBe(1);
   });
 
   it('encrypt and decrypt round-trip between two users', async () => {

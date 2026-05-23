@@ -11,8 +11,18 @@ const E2EE_VERSION = 1;
 
 const spkiCache = new Map();
 
+/**
+ * Явно выключить: NEXT_PUBLIC_E2EE_ENABLED=false (или 0).
+ * Явно включить: true / 1.
+ * Если переменная не задана — как в next.config: только в development по умолчанию включено
+ * (в test/production без флага — выкл., чтобы Jest и prod-поведение были предсказуемы).
+ */
 export function isE2eeEnabled() {
-  return process.env.NEXT_PUBLIC_E2EE_ENABLED === 'true';
+  const v = process.env.NEXT_PUBLIC_E2EE_ENABLED;
+  if (v === 'false' || v === '0') return false;
+  if (v === 'true' || v === '1') return true;
+  if (v != null && String(v).trim() !== '') return false;
+  return process.env.NODE_ENV === 'development';
 }
 
 function bytesToB64(u8) {

@@ -84,6 +84,7 @@ const findQueuedMessageForConfirmation = (lastSent, queue, chatId) => {
 
 export const useMessageSender = (chatId, onMessageSent, options = {}) => {
   const directPeerUserId = options?.directPeerUserId ?? null;
+  const e2eeDirectTextBlockedReason = options?.e2eeDirectTextBlockedReason ?? null;
   const { client, connected } = useStomp();
   const [sending, setSending] = useState(false);
   const retryTimeoutRef = useRef(null);
@@ -181,6 +182,14 @@ export const useMessageSender = (chatId, onMessageSent, options = {}) => {
       let encryptionVersionToSend = null;
       let textWireContent = null;
       if (type === 'TEXT') {
+        if (e2eeDirectTextBlockedReason === 'no_peer') {
+          if (typeof window !== 'undefined') {
+            alert(
+              'Личный чат ещё без данных собеседника (обновите страницу или дождитесь списка чатов). Без шифрования сообщение не отправляем.'
+            );
+          }
+          return null;
+        }
         textWireContent = content.trim();
         if (directPeerUserId) {
           try {
@@ -190,10 +199,18 @@ export const useMessageSender = (chatId, onMessageSent, options = {}) => {
               if (enc) {
                 encryptionVersionToSend = enc.encryptionVersion;
                 textWireContent = enc.content;
+              } else if (typeof window !== 'undefined') {
+                alert(
+                  'Не удалось зашифровать сообщение. Выйдите и войдите снова, проверьте бэкенд /api/crypto и что у собеседника зарегистрирован ключ.'
+                );
+                return null;
               }
             }
-          } catch (_e) {
-            /* остаётся plaintext */
+          } catch (e) {
+            if (typeof window !== 'undefined') {
+              alert(`Ошибка шифрования: ${e?.message || e}`);
+            }
+            return null;
           }
         }
       }
@@ -364,7 +381,16 @@ export const useMessageSender = (chatId, onMessageSent, options = {}) => {
         setSending(false);
       }
     },
-    [chatId, client, connected, sending, onMessageSent, scheduleRetry, directPeerUserId]
+    [
+      chatId,
+      client,
+      connected,
+      sending,
+      onMessageSent,
+      scheduleRetry,
+      directPeerUserId,
+      e2eeDirectTextBlockedReason,
+    ]
   );
 
   const syncQueue = useCallback(async () => {
