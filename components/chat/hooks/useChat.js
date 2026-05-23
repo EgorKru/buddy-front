@@ -18,6 +18,7 @@ import { useBulkMessageActions } from './useBulkMessageActions';
 import { useStateSync } from './useStateSync';
 import { useChatInitialization } from './useChatInitialization';
 import { useMessageSending } from './useMessageSending';
+import { isE2eeEnabled } from '@/shared/lib/e2ee/directTextE2ee';
 
 export const useChat = (chatId, modals = {}) => {
   const {
@@ -41,12 +42,21 @@ export const useChat = (chatId, modals = {}) => {
   }, [chatId, chatContext.chats]);
 
   const directPeerUserId = useMemo(() => {
-    if (!chat || chat.type !== 'DIRECT' || !user?.id || !Array.isArray(chat.participants)) {
+    const isDirect = chat && String(chat.type || '').toUpperCase() === 'DIRECT';
+    if (!isDirect || !user?.id || !Array.isArray(chat.participants)) {
       return null;
     }
     const other = chat.participants.find((p) => Number(p.id) !== Number(user.id));
     return other?.id != null ? Number(other.id) : null;
   }, [chat, user]);
+
+  /** Личный чат + E2EE вкл., но нет id собеседника — не слать plaintext в БД. */
+  const e2eeDirectTextBlockedReason = useMemo(() => {
+    if (!isE2eeEnabled() || !chat) return null;
+    if (String(chat.type || '').toUpperCase() !== 'DIRECT') return null;
+    if (directPeerUserId != null) return null;
+    return 'no_peer';
+  }, [chat, directPeerUserId]);
 
   const messagesContainerRef = useRef(null);
   const messageInputRef = useRef(null);
@@ -74,6 +84,7 @@ export const useChat = (chatId, modals = {}) => {
   } = useChatMessagesHook({
     chatId,
     upsertMessage: chatContext.upsertMessage,
+    upsertChat: chatContext.upsertChat,
     refreshChats: chatContext.refreshChats,
     localPtsRef,
     localSeqRef,
@@ -219,6 +230,7 @@ export const useChat = (chatId, modals = {}) => {
     syncQueue,
   } = useMessageSender(chatId, undefined, {
     directPeerUserId,
+    e2eeDirectTextBlockedReason,
   });
 
   const messageSending = useMessageSending({

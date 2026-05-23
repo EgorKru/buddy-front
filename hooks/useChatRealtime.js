@@ -65,11 +65,19 @@ export const useChatRealtime = (chatId) => {
                 removeMessage(eventData.messageId);
               }
               break;
-            case 'MESSAGE_DELETED_FOR_ME':
-              if (eventData.messageId) {
+            case 'MESSAGE_DELETED_FOR_ME': {
+              const actorId = eventData.userId ?? eventData.deletedByUserId;
+              const currentUserId = getCurrentUser()?.id;
+              if (
+                eventData.messageId &&
+                actorId != null &&
+                currentUserId != null &&
+                Number(actorId) === Number(currentUserId)
+              ) {
                 removeMessage(eventData.messageId);
               }
               break;
+            }
             case 'MESSAGE_PINNED':
               if (eventData.message) {
                 updateMessage(
