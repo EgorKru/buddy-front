@@ -180,9 +180,11 @@ export function useRegistration() {
       if (formData.displayName.trim()) registerData.displayName = formData.displayName.trim();
       const data = await authAPI.register(registerData);
       setCurrentUser(data.user, data.token);
-      if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_E2EE_ENABLED === 'true') {
+      if (typeof window !== 'undefined') {
         import('@/shared/lib/e2ee/directTextE2ee')
-          .then((m) => m.ensureIdentityKeyPublished())
+          .then((m) => {
+            if (m.isE2eeEnabled()) return m.ensureIdentityKeyPublished();
+          })
           .catch(() => {});
       }
       router.push('/');

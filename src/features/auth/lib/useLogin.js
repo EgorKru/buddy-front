@@ -81,9 +81,11 @@ export function useLogin() {
     try {
       const data = await authAPI.login(username, password);
       setCurrentUser(data.user, data.token);
-      if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_E2EE_ENABLED === 'true') {
+      if (typeof window !== 'undefined') {
         import('@/shared/lib/e2ee/directTextE2ee')
-          .then((m) => m.ensureIdentityKeyPublished())
+          .then((m) => {
+            if (m.isE2eeEnabled()) return m.ensureIdentityKeyPublished();
+          })
           .catch(() => {});
       }
       setShowLoader(true);
