@@ -1,5 +1,5 @@
 /**
- * Login form — v2 design system.
+ * Форма входа — v2 design system.
  */
 import { useState } from 'react';
 import Link from 'next/link';
@@ -9,8 +9,8 @@ import ds from '@/design-system/primitives.module.css';
 function LoginUsernameField({ formData, handleChange, handleBlur, usernameError }) {
   return (
     <div className={ds.field}>
-      <label htmlFor="login-username">Email or username</label>
-      <span className={ds.fieldHint}>Use the same identifier you registered with.</span>
+      <label htmlFor="login-username">Email или имя пользователя</label>
+      <span className={ds.fieldHint}>Используйте тот же идентификатор, что при регистрации.</span>
       <input
         type="text"
         id="login-username"
@@ -18,7 +18,7 @@ function LoginUsernameField({ formData, handleChange, handleBlur, usernameError 
         value={formData.username}
         onChange={handleChange}
         onBlur={handleBlur}
-        placeholder="you@company.com or username"
+        placeholder="email@example.com или имя_пользователя"
         autoComplete="username"
         className={`${ds.input} ${usernameError ? ds.inputInvalid : ''}`}
         aria-invalid={usernameError ? 'true' : 'false'}
@@ -42,7 +42,7 @@ function LoginPasswordField({ formData, handleChange, handleBlur, passwordError,
 
   return (
     <div className={ds.field}>
-      <label htmlFor="login-password">Password</label>
+      <label htmlFor="login-password">Пароль</label>
       <div className={ds.passwordWrap}>
         <input
           type={showPassword ? 'text' : 'password'}
@@ -51,7 +51,7 @@ function LoginPasswordField({ formData, handleChange, handleBlur, passwordError,
           value={formData.password}
           onChange={handleChange}
           onBlur={handleBlur}
-          placeholder="Enter your password"
+          placeholder="Введите пароль"
           autoComplete="current-password"
           className={`${ds.input} ${passwordError ? ds.inputInvalid : ''}`}
           aria-invalid={passwordError ? 'true' : 'false'}
@@ -61,7 +61,7 @@ function LoginPasswordField({ formData, handleChange, handleBlur, passwordError,
           type="button"
           className={ds.passwordToggle}
           onClick={() => setShowPassword(!showPassword)}
-          aria-label={showPassword ? 'Hide password' : 'Show password'}
+          aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
         >
           {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
         </button>
@@ -106,12 +106,17 @@ export function LoginForm({
             {error}
           </div>
         ) : null}
-        <button type="submit" disabled={loading} className={ds.btnPrimary}>
-          {loading ? 'Signing in...' : 'Log in'}
-        </button>
+        <div className={ds.formActions}>
+          <button type="submit" disabled={loading} className={ds.btnPrimary} aria-busy={loading}>
+            {loading ? 'Вход…' : 'Войти'}
+          </button>
+        </div>
       </form>
       <p className={ds.footerLink}>
-        Don&apos;t have an account? <Link href="/register">Get started</Link>
+        Нет аккаунта? <Link href="/register">Начать</Link>
+      </p>
+      <p className={ds.trustNote}>
+        Сессия защищена при передаче. Личные сообщения остаются приватными на вашем устройстве.
       </p>
     </>
   );

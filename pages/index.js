@@ -18,16 +18,16 @@ export default function Home() {
   }, [router]);
 
   if (!ready) {
-    return <Loader fullPage text="Loading..." />;
+    return <Loader fullPage text="Загрузка…" />;
   }
 
   return (
     <>
       <Head>
-        <title>Pager — Secure messaging and calls</title>
+        <title>Pager — Безопасные сообщения и звонки</title>
         <meta
           name="description"
-          content="Secure messaging and calls for focused teams. Real-time chat, reliable reconnect, and private direct conversations."
+          content="Безопасные сообщения и звонки для сфокусированных команд. Чат в реальном времени, надёжный reconnect и приватные личные диалоги."
         />
       </Head>
       <LandingPage />

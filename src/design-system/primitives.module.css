@@ -149,7 +149,14 @@
 .formStack {
   display: flex;
   flex-direction: column;
-  gap: var(--pager-space-3);
+  gap: var(--pager-space-4);
+}
+
+.formActions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pager-space-2);
+  margin-top: var(--pager-space-1);
 }
 
 .field {
@@ -188,10 +195,17 @@
   color: var(--pager-text-subtle);
 }
 
-.input:focus {
+.input:focus,
+.input:focus-visible {
   outline: none;
   border-color: var(--pager-accent);
   box-shadow: var(--pager-focus-ring);
+}
+
+.inputInvalid:focus,
+.inputInvalid:focus-visible {
+  border-color: var(--pager-error-text);
+  box-shadow: var(--pager-focus-ring-error);
 }
 
 .inputInvalid {
@@ -244,10 +258,20 @@
 }
 
 .footerLink {
-  margin: var(--pager-space-4) 0 0;
+  margin: var(--pager-space-3) 0 0;
+  padding-top: var(--pager-space-3);
+  border-top: 1px solid var(--pager-border);
   text-align: center;
   font-size: var(--pager-font-small);
   color: var(--pager-text-muted);
+}
+
+.trustNote {
+  margin: var(--pager-space-3) 0 0;
+  font-size: var(--pager-font-caption);
+  line-height: 1.5;
+  color: var(--pager-text-subtle);
+  text-align: center;
 }
 
 .footerLink a {

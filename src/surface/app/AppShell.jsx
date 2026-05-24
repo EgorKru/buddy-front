@@ -12,7 +12,7 @@ import styles from './appShell.module.css';
  * }} props
  */
 export function AppShell({ user, onLogout, onMenuClick, children }) {
-  const displayName = user?.displayName || user?.username || 'User';
+  const displayName = user?.displayName || user?.username || 'Пользователь';
 
   return (
     <div className={ds.surface}>
@@ -23,7 +23,7 @@ export function AppShell({ user, onLogout, onMenuClick, children }) {
               type="button"
               className={styles.menuBtn}
               onClick={onMenuClick}
-              aria-label="Open conversations"
+              aria-label="Открыть список чатов"
             >
               <Menu size={20} />
             </button>
@@ -33,14 +33,14 @@ export function AppShell({ user, onLogout, onMenuClick, children }) {
             </Link>
           </div>
           <div className={styles.headerRight}>
-            <span className={styles.greeting}>Hello, {displayName}</span>
+            <span className={styles.greeting}>Привет, {displayName}</span>
             <Link href="/settings" className={styles.iconLink}>
               <Settings size={18} />
-              Settings
+              Настройки
             </Link>
             <button type="button" className={styles.iconLink} onClick={onLogout}>
               <LogOut size={18} />
-              Log out
+              Выйти
             </button>
           </div>
         </div>

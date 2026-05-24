@@ -4,35 +4,34 @@ import styles from './landing.module.css';
 const CHANNELS = [
   {
     initials: 'DS',
-    title: 'Design sync',
-    meta: '4 members · active now',
+    title: 'Синк по дизайну',
+    meta: '4 участника · сейчас активен',
     active: true,
   },
   {
     initials: 'RC',
-    title: 'Release channel',
-    meta: 'Build passed on staging',
+    title: 'Канал релиза',
+    meta: 'Сборка прошла на стенде',
   },
   {
     initials: 'AK',
-    title: 'Alex · direct',
-    meta: 'Encrypted thread',
+    title: 'Алекс · личный',
+    meta: 'Зашифрованный тред',
     secure: true,
   },
 ];
 
 const MESSAGES = [
-  { variant: 'in', text: 'Can we lock the API contract before Friday?' },
-  { variant: 'out', text: 'Yes — latest changes are on the branch.' },
-  { variant: 'in', text: 'I will review the WebSocket payload tonight.' },
+  { variant: 'in', text: 'Можем зафиксировать API-контракт до пятницы?' },
+  { variant: 'out', text: 'Да — последние изменения уже в ветке.' },
+  { variant: 'in', text: 'Сегодня вечером посмотрю полезную нагрузку WebSocket.' },
 ];
 
-/** Layered product planes — channels, workspace thread, direct route, voice. */
 export function HeroComposition() {
   return (
     <div className={styles.composition} aria-hidden>
       <article className={styles.planeWarm}>
-        <p className={styles.planeLabel}>Team channels</p>
+        <p className={styles.planeLabel}>Командные каналы</p>
         <ul className={styles.channelList}>
           {CHANNELS.map((channel) => (
             <li
@@ -53,7 +52,7 @@ export function HeroComposition() {
       </article>
 
       <article className={styles.planeDeep}>
-        <p className={`${styles.planeLabel} ${styles.planeLabelOnDark}`}>Pager workspace</p>
+        <p className={`${styles.planeLabel} ${styles.planeLabelOnDark}`}>Workspace Pager</p>
         <div className={styles.thread}>
           {MESSAGES.map((message) => (
             <p
@@ -63,23 +62,15 @@ export function HeroComposition() {
               {message.text}
             </p>
           ))}
-          <p className={styles.typingLine}>Maya is typing…</p>
+          <p className={styles.typingLine}>Майя печатает…</p>
         </div>
       </article>
-
-      <aside className={`${styles.planeChip} ${styles.planeChipDirect}`}>
-        <Shield size={20} strokeWidth={2} aria-hidden />
-        <span>
-          <strong>Direct route</strong>
-          <span>Encrypted end-to-end</span>
-        </span>
-      </aside>
 
       <aside className={`${styles.planeChip} ${styles.planeChipCall}`}>
         <Phone size={16} strokeWidth={2.25} aria-hidden />
         <span>
-          <strong>Voice room</strong>
-          <span>Live · 2 participants</span>
+          <strong>Голосовая комната</strong>
+          <span>В эфире · 2 участника</span>
         </span>
       </aside>
     </div>

@@ -1,72 +1,56 @@
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import ds from '@/design-system/primitives.module.css';
+import { PublicHeader } from '@/surface/shared';
 import styles from './landing.module.css';
 import { HeroComposition } from './HeroComposition';
 
-const TRUST_ITEMS = ['Secure messaging', 'Encrypted direct', 'Voice rooms', 'Context that stays'];
+const TRUST_ITEMS = [
+  'Безопасные сообщения',
+  'Шифрование в личке',
+  'Голосовые комнаты',
+  'Контекст сохраняется',
+];
 
 const PILLARS = [
   {
-    title: 'Direct conversations stay private',
-    body: '1:1 text is encrypted on the client. The server never sees plaintext.',
+    title: 'Личные переписки остаются приватными',
+    body: 'Текст в диалогах 1:1 шифруется на клиенте. Сервер видит только шифротекст.',
   },
   {
-    title: 'Team channels stay in sync',
-    body: 'Real-time delivery, typing, and reconnect sync keep one shared timeline.',
+    title: 'Командные каналы синхронны',
+    body: 'Доставка в реальном времени, индикатор набора и синхронизация после reconnect.',
   },
   {
-    title: 'Calls without leaving the thread',
-    body: 'Open a voice room from the conversation and return to the same context.',
+    title: 'Звонки без выхода из треда',
+    body: 'Откройте голосовую комнату из переписки и вернитесь в тот же контекст.',
   },
 ];
 
 export function LandingPage() {
   return (
     <div className={ds.surface}>
-      <header className={styles.header}>
-        <div className={styles.headerInner}>
-          <Link href="/" className={ds.logo}>
-            <span className={ds.logoMark}>P</span>
-            Pager
-          </Link>
-
-          <nav className={styles.headerNav} aria-label="Primary">
-            <a href="#product">Product</a>
-            <a href="#security">Security</a>
-            <a href="#documentation">Documentation</a>
-          </nav>
-
-          <div className={styles.headerActions}>
-            <Link href="/login" className={ds.btnGhost}>
-              Log in
-            </Link>
-            <Link href="/register" className={ds.btnHeader}>
-              Get started
-            </Link>
-          </div>
-        </div>
-      </header>
+      <PublicHeader />
 
       <main>
         <section className={styles.hero} aria-labelledby="landing-headline">
           <h1 id="landing-headline" className={styles.headline}>
-            Secure messaging and calls
-            <span className={styles.headlineBreak}>for focused teams</span>
+            Безопасные сообщения и звонки
+            <span className={styles.headlineBreak}> для сфокусированных команд</span>
           </h1>
           <p className={styles.subheadline}>
-            Chat in real time, reconnect without losing context, and keep direct conversations
-            private.
+            Общайтесь в реальном времени, переподключайтесь без потери контекста и сохраняйте
+            приватность личных диалогов.
           </p>
           <Link href="/register" className={ds.btnCta}>
-            Get started
+            Начать
             <ArrowRight size={18} strokeWidth={2.25} aria-hidden />
           </Link>
         </section>
 
-        <section id="product" className={styles.showcase} aria-label="Product preview">
+        <section id="product" className={styles.showcase} aria-label="Превью продукта">
           <div className={styles.trustStrip}>
-            <p className={styles.trustLabel}>One workspace for focused communication</p>
+            <p className={styles.trustLabel}>Один workspace для сфокусированного общения</p>
             <ul className={styles.trustList}>
               {TRUST_ITEMS.map((item) => (
                 <li key={item}>{item}</li>
@@ -80,13 +64,11 @@ export function LandingPage() {
         <section id="security" className={styles.narrative}>
           <div className={ds.container}>
             <div className={styles.narrativeIntro}>
-              <p className={styles.eyebrow}>Security</p>
-              <h2 className={styles.sectionTitle}>
-                Communication that respects privacy and continuity
-              </h2>
+              <p className={styles.eyebrow}>Безопасность</p>
+              <h2 className={styles.sectionTitle}>Приватность и непрерывность по умолчанию</h2>
               <p className={styles.sectionLead}>
-                Pager is built for teams that need clarity without noise — private direct routes,
-                reliable delivery, and recovery that preserves the thread instead of resetting it.
+                Pager структурирует общение: приватные direct-маршруты, надёжная доставка и
+                восстановление, которое сохраняет тред, а не сбрасывает его.
               </p>
             </div>
             <ul className={styles.pillarList}>
@@ -102,12 +84,12 @@ export function LandingPage() {
 
         <section id="documentation" className={styles.docsBand}>
           <div className={styles.docsInner}>
-            <h2 className={styles.docsTitle}>Open your team workspace</h2>
+            <h2 className={styles.docsTitle}>Откройте workspace команды</h2>
             <p className={styles.docsLead}>
-              Start with messaging, direct privacy, and voice — in one calm surface.
+              Сообщения, приватные direct-маршруты и голос — в одном спокойном интерфейсе.
             </p>
             <Link href="/register" className={ds.btnCta}>
-              Get started
+              Начать
               <ArrowRight size={18} strokeWidth={2.25} aria-hidden />
             </Link>
           </div>
@@ -118,9 +100,9 @@ export function LandingPage() {
         <div className={ds.container}>
           <div className={styles.footerRow}>
             <span className={styles.footerBrand}>Pager</span>
-            <nav className={styles.footerNav} aria-label="Footer">
-              <Link href="/login">Log in</Link>
-              <Link href="/register">Get started</Link>
+            <nav className={styles.footerNav} aria-label="Подвал">
+              <Link href="/login">Войти</Link>
+              <Link href="/register">Начать</Link>
             </nav>
           </div>
         </div>

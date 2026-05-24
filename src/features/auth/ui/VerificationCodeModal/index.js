@@ -1,5 +1,5 @@
 /**
- * Verification code modal — v2 design system.
+ * Модальное окно кода подтверждения — v2 design system.
  */
 import { useRef, useEffect } from 'react';
 import ds from '@/design-system/primitives.module.css';
@@ -46,11 +46,11 @@ export function VerificationCodeModal({
         aria-labelledby="code-modal-title"
       >
         <h2 id="code-modal-title" className={ds.modalTitle}>
-          Enter verification code
+          Введите код подтверждения
         </h2>
-        <p className={ds.modalHint}>We sent a code to {email}</p>
+        <p className={ds.modalHint}>Код отправлен на {email}</p>
         {codeTimer > 0 ? (
-          <p className={ds.modalTimer}>Code expires in {formatTime(codeTimer)}</p>
+          <p className={ds.modalTimer}>Код действителен ещё {formatTime(codeTimer)}</p>
         ) : null}
         <input
           ref={inputRef}
@@ -65,7 +65,7 @@ export function VerificationCodeModal({
           placeholder="000000"
           className={`${ds.input} ${verificationCodeError ? ds.inputInvalid : ''}`}
           onKeyDown={handleKeyDown}
-          aria-label="Email verification code"
+          aria-label="Код подтверждения из email"
           aria-invalid={verificationCodeError ? 'true' : 'false'}
           aria-describedby={
             [
@@ -87,7 +87,7 @@ export function VerificationCodeModal({
           </div>
         ) : null}
         {resendTimer > 0 ? (
-          <p className={ds.modalTimer}>Resend available in {resendTimer}s</p>
+          <p className={ds.modalTimer}>Повторная отправка через {resendTimer} с</p>
         ) : (
           <button
             type="button"
@@ -95,15 +95,15 @@ export function VerificationCodeModal({
             onClick={onResend}
             disabled={sendingCode}
           >
-            {sendingCode ? 'Sending...' : 'Resend code'}
+            {sendingCode ? 'Отправка…' : 'Отправить код повторно'}
           </button>
         )}
         <div className={ds.modalActions}>
           <button type="button" onClick={onSubmit} disabled={loading} className={ds.btnPrimary}>
-            {loading ? 'Creating account...' : 'Confirm'}
+            {loading ? 'Создание аккаунта…' : 'Подтвердить'}
           </button>
           <button type="button" onClick={onClose} className={ds.modalLinkBtn}>
-            Cancel
+            Отмена
           </button>
         </div>
       </div>

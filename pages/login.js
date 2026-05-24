@@ -12,14 +12,18 @@ export default function Login() {
   return (
     <>
       <Head>
-        <title>Log in — Pager</title>
+        <title>Вход — Pager</title>
       </Head>
       {showLoader ? (
         <div className={ds.loaderOverlay}>
-          <Loader text="Signing in..." />
+          <Loader text="Вход…" />
         </div>
       ) : null}
-      <AuthLayout title="Welcome back" subtitle="Log in to continue your conversations.">
+      <AuthLayout
+        mode="login"
+        title="С возвращением"
+        subtitle="Войдите, чтобы продолжить переписку."
+      >
         <LoginForm {...login} />
       </AuthLayout>
     </>

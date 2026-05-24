@@ -51,7 +51,7 @@ export default function AppHome() {
         });
         router.push(`/room/${newRoom.roomId}?${params}`);
       } catch (err) {
-        setInputError(err?.message || 'Failed to create room');
+        setInputError(err?.message || 'Не удалось создать комнату');
       }
     },
     [createRoom, router]
@@ -62,13 +62,13 @@ export default function AppHome() {
     setInputError('');
 
     if (!trimmedRoomId) {
-      setInputError('Enter a room ID');
+      setInputError('Введите ID комнаты');
       roomInputRef.current?.focus();
       return;
     }
 
     if (!ROOM_ID_REGEX.test(trimmedRoomId)) {
-      setInputError('Room ID: 6–12 letters or digits (A–Z, 0–9)');
+      setInputError('ID комнаты: 6–12 букв или цифр (A–Z, 0–9)');
       roomInputRef.current?.focus();
       return;
     }
@@ -97,7 +97,7 @@ export default function AppHome() {
   const displayError = inputError || createError;
 
   if (!hasMounted || !user) {
-    return <Loader fullPage text="Loading..." />;
+    return <Loader fullPage text="Загрузка…" />;
   }
 
   return (
@@ -118,9 +118,9 @@ export default function AppHome() {
         onMenuClick={() => setSidebarOpen((open) => !open)}
       >
         <div className={shellStyles.panel}>
-          <h2 className={shellStyles.panelTitle}>Start a voice room</h2>
+          <h2 className={shellStyles.panelTitle}>Голосовая комната</h2>
           <p className={shellStyles.panelHint}>
-            Create a room and share the link with your team, or join an existing one.
+            Создайте комнату и отправьте ссылку команде или присоединитесь к существующей.
           </p>
           <button
             type="button"
@@ -129,14 +129,14 @@ export default function AppHome() {
             disabled={isCreating}
           >
             <Plus size={20} />
-            Create new room
+            Создать комнату
           </button>
         </div>
 
-        <div className={shellStyles.divider}>or</div>
+        <div className={shellStyles.divider}>или</div>
 
         <div className={shellStyles.panel}>
-          <h2 className={shellStyles.panelTitle}>Join existing room</h2>
+          <h2 className={shellStyles.panelTitle}>Присоединиться к комнате</h2>
           <div className={shellStyles.joinRow}>
             <div className={shellStyles.inputWrap}>
               <Lock size={18} className={shellStyles.inputIcon} aria-hidden />
@@ -145,7 +145,7 @@ export default function AppHome() {
                 id="room-id"
                 name="roomId"
                 type="text"
-                placeholder="Paste room ID"
+                placeholder="Вставьте ID комнаты"
                 value={roomId}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
@@ -168,7 +168,7 @@ export default function AppHome() {
               disabled={!roomId.trim() || isCreating}
             >
               <ArrowRight size={18} />
-              Join room
+              Войти в комнату
             </button>
           </div>
         </div>
@@ -178,8 +178,8 @@ export default function AppHome() {
         isOpen={showPreview}
         onClose={() => setShowPreview(false)}
         onConfirm={handleCreateRoom}
-        title="Before you join"
-        confirmText="Create room"
+        title="Перед входом"
+        confirmText="Создать комнату"
         isCreating={isCreating}
       />
     </>

@@ -9,11 +9,12 @@ export default function Register() {
   return (
     <>
       <Head>
-        <title>Get started — Pager</title>
+        <title>Регистрация — Pager</title>
       </Head>
       <AuthLayout
-        title="Create your account"
-        subtitle="Start with a secure workspace for messaging and calls."
+        mode="register"
+        title="Создайте аккаунт"
+        subtitle="Начните с безопасного workspace для сообщений и звонков."
       >
         <RegistrationForm {...registration} />
       </AuthLayout>
