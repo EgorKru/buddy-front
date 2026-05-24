@@ -1,15 +1,16 @@
 /**
- * Форма регистрации: поля и кнопка, отображение ошибок. FSD: features/auth
+ * Registration form — v2 design system.
  */
 import { useState } from 'react';
+import Link from 'next/link';
 import { Eye, EyeOff } from 'lucide-react';
 import { VerificationCodeModal } from '../VerificationCodeModal';
-import styles from '@/styles/login.module.css';
+import ds from '@/design-system/primitives.module.css';
 
 function RegisterUsernameField({ formData, handleChange, handleBlur, usernameError }) {
   return (
-    <div className={styles.formGroup}>
-      <label htmlFor="register-username">Имя пользователя</label>
+    <div className={ds.field}>
+      <label htmlFor="register-username">Username</label>
       <input
         type="text"
         id="register-username"
@@ -17,14 +18,14 @@ function RegisterUsernameField({ formData, handleChange, handleBlur, usernameErr
         value={formData.username}
         onChange={handleChange}
         onBlur={handleBlur}
-        placeholder="Введите имя пользователя"
+        placeholder="Choose a username"
         autoComplete="username"
-        className={usernameError ? styles.inputInvalid : undefined}
+        className={`${ds.input} ${usernameError ? ds.inputInvalid : ''}`}
         aria-invalid={usernameError ? 'true' : 'false'}
         aria-describedby={usernameError ? 'register-username-error' : undefined}
       />
       {usernameError ? (
-        <p id="register-username-error" className={styles.fieldError} role="alert">
+        <p id="register-username-error" className={ds.fieldError} role="alert">
           {usernameError}
         </p>
       ) : null}
@@ -34,7 +35,7 @@ function RegisterUsernameField({ formData, handleChange, handleBlur, usernameErr
 
 function RegisterEmailField({ formData, handleChange, handleBlur, emailError }) {
   return (
-    <div className={styles.formGroup}>
+    <div className={ds.field}>
       <label htmlFor="register-email">Email</label>
       <input
         type="email"
@@ -43,14 +44,14 @@ function RegisterEmailField({ formData, handleChange, handleBlur, emailError }) 
         value={formData.email}
         onChange={handleChange}
         onBlur={handleBlur}
-        placeholder="Введите email"
+        placeholder="you@company.com"
         autoComplete="email"
-        className={emailError ? styles.inputInvalid : undefined}
+        className={`${ds.input} ${emailError ? ds.inputInvalid : ''}`}
         aria-invalid={emailError ? 'true' : 'false'}
         aria-describedby={emailError ? 'register-email-error' : undefined}
       />
       {emailError ? (
-        <p id="register-email-error" className={styles.fieldError} role="alert">
+        <p id="register-email-error" className={ds.fieldError} role="alert">
           {emailError}
         </p>
       ) : null}
@@ -58,68 +59,38 @@ function RegisterEmailField({ formData, handleChange, handleBlur, emailError }) 
   );
 }
 
-function RegisterDisplayNameField({ formData, handleChange, handleBlur }) {
-  return (
-    <div className={styles.formGroup}>
-      <label htmlFor="register-displayName">Отображаемое имя (необязательно)</label>
-      <input
-        type="text"
-        id="register-displayName"
-        name="displayName"
-        value={formData.displayName}
-        onChange={handleChange}
-        onBlur={handleBlur}
-        placeholder="Как вас называть?"
-        autoComplete="name"
-      />
-    </div>
-  );
-}
-
-function RegisterPasswordField({
-  formData,
-  handleChange,
-  handleBlur,
-  passwordError,
-  onPasswordFocus,
-  onPasswordBlur,
-}) {
+function RegisterPasswordField({ formData, handleChange, handleBlur, passwordError }) {
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <div className={styles.formGroup}>
-      <label htmlFor="register-password">Пароль</label>
-      <div className={styles.passwordContainer}>
+    <div className={ds.field}>
+      <label htmlFor="register-password">Password</label>
+      <span className={ds.fieldHint}>At least 6 characters.</span>
+      <div className={ds.passwordWrap}>
         <input
           type={showPassword ? 'text' : 'password'}
           id="register-password"
           name="password"
           value={formData.password}
           onChange={handleChange}
-          onFocus={onPasswordFocus}
-          onBlur={(e) => {
-            handleBlur(e);
-            onPasswordBlur?.();
-          }}
-          onMouseEnter={onPasswordFocus}
-          onMouseLeave={onPasswordBlur}
-          placeholder="Минимум 6 символов"
+          onBlur={handleBlur}
+          placeholder="Create a password"
           autoComplete="new-password"
-          className={passwordError ? styles.inputInvalid : undefined}
+          className={`${ds.input} ${passwordError ? ds.inputInvalid : ''}`}
           aria-invalid={passwordError ? 'true' : 'false'}
           aria-describedby={passwordError ? 'register-password-error' : undefined}
         />
         <button
           type="button"
-          className={styles.passwordToggle}
+          className={ds.passwordToggle}
           onClick={() => setShowPassword(!showPassword)}
-          aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+          aria-label={showPassword ? 'Hide password' : 'Show password'}
         >
-          {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
         </button>
       </div>
       {passwordError ? (
-        <p id="register-password-error" className={styles.fieldError} role="alert">
+        <p id="register-password-error" className={ds.fieldError} role="alert">
           {passwordError}
         </p>
       ) : null}
@@ -132,31 +103,23 @@ function RegisterPasswordConfirmationField({
   handleChange,
   handleBlur,
   passwordConfirmationError,
-  onPasswordFocus,
-  onPasswordBlur,
 }) {
   const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false);
 
   return (
-    <div className={styles.formGroup}>
-      <label htmlFor="register-passwordConfirmation">Подтверждение пароля</label>
-      <div className={styles.passwordContainer}>
+    <div className={ds.field}>
+      <label htmlFor="register-passwordConfirmation">Confirm password</label>
+      <div className={ds.passwordWrap}>
         <input
           type={showPasswordConfirmation ? 'text' : 'password'}
           id="register-passwordConfirmation"
           name="passwordConfirmation"
           value={formData.passwordConfirmation}
           onChange={handleChange}
-          onFocus={onPasswordFocus}
-          onBlur={(e) => {
-            handleBlur(e);
-            onPasswordBlur?.();
-          }}
-          onMouseEnter={onPasswordFocus}
-          onMouseLeave={onPasswordBlur}
-          placeholder="Повторите пароль"
+          onBlur={handleBlur}
+          placeholder="Repeat your password"
           autoComplete="new-password"
-          className={passwordConfirmationError ? styles.inputInvalid : undefined}
+          className={`${ds.input} ${passwordConfirmationError ? ds.inputInvalid : ''}`}
           aria-invalid={passwordConfirmationError ? 'true' : 'false'}
           aria-describedby={
             passwordConfirmationError ? 'register-passwordConfirmation-error' : undefined
@@ -164,15 +127,15 @@ function RegisterPasswordConfirmationField({
         />
         <button
           type="button"
-          className={styles.passwordToggle}
+          className={ds.passwordToggle}
           onClick={() => setShowPasswordConfirmation(!showPasswordConfirmation)}
-          aria-label={showPasswordConfirmation ? 'Скрыть пароль' : 'Показать пароль'}
+          aria-label={showPasswordConfirmation ? 'Hide password' : 'Show password'}
         >
-          {showPasswordConfirmation ? <EyeOff size={20} /> : <Eye size={20} />}
+          {showPasswordConfirmation ? <EyeOff size={18} /> : <Eye size={18} />}
         </button>
       </div>
       {passwordConfirmationError ? (
-        <p id="register-passwordConfirmation-error" className={styles.fieldError} role="alert">
+        <p id="register-passwordConfirmation-error" className={ds.fieldError} role="alert">
           {passwordConfirmationError}
         </p>
       ) : null}
@@ -201,12 +164,16 @@ export function RegistrationForm({
   handleSubmitCode,
   handleResendCode,
   formatTime,
-  onPasswordFocus,
-  onPasswordBlur,
 }) {
+  const submitLabel = loading
+    ? sendingCode
+      ? 'Sending code...'
+      : 'Creating account...'
+    : 'Get started';
+
   return (
     <>
-      <form onSubmit={handleRegister} noValidate>
+      <form className={ds.formStack} onSubmit={handleRegister} noValidate>
         <RegisterUsernameField
           formData={formData}
           handleChange={handleChange}
@@ -219,34 +186,25 @@ export function RegistrationForm({
           handleBlur={handleBlur}
           emailError={emailError}
         />
-        <RegisterDisplayNameField
-          formData={formData}
-          handleChange={handleChange}
-          handleBlur={handleBlur}
-        />
         <RegisterPasswordField
           formData={formData}
           handleChange={handleChange}
           handleBlur={handleBlur}
           passwordError={passwordError}
-          onPasswordFocus={onPasswordFocus}
-          onPasswordBlur={onPasswordBlur}
         />
         <RegisterPasswordConfirmationField
           formData={formData}
           handleChange={handleChange}
           handleBlur={handleBlur}
           passwordConfirmationError={passwordConfirmationError}
-          onPasswordFocus={onPasswordFocus}
-          onPasswordBlur={onPasswordBlur}
         />
         {!showCodeModal && error ? (
-          <div className={styles.error} role="alert">
+          <div className={ds.formError} role="alert">
             {error}
           </div>
         ) : null}
-        <button type="submit" disabled={loading} className={styles.button}>
-          {loading ? 'Отправка кода...' : 'Зарегистрироваться'}
+        <button type="submit" disabled={loading} className={ds.btnPrimary}>
+          {submitLabel}
         </button>
       </form>
 
@@ -268,6 +226,10 @@ export function RegistrationForm({
           verificationCodeError={verificationCodeError}
         />
       ) : null}
+
+      <p className={ds.footerLink}>
+        Already have an account? <Link href="/login">Log in</Link>
+      </p>
     </>
   );
 }

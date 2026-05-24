@@ -1,0 +1,59 @@
+.header {
+  height: var(--pager-header-height);
+  border-bottom: 1px solid var(--pager-border);
+  background: color-mix(in srgb, var(--pager-bg) 92%, transparent);
+}
+
+.headerInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+  max-width: var(--pager-max-width);
+  margin: 0 auto;
+  padding: 0 var(--pager-gutter);
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--pager-space-2);
+}
+
+.main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - var(--pager-header-height));
+  min-height: calc(100dvh - var(--pager-header-height));
+  padding: var(--pager-space-5) var(--pager-gutter);
+}
+
+.card {
+  width: 100%;
+  max-width: 440px;
+  padding: clamp(32px, 5vw, 48px);
+  border-radius: var(--pager-radius-xl);
+  border: 1px solid var(--pager-border);
+  background: var(--pager-bg-elevated);
+  box-shadow: var(--pager-shadow-md);
+}
+
+.cardIntro {
+  margin-bottom: var(--pager-space-4);
+}
+
+.cardIntro h1 {
+  margin: 0 0 10px;
+  font-size: clamp(1.75rem, 3vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+}
+
+.cardIntro p {
+  margin: 0;
+  font-size: var(--pager-font-body);
+  line-height: 1.55;
+  color: var(--pager-text-muted);
+}

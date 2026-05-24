@@ -1,0 +1,76 @@
+/**
+ * Pager v2 design tokens — warm light product surface.
+ */
+
+:root {
+  /* Color */
+  --pager-bg: #faf7f2;
+  --pager-bg-elevated: #ffffff;
+  --pager-text: #12131a;
+  --pager-text-muted: #5f6470;
+  --pager-text-subtle: #8b909c;
+  --pager-border: #e6e2dc;
+  --pager-border-strong: #d4cfc7;
+
+  --pager-cta-bg: #12131a;
+  --pager-cta-bg-hover: #2a2b35;
+  --pager-cta-text: #ffffff;
+
+  --pager-accent: #2563eb;
+  --pager-accent-soft: #eef4ff;
+  --pager-success: #0f9d58;
+
+  --pager-showcase-bg: #f0e4ea;
+  --pager-showcase-bg-deep: #e8d8df;
+
+  --pager-panel-warm: #f4d96b;
+  --pager-panel-warm-text: #1a1408;
+  --pager-panel-deep: #1c3347;
+  --pager-panel-deep-text: #f4f7fb;
+  --pager-panel-light: #ffffff;
+
+  --pager-header-btn-bg: #eceae6;
+  --pager-header-btn-text: #12131a;
+
+  --pager-error-bg: #fef2f2;
+  --pager-error-border: #fecaca;
+  --pager-error-text: #b91c1c;
+
+  /* Typography */
+  --pager-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --pager-font-display: clamp(3.25rem, 7.2vw, 5.75rem);
+  --pager-font-h2: clamp(2rem, 3.2vw, 2.75rem);
+  --pager-font-h3: clamp(1.25rem, 2vw, 1.5rem);
+  --pager-font-body: 1.0625rem;
+  --pager-font-small: 0.9375rem;
+  --pager-font-caption: 0.8125rem;
+
+  /* Layout */
+  --pager-max-width: 1280px;
+  --pager-gutter: clamp(24px, 5vw, 64px);
+  --pager-header-height: 72px;
+
+  /* Spacing */
+  --pager-space-1: 8px;
+  --pager-space-2: 16px;
+  --pager-space-3: 24px;
+  --pager-space-4: 32px;
+  --pager-space-5: 48px;
+  --pager-space-6: 64px;
+  --pager-space-7: 96px;
+
+  /* Radii */
+  --pager-radius-sm: 10px;
+  --pager-radius-md: 14px;
+  --pager-radius-lg: 20px;
+  --pager-radius-xl: 28px;
+  --pager-radius-pill: 999px;
+
+  /* Shadows */
+  --pager-shadow-sm: 0 1px 2px rgba(18, 19, 26, 0.06);
+  --pager-shadow-md: 0 12px 32px rgba(18, 19, 26, 0.08);
+  --pager-shadow-lg: 0 28px 56px rgba(18, 19, 26, 0.12);
+  --pager-shadow-xl: 0 40px 80px rgba(18, 19, 26, 0.14);
+
+  --pager-focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.28);
+}

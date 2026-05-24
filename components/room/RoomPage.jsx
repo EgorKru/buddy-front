@@ -254,9 +254,9 @@ export default function RoomPage() {
       const participantCount = participants.length || Object.keys(players).length || 0;
       if (participantCount <= 1) endRoom();
       else leaveRoom();
-      router.push('/');
+      router.push('/app');
     } catch {
-      router.push('/');
+      router.push('/app');
     }
   };
 

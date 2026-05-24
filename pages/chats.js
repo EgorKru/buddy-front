@@ -137,7 +137,7 @@ export default function Chats() {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <button onClick={() => router.push('/')} className={styles.backButton}>
+        <button onClick={() => router.push('/app')} className={styles.backButton}>
           <ArrowLeft size={20} />
         </button>
         <h1>Чаты</h1>

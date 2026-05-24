@@ -66,7 +66,7 @@ export default function ChatHeader({
   const status = getOtherParticipantStatus();
 
   const handleBack = () => {
-    router.push('/');
+    router.push('/app');
   };
 
   return (

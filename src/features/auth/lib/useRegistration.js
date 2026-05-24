@@ -187,7 +187,7 @@ export function useRegistration() {
           })
           .catch(() => {});
       }
-      router.push('/');
+      router.push('/app');
     } catch (err) {
       setError(getRegisterErrorMessage(err));
       setLoading(false);
