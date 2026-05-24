@@ -1,8 +1,8 @@
 /**
- * Модальное окно ввода кода подтверждения. FSD: features/auth
+ * Verification code modal — v2 design system.
  */
 import { useRef, useEffect } from 'react';
-import styles from '@/styles/login.module.css';
+import ds from '@/design-system/primitives.module.css';
 
 export function VerificationCodeModal({
   email,
@@ -38,72 +38,72 @@ export function VerificationCodeModal({
   };
 
   return (
-    <div className={styles.codeModalOverlay} onClick={handleOverlayClick}>
-      <div className={styles.codeModalContainer}>
-        <div className={styles.codeModalContent}>
-          <h2>Введите код подтверждения</h2>
-          <p className={styles.codeModalHint}>Код отправлен на {email}</p>
-          {codeTimer > 0 && (
-            <p className={styles.codeModalTimer}>Код действителен {formatTime(codeTimer)}</p>
-          )}
-          <input
-            ref={inputRef}
-            type="text"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            name="verificationCode"
-            value={verificationCode}
-            onChange={onChange}
-            onBlur={onVerificationCodeBlur}
-            maxLength={6}
-            placeholder="000000"
-            className={`${styles.verificationCodeInput}${
-              verificationCodeError ? ` ${styles.inputInvalid}` : ''
-            }`}
-            onKeyDown={handleKeyDown}
-            aria-label="Код подтверждения из email"
-            aria-invalid={verificationCodeError ? 'true' : 'false'}
-            aria-describedby={
-              [
-                verificationCodeError ? 'register-verification-code-error' : null,
-                error ? 'register-code-api-error' : null,
-              ]
-                .filter(Boolean)
-                .join(' ') || undefined
-            }
-          />
-          {verificationCodeError ? (
-            <p id="register-verification-code-error" className={styles.fieldError} role="alert">
-              {verificationCodeError}
-            </p>
-          ) : null}
-          {error ? (
-            <div id="register-code-api-error" className={styles.error} role="alert">
-              {error}
-            </div>
-          ) : null}
-          {resendTimer > 0 ? (
-            <p className={styles.codeModalResendWait}>Отправить повторно через {resendTimer}с</p>
-          ) : (
-            <button
-              type="button"
-              className={styles.codeModalResendButton}
-              onClick={onResend}
-              disabled={sendingCode}
-            >
-              {sendingCode ? 'Отправка...' : 'Отправить код повторно'}
-            </button>
-          )}
+    <div className={ds.modalOverlay} onClick={handleOverlayClick}>
+      <div
+        className={ds.modalCard}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="code-modal-title"
+      >
+        <h2 id="code-modal-title" className={ds.modalTitle}>
+          Enter verification code
+        </h2>
+        <p className={ds.modalHint}>We sent a code to {email}</p>
+        {codeTimer > 0 ? (
+          <p className={ds.modalTimer}>Code expires in {formatTime(codeTimer)}</p>
+        ) : null}
+        <input
+          ref={inputRef}
+          type="text"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          name="verificationCode"
+          value={verificationCode}
+          onChange={onChange}
+          onBlur={onVerificationCodeBlur}
+          maxLength={6}
+          placeholder="000000"
+          className={`${ds.input} ${verificationCodeError ? ds.inputInvalid : ''}`}
+          onKeyDown={handleKeyDown}
+          aria-label="Email verification code"
+          aria-invalid={verificationCodeError ? 'true' : 'false'}
+          aria-describedby={
+            [
+              verificationCodeError ? 'register-verification-code-error' : null,
+              error ? 'register-code-api-error' : null,
+            ]
+              .filter(Boolean)
+              .join(' ') || undefined
+          }
+        />
+        {verificationCodeError ? (
+          <p id="register-verification-code-error" className={ds.fieldError} role="alert">
+            {verificationCodeError}
+          </p>
+        ) : null}
+        {error ? (
+          <div id="register-code-api-error" className={ds.formError} role="alert">
+            {error}
+          </div>
+        ) : null}
+        {resendTimer > 0 ? (
+          <p className={ds.modalTimer}>Resend available in {resendTimer}s</p>
+        ) : (
           <button
             type="button"
-            onClick={onSubmit}
-            disabled={loading}
-            className={`${styles.button} ${styles.codeModalButtonFull}`}
+            className={ds.btnSecondary}
+            onClick={onResend}
+            disabled={sendingCode}
           >
-            {loading ? 'Регистрация...' : 'Подтвердить'}
+            {sendingCode ? 'Sending...' : 'Resend code'}
           </button>
-          <button type="button" onClick={onClose} className={styles.codeModalCancelButton}>
-            Отмена
+        )}
+        <div className={ds.modalActions}>
+          <button type="button" onClick={onSubmit} disabled={loading} className={ds.btnPrimary}>
+            {loading ? 'Creating account...' : 'Confirm'}
+          </button>
+          <button type="button" onClick={onClose} className={ds.modalLinkBtn}>
+            Cancel
           </button>
         </div>
       </div>

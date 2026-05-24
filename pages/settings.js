@@ -31,7 +31,7 @@ export default function Settings() {
     <div className={styles.container}>
       <div className={styles.card}>
         <div className={styles.header}>
-          <Link href="/" className={styles.backButton}>
+          <Link href="/app" className={styles.backButton}>
             <ArrowLeft size={20} />
             Назад
           </Link>

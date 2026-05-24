@@ -107,7 +107,7 @@ export function useProfile(user) {
       setSuccess('Профиль успешно обновлён!');
 
       redirectTimeoutRef.current = setTimeout(() => {
-        router.push('/');
+        router.push('/app');
       }, REDIRECT_DELAY_MS);
     } catch (err) {
       setError(getFriendlyErrorMessage(err));

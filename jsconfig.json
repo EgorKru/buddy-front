@@ -8,7 +8,9 @@
       "@/shared/*": ["./src/shared/*"],
       "@/entities/*": ["./src/entities/*"],
       "@/features/*": ["./src/features/*"],
-      "@/widgets/*": ["./src/widgets/*"]
+      "@/widgets/*": ["./src/widgets/*"],
+      "@/design-system/*": ["./src/design-system/*"],
+      "@/surface/*": ["./src/surface/*"]
     }
   },
   "include": ["**/*"],

@@ -1,15 +1,16 @@
 /**
- * Форма входа: поля и кнопка. FSD: features/auth
+ * Login form — v2 design system.
  */
 import { useState } from 'react';
 import Link from 'next/link';
 import { Eye, EyeOff } from 'lucide-react';
-import styles from '@/styles/login.module.css';
+import ds from '@/design-system/primitives.module.css';
 
 function LoginUsernameField({ formData, handleChange, handleBlur, usernameError }) {
   return (
-    <div className={styles.formGroup}>
-      <label htmlFor="login-username">Имя пользователя</label>
+    <div className={ds.field}>
+      <label htmlFor="login-username">Email or username</label>
+      <span className={ds.fieldHint}>Use the same identifier you registered with.</span>
       <input
         type="text"
         id="login-username"
@@ -17,14 +18,14 @@ function LoginUsernameField({ formData, handleChange, handleBlur, usernameError 
         value={formData.username}
         onChange={handleChange}
         onBlur={handleBlur}
-        placeholder="Введите имя пользователя"
+        placeholder="you@company.com or username"
         autoComplete="username"
-        className={usernameError ? styles.inputInvalid : undefined}
+        className={`${ds.input} ${usernameError ? ds.inputInvalid : ''}`}
         aria-invalid={usernameError ? 'true' : 'false'}
         aria-describedby={usernameError ? 'login-username-error' : undefined}
       />
       {usernameError ? (
-        <p id="login-username-error" className={styles.fieldError} role="alert">
+        <p id="login-username-error" className={ds.fieldError} role="alert">
           {usernameError}
         </p>
       ) : null}
@@ -32,15 +33,7 @@ function LoginUsernameField({ formData, handleChange, handleBlur, usernameError 
   );
 }
 
-function LoginPasswordField({
-  formData,
-  handleChange,
-  handleBlur,
-  passwordError,
-  error,
-  onPasswordFocus,
-  onPasswordBlur,
-}) {
+function LoginPasswordField({ formData, handleChange, handleBlur, passwordError, error }) {
   const [showPassword, setShowPassword] = useState(false);
 
   const describedBy = [passwordError ? 'login-password-error' : null, error ? 'login-error' : null]
@@ -48,39 +41,33 @@ function LoginPasswordField({
     .join(' ');
 
   return (
-    <div className={styles.formGroup}>
-      <label htmlFor="login-password">Пароль</label>
-      <div className={styles.passwordContainer}>
+    <div className={ds.field}>
+      <label htmlFor="login-password">Password</label>
+      <div className={ds.passwordWrap}>
         <input
           type={showPassword ? 'text' : 'password'}
           id="login-password"
           name="password"
           value={formData.password}
           onChange={handleChange}
-          onFocus={onPasswordFocus}
-          onBlur={(e) => {
-            handleBlur(e);
-            onPasswordBlur?.();
-          }}
-          onMouseEnter={onPasswordFocus}
-          onMouseLeave={onPasswordBlur}
-          placeholder="Введите пароль"
+          onBlur={handleBlur}
+          placeholder="Enter your password"
           autoComplete="current-password"
-          className={passwordError ? styles.inputInvalid : undefined}
+          className={`${ds.input} ${passwordError ? ds.inputInvalid : ''}`}
           aria-invalid={passwordError ? 'true' : 'false'}
           aria-describedby={describedBy || undefined}
         />
         <button
           type="button"
-          className={styles.passwordToggle}
+          className={ds.passwordToggle}
           onClick={() => setShowPassword(!showPassword)}
-          aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+          aria-label={showPassword ? 'Hide password' : 'Show password'}
         >
-          {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
         </button>
       </div>
       {passwordError ? (
-        <p id="login-password-error" className={styles.fieldError} role="alert">
+        <p id="login-password-error" className={ds.fieldError} role="alert">
           {passwordError}
         </p>
       ) : null}
@@ -97,12 +84,10 @@ export function LoginForm({
   handleChange,
   handleBlur,
   handleLogin,
-  onPasswordFocus,
-  onPasswordBlur,
 }) {
   return (
     <>
-      <form onSubmit={handleLogin} noValidate>
+      <form className={ds.formStack} onSubmit={handleLogin} noValidate>
         <LoginUsernameField
           formData={formData}
           handleChange={handleChange}
@@ -115,20 +100,18 @@ export function LoginForm({
           handleBlur={handleBlur}
           passwordError={passwordError}
           error={error}
-          onPasswordFocus={onPasswordFocus}
-          onPasswordBlur={onPasswordBlur}
         />
         {error ? (
-          <div id="login-error" className={styles.error} role="alert">
+          <div id="login-error" className={ds.formError} role="alert">
             {error}
           </div>
         ) : null}
-        <button type="submit" disabled={loading} className={styles.button}>
-          {loading ? 'Вход...' : 'Войти'}
+        <button type="submit" disabled={loading} className={ds.btnPrimary}>
+          {loading ? 'Signing in...' : 'Log in'}
         </button>
       </form>
-      <p className={styles.link}>
-        Нет аккаунта? <Link href="/register">Зарегистрироваться</Link>
+      <p className={ds.footerLink}>
+        Don&apos;t have an account? <Link href="/register">Get started</Link>
       </p>
     </>
   );

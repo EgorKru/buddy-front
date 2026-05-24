@@ -40,7 +40,7 @@ export default function App({ Component, pageProps }) {
   const router = useRouter();
   const isPublicRoute = useMemo(() => {
     const path = router?.pathname || '';
-    return path === '/login' || path === '/register';
+    return path === '/' || path === '/login' || path === '/register';
   }, [router?.pathname]);
 
   const authed = isAuthenticated();

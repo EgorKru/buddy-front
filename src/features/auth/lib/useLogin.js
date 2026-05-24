@@ -93,7 +93,7 @@ export function useLogin() {
       await new Promise((resolve) => setTimeout(resolve, LOADER_DURATION_MS));
 
       if (isMountedRef.current) {
-        router.push('/');
+        router.push('/app');
       }
     } catch (err) {
       setError(getLoginErrorMessage(err));

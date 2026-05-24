@@ -1,0 +1,216 @@
+.header {
+  border-bottom: 1px solid var(--pager-border);
+  background: var(--pager-bg-elevated);
+}
+
+.headerInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--pager-space-3);
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 14px var(--pager-gutter);
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--pager-space-2);
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: var(--pager-space-2);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.menuBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--pager-border);
+  border-radius: var(--pager-radius-sm);
+  background: var(--pager-bg);
+  color: var(--pager-text);
+  cursor: pointer;
+}
+
+.menuBtn:hover {
+  border-color: var(--pager-border-strong);
+}
+
+.greeting {
+  font-size: var(--pager-font-small);
+  color: var(--pager-text-muted);
+  margin-right: var(--pager-space-1);
+}
+
+.iconLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: var(--pager-radius-sm);
+  background: transparent;
+  color: var(--pager-text-muted);
+  font-size: var(--pager-font-small);
+  font-weight: 500;
+  font-family: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.iconLink:hover {
+  color: var(--pager-text);
+  background: var(--pager-bg);
+}
+
+.main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: clamp(40px, 6vh, 64px) var(--pager-gutter);
+}
+
+.panel {
+  padding: var(--pager-space-5);
+  border-radius: var(--pager-radius-xl);
+  border: 1px solid var(--pager-border);
+  background: var(--pager-bg-elevated);
+  box-shadow: var(--pager-shadow-sm);
+}
+
+.panelTitle {
+  margin: 0 0 var(--pager-space-2);
+  font-size: var(--pager-font-h3);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.panelHint {
+  margin: 0 0 var(--pager-space-4);
+  font-size: var(--pager-font-small);
+  color: var(--pager-text-muted);
+  line-height: 1.5;
+}
+
+.createBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  justify-content: center;
+  padding: 14px 20px;
+  border: none;
+  border-radius: var(--pager-radius-md);
+  background: var(--pager-cta-bg);
+  color: var(--pager-cta-text);
+  font-size: var(--pager-font-body);
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.createBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: var(--pager-space-3);
+  margin: var(--pager-space-5) 0;
+  color: var(--pager-text-subtle);
+  font-size: var(--pager-font-caption);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--pager-border);
+}
+
+.joinRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pager-space-2);
+}
+
+.inputWrap {
+  position: relative;
+}
+
+.inputIcon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--pager-text-subtle);
+  pointer-events: none;
+}
+
+.joinInput {
+  width: 100%;
+  padding: 14px 16px 14px 44px;
+  border-radius: var(--pager-radius-md);
+  border: 1px solid var(--pager-border-strong);
+  background: var(--pager-bg);
+  font-size: var(--pager-font-body);
+  font-family: inherit;
+}
+
+.joinInput:focus {
+  outline: none;
+  border-color: var(--pager-accent);
+  box-shadow: var(--pager-focus-ring);
+}
+
+.joinInputError {
+  border-color: var(--pager-error-text);
+}
+
+.errorMsg {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: var(--pager-font-small);
+  color: var(--pager-error-text);
+}
+
+.joinBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 20px;
+  border: 1px solid var(--pager-border-strong);
+  border-radius: var(--pager-radius-md);
+  background: var(--pager-bg-elevated);
+  font-size: var(--pager-font-body);
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.joinBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sidebarOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(18, 19, 26, 0.32);
+}
