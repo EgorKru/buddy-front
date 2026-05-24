@@ -11,22 +11,24 @@
 
 .fullPageLoader {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 16px;
-  background: var(--home-bg, #ffffff);
-  color: var(--home-text-secondary, #6b7280);
+  background: var(--pager-bg, #faf7f2);
+  color: var(--pager-text-muted, #5f6470);
   font-size: 16px;
   font-weight: 400;
+  font-family: var(--pager-font-sans, Inter, sans-serif);
 }
 
 .spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid #e5e7eb;
-  border-top-color: #6b6b6b;
+  border: 3px solid var(--pager-border, #e6e2dc);
+  border-top-color: var(--pager-text, #12131a);
   border-radius: 50%;
   animation: loaderSpin 1s linear infinite;
 }
