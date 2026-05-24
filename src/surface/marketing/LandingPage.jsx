@@ -3,29 +3,11 @@ import { ArrowRight } from 'lucide-react';
 import ds from '@/design-system/primitives.module.css';
 import { PublicHeader } from '@/surface/shared';
 import styles from './landing.module.css';
-import { HeroComposition } from './HeroComposition';
-
-const TRUST_ITEMS = [
-  'Безопасные сообщения',
-  'Шифрование в личке',
-  'Голосовые комнаты',
-  'Контекст сохраняется',
-];
-
-const PILLARS = [
-  {
-    title: 'Личные переписки остаются приватными',
-    body: 'Текст в диалогах 1:1 шифруется на клиенте. Сервер видит только шифротекст.',
-  },
-  {
-    title: 'Командные каналы синхронны',
-    body: 'Доставка в реальном времени, индикатор набора и синхронизация после reconnect.',
-  },
-  {
-    title: 'Звонки без выхода из треда',
-    body: 'Откройте голосовую комнату из переписки и вернитесь в тот же контекст.',
-  },
-];
+import { TRUST_LINE, HERO_STATS } from './landingContent';
+import { UseCaseTabs } from './UseCaseTabs';
+import { TrustMetrics } from './TrustMetrics';
+import { FeatureRows } from './FeatureRows';
+import { Testimonials } from './Testimonials';
 
 export function LandingPage() {
   return (
@@ -34,62 +16,56 @@ export function LandingPage() {
 
       <main>
         <section className={styles.hero} aria-labelledby="landing-headline">
-          <h1 id="landing-headline" className={styles.headline}>
-            Безопасные сообщения и звонки
-            <span className={styles.headlineBreak}> для сфокусированных команд</span>
-          </h1>
-          <p className={styles.subheadline}>
-            Общайтесь в реальном времени, переподключайтесь без потери контекста и сохраняйте
-            приватность личных диалогов.
-          </p>
-          <Link href="/register" className={ds.btnCta}>
-            Начать
-            <ArrowRight size={18} strokeWidth={2.25} aria-hidden />
-          </Link>
-        </section>
-
-        <section id="product" className={styles.showcase} aria-label="Превью продукта">
-          <div className={styles.trustStrip}>
-            <p className={styles.trustLabel}>Один workspace для сфокусированного общения</p>
-            <ul className={styles.trustList}>
-              {TRUST_ITEMS.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
+          <div className={styles.heroInner}>
+            <h1 id="landing-headline" className={styles.headline}>
+              Общение команды, которое не разваливается на три сервиса
+            </h1>
+            <p className={styles.subheadline}>
+              Pager объединяет групповые чаты, защищённые личные диалоги и голосовые созвоны.
+              Сообщения приходят сразу, личное остаётся приватным, а после обрыва связи история на
+              месте.
+            </p>
+            <div className={styles.heroActions}>
+              <Link href="/register" className={ds.btnCta}>
+                Начать бесплатно
+                <ArrowRight size={18} strokeWidth={2.25} aria-hidden />
+              </Link>
+              <a href="#use-cases-heading" className={styles.heroSecondary}>
+                Смотреть, как это работает
+              </a>
+            </div>
+            <p className={styles.heroFinePrint}>Регистрация по email · без карты на старте</p>
           </div>
 
-          <HeroComposition />
-        </section>
-
-        <section id="security" className={styles.narrative}>
-          <div className={ds.container}>
-            <div className={styles.narrativeIntro}>
-              <p className={styles.eyebrow}>Безопасность</p>
-              <h2 className={styles.sectionTitle}>Приватность и непрерывность по умолчанию</h2>
-              <p className={styles.sectionLead}>
-                Pager структурирует общение: приватные direct-маршруты, надёжная доставка и
-                восстановление, которое сохраняет тред, а не сбрасывает его.
-              </p>
-            </div>
-            <ul className={styles.pillarList}>
-              {PILLARS.map((pillar) => (
-                <li key={pillar.title} className={styles.pillarItem}>
-                  <h3>{pillar.title}</h3>
-                  <p>{pillar.body}</p>
+          <div className={styles.heroTrust}>
+            <p className={styles.heroTrustLine}>{TRUST_LINE}</p>
+            <ul className={styles.heroStats} aria-label="Кратко о возможностях">
+              {HERO_STATS.map((stat) => (
+                <li key={stat.label}>
+                  <strong>{stat.value}</strong>
+                  <span>{stat.label}</span>
                 </li>
               ))}
             </ul>
           </div>
         </section>
 
-        <section id="documentation" className={styles.docsBand}>
-          <div className={styles.docsInner}>
-            <h2 className={styles.docsTitle}>Откройте workspace команды</h2>
-            <p className={styles.docsLead}>
-              Сообщения, приватные direct-маршруты и голос — в одном спокойном интерфейсе.
+        <UseCaseTabs />
+        <TrustMetrics />
+        <FeatureRows />
+        <Testimonials />
+
+        <section className={styles.finalCta} aria-labelledby="final-cta-heading">
+          <div className={styles.finalCtaInner}>
+            <h2 id="final-cta-heading" className={styles.finalCtaTitle}>
+              Соберите команду в Pager за несколько минут
+            </h2>
+            <p className={styles.finalCtaLead}>
+              Создайте аккаунт, пригласите коллег в чат или комнату — и перестаньте терять контекст
+              между мессенджером и созвоном.
             </p>
-            <Link href="/register" className={ds.btnCta}>
-              Начать
+            <Link href="/register" className={`${ds.btnCta} ${styles.finalCtaBtn}`}>
+              Создать workspace
               <ArrowRight size={18} strokeWidth={2.25} aria-hidden />
             </Link>
           </div>
@@ -99,8 +75,14 @@ export function LandingPage() {
       <footer className={styles.footer}>
         <div className={ds.container}>
           <div className={styles.footerRow}>
-            <span className={styles.footerBrand}>Pager</span>
+            <div className={styles.footerBrandBlock}>
+              <span className={styles.footerBrand}>Pager</span>
+              <p className={styles.footerTagline}>Сообщения, приватность и голос для команд</p>
+            </div>
             <nav className={styles.footerNav} aria-label="Подвал">
+              <a href="#use-cases-heading">Возможности</a>
+              <a href="#features">Преимущества</a>
+              <a href="#testimonials">Отзывы</a>
               <Link href="/login">Войти</Link>
               <Link href="/register">Начать</Link>
             </nav>

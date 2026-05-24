@@ -3,9 +3,9 @@ import ds from '@/design-system/primitives.module.css';
 import styles from './public.module.css';
 
 const NAV_ITEMS = [
-  { href: '#product', label: 'Продукт' },
-  { href: '#security', label: 'Безопасность' },
-  { href: '#documentation', label: 'Документация' },
+  { href: '#use-cases-heading', label: 'Сценарии' },
+  { href: '#features', label: 'Преимущества' },
+  { href: '#testimonials', label: 'Отзывы' },
 ];
 
 /**

@@ -12,28 +12,37 @@ import GlobalNotifications from '@/component/GlobalNotifications';
 import GlobalCallHandler from '@/component/GlobalCallHandler';
 import { isAuthenticated } from '@/utils/api';
 
-function registerServiceWorker() {
-  if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker
-        .register('/sw.js')
-        .then((registration) => {
-          registration.addEventListener('updatefound', () => {
-            const newWorker = registration.installing;
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              }
-            });
-          });
-        })
-        .catch((_error) => {});
+function unregisterServiceWorkersInDev() {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
 
-      navigator.serviceWorker.addEventListener('message', (event) => {
-        if (event.data && event.data.type === 'SW_READY') {
-        }
-      });
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    registrations.forEach((registration) => registration.unregister());
+  });
+}
+
+function registerServiceWorker() {
+  if (process.env.NODE_ENV !== 'production') return;
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('/sw.js')
+      .then((registration) => {
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            }
+          });
+        });
+      })
+      .catch((_error) => {});
+
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'SW_READY') {
+      }
     });
-  }
+  });
 }
 
 export default function App({ Component, pageProps }) {
@@ -46,6 +55,10 @@ export default function App({ Component, pageProps }) {
   const authed = isAuthenticated();
 
   useEffect(() => {
+    if (process.env.NODE_ENV !== 'production') {
+      unregisterServiceWorkersInDev();
+      return;
+    }
     registerServiceWorker();
   }, []);
 
