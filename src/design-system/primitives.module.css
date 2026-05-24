@@ -15,14 +15,6 @@
   padding-right: var(--pager-gutter);
 }
 
-.containerWide {
-  width: 100%;
-  max-width: 1440px;
-  margin: 0 auto;
-  padding-left: var(--pager-gutter);
-  padding-right: var(--pager-gutter);
-}
-
 /* Buttons */
 
 .btn {
@@ -67,6 +59,10 @@
   background: var(--pager-cta-bg-hover);
 }
 
+.btnCta:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
 .btnHeader {
   composes: btn;
   padding: 10px 20px;
@@ -78,7 +74,7 @@
 }
 
 .btnHeader:hover:not(:disabled) {
-  background: #e2e0dc;
+  background: var(--pager-header-btn-bg-hover);
 }
 
 .btnGhost {

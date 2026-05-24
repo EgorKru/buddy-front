@@ -30,6 +30,7 @@
   --pager-panel-light: #ffffff;
 
   --pager-header-btn-bg: #eceae6;
+  --pager-header-btn-bg-hover: #e2e0dc;
   --pager-header-btn-text: #12131a;
 
   --pager-error-bg: #fef2f2;
@@ -38,12 +39,15 @@
 
   /* Typography */
   --pager-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --pager-font-display: clamp(3.25rem, 7.2vw, 5.75rem);
-  --pager-font-h2: clamp(2rem, 3.2vw, 2.75rem);
-  --pager-font-h3: clamp(1.25rem, 2vw, 1.5rem);
+  --pager-font-display: clamp(3.35rem, 7vw, 5.65rem);
+  --pager-font-h2: clamp(2rem, 3.2vw, 2.65rem);
   --pager-font-body: 1.0625rem;
   --pager-font-small: 0.9375rem;
   --pager-font-caption: 0.8125rem;
+
+  --pager-measure-headline: 13.5ch;
+  --pager-measure-lead: 44ch;
+  --pager-measure-body: 38ch;
 
   /* Layout */
   --pager-max-width: 1280px;
@@ -57,7 +61,8 @@
   --pager-space-4: 32px;
   --pager-space-5: 48px;
   --pager-space-6: 64px;
-  --pager-space-7: 96px;
+  --pager-space-7: 88px;
+  --pager-space-8: 112px;
 
   /* Radii */
   --pager-radius-sm: 10px;
@@ -69,8 +74,8 @@
   /* Shadows */
   --pager-shadow-sm: 0 1px 2px rgba(18, 19, 26, 0.06);
   --pager-shadow-md: 0 12px 32px rgba(18, 19, 26, 0.08);
-  --pager-shadow-lg: 0 28px 56px rgba(18, 19, 26, 0.12);
-  --pager-shadow-xl: 0 40px 80px rgba(18, 19, 26, 0.14);
+  --pager-shadow-lg: 0 24px 48px rgba(18, 19, 26, 0.1);
+  --pager-shadow-xl: 0 36px 72px rgba(18, 19, 26, 0.12);
 
   --pager-focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.28);
 }

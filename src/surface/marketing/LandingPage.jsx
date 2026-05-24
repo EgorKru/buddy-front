@@ -4,7 +4,22 @@ import ds from '@/design-system/primitives.module.css';
 import styles from './landing.module.css';
 import { HeroComposition } from './HeroComposition';
 
-const TRUST_ITEMS = ['WebSocket delivery', 'Encrypted direct', 'Voice rooms', 'Session sync'];
+const TRUST_ITEMS = ['Secure messaging', 'Encrypted direct', 'Voice rooms', 'Context that stays'];
+
+const PILLARS = [
+  {
+    title: 'Direct conversations stay private',
+    body: '1:1 text is encrypted on the client. The server never sees plaintext.',
+  },
+  {
+    title: 'Team channels stay in sync',
+    body: 'Real-time delivery, typing, and reconnect sync keep one shared timeline.',
+  },
+  {
+    title: 'Calls without leaving the thread',
+    body: 'Open a voice room from the conversation and return to the same context.',
+  },
+];
 
 export function LandingPage() {
   return (
@@ -35,24 +50,23 @@ export function LandingPage() {
 
       <main>
         <section className={styles.hero} aria-labelledby="landing-headline">
-          <div className={styles.heroInner}>
-            <h1 id="landing-headline" className={styles.headline}>
-              Secure messaging and calls for focused teams
-            </h1>
-            <p className={styles.subheadline}>
-              Chat in real time, reconnect without losing context, and keep direct conversations
-              private.
-            </p>
-            <Link href="/register" className={`${ds.btnCta} ${styles.heroCta}`}>
-              Get started
-              <ArrowRight size={18} strokeWidth={2.25} aria-hidden />
-            </Link>
-          </div>
+          <h1 id="landing-headline" className={styles.headline}>
+            Secure messaging and calls
+            <span className={styles.headlineBreak}>for focused teams</span>
+          </h1>
+          <p className={styles.subheadline}>
+            Chat in real time, reconnect without losing context, and keep direct conversations
+            private.
+          </p>
+          <Link href="/register" className={ds.btnCta}>
+            Get started
+            <ArrowRight size={18} strokeWidth={2.25} aria-hidden />
+          </Link>
         </section>
 
         <section id="product" className={styles.showcase} aria-label="Product preview">
           <div className={styles.trustStrip}>
-            <p className={styles.trustLabel}>Built for focused teams</p>
+            <p className={styles.trustLabel}>One workspace for focused communication</p>
             <ul className={styles.trustList}>
               {TRUST_ITEMS.map((item) => (
                 <li key={item}>{item}</li>
@@ -64,39 +78,33 @@ export function LandingPage() {
         </section>
 
         <section id="security" className={styles.narrative}>
-          <div className={styles.container}>
+          <div className={ds.container}>
             <div className={styles.narrativeIntro}>
               <p className={styles.eyebrow}>Security</p>
               <h2 className={styles.sectionTitle}>
-                Private channels, reliable delivery, clear recovery
+                Communication that respects privacy and continuity
               </h2>
               <p className={styles.sectionLead}>
-                Direct conversations stay encrypted on the client. Team channels use structured
-                auth, refresh rotation, and reconnect sync so context is never lost after a drop.
+                Pager is built for teams that need clarity without noise — private direct routes,
+                reliable delivery, and recovery that preserves the thread instead of resetting it.
               </p>
             </div>
-            <div className={styles.narrativeGrid}>
-              <article className={styles.narrativeCard}>
-                <h3>Encrypted direct</h3>
-                <p>Client-side encryption for 1:1 text. Server stores ciphertext only.</p>
-              </article>
-              <article className={styles.narrativeCard}>
-                <h3>Session continuity</h3>
-                <p>JWT API with refresh token rotation and clean sign-out.</p>
-              </article>
-              <article className={styles.narrativeCard}>
-                <h3>Cluster-ready realtime</h3>
-                <p>Redis STOMP relay and presence across instances.</p>
-              </article>
-            </div>
+            <ul className={styles.pillarList}>
+              {PILLARS.map((pillar) => (
+                <li key={pillar.title} className={styles.pillarItem}>
+                  <h3>{pillar.title}</h3>
+                  <p>{pillar.body}</p>
+                </li>
+              ))}
+            </ul>
           </div>
         </section>
 
         <section id="documentation" className={styles.docsBand}>
-          <div className={styles.container}>
-            <h2 className={styles.docsTitle}>Ready to open your workspace?</h2>
+          <div className={styles.docsInner}>
+            <h2 className={styles.docsTitle}>Open your team workspace</h2>
             <p className={styles.docsLead}>
-              Create an account and start messaging your team in minutes.
+              Start with messaging, direct privacy, and voice — in one calm surface.
             </p>
             <Link href="/register" className={ds.btnCta}>
               Get started
@@ -107,12 +115,14 @@ export function LandingPage() {
       </main>
 
       <footer className={styles.footer}>
-        <div className={styles.footerInner}>
-          <span className={styles.footerBrand}>Pager</span>
-          <nav className={styles.footerNav} aria-label="Footer">
-            <Link href="/login">Log in</Link>
-            <Link href="/register">Get started</Link>
-          </nav>
+        <div className={ds.container}>
+          <div className={styles.footerRow}>
+            <span className={styles.footerBrand}>Pager</span>
+            <nav className={styles.footerNav} aria-label="Footer">
+              <Link href="/login">Log in</Link>
+              <Link href="/register">Get started</Link>
+            </nav>
+          </div>
         </div>
       </footer>
     </div>
