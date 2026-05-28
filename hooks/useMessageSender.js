@@ -85,6 +85,7 @@ const findQueuedMessageForConfirmation = (lastSent, queue, chatId) => {
 export const useMessageSender = (chatId, onMessageSent, options = {}) => {
   const directPeerUserId = options?.directPeerUserId ?? null;
   const e2eeDirectTextBlockedReason = options?.e2eeDirectTextBlockedReason ?? null;
+  const onBeforeSend = options?.onBeforeSend ?? null;
   const { client, connected } = useStomp();
   const [sending, setSending] = useState(false);
   const retryTimeoutRef = useRef(null);
@@ -185,7 +186,7 @@ export const useMessageSender = (chatId, onMessageSent, options = {}) => {
         if (e2eeDirectTextBlockedReason === 'no_peer') {
           if (typeof window !== 'undefined') {
             alert(
-              'Личный чат ещё без данных собеседника (обновите страницу или дождитесь списка чатов). Без шифрования сообщение не отправляем.'
+              'Не удалось отправить сообщение. Обновите страницу или дождитесь загрузки списка чатов.'
             );
           }
           return null;
@@ -201,14 +202,14 @@ export const useMessageSender = (chatId, onMessageSent, options = {}) => {
                 textWireContent = enc.content;
               } else if (typeof window !== 'undefined') {
                 alert(
-                  'Не удалось зашифровать сообщение. Выйдите и войдите снова, проверьте бэкенд /api/crypto и что у собеседника зарегистрирован ключ.'
+                  'Не удалось отправить сообщение. Выйдите и войдите снова или обновите страницу.'
                 );
                 return null;
               }
             }
           } catch (e) {
             if (typeof window !== 'undefined') {
-              alert(`Ошибка шифрования: ${e?.message || e}`);
+              alert(`Не удалось отправить сообщение: ${e?.message || e}`);
             }
             return null;
           }
@@ -246,16 +247,14 @@ export const useMessageSender = (chatId, onMessageSent, options = {}) => {
       if (!saveMessageToQueue(optimisticMessage)) return null;
 
       lastSentMessageRef.current = optimisticMessage;
+      onBeforeSend?.(optimisticMessage);
       setSending(true);
 
       try {
-        const isWebSocketReady =
-          client &&
-          client.connected &&
-          client.active &&
-          (connected || client.state === STOMP_CONNECTED_STATE);
+        const isWebSocketReady = Boolean(client && connected);
 
-        if (isWebSocketReady) {
+        // TEXT через REST: гарантированное сохранение и broadcast на /topic/chat/{id}
+        if (isWebSocketReady && type !== 'TEXT') {
           try {
             const payload = {
               chatId: parseInt(chatId),
@@ -390,6 +389,7 @@ export const useMessageSender = (chatId, onMessageSent, options = {}) => {
       scheduleRetry,
       directPeerUserId,
       e2eeDirectTextBlockedReason,
+      onBeforeSend,
     ]
   );
 
@@ -540,6 +540,7 @@ export const useMessageSender = (chatId, onMessageSent, options = {}) => {
                     senderUsername: queuedMessage.senderUsername,
                     senderDisplayName: queuedMessage.senderDisplayName,
                     createdAt: queuedMessage.createdAt,
+                    encryptionVersion: queuedMessage.encryptionVersion,
                   };
                   onMessageSent({ ...confirmation, message: messageDto }, queuedMessage.tempId);
                 }

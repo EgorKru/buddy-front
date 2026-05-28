@@ -4,10 +4,10 @@ import { MessageCircle, CheckCheck, Users } from 'lucide-react';
 import {
   getChatName,
   getChatAvatar,
-  getLastMessagePreview,
   getLastMessageReadMeta,
   getOtherParticipantOnline,
 } from '@/utils/chatHelpers';
+import ChatLastMessagePreview from '@/component/ChatSidebar/ChatLastMessagePreview';
 import { formatChatListTime } from '@/utils/dateHelpers';
 import styles from '@/component/ChatSidebar/index.module.css';
 
@@ -23,7 +23,12 @@ function ChatListItem({ chat, user, currentChatId, readAtByChatIdByUserId, onCha
       : 'Отправлено';
 
     return (
-      <span title={title} style={{ display: 'inline-flex', alignItems: 'center', marginRight: 6 }}>
+      <span
+        data-testid="chat-sidebar-read-status"
+        data-read={meta.isRead ? 'true' : 'false'}
+        title={title}
+        style={{ display: 'inline-flex', alignItems: 'center', marginRight: 6 }}
+      >
         {meta.isRead ? (
           <CheckCheck size={14} className={styles.statusIconRead} />
         ) : (
@@ -42,7 +47,10 @@ function ChatListItem({ chat, user, currentChatId, readAtByChatIdByUserId, onCha
   };
 
   return (
-    <div className={`${styles.chatItem} ${currentChatId === String(chat.id) ? styles.active : ''}`}>
+    <div
+      data-testid={`chat-sidebar-item-${chat.id}`}
+      className={`${styles.chatItem} ${currentChatId === String(chat.id) ? styles.active : ''}`}
+    >
       <div className={styles.chatAvatarWrapper}>
         <div className={styles.chatAvatar}>
           {getChatAvatar(chat, user) ? (
@@ -54,7 +62,11 @@ function ChatListItem({ chat, user, currentChatId, readAtByChatIdByUserId, onCha
           )}
         </div>
         {getOtherParticipantOnline(chat, user) && (
-          <span className={styles.onlineIndicator} title="Онлайн" />
+          <span
+            data-testid="chat-sidebar-online"
+            className={styles.onlineIndicator}
+            title="Онлайн"
+          />
         )}
       </div>
       <div className={styles.chatInfo}>
@@ -81,9 +93,9 @@ function ChatListItem({ chat, user, currentChatId, readAtByChatIdByUserId, onCha
             {getSenderName() && (
               <span className={styles.lastMessageSender}>{getSenderName()}:</span>
             )}
-            <span className={styles.lastMessageText}>
+            <span className={styles.lastMessageText} data-testid="chat-sidebar-last-message">
               {getReadStatusIcon()}
-              {getLastMessagePreview(chat)}
+              <ChatLastMessagePreview chat={chat} user={user} />
             </span>
           </div>
         )}
@@ -93,4 +105,35 @@ function ChatListItem({ chat, user, currentChatId, readAtByChatIdByUserId, onCha
   );
 }
 
-export default React.memo(ChatListItem);
+function chatListItemPropsAreEqual(prev, next) {
+  if (String(prev.currentChatId) !== String(next.currentChatId)) return false;
+  if (Number(prev.user?.id) !== Number(next.user?.id)) return false;
+
+  const id = String(prev.chat?.id);
+  if (id !== String(next.chat?.id)) return false;
+
+  const pc = prev.chat;
+  const nc = next.chat;
+  if (pc.unreadCount !== nc.unreadCount) return false;
+  if (pc.type !== nc.type) return false;
+  if (pc.name !== nc.name) return false;
+
+  const pl = pc.lastMessage;
+  const nl = nc.lastMessage;
+  if (String(pl?.id) !== String(nl?.id)) return false;
+  if (pl?.content !== nl?.content) return false;
+  if (pl?.createdAt !== nl?.createdAt) return false;
+  if (Number(pl?.senderId) !== Number(nl?.senderId)) return false;
+
+  const prevRead = prev.readAtByChatIdByUserId?.[id];
+  const nextRead = next.readAtByChatIdByUserId?.[id];
+  if (prevRead !== nextRead) return false;
+
+  const prevOther = pc.participants?.find((p) => Number(p.id) !== Number(prev.user?.id));
+  const nextOther = nc.participants?.find((p) => Number(p.id) !== Number(next.user?.id));
+  if (Boolean(prevOther?.online) !== Boolean(nextOther?.online)) return false;
+
+  return true;
+}
+
+export default React.memo(ChatListItem, chatListItemPropsAreEqual);

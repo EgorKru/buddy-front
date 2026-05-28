@@ -16,6 +16,7 @@ import {
 import { getCurrentUser, isAuthenticated } from '@/utils/api';
 import { useCreateChat } from '@/hooks/useCreateChat';
 import { getChatName, getChatAvatar } from '@/utils/chatHelpers';
+import ChatLastMessagePreview from '@/component/ChatSidebar/ChatLastMessagePreview';
 import { formatChatListTime, parseServerDate } from '@/utils/dateHelpers';
 import styles from '@/styles/chats.module.css';
 import { useChats, getChatTime } from '@/context/messaging';
@@ -224,20 +225,7 @@ export default function Chats() {
                         )}
                       </span>
                       <span className={styles.lastMessageText}>
-                        {chat.lastMessage.content ? (
-                          <>
-                            {chat.lastMessage.content.substring(0, 50)}
-                            {chat.lastMessage.content.length > 50 ? '...' : ''}
-                          </>
-                        ) : chat.lastMessage.type === 'IMAGE' ? (
-                          '📷 Изображение'
-                        ) : chat.lastMessage.type === 'FILE' ? (
-                          '📎 Файл'
-                        ) : chat.lastMessage.type === 'VOICE' ? (
-                          '🎤 Голосовое сообщение'
-                        ) : (
-                          'Сообщение'
-                        )}
+                        <ChatLastMessagePreview chat={chat} user={user} />
                       </span>
                     </div>
                   )}

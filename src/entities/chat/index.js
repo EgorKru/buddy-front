@@ -2,6 +2,8 @@
  * Сущность "чат": имя, аватар, превью последнего сообщения, мета прочтений. FSD: entities
  */
 
+import { parseServerDate } from '@/shared/lib/date';
+
 const PREVIEW_MAX_LENGTH = 40;
 
 /**
@@ -45,45 +47,58 @@ export const getChatAvatar = (chat, currentUser) => {
 };
 
 /**
- * Текст превью последнего сообщения чата (для списка чатов).
- * @param {object} chat — объект чата с lastMessage
+ * Текст превью одного сообщения (список чатов, ответ, пересылка).
+ * @param {object} message
+ * @param {{ decryptedText?: string }} [options] — расшифрованный текст для E2EE
  * @returns {string}
  */
-export const getLastMessagePreview = (chat) => {
-  const lastMessage = chat?.lastMessage;
-  if (!lastMessage) return '';
-  if (Number(lastMessage.encryptionVersion) > 0) return '🔒 Зашифрованное сообщение';
-  if (lastMessage.type === 'VOICE' && !lastMessage.content) return '🎤 Голосовое сообщение';
-  if ((lastMessage.type === 'FILE' || lastMessage.type === 'IMAGE') && !lastMessage.content) {
-    if (lastMessage.fileName) {
-      const icon = lastMessage.type === 'IMAGE' ? '📷' : '📎';
-      return `${icon} ${truncate(lastMessage.fileName, PREVIEW_MAX_LENGTH)}`;
+export const getMessagePreview = (message, options = {}) => {
+  const { decryptedText } = options;
+  if (!message) return '';
+  if (Number(message.encryptionVersion) > 0) {
+    if (typeof decryptedText === 'string' && decryptedText.length > 0) {
+      return truncate(decryptedText, PREVIEW_MAX_LENGTH);
     }
-    if (lastMessage.fileUrl) {
-      const parts = lastMessage.fileUrl.split('/');
+    return '…';
+  }
+  if (message.type === 'VOICE' && !message.content) return '🎤 Голосовое сообщение';
+  if ((message.type === 'FILE' || message.type === 'IMAGE') && !message.content) {
+    if (message.fileName) {
+      const icon = message.type === 'IMAGE' ? '📷' : '📎';
+      return `${icon} ${truncate(message.fileName, PREVIEW_MAX_LENGTH)}`;
+    }
+    if (message.fileUrl) {
+      const parts = message.fileUrl.split('/');
       const lastPart = parts[parts.length - 1];
       const match = lastPart.match(/^[^.]*\.(.+)$/);
       if (match) {
         const extension = match[1];
-        return lastMessage.type === 'IMAGE'
-          ? `📷 Изображение.${extension}`
-          : `📎 Файл.${extension}`;
+        return message.type === 'IMAGE' ? `📷 Изображение.${extension}` : `📎 Файл.${extension}`;
       }
-      return lastMessage.type === 'IMAGE' ? '📷 Изображение' : '📎 Файл';
+      return message.type === 'IMAGE' ? '📷 Изображение' : '📎 Файл';
     }
-    return lastMessage.type === 'IMAGE' ? '📷 Изображение' : '📎 Файл';
+    return message.type === 'IMAGE' ? '📷 Изображение' : '📎 Файл';
   }
-  if (!lastMessage.content) {
-    if (lastMessage.forwardedFrom?.originalContent) {
-      return truncate(lastMessage.forwardedFrom.originalContent, PREVIEW_MAX_LENGTH);
+  if (!message.content) {
+    if (message.forwardedFrom?.originalContent) {
+      return truncate(message.forwardedFrom.originalContent, PREVIEW_MAX_LENGTH);
     }
-    if (lastMessage.replyTo?.content) {
-      return truncate(lastMessage.replyTo.content, PREVIEW_MAX_LENGTH);
+    if (message.replyTo?.content) {
+      return truncate(message.replyTo.content, PREVIEW_MAX_LENGTH);
     }
     return 'Сообщение';
   }
-  return truncate(lastMessage.content, PREVIEW_MAX_LENGTH);
+  return truncate(message.content, PREVIEW_MAX_LENGTH);
 };
+
+/**
+ * Текст превью последнего сообщения чата (для списка чатов).
+ * @param {object} chat — объект чата с lastMessage
+ * @param {{ decryptedText?: string }} [options]
+ * @returns {string}
+ */
+export const getLastMessagePreview = (chat, options = {}) =>
+  getMessagePreview(chat?.lastMessage, options);
 
 /**
  * Мета о прочтении последнего сообщения: кто из участников (кроме текущего) прочитал.
@@ -96,8 +111,9 @@ export const getLastMessageReadMeta = (chat, user, readAtByChatIdByUserId) => {
   const lastMessage = chat?.lastMessage;
   if (!lastMessage?.createdAt || !user?.id) return { isRead: false, readCount: 0, totalOthers: 0 };
   const chatReadMap = readAtByChatIdByUserId?.[String(chat.id)] || {};
-  const msgTime = new Date(lastMessage.createdAt).getTime();
-  if (Number.isNaN(msgTime)) return { isRead: false, readCount: 0, totalOthers: 0 };
+  const msgTime = parseServerDate(lastMessage.createdAt)?.getTime();
+  if (msgTime == null || Number.isNaN(msgTime))
+    return { isRead: false, readCount: 0, totalOthers: 0 };
   const participantIds = Array.isArray(chat?.participants)
     ? chat.participants.map((p) => Number(p?.id)).filter((n) => Number.isFinite(n))
     : [];
@@ -105,8 +121,8 @@ export const getLastMessageReadMeta = (chat, user, readAtByChatIdByUserId) => {
   const totalOthers = Math.max(0, (uniqueParticipantIds.length || 0) - 1);
   const otherReaders = Object.entries(chatReadMap)
     .filter(([rid]) => Number(rid) !== Number(user.id))
-    .map(([, readAt]) => new Date(readAt).getTime())
-    .filter((t) => !Number.isNaN(t));
+    .map(([, readAt]) => parseServerDate(readAt)?.getTime())
+    .filter((t) => t != null && !Number.isNaN(t));
   const readCount = otherReaders.reduce(
     (acc, readAtTime) => (readAtTime >= msgTime ? acc + 1 : acc),
     0

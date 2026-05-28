@@ -64,7 +64,6 @@ export const getForwardedContentPreview = (
   originalContent,
   originalEncryptionVersion
 ) => {
-  if (Number(originalEncryptionVersion) > 0) return '🔒 Зашифрованное сообщение';
   if (originalType === 'VOICE') return '🎤 Голосовое сообщение';
   if (originalType === 'IMAGE') return '📷 Фото';
   if (originalType === 'FILE') return '📎 Файл';
@@ -72,7 +71,6 @@ export const getForwardedContentPreview = (
 };
 
 export const getReplyContentPreview = (replyTo) => {
-  if (Number(replyTo?.encryptionVersion) > 0) return '🔒 Зашифрованное сообщение';
   if (replyTo.type === 'VOICE') return '🎤 Голосовое сообщение';
   if (replyTo.type === 'IMAGE') return '📷 Фото';
   if (replyTo.type === 'FILE') return '📎 Файл';

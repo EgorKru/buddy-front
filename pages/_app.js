@@ -1,7 +1,7 @@
 import '@/styles/globals.css';
 import '@/styles/animations.css';
 
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { StompProvider } from '@/context/socket';
@@ -52,7 +52,16 @@ export default function App({ Component, pageProps }) {
     return path === '/' || path === '/login' || path === '/register';
   }, [router?.pathname]);
 
-  const authed = isAuthenticated();
+  const [authed, setAuthed] = useState(() =>
+    typeof window !== 'undefined' ? isAuthenticated() : false
+  );
+
+  useEffect(() => {
+    const syncAuthed = () => setAuthed(isAuthenticated());
+    syncAuthed();
+    router.events.on('routeChangeComplete', syncAuthed);
+    return () => router.events.off('routeChangeComplete', syncAuthed);
+  }, [router.events]);
 
   useEffect(() => {
     if (process.env.NODE_ENV !== 'production') {

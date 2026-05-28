@@ -9,7 +9,7 @@ const config = {
     '^@/features/(.*)$': '<rootDir>/src/features/$1',
     '^@/widgets/(.*)$': '<rootDir>/src/widgets/$1',
     '^@/(.*)$': '<rootDir>/$1',
-    '\\.module\\.css$': 'identity-obj-proxy',
+    '^.+\\.module\\.(css|scss|sass)$': 'identity-obj-proxy',
   },
   testMatch: ['**/__tests__/**/*.test.js', '**/__tests__/**/*.test.jsx'],
   collectCoverageFrom: [

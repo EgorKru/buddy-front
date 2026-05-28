@@ -6,6 +6,7 @@
 export {
   getChatName,
   getChatAvatar,
+  getMessagePreview,
   getLastMessagePreview,
   getLastMessageReadMeta,
   getOtherParticipantOnline,

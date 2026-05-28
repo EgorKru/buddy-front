@@ -14,6 +14,7 @@ import {
   FINAL_CTA,
   TRUSTED_LOGOS,
 } from './landingContent';
+import { VoiceTaskDemo } from './VoiceTaskDemo';
 
 function revealClassName(extra = '') {
   return [styles.reveal, extra].filter(Boolean).join(' ');
@@ -75,6 +76,9 @@ export function LandingPage() {
           ))}
         </div>
         <div className={styles.navActions}>
+          <Link href={HERO.secondaryCta.href} className={styles.navLogin}>
+            {HERO.secondaryCta.label}
+          </Link>
           <Link href={HERO.primaryCta.href} className={styles.navCta}>
             Начать ↗
           </Link>
@@ -94,15 +98,6 @@ export function LandingPage() {
             </h1>
 
             <p className={styles.heroSub}>{HERO.subheadline}</p>
-
-            <div className={styles.heroActions}>
-              <Link href={HERO.primaryCta.href} className={styles.btnPrimary}>
-                Попробовать бесплатно ↗
-              </Link>
-              <Link href={HERO.secondaryCta.href} className={styles.btnGhost}>
-                {HERO.secondaryCta.label}
-              </Link>
-            </div>
           </div>
 
           <HeroMock />
@@ -288,16 +283,7 @@ export function LandingPage() {
 
         <div className={styles.voiceLayout}>
           <div className={`${styles.voiceOrb} ${revealClassName()}`} data-reveal>
-            <div className={styles.voiceWave} aria-hidden>
-              <span />
-              <span />
-              <span />
-              <span />
-              <span />
-            </div>
-            <p className={styles.voicePrompt}>
-              &laquo;Привет, Pager, напомни завтра про встречу в 10&raquo;
-            </p>
+            <VoiceTaskDemo />
           </div>
 
           <div className={styles.voiceFeatures}>

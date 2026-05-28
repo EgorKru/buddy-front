@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { getCurrentUser, isAuthenticated } from '@/utils/api';
 import { useChats, useChatMessages } from '@/context/messaging';
@@ -19,6 +19,7 @@ import { useStateSync } from './useStateSync';
 import { useChatInitialization } from './useChatInitialization';
 import { useMessageSending } from './useMessageSending';
 import { isE2eeEnabled } from '@/shared/lib/e2ee/directTextE2ee';
+import { MESSAGE_STATUS } from '@/utils/messageQueue';
 
 export const useChat = (chatId, modals = {}) => {
   const {
@@ -224,13 +225,32 @@ export const useChat = (chatId, modals = {}) => {
     isLoadingInitialRef,
   });
 
+  const handleMessageSent = useCallback(
+    (confirmation, tempId) => {
+      if (confirmation?.status !== 'sent' || !tempId) return;
+      const serverMessage = confirmation.message;
+      if (!serverMessage?.id) return;
+      chatContext.replaceOptimistic(chatId, tempId, serverMessage, MESSAGE_STATUS.SENT);
+    },
+    [chatId, chatContext]
+  );
+
+  const handleBeforeSend = useCallback(
+    (optimisticMessage) => {
+      if (!optimisticMessage || !chatId) return;
+      chatContext.addOptimistic(chatId, optimisticMessage);
+    },
+    [chatId, chatContext]
+  );
+
   const {
     sendMessage: sendMessageHook,
     sending,
     syncQueue,
-  } = useMessageSender(chatId, undefined, {
+  } = useMessageSender(chatId, handleMessageSent, {
     directPeerUserId,
     e2eeDirectTextBlockedReason,
+    onBeforeSend: handleBeforeSend,
   });
 
   const messageSending = useMessageSending({

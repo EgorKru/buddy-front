@@ -283,12 +283,12 @@ export const useMessageActions = ({
       if (editingWasE2ee) {
         const mod = await import('@/shared/lib/e2ee/directTextE2ee');
         if (!mod.isE2eeEnabled() || !directPeerUserId) {
-          alert('E2EE недоступно: включите NEXT_PUBLIC_E2EE_ENABLED или откройте личный чат.');
+          alert('Не удалось сохранить изменения. Обновите страницу или откройте личный чат.');
           return;
         }
         const enc = await mod.encryptDirectText(directPeerUserId, newPlain);
         if (!enc) {
-          alert('Не удалось зашифровать текст. Убедитесь, что у собеседника опубликован ключ.');
+          alert('Не удалось сохранить изменения. Попробуйте ещё раз.');
           return;
         }
         payload = enc.content;

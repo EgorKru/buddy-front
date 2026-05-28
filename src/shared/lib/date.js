@@ -3,6 +3,10 @@
  */
 
 const MS_PER_DAY = 86400000;
+const MS_PER_MINUTE = 60000;
+const MS_PER_HOUR = 3600000;
+/** Допуск рассинхрона часов клиента и сервера при разборе legacy-дат с суффиксом Z. */
+const CLOCK_SKEW_MS = 5 * MS_PER_MINUTE;
 
 /**
  * Выбор формы слова для числа (русская локализация).
@@ -11,9 +15,52 @@ const MS_PER_DAY = 86400000;
  * @returns {string}
  */
 function pluralize(count, forms) {
+  const n = Math.abs(Math.trunc(count));
   const cases = [2, 0, 1, 1, 1, 2];
-  const index = count % 100 > 4 && count % 100 < 20 ? 2 : cases[Math.min(count % 10, 5)];
-  return forms[index];
+  const index = n % 100 > 4 && n % 100 < 20 ? 2 : cases[Math.min(n % 10, 5)];
+  return forms[index] ?? forms[2] ?? forms[0];
+}
+
+/**
+ * Разбирает ISO без таймзоны как локальное «настенное» время на устройстве клиента.
+ * @param {string} value
+ * @returns {Date|null}
+ */
+function parseNaiveLocalDateTime(value) {
+  const match = String(value)
+    .trim()
+    .match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?/);
+  if (!match) return null;
+  const [, year, month, day, hour, minute, second, fraction] = match;
+  let millisecond = 0;
+  if (fraction) {
+    const digits = fraction.padEnd(3, '0').slice(0, 3);
+    millisecond = Number(digits);
+    if (!Number.isFinite(millisecond)) millisecond = 0;
+  }
+  const date = new Date(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    Number(second),
+    millisecond
+  );
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/**
+ * Legacy: сервер отдавал LocalDateTime с суффиксом Z без реального UTC.
+ * @param {string} value
+ * @returns {Date|null}
+ */
+function parseLegacyFakeUtc(value) {
+  const naive = parseNaiveLocalDateTime(String(value).replace(/Z$/i, ''));
+  if (!naive) return null;
+  const now = Date.now();
+  if (naive.getTime() <= now + CLOCK_SKEW_MS) return naive;
+  return null;
 }
 
 /**
@@ -42,19 +89,28 @@ export const parseServerDate = (dateString) => {
       return null;
     }
     const millisecond = Math.floor(Number(nanosecond) / 1000000);
-    const date = new Date(
-      Date.UTC(y, m - 1, d, Number(hour), Number(minute), Number(second), millisecond)
-    );
-    return isNaN(date.getTime()) ? null : date;
+    const date = new Date(y, m - 1, d, Number(hour), Number(minute), Number(second), millisecond);
+    return Number.isNaN(date.getTime()) ? null : date;
   }
   const str = String(dateString).trim();
+  if (!str) return null;
   if (/^\d+$/.test(str)) {
     const timestamp = parseInt(str, 10);
     if (timestamp > 1000000000000) return new Date(timestamp);
     if (timestamp > 1000000000) return new Date(timestamp * 1000);
   }
-  const date = new Date(str);
-  return isNaN(date.getTime()) ? null : date;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(str)) {
+    return parseNaiveLocalDateTime(str);
+  }
+  const parsed = new Date(str);
+  if (!Number.isNaN(parsed.getTime())) {
+    if (/Z$/i.test(str) && parsed.getTime() > Date.now() + CLOCK_SKEW_MS) {
+      const legacy = parseLegacyFakeUtc(str);
+      if (legacy) return legacy;
+    }
+    return parsed;
+  }
+  return parseNaiveLocalDateTime(str.replace(/Z$/i, ''));
 };
 
 /**
@@ -100,7 +156,10 @@ export const formatChatListTime = (dateString) => {
   const date = parseServerDate(dateString);
   if (!date || isNaN(date.getTime())) return '';
   const now = new Date();
-  const diff = now - date;
+  const diff = now.getTime() - date.getTime();
+  if (diff < 0) {
+    return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  }
   const days = Math.floor(diff / MS_PER_DAY);
   if (days === 0) return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
   if (days === 1) return 'Вчера';
@@ -133,9 +192,10 @@ export const formatLastSeen = (dateString) => {
   const date = parseServerDate(dateString);
   if (!date || isNaN(date.getTime())) return '';
   const now = new Date();
-  const diffMs = now - date;
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
+  const diffMs = now.getTime() - date.getTime();
+  if (diffMs < 0) return 'только что';
+  const diffMins = Math.floor(diffMs / MS_PER_MINUTE);
+  const diffHours = Math.floor(diffMs / MS_PER_HOUR);
   const diffDays = Math.floor(diffMs / MS_PER_DAY);
   if (diffMins < 1) return 'только что';
   if (diffMins < 60) {

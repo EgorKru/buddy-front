@@ -371,10 +371,19 @@ const MessageRow = React.memo(
                       />
                     )}
                     {msg.replyTo && (
-                      <ReplyMessage replyTo={msg.replyTo} onNavigate={handleNavigateToMessage} />
+                      <ReplyMessage
+                        replyTo={msg.replyTo}
+                        onNavigate={handleNavigateToMessage}
+                        chat={chats?.find((c) => String(c.id) === String(msg.chatId))}
+                        user={user}
+                      />
                     )}
                     <div className={styles.messageTextContentWrapper}>
-                      <div className={styles.messageTextContent}>
+                      <div
+                        className={styles.messageTextContent}
+                        data-testid="chat-message-text"
+                        data-message-id={msg.id}
+                      >
                         {Number(msg.encryptionVersion) > 0 ? (
                           <E2eeTextContent
                             msg={msg}
@@ -386,7 +395,7 @@ const MessageRow = React.memo(
                             styles={styles}
                           />
                         ) : (
-                          highlightedContent
+                          <span data-testid="chat-message-text-body">{highlightedContent}</span>
                         )}
                       </div>
                       <div className={styles.messageTextMeta}>
