@@ -7,10 +7,23 @@
   margin: 0 auto;
   min-height: calc(100dvh - var(--pager-header-height));
   padding: var(--pager-space-6) var(--pager-gutter);
+  position: relative;
+}
+
+.shell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 10% -5%, rgba(199, 128, 228, 0.2), transparent 40%),
+    radial-gradient(circle at 95% 12%, rgba(154, 91, 208, 0.14), transparent 45%);
+  pointer-events: none;
 }
 
 .brandAside {
   padding-right: clamp(0px, 2vw, 24px);
+  position: relative;
+  z-index: 1;
 }
 
 .brandEyebrow {
@@ -19,7 +32,7 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--pager-accent);
+  color: #8d47bf;
 }
 
 .brandTitle {
@@ -28,7 +41,7 @@
   font-weight: 700;
   letter-spacing: -0.04em;
   line-height: 1.08;
-  max-width: 22ch;
+  max-width: 24ch;
   text-wrap: balance;
 }
 
@@ -46,7 +59,7 @@
   padding-left: 18px;
   font-size: var(--pager-font-small);
   line-height: 1.55;
-  color: var(--pager-text-muted);
+  color: #514d67;
 }
 
 .brandList li::before {
@@ -57,23 +70,27 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--pager-text-subtle);
+  background: #a26fca;
 }
 
 .formArea {
   display: flex;
   justify-content: center;
   width: 100%;
+  position: relative;
+  z-index: 1;
 }
 
 .card {
   width: 100%;
   max-width: 440px;
   padding: clamp(28px, 4vw, 40px);
-  border-radius: var(--pager-radius-xl);
-  border: 1px solid var(--pager-border);
-  background: var(--pager-bg-elevated);
-  box-shadow: var(--pager-shadow-sm);
+  border-radius: 20px;
+  border: 1px solid rgba(175, 145, 201, 0.36);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow:
+    0 16px 36px rgba(84, 62, 117, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 
 .cardIntro {
@@ -82,7 +99,7 @@
 
 .cardIntro h1 {
   margin: 0 0 10px;
-  font-size: clamp(1.625rem, 2.8vw, 1.875rem);
+  font-size: clamp(1.75rem, 2.8vw, 2rem);
   font-weight: 700;
   letter-spacing: -0.04em;
   line-height: 1.12;
@@ -92,7 +109,7 @@
   margin: 0;
   font-size: var(--pager-font-body);
   line-height: 1.55;
-  color: var(--pager-text-muted);
+  color: #57526d;
 }
 
 @media (max-width: 960px) {

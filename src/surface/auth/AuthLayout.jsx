@@ -17,8 +17,8 @@ const BRAND_POINTS = [
  * }} props
  */
 export function AuthLayout({ mode, title, subtitle, children }) {
-  const alternateHref = mode === 'login' ? '/register' : '/login';
-  const alternateLabel = mode === 'login' ? 'Начать' : 'Войти';
+  const alternateHref = mode === 'login' ? '/register' : '/register';
+  const alternateLabel = 'Быстрый старт';
 
   return (
     <div className={ds.surface}>
@@ -26,6 +26,7 @@ export function AuthLayout({ mode, title, subtitle, children }) {
         variant="auth"
         authActionHref={alternateHref}
         authActionLabel={alternateLabel}
+        authMode={mode}
       />
 
       <div className={styles.shell}>

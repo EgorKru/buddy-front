@@ -9,12 +9,18 @@ const NAV_ITEMS = [
 ];
 
 /**
- * @param {{ variant?: 'marketing' | 'auth', authActionHref?: string, authActionLabel?: string }} props
+ * @param {{
+ *   variant?: 'marketing' | 'auth',
+ *   authActionHref?: string,
+ *   authActionLabel?: string,
+ *   authMode?: 'login' | 'register',
+ * }} props
  */
 export function PublicHeader({
   variant = 'marketing',
   authActionHref = '/register',
   authActionLabel = 'Начать',
+  authMode = 'login',
 }) {
   return (
     <header className={styles.header}>
@@ -37,10 +43,13 @@ export function PublicHeader({
         )}
 
         <div className={styles.headerActions}>
-          <Link href="/login" className={ds.btnGhost}>
+          <Link href="/login" className={authMode === 'login' ? ds.btnHeader : ds.btnGhost}>
             Войти
           </Link>
-          <Link href={authActionHref} className={ds.btnHeader}>
+          <Link
+            href={authActionHref}
+            className={authMode === 'register' ? ds.btnHeader : ds.btnGhost}
+          >
             {authActionLabel}
           </Link>
         </div>
