@@ -12,8 +12,10 @@ export function useMessageSubmit({
   sending,
   uploadingFile,
   replyingToMessageId,
+  replyingToMessage,
   setNewMessage,
   messageActions,
+  dismissLocalTyping,
   prepareScrollForSending,
   sendFileMessage,
   sendTextMessage,
@@ -38,13 +40,15 @@ export function useMessageSubmit({
       const replyToId = replyingToMessageId;
       const fileToSend = selectedFile;
 
+      dismissLocalTyping?.();
+
       setNewMessage('');
       prepareScrollForSending();
 
       if (fileToSend) {
         setUploadingFile(true);
         try {
-          await sendFileMessage(fileToSend, messageText, replyToId);
+          await sendFileMessage(fileToSend, messageText, replyToId, null, replyingToMessage);
           clearSelectedFile();
           messageActions.setReplyingToMessageId?.(null);
           messageActions.setReplyingToMessage?.(null);
@@ -61,7 +65,7 @@ export function useMessageSubmit({
       }
 
       if (messageText) {
-        await sendTextMessage(messageText, replyToId);
+        await sendTextMessage(messageText, replyToId, replyingToMessage);
         messageActions.setReplyingToMessageId?.(null);
         messageActions.setReplyingToMessage?.(null);
       }
@@ -75,8 +79,10 @@ export function useMessageSubmit({
       sending,
       uploadingFile,
       replyingToMessageId,
+      replyingToMessage,
       setNewMessage,
       messageActions,
+      dismissLocalTyping,
       prepareScrollForSending,
       sendFileMessage,
       sendTextMessage,

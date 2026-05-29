@@ -10,4 +10,5 @@ export {
   getLastMessagePreview,
   getLastMessageReadMeta,
   getOtherParticipantOnline,
+  getOtherParticipantPresence,
 } from '../src/entities/chat';

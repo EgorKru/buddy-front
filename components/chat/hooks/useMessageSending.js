@@ -17,7 +17,7 @@ export const useMessageSending = ({
   messagesContainerRef,
 }) => {
   const sendTextMessage = useCallback(
-    async (content, replyToId = null) => {
+    async (content, replyToId = null, replyToMessage = null) => {
       if (!content?.trim() || !user || !chatId) return null;
 
       const result = await sendMessageHook(
@@ -27,7 +27,11 @@ export const useMessageSending = ({
         null,
         null,
         null,
-        replyToId
+        replyToId,
+        null,
+        null,
+        null,
+        replyToMessage
       );
 
       if (result?.serverMessage) {
@@ -87,7 +91,8 @@ export const useMessageSending = ({
           replyToId,
           fileName,
           fileSize,
-          mimeType
+          mimeType,
+          replyToMessage
         );
 
         if (typeof window !== 'undefined' && uploadResponse.fileUrl) {

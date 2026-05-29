@@ -97,6 +97,7 @@ export default function MessageContextMenu({
           <button
             key={index}
             className={styles.menuItem}
+            data-testid={item.label === 'Ответить' ? 'chat-context-menu-reply' : undefined}
             onClick={(e) => {
               e.stopPropagation();
               item.onClick?.();

@@ -52,13 +52,22 @@ async function pollRealtime(page, checkFn, message) {
  * @param {import('@playwright/test').Page} senderPage
  * @param {string|number} chatId
  */
-async function sendTextAndWaitRest(senderPage, _chatId, text) {
+async function sendTextAndWaitRest(senderPage, chatId, text) {
+  const api =
+    process.env.NEXT_PUBLIC_API_URL || process.env.E2E_API_URL || 'http://localhost:8080/api';
   const input = senderPage.getByTestId(T.messageInput);
   const send = senderPage.getByTestId(T.sendButton);
   await expect(input).toBeVisible({ timeout: 10_000 });
   await input.fill(text);
   await expect(send).toBeVisible({ timeout: 10_000 });
+  const responsePromise = senderPage.waitForResponse(
+    (res) =>
+      res.request().method() === 'POST' &&
+      res.url().includes(`/chats/${chatId}/messages`) &&
+      res.status() < 400
+  );
   await send.click();
+  await responsePromise;
 }
 
 module.exports = {

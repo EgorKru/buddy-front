@@ -226,6 +226,39 @@
   background: rgb(255, 100, 100);
 }
 
+.backgroundFilters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 0 24px 12px;
+}
+
+.backgroundFiltersLabel {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.65);
+  margin-right: 4px;
+}
+
+.backgroundFilterBtn {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.backgroundFilterBtn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.backgroundFilterActive {
+  border-color: rgb(99, 102, 241);
+  background: rgba(99, 102, 241, 0.25);
+}
+
 .controls {
   display: flex;
   gap: 12px;

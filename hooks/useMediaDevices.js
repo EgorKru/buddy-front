@@ -1,4 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  acquireMediaStream,
+  buildProcessedMediaStream,
+  stopMediaStream,
+  getBackgroundEffect,
+  setBackgroundEffect as persistBackgroundEffect,
+  BACKGROUND_EFFECT,
+} from '@/shared/lib/media';
 
 export function useMediaDevices() {
   const [devices, setDevices] = useState({ cameras: [], microphones: [], speakers: [] });
@@ -12,11 +20,28 @@ export function useMediaDevices() {
   const [permissionGranted, setPermissionGranted] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
   const [isMicWorking, setIsMicWorking] = useState(false);
+  const [backgroundEffect, setBackgroundEffectState] = useState(BACKGROUND_EFFECT.NONE);
+  const [lastAcquisition, setLastAcquisition] = useState(null);
 
   const streamRef = useRef(null);
+  const rawStreamRef = useRef(null);
+  const backgroundEffectStopRef = useRef(null);
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
   const animationFrameRef = useRef(null);
+
+  useEffect(() => {
+    setBackgroundEffectState(getBackgroundEffect());
+  }, []);
+
+  const releaseStreams = useCallback(() => {
+    backgroundEffectStopRef.current?.();
+    backgroundEffectStopRef.current = null;
+    stopMediaStream(rawStreamRef.current);
+    stopMediaStream(streamRef.current);
+    rawStreamRef.current = null;
+    streamRef.current = null;
+  }, []);
 
   const getDevices = useCallback(async () => {
     try {
@@ -41,35 +66,51 @@ export function useMediaDevices() {
     }
   }, [selectedCamera, selectedMicrophone]);
 
+  const setBackgroundEffect = useCallback((effect) => {
+    const normalized =
+      effect === BACKGROUND_EFFECT.BLUR ? BACKGROUND_EFFECT.BLUR : BACKGROUND_EFFECT.NONE;
+    persistBackgroundEffect(normalized);
+    setBackgroundEffectState(normalized);
+    if (rawStreamRef.current) {
+      const processed = buildProcessedMediaStream(rawStreamRef.current, {
+        effect: normalized,
+        effectStopRef: backgroundEffectStopRef,
+      });
+      streamRef.current = processed;
+      setLocalStream(processed);
+    }
+  }, []);
+
   const startPreview = useCallback(
     async (video = false, audio = false) => {
       setIsLoading(true);
       setError(null);
 
       try {
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach((track) => track.stop());
-        }
+        releaseStreams();
 
-        const constraints = {
-          video: video
-            ? {
-                deviceId: selectedCamera ? { exact: selectedCamera } : undefined,
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
-                facingMode: 'user',
-              }
-            : false,
-          audio: audio
-            ? {
-                deviceId: selectedMicrophone ? { exact: selectedMicrophone } : undefined,
-                echoCancellation: true,
-                noiseSuppression: true,
-              }
-            : false,
-        };
+        const {
+          stream: raw,
+          micReadyMs,
+          cameraReadyMs,
+          totalMs,
+        } = await acquireMediaStream({
+          audio,
+          video,
+          cameraDeviceId: selectedCamera || undefined,
+          microphoneDeviceId: selectedMicrophone || undefined,
+          onMicReady: () => {
+            if (audio) setAudioEnabled(true);
+          },
+        });
 
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        rawStreamRef.current = raw;
+        setLastAcquisition({ micReadyMs, cameraReadyMs, totalMs });
+
+        const stream = buildProcessedMediaStream(raw, {
+          effect: backgroundEffect,
+          effectStopRef: backgroundEffectStopRef,
+        });
 
         streamRef.current = stream;
         setPermissionGranted(true);
@@ -96,16 +137,14 @@ export function useMediaDevices() {
         setIsLoading(false);
       }
     },
-    [selectedCamera, selectedMicrophone, getDevices]
+    [selectedCamera, selectedMicrophone, getDevices, backgroundEffect, releaseStreams]
   );
 
   const stopPreview = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
+    releaseStreams();
     setLocalStream(null);
-  }, []);
+    setLastAcquisition(null);
+  }, [releaseStreams]);
 
   const toggleAudio = useCallback(async () => {
     const newAudioEnabled = !audioEnabled;
@@ -486,11 +525,9 @@ export function useMediaDevices() {
   useEffect(() => {
     return () => {
       stopAudioAnalysis();
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-      }
+      releaseStreams();
     };
-  }, [stopAudioAnalysis]);
+  }, [stopAudioAnalysis, releaseStreams]);
 
   return {
     devices,
@@ -513,5 +550,8 @@ export function useMediaDevices() {
     getStream,
     getDevices,
     setError,
+    backgroundEffect,
+    setBackgroundEffect,
+    lastAcquisition,
   };
 }

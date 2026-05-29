@@ -34,7 +34,7 @@ const TypingIndicator = ({ participants = [], typingUserIds = [], currentUserId 
   }
 
   return (
-    <div className={styles.typingIndicator}>
+    <div className={styles.typingIndicator} data-testid="chat-typing-indicator">
       <div className={styles.typingText}>
         {text}
         <span className={styles.dots}>

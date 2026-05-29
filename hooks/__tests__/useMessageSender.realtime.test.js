@@ -147,4 +147,20 @@ describe('useMessageSender realtime delivery', () => {
     );
     expect(chatAPI.sendMessage).not.toHaveBeenCalled();
   });
+
+  it('TEXT always goes through REST for durable server persistence', async () => {
+    const { result } = renderHook(() =>
+      useMessageSender('5', null, {
+        directPeerUserId: 2,
+        onBeforeSend: jest.fn(),
+      })
+    );
+
+    await act(async () => {
+      await result.current.sendMessage('Persist me', 'TEXT');
+    });
+
+    expect(chatAPI.sendMessage).toHaveBeenCalledWith('5', 'Persist me', 'TEXT', null, null, null);
+    expect(publishMock).not.toHaveBeenCalled();
+  });
 });

@@ -1,4 +1,4 @@
-import { formatChatListTime, formatLastSeen, parseServerDate } from '../date';
+import { formatChatListTime, formatLastSeen, getOnlineStatus, parseServerDate } from '../date';
 
 describe('parseServerDate', () => {
   it('parses ISO instant in UTC as local client time', () => {
@@ -73,5 +73,23 @@ describe('formatLastSeen', () => {
     expect(label).toBe('только что');
 
     jest.useRealTimers();
+  });
+});
+
+describe('getOnlineStatus', () => {
+  it('returns busy text when participant is online and busy', () => {
+    expect(getOnlineStatus({ id: 2, online: true, busy: true }, 1)).toEqual({
+      text: 'занят',
+      online: true,
+      busy: true,
+    });
+  });
+
+  it('returns online text when participant is online and not busy', () => {
+    expect(getOnlineStatus({ id: 2, online: true, busy: false }, 1)).toEqual({
+      text: 'онлайн',
+      online: true,
+      busy: false,
+    });
   });
 });

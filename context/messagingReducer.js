@@ -1,12 +1,13 @@
+import { parseServerDate } from '@/shared/lib/date';
+
 const toIso = (value) => {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  const date = parseServerDate(value);
+  return date ? date.toISOString() : null;
 };
 
 const isNewer = (a, b) => {
-  const ta = a ? new Date(a).getTime() : 0;
-  const tb = b ? new Date(b).getTime() : 0;
+  const ta = parseServerDate(a)?.getTime() ?? 0;
+  const tb = parseServerDate(b)?.getTime() ?? 0;
   return ta > tb;
 };
 
@@ -319,6 +320,9 @@ export const messagingReducer = (state, action) => {
         if (!finalMessage.fileName && optimisticMsg.fileName) {
           finalMessage.fileName = optimisticMsg.fileName;
         }
+        if (!finalMessage.replyTo && optimisticMsg.replyTo) {
+          finalMessage.replyTo = optimisticMsg.replyTo;
+        }
       }
       messagesById[mid] = finalMessage;
 
@@ -437,7 +441,7 @@ export const messagingReducer = (state, action) => {
     }
 
     case actionTypes.UPDATE_PRESENCE: {
-      const { userId, online, lastSeenAt } = action.payload || {};
+      const { userId, online, busy, lastSeenAt } = action.payload || {};
       if (!userId) return state;
       const uid = String(userId);
       const chatsById = { ...state.chatsById };
@@ -450,6 +454,7 @@ export const messagingReducer = (state, action) => {
           return {
             ...p,
             online: online ?? p.online,
+            busy: busy ?? p.busy,
             lastSeenAt: lastSeenAt ?? p.lastSeenAt,
           };
         });
@@ -457,6 +462,7 @@ export const messagingReducer = (state, action) => {
           participants.some(
             (p, i) =>
               p.online !== chat.participants[i]?.online ||
+              p.busy !== chat.participants[i]?.busy ||
               p.lastSeenAt !== chat.participants[i]?.lastSeenAt
           )
         ) {

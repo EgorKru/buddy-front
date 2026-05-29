@@ -21,7 +21,7 @@ import { useMessageSending } from './useMessageSending';
 import { isE2eeEnabled } from '@/shared/lib/e2ee/directTextE2ee';
 import { MESSAGE_STATUS } from '@/utils/messageQueue';
 
-export const useChat = (chatId, modals = {}) => {
+export const useChat = (chatId, modals = {}, realtimeOptions = {}) => {
   const {
     deleteConfirm = null,
     setDeleteConfirm = null,
@@ -198,7 +198,7 @@ export const useChat = (chatId, modals = {}) => {
     setForwardModal,
   });
 
-  useChatRealtime(chatId);
+  useChatRealtime(chatId, realtimeOptions);
 
   useStateSync({
     upsertMessage: chatContext.upsertMessage,

@@ -23,6 +23,7 @@ describe('useMessageSubmit', () => {
     setSelectedFile: jest.fn(),
     setUploadingFile: jest.fn(),
     selectedFileUrlRef: { current: null },
+    dismissLocalTyping: jest.fn(),
   };
 
   beforeEach(() => {
@@ -90,9 +91,13 @@ describe('useMessageSubmit', () => {
       await result.current(e);
     });
 
+    expect(defaultProps.dismissLocalTyping).toHaveBeenCalled();
     expect(setNewMessage).toHaveBeenCalledWith('');
     expect(defaultProps.prepareScrollForSending).toHaveBeenCalled();
-    expect(sendTextMessage).toHaveBeenCalledWith('  hi', null);
+    expect(sendTextMessage).toHaveBeenCalledWith('  hi', null, undefined);
+    const dismissOrder = defaultProps.dismissLocalTyping.mock.invocationCallOrder[0];
+    const sendOrder = sendTextMessage.mock.invocationCallOrder[0];
+    expect(dismissOrder).toBeLessThan(sendOrder);
     expect(messageActions.setReplyingToMessageId).toHaveBeenCalledWith(null);
     expect(messageActions.setReplyingToMessage).toHaveBeenCalledWith(null);
   });

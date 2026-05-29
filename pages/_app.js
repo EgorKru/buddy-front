@@ -52,13 +52,13 @@ export default function App({ Component, pageProps }) {
     return path === '/' || path === '/login' || path === '/register';
   }, [router?.pathname]);
 
-  const [authed, setAuthed] = useState(() =>
-    typeof window !== 'undefined' ? isAuthenticated() : false
-  );
+  const [authReady, setAuthReady] = useState(false);
+  const [authed, setAuthed] = useState(false);
 
   useEffect(() => {
     const syncAuthed = () => setAuthed(isAuthenticated());
     syncAuthed();
+    setAuthReady(true);
     router.events.on('routeChangeComplete', syncAuthed);
     return () => router.events.off('routeChangeComplete', syncAuthed);
   }, [router.events]);
@@ -70,6 +70,20 @@ export default function App({ Component, pageProps }) {
     }
     registerServiceWorker();
   }, []);
+
+  if (!authReady) {
+    return (
+      <>
+        <Head>
+          <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes"
+          />
+        </Head>
+        <div style={{ minHeight: '100vh' }} />
+      </>
+    );
+  }
 
   return (
     <>

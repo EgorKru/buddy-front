@@ -6,6 +6,7 @@ jest.mock('@/component/ChatSidebar/index.module.css', () => ({
   chatAvatarWrapper: 'chatAvatarWrapper',
   chatAvatar: 'chatAvatar',
   onlineIndicator: 'onlineIndicator',
+  busyIndicator: 'busyIndicator',
   chatInfo: 'chatInfo',
   chatHeader: 'chatHeader',
   chatName: 'chatName',
@@ -69,5 +70,23 @@ describe('ChatListItem selectors', () => {
     );
 
     expect(screen.getByTestId('chat-sidebar-read-status')).toHaveAttribute('data-read', 'false');
+  });
+
+  it('shows busy indicator when peer is online and busy', () => {
+    const busyChat = {
+      ...chat,
+      participants: [
+        { id: 1, online: true },
+        { id: 2, online: true, busy: true },
+      ],
+    };
+
+    render(
+      <ChatListItem chat={busyChat} user={user} currentChatId={null} readAtByChatIdByUserId={{}} />
+    );
+
+    const online = screen.getByTestId('chat-sidebar-online');
+    expect(online).toHaveAttribute('data-busy', 'true');
+    expect(online).toHaveClass('busyIndicator');
   });
 });

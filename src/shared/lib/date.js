@@ -217,10 +217,12 @@ export const formatLastSeen = (dateString) => {
  * @returns {{ text: string, online: boolean }}
  */
 export const getOnlineStatus = (participant, currentUserId) => {
-  if (!participant) return { text: '', online: false };
-  if (Number(participant.id) === Number(currentUserId)) return { text: '', online: false };
-  if (participant.online) return { text: 'онлайн', online: true };
+  if (!participant) return { text: '', online: false, busy: false };
+  if (Number(participant.id) === Number(currentUserId))
+    return { text: '', online: false, busy: false };
+  if (participant.online && participant.busy) return { text: 'занят', online: true, busy: true };
+  if (participant.online) return { text: 'онлайн', online: true, busy: false };
   if (participant.lastSeenAt)
-    return { text: `был(а) ${formatLastSeen(participant.lastSeenAt)}`, online: false };
-  return { text: '', online: false };
+    return { text: `был(а) ${formatLastSeen(participant.lastSeenAt)}`, online: false, busy: false };
+  return { text: '', online: false, busy: false };
 };

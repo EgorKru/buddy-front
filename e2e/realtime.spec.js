@@ -20,6 +20,7 @@ test.describe.configure({ mode: 'serial' });
 
 test.describe('Realtime UI (WebSocket delivery)', () => {
   test.skip(!hasE2eEnv, 'Set E2E_SENDER_*, E2E_RECIPIENT_*, E2E_CHAT_ID in .env.e2e.local');
+  test.setTimeout(180_000);
 
   let senderContext;
   let recipientContext;
@@ -65,21 +66,22 @@ test.describe('Realtime UI (WebSocket delivery)', () => {
 
   test(`recipient sees message in thread within ${REALTIME_MS}ms`, async () => {
     const uniqueText = `e2e-thread-${Date.now()}`;
-    const bodies = recipientPage.getByTestId(T.messageBody);
+    const threadMessage = recipientPage
+      .locator('[data-testid="chat-message-text"]')
+      .filter({ hasText: uniqueText });
 
     const sentAt = Date.now();
     await sendTextAndWaitRest(senderPage, chatId, uniqueText);
 
     await pollRealtime(
       recipientPage,
-      async () => {
-        const byTestId = await bodies.filter({ hasText: uniqueText }).count();
-        const byText = await recipientPage.getByText(uniqueText, { exact: true }).count();
-        return byTestId > 0 || byText > 0;
-      },
+      async () => (await threadMessage.count()) > 0,
       `message "${uniqueText}" in chat thread`
     );
 
+    await expect(
+      recipientPage.getByTestId(T.messageBody).filter({ hasText: uniqueText })
+    ).toBeVisible();
     expect(Date.now() - sentAt).toBeLessThanOrEqual(REALTIME_MS);
   });
 
@@ -127,5 +129,49 @@ test.describe('Realtime UI (WebSocket delivery)', () => {
     );
 
     expect(Date.now() - readStart).toBeLessThanOrEqual(REALTIME_MS);
+  });
+
+  test(`sender sees read after recipient returns to chat within ${REALTIME_MS}ms`, async () => {
+    const uniqueText = `e2e-read-return-${Date.now()}`;
+    const readStatus = senderPage
+      .getByTestId(T.sidebarItem(chatId))
+      .getByTestId(T.sidebarReadStatus);
+
+    await recipientPage.goto('/app');
+    await recipientPage.waitForURL(/\/app$/, { timeout: 15_000 });
+
+    await sendTextAndWaitRest(senderPage, chatId, uniqueText);
+
+    await openChat(recipientPage, chatId);
+    await waitForChatReady(recipientPage, { requireStomp: true });
+
+    await expect(
+      recipientPage.getByTestId(T.messageBody).filter({ hasText: uniqueText })
+    ).toBeVisible({ timeout: 15_000 });
+
+    const readStart = Date.now();
+    await pollRealtime(
+      senderPage,
+      async () => (await readStatus.getAttribute('data-read')) === 'true',
+      'sender sidebar read status after recipient return'
+    );
+
+    expect(Date.now() - readStart).toBeLessThanOrEqual(REALTIME_MS);
+  });
+
+  test('message persists after recipient reloads chat page', async () => {
+    const uniqueText = `e2e-persist-${Date.now()}`;
+
+    await sendTextAndWaitRest(senderPage, chatId, uniqueText);
+    await expect(
+      recipientPage.getByTestId(T.messageBody).filter({ hasText: uniqueText })
+    ).toBeVisible({ timeout: 15_000 });
+
+    await recipientPage.reload({ waitUntil: 'domcontentloaded' });
+    await waitForChatReady(recipientPage, { requireStomp: true });
+
+    await expect(
+      recipientPage.getByTestId(T.messageBody).filter({ hasText: uniqueText })
+    ).toBeVisible({ timeout: 15_000 });
   });
 });

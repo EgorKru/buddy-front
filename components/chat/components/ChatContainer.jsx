@@ -65,14 +65,34 @@ const ChatContainer = ({ chatId }) => {
     setForwardModal,
   } = useChatModals();
 
-  const chatHook = useChat(chatId, {
-    deleteConfirm,
-    setDeleteConfirm,
-    deleteForAll,
-    setDeleteForAll,
-    forwardModal,
-    setForwardModal,
-  });
+  const { startTyping, stopTyping, typingUserIds, clearTypingForUser } = useTypingIndicator(chatId);
+  const typingTimeoutRef = useRef(null);
+
+  const dismissLocalTyping = useCallback(() => {
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+    stopTyping();
+  }, [stopTyping]);
+
+  const onPeerMessage = useCallback(
+    (senderId) => clearTypingForUser(senderId),
+    [clearTypingForUser]
+  );
+
+  const chatHook = useChat(
+    chatId,
+    {
+      deleteConfirm,
+      setDeleteConfirm,
+      deleteForAll,
+      setDeleteForAll,
+      forwardModal,
+      setForwardModal,
+    },
+    { onPeerMessage }
+  );
 
   const {
     chatContext,
@@ -190,12 +210,6 @@ const ChatContainer = ({ chatId }) => {
     upsertMessage: _upsertMessage,
   } = chatContext;
 
-  // Typing indicator
-  const { startTyping, stopTyping, typingUserIds } = useTypingIndicator(chatId);
-
-  // Таймер для остановки typing indicator
-  const typingTimeoutRef = useRef(null);
-
   // Обертка для setNewMessage с typing indicator
   const handleNewMessageChange = useCallback(
     (value) => {
@@ -212,28 +226,20 @@ const ChatContainer = ({ chatId }) => {
 
         // Остановить typing indicator через 3 секунды
         typingTimeoutRef.current = setTimeout(() => {
-          stopTyping();
+          dismissLocalTyping();
         }, 3000);
       } else {
-        // Если текст пустой, сразу останавливаем typing
-        if (typingTimeoutRef.current) {
-          clearTimeout(typingTimeoutRef.current);
-        }
-        stopTyping();
+        dismissLocalTyping();
       }
     },
-    [setNewMessage, startTyping, stopTyping]
+    [setNewMessage, startTyping, dismissLocalTyping]
   );
 
-  // Остановить typing при размонтировании
   useEffect(() => {
     return () => {
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-      stopTyping();
+      dismissLocalTyping();
     };
-  }, [stopTyping]);
+  }, [dismissLocalTyping]);
 
   useMessageEffects({
     messages,
@@ -313,8 +319,10 @@ const ChatContainer = ({ chatId }) => {
     sending,
     uploadingFile,
     replyingToMessageId,
+    replyingToMessage,
     setNewMessage,
     messageActions,
+    dismissLocalTyping,
     prepareScrollForSending,
     sendFileMessage,
     sendTextMessage,

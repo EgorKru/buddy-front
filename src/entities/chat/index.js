@@ -137,8 +137,22 @@ export const getLastMessageReadMeta = (chat, user, readAtByChatIdByUserId) => {
  * @returns {boolean}
  */
 export const getOtherParticipantOnline = (chat, user) => {
-  if (!chat?.participants || !user?.id) return false;
-  if (chat.type !== 'DIRECT') return false;
+  const presence = getOtherParticipantPresence(chat, user);
+  return presence.online;
+};
+
+/**
+ * Presence второго участника в личном чате.
+ * @param {object} chat
+ * @param {object} user — текущий пользователь
+ * @returns {{ online: boolean, busy: boolean }}
+ */
+export const getOtherParticipantPresence = (chat, user) => {
+  if (!chat?.participants || !user?.id) return { online: false, busy: false };
+  if (chat.type !== 'DIRECT') return { online: false, busy: false };
   const other = chat.participants.find((p) => Number(p.id) !== Number(user.id));
-  return other?.online || false;
+  return {
+    online: Boolean(other?.online),
+    busy: Boolean(other?.online && other?.busy),
+  };
 };

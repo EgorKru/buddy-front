@@ -1,53 +1,69 @@
 import { useEffect, useState } from 'react';
 import { X, Download } from 'lucide-react';
-import { chatAPI } from '@/utils/api';
+import { fetchChatFileBlob } from '@/shared/lib/chat/fetchChatFileBlob';
+import { FILE_PREVIEW_KIND } from '@/component/FileMessage/utils';
 import styles from './index.module.css';
 
-export default function FileViewerModal({ fileUrl, fileName, mimeType, onClose }) {
-  const [content, setContent] = useState('');
+export default function FileViewerModal({ fileUrl, fileName, mimeType, previewKind, onClose }) {
+  const [textContent, setTextContent] = useState('');
+  const [blobUrl, setBlobUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const kind = previewKind || FILE_PREVIEW_KIND.TEXT;
 
   useEffect(() => {
     if (!fileUrl) return;
 
+    let objectUrl = null;
+    let cancelled = false;
+
     const loadFile = async () => {
       setLoading(true);
       setError(null);
+      setTextContent('');
+      setBlobUrl(null);
+
       try {
-        const url = chatAPI.getFileUrl(fileUrl, false);
-        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+        const blob = await fetchChatFileBlob(fileUrl, { filename: fileName });
 
-        const headers = {};
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
+        if (cancelled) return;
+
+        if (kind === FILE_PREVIEW_KIND.TEXT) {
+          const text = await blob.text();
+          if (!cancelled) setTextContent(text);
+        } else if (kind === FILE_PREVIEW_KIND.PDF || kind === FILE_PREVIEW_KIND.VIDEO) {
+          objectUrl = URL.createObjectURL(blob);
+          if (!cancelled) setBlobUrl(objectUrl);
         }
-
-        const response = await fetch(url, { headers });
-
-        if (!response.ok) {
-          if (response.status === 401) {
-            if (typeof window !== 'undefined') {
-              localStorage.removeItem('token');
-              localStorage.removeItem('user');
-              window.location.href = '/login';
-            }
-            throw new Error('Unauthorized');
-          }
-          throw new Error(`Failed to load file: ${response.status}`);
-        }
-
-        const text = await response.text();
-        setContent(text);
       } catch (err) {
-        setError('Не удалось загрузить файл');
+        if (!cancelled) setError('Не удалось загрузить файл');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
-    loadFile();
-  }, [fileUrl]);
+    if (kind === FILE_PREVIEW_KIND.OFFICE) {
+      setLoading(false);
+    } else {
+      loadFile();
+    }
+
+    return () => {
+      cancelled = true;
+      if (objectUrl && typeof URL.revokeObjectURL === 'function') {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [fileUrl, fileName, kind]);
+
+  useEffect(() => {
+    return () => {
+      if (blobUrl && typeof URL.revokeObjectURL === 'function') {
+        URL.revokeObjectURL(blobUrl);
+      }
+    };
+  }, [blobUrl]);
 
   useEffect(() => {
     const handleEscape = (e) => {
@@ -69,37 +85,15 @@ export default function FileViewerModal({ fileUrl, fileName, mimeType, onClose }
     if (!fileUrl) return;
 
     try {
-      const url = chatAPI.getFileUrl(fileUrl, true, fileName);
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-
-      const headers = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(url, { headers });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          if (typeof window !== 'undefined') {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            window.location.href = '/login';
-          }
-          throw new Error('Unauthorized');
-        }
-        throw new Error(`Failed to download file: ${response.status}`);
-      }
-
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
+      const blob = await fetchChatFileBlob(fileUrl, { download: true, filename: fileName });
+      const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = blobUrl;
+      link.href = url;
       link.download = fileName || 'file';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      URL.revokeObjectURL(blobUrl);
+      URL.revokeObjectURL(url);
     } catch (error) {
       alert('Не удалось скачать файл');
     }
@@ -108,7 +102,12 @@ export default function FileViewerModal({ fileUrl, fileName, mimeType, onClose }
   if (!fileUrl) return null;
 
   return (
-    <div className={styles.modalOverlay} onClick={onClose}>
+    <div
+      className={styles.modalOverlay}
+      onClick={onClose}
+      data-testid="chat-file-viewer-modal"
+      data-preview-kind={kind}
+    >
       <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           <div className={styles.fileName}>{fileName || 'Файл'}</div>
@@ -118,6 +117,7 @@ export default function FileViewerModal({ fileUrl, fileName, mimeType, onClose }
               className={styles.actionButton}
               onClick={handleDownload}
               title="Скачать"
+              data-testid="chat-file-viewer-download"
             >
               <Download size={20} />
             </button>
@@ -137,10 +137,32 @@ export default function FileViewerModal({ fileUrl, fileName, mimeType, onClose }
               <span>{error}</span>
             </div>
           )}
-          {!loading && !error && (
-            <pre className={styles.textContent}>
-              <code>{content}</code>
+          {!loading && !error && kind === FILE_PREVIEW_KIND.TEXT && (
+            <pre className={styles.textContent} data-testid="chat-file-viewer-text">
+              <code>{textContent}</code>
             </pre>
+          )}
+          {!loading && !error && kind === FILE_PREVIEW_KIND.PDF && blobUrl && (
+            <iframe
+              title={fileName || 'PDF'}
+              src={blobUrl}
+              className={styles.pdfFrame}
+              data-testid="chat-file-viewer-pdf"
+            />
+          )}
+          {!loading && !error && kind === FILE_PREVIEW_KIND.VIDEO && blobUrl && (
+            <video
+              controls
+              src={blobUrl}
+              className={styles.videoPlayer}
+              data-testid="chat-file-viewer-video"
+            />
+          )}
+          {!loading && kind === FILE_PREVIEW_KIND.OFFICE && (
+            <div className={styles.officeHint} data-testid="chat-file-viewer-office">
+              <p>Предпросмотр документов Word и Excel в браузере недоступен.</p>
+              <p>Нажмите «Скачать», чтобы открыть файл в приложении на устройстве.</p>
+            </div>
           )}
         </div>
       </div>

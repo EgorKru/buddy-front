@@ -5,7 +5,7 @@ import {
   getChatName,
   getChatAvatar,
   getLastMessageReadMeta,
-  getOtherParticipantOnline,
+  getOtherParticipantPresence,
 } from '@/utils/chatHelpers';
 import ChatLastMessagePreview from '@/component/ChatSidebar/ChatLastMessagePreview';
 import { formatChatListTime } from '@/utils/dateHelpers';
@@ -61,13 +61,18 @@ function ChatListItem({ chat, user, currentChatId, readAtByChatIdByUserId, onCha
             <MessageCircle size={20} />
           )}
         </div>
-        {getOtherParticipantOnline(chat, user) && (
-          <span
-            data-testid="chat-sidebar-online"
-            className={styles.onlineIndicator}
-            title="Онлайн"
-          />
-        )}
+        {(() => {
+          const presence = getOtherParticipantPresence(chat, user);
+          if (!presence.online) return null;
+          return (
+            <span
+              data-testid="chat-sidebar-online"
+              data-busy={presence.busy ? 'true' : 'false'}
+              className={presence.busy ? styles.busyIndicator : styles.onlineIndicator}
+              title={presence.busy ? 'Занят' : 'Онлайн'}
+            />
+          );
+        })()}
       </div>
       <div className={styles.chatInfo}>
         <div className={styles.chatHeader}>
@@ -132,6 +137,7 @@ function chatListItemPropsAreEqual(prev, next) {
   const prevOther = pc.participants?.find((p) => Number(p.id) !== Number(prev.user?.id));
   const nextOther = nc.participants?.find((p) => Number(p.id) !== Number(next.user?.id));
   if (Boolean(prevOther?.online) !== Boolean(nextOther?.online)) return false;
+  if (Boolean(prevOther?.busy) !== Boolean(nextOther?.busy)) return false;
 
   return true;
 }

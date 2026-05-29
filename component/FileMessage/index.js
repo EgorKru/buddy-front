@@ -1,7 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Download } from 'lucide-react';
-import { chatAPI } from '@/utils/api';
-import { formatFileSize, getFileName, canViewInBrowser } from './utils';
+import { fetchChatFileBlob } from '@/shared/lib/chat/fetchChatFileBlob';
+import {
+  formatFileSize,
+  getFileName,
+  getFilePreviewKind,
+  canOpenInViewer,
+  isInlineVideoPreview,
+  FILE_PREVIEW_KIND,
+} from './utils';
 import styles from './index.module.css';
 
 export default function FileMessage({
@@ -17,9 +24,46 @@ export default function FileMessage({
   setFileViewerModal,
 }) {
   const [downloading, setDownloading] = useState(false);
+  const [videoBlobUrl, setVideoBlobUrl] = useState(null);
+  const [videoError, setVideoError] = useState(null);
+  const [videoLoading, setVideoLoading] = useState(false);
 
   const { name: fileName, extension } = getFileName(fileUrl, originalFileName);
   const displaySize = fileSize ? formatFileSize(fileSize) : 'Неизвестно';
+  const previewKind = getFilePreviewKind(mimeType, extension);
+  const showInlineVideo = isInlineVideoPreview(previewKind);
+
+  useEffect(() => {
+    if (!showInlineVideo || !fileUrl) {
+      setVideoBlobUrl(null);
+      return;
+    }
+
+    let objectUrl = null;
+    let cancelled = false;
+    setVideoLoading(true);
+    setVideoError(null);
+
+    fetchChatFileBlob(fileUrl)
+      .then((blob) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setVideoBlobUrl(objectUrl);
+      })
+      .catch(() => {
+        if (!cancelled) setVideoError('Не удалось загрузить видео');
+      })
+      .finally(() => {
+        if (!cancelled) setVideoLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      if (objectUrl && typeof URL.revokeObjectURL === 'function') {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [fileUrl, showInlineVideo]);
 
   const handleDownload = async (e) => {
     e.stopPropagation();
@@ -28,29 +72,7 @@ export default function FileMessage({
     setDownloading(true);
     try {
       const fullFileName = extension ? `${fileName}.${extension}` : fileName;
-      const url = chatAPI.getFileUrl(fileUrl, true, fullFileName);
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-
-      const headers = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(url, { headers });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          if (typeof window !== 'undefined') {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            window.location.href = '/login';
-          }
-          throw new Error('Unauthorized');
-        }
-        throw new Error(`Failed to download file: ${response.status}`);
-      }
-
-      const blob = await response.blob();
+      const blob = await fetchChatFileBlob(fileUrl, { download: true, filename: fullFileName });
       const blobUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = blobUrl;
@@ -70,40 +92,15 @@ export default function FileMessage({
     e.stopPropagation();
     e.preventDefault();
 
-    if (!fileUrl || !setFileViewerModal) return;
+    if (!fileUrl || !setFileViewerModal || !canOpenInViewer(previewKind)) return;
 
-    const ext = extension ? extension.toLowerCase() : '';
-    const canViewByMime = canViewInBrowser(mimeType);
-    const canViewByExtension =
-      ext &&
-      [
-        'txt',
-        'log',
-        'md',
-        'json',
-        'xml',
-        'html',
-        'css',
-        'js',
-        'ts',
-        'jsx',
-        'tsx',
-        'csv',
-        'yaml',
-        'yml',
-        'ini',
-        'conf',
-        'config',
-      ].includes(ext);
-
-    if (canViewByMime || canViewByExtension) {
-      const fullFileName = extension ? `${fileName}.${extension}` : fileName;
-      setFileViewerModal({
-        fileUrl,
-        fileName: fullFileName,
-        mimeType: mimeType || (ext ? `text/${ext}` : 'text/plain'),
-      });
-    }
+    const fullFileName = extension ? `${fileName}.${extension}` : fileName;
+    setFileViewerModal({
+      fileUrl,
+      fileName: fullFileName,
+      mimeType: mimeType || 'application/octet-stream',
+      previewKind,
+    });
   };
 
   const isEmbedded = !messageTime;
@@ -111,10 +108,32 @@ export default function FileMessage({
   return (
     <div
       className={`${styles.fileMessage} ${isOwn ? styles.ownMessage : ''} ${isEmbedded ? styles.embedded : ''}`}
+      data-testid="chat-message-file"
+      data-preview-kind={previewKind}
     >
+      {showInlineVideo && (
+        <div className={styles.videoWrapper}>
+          {videoLoading && (
+            <div className={styles.videoLoading}>
+              <div className={styles.spinner} />
+            </div>
+          )}
+          {videoError && <div className={styles.videoError}>{videoError}</div>}
+          {videoBlobUrl && !videoError && (
+            <video
+              controls
+              src={videoBlobUrl}
+              className={styles.inlineVideo}
+              data-testid="chat-message-file-video"
+              onClick={(e) => e.stopPropagation()}
+            />
+          )}
+        </div>
+      )}
       <div
-        className={`${styles.fileContainer} ${isEmbedded ? styles.embeddedContainer : ''}`}
+        className={`${styles.fileContainer} ${isEmbedded ? styles.embeddedContainer : ''} ${canOpenInViewer(previewKind) ? styles.viewable : ''}`}
         onClick={handleClick}
+        data-testid="chat-message-file-card"
       >
         <div className={styles.fileIconWrapper}>
           <div className={styles.fileIconContainer}>
@@ -134,6 +153,9 @@ export default function FileMessage({
           </div>
           <div className={styles.fileSize}>{displaySize}</div>
           {content && content.trim() && <div className={styles.fileCaption}>{content}</div>}
+          {previewKind === FILE_PREVIEW_KIND.OFFICE && (
+            <div className={styles.fileHint}>Скачайте, чтобы открыть в Word / Excel</div>
+          )}
         </div>
         <div className={styles.fileRightColumn}>
           <button
@@ -142,6 +164,7 @@ export default function FileMessage({
             onClick={handleDownload}
             disabled={downloading}
             title="Скачать"
+            data-testid="chat-message-file-download"
           >
             {downloading ? <div className={styles.spinner} /> : <Download size={20} />}
           </button>

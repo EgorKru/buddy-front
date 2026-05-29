@@ -10,6 +10,7 @@ import {
   getMessageQueue,
   MESSAGE_STATUS,
 } from '@/utils/messageQueue';
+import { messageToReplyToDto } from '@/shared/lib/chat/replyTo';
 
 const STOMP_CONNECTED_STATE = 1;
 const RETRY_DELAYS = [2000, 5000, 10000];
@@ -28,7 +29,8 @@ const createOptimisticMessage = (
   fileSize = null,
   mimeType = null,
   e2ee = null,
-  replyToMessageId = null
+  replyToMessageId = null,
+  replyToMessage = null
 ) => {
   const tempId = `temp-${Date.now()}-${Math.random()}`;
   let messageContent;
@@ -65,6 +67,9 @@ const createOptimisticMessage = (
   }
   if (replyToMessageId != null) {
     message.replyToMessageId = replyToMessageId;
+  }
+  if (replyToMessage) {
+    message.replyTo = messageToReplyToDto(replyToMessage);
   }
   return message;
 };
@@ -172,7 +177,8 @@ export const useMessageSender = (chatId, onMessageSent, options = {}) => {
       replyToMessageId = null,
       fileName = null,
       fileSize = null,
-      mimeType = null
+      mimeType = null,
+      replyToMessage = null
     ) => {
       if (type === 'VOICE' && !fileUrl && !voiceData) return null;
       if (type === 'IMAGE' && !fileUrl) return null;
@@ -241,7 +247,8 @@ export const useMessageSender = (chatId, onMessageSent, options = {}) => {
         fileSize,
         mimeType,
         e2eeWire,
-        replyToMessageId
+        replyToMessageId,
+        replyToMessage
       );
 
       if (!saveMessageToQueue(optimisticMessage)) return null;

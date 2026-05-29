@@ -7,9 +7,10 @@ import {
   extractChatMessageFromStompPayload,
   planOwnIncomingStompMessage,
 } from '@/shared/lib/chat/realtimePayload';
+import { enrichMessageWithReply } from '@/shared/lib/chat/replyTo';
 import { MESSAGE_STATUS } from '@/utils/messageQueue';
 
-export const useChatRealtime = (chatId) => {
+export const useChatRealtime = (chatId, { onPeerMessage } = {}) => {
   const { client, connected } = useStomp();
   const {
     setActiveChatId,
@@ -30,8 +31,20 @@ export const useChatRealtime = (chatId) => {
   const messagesByIdRef = useRef(messagesById);
   messageIdsByChatIdRef.current = messageIdsByChatId;
   messagesByIdRef.current = messagesById;
-  const lastMarkedReadRef = useRef(null);
   const markReadTimeoutRef = useRef(null);
+
+  const scheduleMarkChatAsRead = useCallback(() => {
+    if (!chatId) return;
+    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+
+    if (markReadTimeoutRef.current) {
+      clearTimeout(markReadTimeoutRef.current);
+    }
+    markReadTimeoutRef.current = setTimeout(() => {
+      markReadTimeoutRef.current = null;
+      markChatAsRead(chatId);
+    }, 300);
+  }, [chatId, markChatAsRead]);
   const loadingInitialRef = useRef(false);
   const lastLoadedChatIdRef = useRef(null);
 
@@ -54,10 +67,21 @@ export const useChatRealtime = (chatId) => {
           switch (update.eventType) {
             case 'MESSAGE_NEW':
               if (eventData.message) {
-                upsertMessage(
+                const senderId = eventData.message.senderId;
+                const currentUserId = getCurrentUser()?.id;
+                if (
+                  senderId != null &&
+                  onPeerMessage &&
+                  currentUserId != null &&
+                  Number(senderId) !== Number(currentUserId)
+                ) {
+                  onPeerMessage(senderId);
+                }
+                const hydrated = enrichMessageWithReply(
                   { ...eventData.message, status: MESSAGE_STATUS.SENT, isOptimistic: false },
-                  { unreadDelta: 0 }
+                  messagesByIdRef.current
                 );
+                upsertMessage(hydrated, { unreadDelta: 0 });
               }
               break;
             case 'MESSAGE_EDITED':
@@ -109,7 +133,7 @@ export const useChatRealtime = (chatId) => {
         }
       } catch (error) {}
     },
-    [upsertMessage, updateMessage, removeMessage]
+    [upsertMessage, updateMessage, removeMessage, onPeerMessage]
   );
 
   const loadInitial = useCallback(async () => {
@@ -211,11 +235,29 @@ export const useChatRealtime = (chatId) => {
     const chatIdStr = String(chatId);
     setActiveChatId(chatId);
 
-    // НЕ вызываем markChatAsRead при открытии - Intersection Observer сделает это автоматически
-    // когда сообщения станут видимыми
-
     return () => setActiveChatId(null);
   }, [chatId, setActiveChatId]);
+
+  useEffect(() => {
+    if (!chatId || !connected) return;
+    const chatIdStr = String(chatId);
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const chatState = await chatAPI.getChatState(chatId);
+        if (!cancelled && chatState?.pts !== undefined) {
+          localPtsRef.current.set(chatIdStr, chatState.pts);
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [chatId, connected]);
 
   useEffect(() => {
     if (!chatId || !client || !connected) {
@@ -250,7 +292,11 @@ export const useChatRealtime = (chatId) => {
         const chatIdStr = String(chatId);
         const currentLocalPts = localPtsRef.current.get(chatIdStr) || 0;
 
-        if (receivedPts !== undefined && receivedPts > currentLocalPts + receivedPtsCount) {
+        if (
+          receivedPts !== undefined &&
+          currentLocalPts > 0 &&
+          receivedPts > currentLocalPts + receivedPtsCount
+        ) {
           const gapKey = `${chatIdStr}_${currentLocalPts}`;
           if (!gapRecoveryInProgressRef.current.has(gapKey)) {
             gapRecoveryInProgressRef.current.add(gapKey);
@@ -337,17 +383,18 @@ export const useChatRealtime = (chatId) => {
           return;
         }
 
-        const dto = extractChatMessageFromStompPayload(data);
-        if (!dto?.id || !dto?.chatId) return;
+        const rawDto = extractChatMessageFromStompPayload(data);
+        if (!rawDto?.id || !rawDto?.chatId) return;
+
+        const dto = enrichMessageWithReply(
+          { ...rawDto, status: MESSAGE_STATUS.SENT, isOptimistic: false },
+          messagesByIdRef.current
+        );
 
         if (dto.type === 'SYSTEM') {
           if (Number(dto.chatId) !== Number(chatId)) return;
 
-          // Добавляем системное сообщение без задержки
-          upsertMessage(
-            { ...dto, status: MESSAGE_STATUS.SENT, isOptimistic: false },
-            { unreadDelta: 0 }
-          );
+          upsertMessage(dto, { unreadDelta: 0 });
           return;
         }
 
@@ -372,13 +419,14 @@ export const useChatRealtime = (chatId) => {
               return;
             }
             if (plan.action === 'upsert') {
-              upsertMessage(
-                { ...plan.dto, status: MESSAGE_STATUS.SENT, isOptimistic: false },
-                { unreadDelta: 0 }
-              );
+              upsertMessage(plan.dto, { unreadDelta: 0 });
               return;
             }
             return;
+          }
+
+          if (!isOwn && dto.senderId != null && onPeerMessage) {
+            onPeerMessage(dto.senderId);
           }
 
           if (
@@ -417,12 +465,11 @@ export const useChatRealtime = (chatId) => {
 
           const isVisible =
             typeof document !== 'undefined' && document.visibilityState === 'visible';
-          upsertMessage(
-            { ...dto, status: MESSAGE_STATUS.SENT, isOptimistic: false },
-            { unreadDelta: isVisible ? 0 : undefined }
-          );
+          upsertMessage(dto, { unreadDelta: isVisible ? 0 : undefined });
 
-          // НЕ вызываем markChatAsRead - за это отвечает Intersection Observer
+          if (isVisible) {
+            scheduleMarkChatAsRead();
+          }
         };
 
         processMessage();
@@ -446,5 +493,15 @@ export const useChatRealtime = (chatId) => {
         markReadTimeoutRef.current = null;
       }
     };
-  }, [chatId, client, connected, upsertMessage, updateMessage, replaceOptimistic, removeMessage]);
+  }, [
+    chatId,
+    client,
+    connected,
+    upsertMessage,
+    updateMessage,
+    replaceOptimistic,
+    removeMessage,
+    scheduleMarkChatAsRead,
+    onPeerMessage,
+  ]);
 };

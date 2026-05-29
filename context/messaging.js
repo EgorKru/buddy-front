@@ -11,10 +11,8 @@ import { chatAPI, getCurrentUser, isAuthenticated, getToken } from '@/utils/api'
 import { useStomp } from '@/context/socket';
 import { safeJsonParse, safeUnsubscribe } from '@/utils/safe';
 import { playPagerNotificationSound } from '@/utils/pagerSound';
-import {
-  extractChatMessageFromStompPayload,
-  extractNotificationMessage,
-} from '@/shared/lib/chat/realtimePayload';
+import { extractNotificationMessage } from '@/shared/lib/chat/realtimePayload';
+import { enrichMessageWithReply } from '@/shared/lib/chat/replyTo';
 import { MESSAGE_STATUS } from '@/utils/messageQueue';
 import {
   messagingReducer as reducer,
@@ -95,7 +93,6 @@ export const MessagingProvider = ({ children }) => {
     readReceipts: null,
   });
   const refreshMissingChatTimerRef = useRef(null);
-  const activeChatTopicSubRef = useRef(null);
   const readSubsRef = useRef(new Map());
   const refreshInFlightRef = useRef(false);
   const lastSoundAtRef = useRef(0);
@@ -310,15 +307,21 @@ export const MessagingProvider = ({ children }) => {
   const upsertMessage = useCallback(
     (message, meta = {}) => {
       if (!message?.id || !message?.chatId) return;
-      const mid = String(message.id);
-      if (processedMessageIdsRef.current.has(mid)) return;
+      const enriched = enrichMessageWithReply(message, stateRef.current.messagesById);
+      const mid = String(enriched.id);
+      const alreadyInStore = Boolean(stateRef.current.messagesById[mid]);
+      if (processedMessageIdsRef.current.has(mid) && alreadyInStore && !meta.force) {
+        return;
+      }
 
       const currentUser = getCurrentUser();
       const isOwn =
-        currentUser?.id && message?.senderId && Number(currentUser.id) === Number(message.senderId);
+        currentUser?.id &&
+        enriched?.senderId &&
+        Number(currentUser.id) === Number(enriched.senderId);
 
       if (isOwn) {
-        const cid = String(message.chatId);
+        const cid = String(enriched.chatId);
         const existingIds = ensureArray(stateRef.current.messageIdsByChatId[cid]);
         const alreadyInList = existingIds.some((id) => String(id) === mid);
         if (alreadyInList) {
@@ -332,15 +335,19 @@ export const MessagingProvider = ({ children }) => {
       const isVisible = typeof document !== 'undefined' && document.visibilityState === 'visible';
       const active =
         stateRef.current.activeChatId &&
-        String(stateRef.current.activeChatId) === String(message.chatId);
+        String(stateRef.current.activeChatId) === String(enriched.chatId);
       const unreadDelta = isOwn ? 0 : active && isVisible ? 0 : 1;
 
       dispatch({
         type: actionTypes.UPSERT_MESSAGE,
-        payload: { message, chatId: message.chatId, unreadDelta: meta.unreadDelta ?? unreadDelta },
+        payload: {
+          message: enriched,
+          chatId: enriched.chatId,
+          unreadDelta: meta.unreadDelta ?? unreadDelta,
+        },
       });
 
-      const cid = String(message.chatId);
+      const cid = String(enriched.chatId);
       if (!stateRef.current.chatsById[cid]) {
         if (refreshMissingChatTimerRef.current) {
           clearTimeout(refreshMissingChatTimerRef.current);
@@ -356,21 +363,26 @@ export const MessagingProvider = ({ children }) => {
 
   const updateMessage = useCallback((message, meta = {}) => {
     if (!message?.id || !message?.chatId) return;
-    const mid = String(message.id);
+    const enriched = enrichMessageWithReply(message, stateRef.current.messagesById);
+    const mid = String(enriched.id);
     processedMessageIdsRef.current.delete(mid);
 
     const currentUser = getCurrentUser();
     const isVisible = typeof document !== 'undefined' && document.visibilityState === 'visible';
     const active =
       stateRef.current.activeChatId &&
-      String(stateRef.current.activeChatId) === String(message.chatId);
+      String(stateRef.current.activeChatId) === String(enriched.chatId);
     const isOwn =
-      currentUser?.id && message?.senderId && Number(currentUser.id) === Number(message.senderId);
+      currentUser?.id && enriched?.senderId && Number(currentUser.id) === Number(enriched.senderId);
     const unreadDelta = isOwn ? 0 : active && isVisible ? 0 : 1;
 
     dispatch({
       type: actionTypes.UPSERT_MESSAGE,
-      payload: { message, chatId: message.chatId, unreadDelta: meta.unreadDelta ?? unreadDelta },
+      payload: {
+        message: enriched,
+        chatId: enriched.chatId,
+        unreadDelta: meta.unreadDelta ?? unreadDelta,
+      },
     });
   }, []);
 
@@ -386,17 +398,19 @@ export const MessagingProvider = ({ children }) => {
   );
 
   const addOptimistic = useCallback((chatId, optimisticMessage) => {
-    dispatch({ type: actionTypes.ADD_OPTIMISTIC, payload: { chatId, message: optimisticMessage } });
+    const enriched = enrichMessageWithReply(optimisticMessage, stateRef.current.messagesById);
+    dispatch({ type: actionTypes.ADD_OPTIMISTIC, payload: { chatId, message: enriched } });
   }, []);
 
   const replaceOptimistic = useCallback((chatId, tempId, serverMessage, status) => {
-    if (serverMessage?.id) {
-      const mid = String(serverMessage.id);
+    const enriched = enrichMessageWithReply(serverMessage, stateRef.current.messagesById);
+    if (enriched?.id) {
+      const mid = String(enriched.id);
       processedMessageIdsRef.current.add(mid);
     }
     dispatch({
       type: actionTypes.REPLACE_OPTIMISTIC,
-      payload: { chatId, tempId, message: serverMessage, status },
+      payload: { chatId, tempId, message: enriched, status },
     });
   }, []);
 
@@ -425,41 +439,34 @@ export const MessagingProvider = ({ children }) => {
     } catch (e) {}
   }, []);
 
-  useEffect(() => {
-    if (!state.activeChatId) return;
+  const markActiveChatReadIfVisible = useCallback(() => {
+    const activeChatId = stateRef.current.activeChatId;
+    if (!activeChatId) return;
     const isVisible = typeof document !== 'undefined' && document.visibilityState === 'visible';
     if (!isVisible) return;
 
-    const activeChat = state.chatsById[String(state.activeChatId)];
-    if (activeChat && activeChat.unreadCount > 0) {
-      dispatch({ type: actionTypes.MARK_CHAT_READ_LOCAL, payload: { chatId: state.activeChatId } });
-      markChatAsRead(state.activeChatId);
-    }
-  }, [state.activeChatId, state.chatsById, markChatAsRead]);
+    dispatch({ type: actionTypes.MARK_CHAT_READ_LOCAL, payload: { chatId: activeChatId } });
+    markChatAsRead(activeChatId);
+  }, [markChatAsRead]);
+
+  useEffect(() => {
+    markActiveChatReadIfVisible();
+  }, [state.activeChatId, markActiveChatReadIfVisible]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const handleVisibilityChange = () => {
-      if (!state.activeChatId) return;
-      const isVisible = document.visibilityState === 'visible';
-      if (isVisible) {
-        const activeChat = state.chatsById[String(state.activeChatId)];
-        if (activeChat && activeChat.unreadCount > 0) {
-          dispatch({
-            type: actionTypes.MARK_CHAT_READ_LOCAL,
-            payload: { chatId: state.activeChatId },
-          });
-          markChatAsRead(state.activeChatId);
-        }
-      }
+    const handleReturnToChat = () => {
+      markActiveChatReadIfVisible();
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener('visibilitychange', handleReturnToChat);
+    window.addEventListener('focus', handleReturnToChat);
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('visibilitychange', handleReturnToChat);
+      window.removeEventListener('focus', handleReturnToChat);
     };
-  }, [state.activeChatId, state.chatsById, markChatAsRead]);
+  }, [markActiveChatReadIfVisible]);
 
   useEffect(() => {
     if (!isAuthenticated()) return;
@@ -508,6 +515,7 @@ export const MessagingProvider = ({ children }) => {
           payload: {
             userId: event.userId,
             online: event.online,
+            busy: event.busy,
             lastSeenAt: event.lastSeenAt,
           },
         });
@@ -524,37 +532,8 @@ export const MessagingProvider = ({ children }) => {
   }, [client, connected, upsertMessage, maybeSound, upsertReadReceipt]);
 
   useEffect(() => {
-    if (!isAuthenticated()) return;
-    if (!client || !connected) {
-      safeUnsubscribe(activeChatTopicSubRef.current);
-      activeChatTopicSubRef.current = null;
-      return;
-    }
-
-    const activeId = state.activeChatId ? String(state.activeChatId) : null;
-    if (!activeId) {
-      safeUnsubscribe(activeChatTopicSubRef.current);
-      activeChatTopicSubRef.current = null;
-      return;
-    }
-
-    safeUnsubscribe(activeChatTopicSubRef.current);
-    activeChatTopicSubRef.current = null;
-
-    try {
-      activeChatTopicSubRef.current = client.subscribe(`/topic/chat/${activeId}`, (m) => {
-        const data = safeJsonParse(m.body);
-        const msg = extractChatMessageFromStompPayload(data);
-        if (!msg?.id || !msg?.chatId) return;
-        upsertMessage({ ...msg, status: MESSAGE_STATUS.SENT, isOptimistic: false });
-      });
-    } catch (e) {}
-
-    return () => {
-      safeUnsubscribe(activeChatTopicSubRef.current);
-      activeChatTopicSubRef.current = null;
-    };
-  }, [state.activeChatId, client, connected, upsertMessage]);
+    processedMessageIdsRef.current.clear();
+  }, [state.activeChatId]);
 
   useEffect(() => {
     if (!isAuthenticated()) return;
@@ -593,7 +572,6 @@ export const MessagingProvider = ({ children }) => {
       safeUnsubscribe(wsSubsRef.current.notifications);
       safeUnsubscribe(wsSubsRef.current.presence);
       safeUnsubscribe(wsSubsRef.current.readReceipts);
-      safeUnsubscribe(activeChatTopicSubRef.current);
       for (const sub of readSubsRef.current.values()) safeUnsubscribe(sub);
       readSubsRef.current.clear();
     };

@@ -10,6 +10,7 @@ const API = process.env.E2E_API_URL || 'http://localhost:8080/api';
 const PASSWORD = 'password123';
 const SENDER = process.env.E2E_SENDER_USERNAME || 'e2e_sender';
 const RECIPIENT = process.env.E2E_RECIPIENT_USERNAME || 'e2e_recipient';
+const OUTSIDER = process.env.E2E_OUTSIDER_USERNAME || 'e2e_outsider';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const envPath = path.join(__dirname, '..', '.env.e2e.local');
@@ -76,30 +77,72 @@ async function findOrCreateDirectChat(senderToken, recipientId) {
   });
 }
 
+async function findOrCreateGroupChat(senderToken, participantIds) {
+  const chats = await request(`${API}/chats`, {
+    headers: { Authorization: `Bearer ${senderToken}` },
+  });
+  const ids = new Set(participantIds.map(Number));
+  const existing = Array.isArray(chats)
+    ? chats.find((c) => {
+        if (String(c.type).toUpperCase() !== 'GROUP' || !Array.isArray(c.participants)) {
+          return false;
+        }
+        const chatIds = new Set(c.participants.map((p) => Number(p.id)));
+        return [...ids].every((id) => chatIds.has(id));
+      })
+    : null;
+  if (existing?.id) return existing;
+
+  return request(`${API}/chats`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${senderToken}`,
+    },
+    body: JSON.stringify({
+      type: 'GROUP',
+      name: 'E2E Meet Group',
+      participantIds,
+    }),
+  });
+}
+
 async function main() {
   console.log('E2E setup: API', API);
 
   const senderAuth = await devRegisterOrLogin(SENDER, 'E2E Sender');
   const recipientAuth = await devRegisterOrLogin(RECIPIENT, 'E2E Recipient');
+  await devRegisterOrLogin(OUTSIDER, 'E2E Outsider');
 
   const chat = await findOrCreateDirectChat(senderAuth.token, recipientAuth.user.id);
+  const groupChat = await findOrCreateGroupChat(senderAuth.token, [recipientAuth.user.id]);
 
+  const e2ePort = process.env.E2E_PORT || '3002';
   const lines = [
-    `E2E_BASE_URL=${process.env.E2E_BASE_URL || 'http://localhost:3000'}`,
+    `E2E_BASE_URL=${process.env.E2E_BASE_URL || `http://localhost:${e2ePort}`}`,
+    `E2E_API_URL=${API}`,
+    `NEXT_PUBLIC_API_URL=${API}`,
+    `NEXT_PUBLIC_WS_URL=${API.replace(/\/api$/, '')}/ws`,
     `E2E_SENDER_USERNAME=${SENDER}`,
     `E2E_SENDER_PASSWORD=${PASSWORD}`,
     `E2E_RECIPIENT_USERNAME=${RECIPIENT}`,
     `E2E_RECIPIENT_PASSWORD=${PASSWORD}`,
+    `E2E_OUTSIDER_USERNAME=${OUTSIDER}`,
+    `E2E_OUTSIDER_PASSWORD=${PASSWORD}`,
     `E2E_CHAT_ID=${chat.id}`,
+    `E2E_GROUP_CHAT_ID=${groupChat.id}`,
     'NEXT_PUBLIC_E2EE_ENABLED=false',
+    'E2E_REALTIME_MS=8000',
     '',
   ];
 
   fs.writeFileSync(envPath, lines.join('\n'), 'utf8');
   console.log('Wrote', envPath);
-  console.log('Chat id:', chat.id);
+  console.log('Direct chat id:', chat.id);
+  console.log('Group chat id:', groupChat.id);
   console.log('Sender:', SENDER, 'id', senderAuth.user.id);
   console.log('Recipient:', RECIPIENT, 'id', recipientAuth.user.id);
+  console.log('Outsider:', OUTSIDER);
 }
 
 main().catch((e) => {

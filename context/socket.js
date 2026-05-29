@@ -72,6 +72,9 @@ export const StompProvider = (props) => {
       transportRef.current = getTransportPreference();
       // JWT только в STOMP CONNECT headers — query ?token= блокируется WebSocketAuthInterceptor
       const wsUrl = ensureNativeWsUrl(config.stomp.nativeUrl);
+      if (typeof window !== 'undefined') {
+        window.__stompBrokerUrl = wsUrl;
+      }
 
       const stompClient = new Client({
         brokerURL: wsUrl,

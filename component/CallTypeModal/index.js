@@ -18,7 +18,11 @@ const CallTypeModal = ({ isOpen, onClose, targetUser, onSelectAudio, onSelectVid
 
   return (
     <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+      <div
+        className={styles.modal}
+        onClick={(e) => e.stopPropagation()}
+        data-testid="call-type-modal"
+      >
         {}
         <div className={styles.avatarContainer}>
           <div className={styles.avatar}>{initials}</div>
@@ -36,6 +40,7 @@ const CallTypeModal = ({ isOpen, onClose, targetUser, onSelectAudio, onSelectVid
         <div className={styles.actions}>
           <button
             className={styles.videoButton}
+            data-testid="call-type-video"
             onClick={() => {
               onSelectVideo?.();
               onClose();
@@ -53,6 +58,7 @@ const CallTypeModal = ({ isOpen, onClose, targetUser, onSelectAudio, onSelectVid
 
           <button
             className={styles.audioButton}
+            data-testid="call-type-audio"
             onClick={() => {
               onSelectAudio?.();
               onClose();

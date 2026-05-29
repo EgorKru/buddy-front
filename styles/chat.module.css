@@ -707,8 +707,21 @@
   flex-shrink: 0;
 }
 
+.busyDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f97316;
+  flex-shrink: 0;
+}
+
 .onlineText {
   color: #22c55e;
+  font-weight: 500;
+}
+
+.busyText {
+  color: #f97316;
   font-weight: 500;
 }
 

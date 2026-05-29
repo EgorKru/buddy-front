@@ -348,7 +348,7 @@ const CallView = ({
   }
 
   return (
-    <div className={styles.overlay}>
+    <div className={styles.overlay} data-testid="active-call-view">
       <div className={styles.callContainer}>
         {}
         <div className={styles.header}>
@@ -361,7 +361,9 @@ const CallView = ({
           </button>
           <div className={styles.headerInfo}>
             <span className={styles.headerName}>{remoteName}</span>
-            <span className={styles.headerTimer}>{formatDuration(callDuration)}</span>
+            <span className={styles.headerTimer} data-testid="active-call-timer">
+              {formatDuration(callDuration)}
+            </span>
           </div>
         </div>
 
@@ -389,7 +391,14 @@ const CallView = ({
           {}
           {isVideo && localStream && (
             <div className={styles.localVideoContainer}>
-              <video ref={localVideoRef} autoPlay playsInline muted className={styles.localVideo} />
+              <video
+                ref={localVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className={styles.localVideo}
+                data-testid="call-local-video"
+              />
               {!videoEnabled && (
                 <div className={styles.localVideoOff}>
                   <VideoOff size={24} />
@@ -421,6 +430,7 @@ const CallView = ({
 
           <button
             className={`${styles.controlButton} ${styles.endCall}`}
+            data-testid="active-call-end"
             onClick={onEndCall}
             title="Завершить звонок"
           >

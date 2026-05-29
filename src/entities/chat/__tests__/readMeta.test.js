@@ -1,4 +1,8 @@
-import { getLastMessageReadMeta, getOtherParticipantOnline } from '@/entities/chat';
+import {
+  getLastMessageReadMeta,
+  getOtherParticipantOnline,
+  getOtherParticipantPresence,
+} from '@/entities/chat';
 
 describe('getLastMessageReadMeta', () => {
   const user = { id: 1 };
@@ -43,5 +47,37 @@ describe('getOtherParticipantOnline', () => {
         { id: 1 }
       )
     ).toBe(true);
+  });
+});
+
+describe('getOtherParticipantPresence', () => {
+  it('returns busy when peer is online and busy', () => {
+    expect(
+      getOtherParticipantPresence(
+        {
+          type: 'DIRECT',
+          participants: [
+            { id: 1, online: true },
+            { id: 2, online: true, busy: true },
+          ],
+        },
+        { id: 1 }
+      )
+    ).toEqual({ online: true, busy: true });
+  });
+
+  it('returns not busy when peer is offline even if busy flag set', () => {
+    expect(
+      getOtherParticipantPresence(
+        {
+          type: 'DIRECT',
+          participants: [
+            { id: 1, online: true },
+            { id: 2, online: false, busy: true },
+          ],
+        },
+        { id: 1 }
+      )
+    ).toEqual({ online: false, busy: false });
   });
 });

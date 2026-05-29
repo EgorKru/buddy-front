@@ -6,6 +6,7 @@ export default function ReplyMessage({ replyTo, onNavigate, chat, user }) {
   return (
     <div
       className={styles.messageReply}
+      data-testid="message-reply-preview"
       onClick={async (e) => {
         e.stopPropagation();
         onNavigate(replyTo.id);

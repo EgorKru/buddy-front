@@ -62,6 +62,15 @@ describe('messagingReducer realtime state', () => {
     expect(next.readAtByChatIdByUserId['4']['2']).toBe('2026-05-28T12:00:00.000Z');
   });
 
+  it('APPLY_READ_RECEIPT accepts Jackson LocalDateTime array from WebSocket', () => {
+    const next = messagingReducer(emptyState, {
+      type: AT.APPLY_READ_RECEIPT,
+      payload: { chatId: 4, readerId: 2, readAt: [2026, 5, 28, 12, 0, 0, 0] },
+    });
+
+    expect(next.readAtByChatIdByUserId['4']['2']).toMatch(/^2026-05-28T/);
+  });
+
   it('UPDATE_PRESENCE sets participant online flag', () => {
     const state = {
       ...emptyState,
@@ -76,6 +85,30 @@ describe('messagingReducer realtime state', () => {
 
     const peer = next.chatsById['4'].participants.find((p) => p.id === 2);
     expect(peer.online).toBe(true);
+  });
+
+  it('UPDATE_PRESENCE sets participant busy flag', () => {
+    const state = {
+      ...emptyState,
+      chatsById: {
+        4: baseChat(4, {
+          participants: [
+            { id: 1, username: 'me', online: false },
+            { id: 2, username: 'peer', online: true, busy: false },
+          ],
+        }),
+      },
+      chatOrder: ['4'],
+    };
+
+    const next = messagingReducer(state, {
+      type: AT.UPDATE_PRESENCE,
+      payload: { userId: 2, online: true, busy: true },
+    });
+
+    const peer = next.chatsById['4'].participants.find((p) => p.id === 2);
+    expect(peer.online).toBe(true);
+    expect(peer.busy).toBe(true);
   });
 
   it('getChatTime prefers newer of updatedAt and lastMessage.createdAt', () => {

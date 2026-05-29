@@ -103,6 +103,31 @@ describe('useChatRealtime', () => {
     expect(replaceOptimistic).not.toHaveBeenCalled();
   });
 
+  it('does not trigger gap recovery on first message when local pts is 0', async () => {
+    const { chatAPI } = require('@/utils/api');
+    chatAPI.getChatUpdates = jest.fn();
+
+    renderHook(() => useChatRealtime('5'));
+
+    await act(async () => {
+      topicHandler({
+        body: JSON.stringify({
+          id: 200,
+          chatId: 5,
+          senderId: 2,
+          type: 'TEXT',
+          content: 'first',
+          createdAt: '2026-05-28T12:00:00.000Z',
+          pts: 10,
+          ptsCount: 1,
+        }),
+      });
+    });
+
+    expect(chatAPI.getChatUpdates).not.toHaveBeenCalled();
+    expect(upsertMessage).toHaveBeenCalled();
+  });
+
   it('upserts own message when no optimistic in state (regression: no reload)', async () => {
     renderHook(() => useChatRealtime('5'));
 
@@ -177,5 +202,128 @@ describe('useChatRealtime', () => {
       expect.objectContaining({ id: 100, senderId: 2 }),
       expect.any(Object)
     );
+  });
+
+  it('marks chat as read after incoming peer message when tab is visible', async () => {
+    jest.useFakeTimers();
+
+    renderHook(() => useChatRealtime('5'));
+
+    await act(async () => {
+      topicHandler({ body: JSON.stringify({ ...serverDto, senderId: 2 }) });
+    });
+
+    expect(markChatAsRead).not.toHaveBeenCalled();
+
+    await act(async () => {
+      jest.advanceTimersByTime(300);
+    });
+
+    expect(markChatAsRead).toHaveBeenCalledWith('5');
+
+    jest.useRealTimers();
+  });
+
+  it('upserts peer reply with replyTo hydrated from local cache', async () => {
+    const parent = {
+      id: 41,
+      chatId: 5,
+      senderId: 2,
+      senderUsername: 'peer',
+      senderDisplayName: 'Peer',
+      content: 'Parent text',
+      type: 'TEXT',
+      createdAt: '2026-01-01T10:00:00.000Z',
+    };
+
+    useChats.mockReturnValue({
+      upsertMessage,
+      replaceOptimistic,
+      updateMessage,
+      removeMessage,
+      setActiveChatId,
+      markChatAsRead,
+      setReadReceiptsForChat,
+      chats: [],
+      messageIdsByChatId: { 5: ['41'] },
+      messagesById: { 41: parent },
+    });
+
+    renderHook(() => useChatRealtime('5'));
+
+    await act(async () => {
+      topicHandler({
+        body: JSON.stringify({
+          id: 42,
+          chatId: 5,
+          senderId: 2,
+          content: 'Reply text',
+          type: 'TEXT',
+          replyToMessageId: 41,
+        }),
+      });
+    });
+
+    expect(upsertMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 42,
+        replyTo: expect.objectContaining({
+          id: 41,
+          content: 'Parent text',
+        }),
+      }),
+      expect.any(Object)
+    );
+  });
+
+  it('calls onPeerMessage before upsert for peer message', async () => {
+    const onPeerMessage = jest.fn();
+    const callOrder = [];
+
+    onPeerMessage.mockImplementation(() => {
+      callOrder.push('typing-clear');
+    });
+    upsertMessage.mockImplementation(() => {
+      callOrder.push('upsert');
+    });
+
+    renderHook(() => useChatRealtime('5', { onPeerMessage }));
+
+    await act(async () => {
+      topicHandler({ body: JSON.stringify({ ...serverDto, senderId: 2 }) });
+    });
+
+    expect(onPeerMessage).toHaveBeenCalledWith(2);
+    expect(callOrder).toEqual(['typing-clear', 'upsert']);
+  });
+
+  it('does not call onPeerMessage for own message', async () => {
+    const onPeerMessage = jest.fn();
+
+    renderHook(() => useChatRealtime('5', { onPeerMessage }));
+
+    await act(async () => {
+      topicHandler({ body: JSON.stringify(serverDto) });
+    });
+
+    expect(onPeerMessage).not.toHaveBeenCalled();
+  });
+
+  it('does not mark chat as read for own incoming message', async () => {
+    jest.useFakeTimers();
+
+    renderHook(() => useChatRealtime('5'));
+
+    await act(async () => {
+      topicHandler({ body: JSON.stringify(serverDto) });
+    });
+
+    await act(async () => {
+      jest.advanceTimersByTime(300);
+    });
+
+    expect(markChatAsRead).not.toHaveBeenCalled();
+
+    jest.useRealTimers();
   });
 });

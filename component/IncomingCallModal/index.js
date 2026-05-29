@@ -39,7 +39,7 @@ const IncomingCallModal = ({ call, onAccept, onReject, onBusy }) => {
   };
 
   return (
-    <div className={styles.overlay}>
+    <div className={styles.overlay} data-testid="incoming-call-modal">
       <div className={styles.modal}>
         {}
         <div className={styles.pulseRings}>
@@ -76,6 +76,7 @@ const IncomingCallModal = ({ call, onAccept, onReject, onBusy }) => {
         <div className={styles.actions}>
           <button
             className={styles.rejectButton}
+            data-testid="incoming-call-reject"
             onClick={() => onReject?.(call.id)}
             title="Отклонить"
           >
@@ -84,6 +85,7 @@ const IncomingCallModal = ({ call, onAccept, onReject, onBusy }) => {
 
           <button
             className={styles.acceptButton}
+            data-testid="incoming-call-accept"
             onClick={() => onAccept?.(call.id)}
             title="Принять"
           >

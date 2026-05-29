@@ -27,6 +27,7 @@ export async function seedAuthContext(context, auth) {
     ({ token, user }) => {
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
+      localStorage.removeItem('disable_websocket');
     },
     { token: auth.token, user: auth.user }
   );
@@ -48,20 +49,46 @@ export async function loginViaUi(page, username, password) {
  * @param {import('@playwright/test').Page} page
  * @param {string|number} chatId
  */
+async function pageHasNextCompileError(page) {
+  const body =
+    (await page
+      .locator('body')
+      .innerText()
+      .catch(() => '')) || '';
+  return (
+    body.includes('Server Error') ||
+    body.includes('missing required error components') ||
+    body.includes('middleware-manifest.json') ||
+    body.includes('vendor-chunks')
+  );
+}
+
 export async function openChat(page, chatId) {
-  await page.goto(`/chat/${chatId}`, { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(() => !!localStorage.getItem('token'), null, { timeout: 10_000 });
-  await page.waitForFunction(() => !window.location.pathname.startsWith('/login'), null, {
-    timeout: 15_000,
-  });
-  await page.getByTestId('chat-message-input').waitFor({ state: 'visible', timeout: 45_000 });
+  const deadline = Date.now() + 90_000;
+  while (Date.now() < deadline) {
+    await page.goto('/app', { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => !!localStorage.getItem('token'), null, { timeout: 10_000 });
+    await page.goto(`/chat/${chatId}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => !window.location.pathname.startsWith('/login'), null, {
+      timeout: 15_000,
+    });
+    const is404 = await page
+      .getByRole('heading', { name: '404' })
+      .isVisible()
+      .catch(() => false);
+    if (!(await pageHasNextCompileError(page)) && !is404) {
+      break;
+    }
+    await page.waitForTimeout(2000);
+  }
+  await page.getByTestId('chat-message-input').waitFor({ state: 'visible', timeout: 60_000 });
 }
 
 /**
  * @param {import('@playwright/test').Page} page
  */
 export async function waitForStompConnected(page) {
-  await page.waitForFunction(() => window.__stompConnected === true, null, { timeout: 30_000 });
+  await page.waitForFunction(() => window.__stompConnected === true, null, { timeout: 60_000 });
 }
 
 /**

@@ -103,26 +103,28 @@ const Bottom = (props) => {
   };
 
   return (
-    <div className={styles.bottomMenu}>
-      <div className={styles.leftSection}>
+    <div className={styles.bottomMenu} data-testid="room-control-bar">
+      <div className={styles.leftSection} data-testid="room-controls-left">
         <button
           className={styles.participantButton}
           onClick={handleParticipantsClick}
           title="Показать участников"
           type="button"
+          data-testid="room-participants-button"
         >
           <Users size={18} />
           <span>{participantCount || 1}</span>
         </button>
       </div>
 
-      <div className={styles.centerSection}>
+      <div className={styles.centerSection} data-testid="room-controls-center">
         {isMuted ? (
           <button
             className={cx(styles.icon, styles.active)}
             title="Включить микрофон"
             onClick={handleToggleAudio}
             type="button"
+            data-testid="room-mic-toggle"
           >
             <MicOff size={22} />
           </button>
@@ -132,6 +134,7 @@ const Bottom = (props) => {
             title="Выключить микрофон"
             onClick={handleToggleAudio}
             type="button"
+            data-testid="room-mic-toggle"
           >
             <Mic size={22} />
           </button>
@@ -142,6 +145,7 @@ const Bottom = (props) => {
             title="Выключить камеру"
             onClick={handleToggleVideo}
             type="button"
+            data-testid="room-video-toggle"
           >
             <Video size={22} />
           </button>
@@ -151,6 +155,7 @@ const Bottom = (props) => {
             title="Включить камеру"
             onClick={handleToggleVideo}
             type="button"
+            data-testid="room-video-toggle"
           >
             <VideoOff size={22} />
           </button>
@@ -162,6 +167,7 @@ const Bottom = (props) => {
           title={handRaised ? 'Опустить руку' : 'Поднять руку'}
           onClick={handleRaiseHand}
           type="button"
+          data-testid="room-hand-toggle"
         >
           <Hand size={22} />
         </button>
@@ -172,6 +178,7 @@ const Bottom = (props) => {
           title={isScreenSharing ? 'Остановить демонстрацию' : 'Показать экран'}
           onClick={handleToggleScreenShare}
           type="button"
+          data-testid="room-screen-share-toggle"
         >
           {isScreenSharing ? <MonitorOff size={22} /> : <Monitor size={22} />}
         </button>
@@ -182,6 +189,7 @@ const Bottom = (props) => {
           title="Настройки устройств"
           onClick={handleSettingsClick}
           type="button"
+          data-testid="room-settings-button"
         >
           <Settings size={22} />
         </button>
@@ -191,12 +199,13 @@ const Bottom = (props) => {
           title="Покинуть встречу"
           onClick={handleLeaveRoom}
           type="button"
+          data-testid="room-leave-button"
         >
           <PhoneOff size={22} />
         </button>
       </div>
 
-      <div className={styles.rightSection}></div>
+      <div className={styles.rightSection} data-testid="room-controls-right"></div>
     </div>
   );
 };
