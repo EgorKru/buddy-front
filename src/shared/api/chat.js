@@ -42,7 +42,8 @@ export const chatAPI = {
     type = 'TEXT',
     fileUrl = null,
     replyToMessageId = null,
-    encryptionVersion = null
+    encryptionVersion = null,
+    extra = {}
   ) => {
     const body = { type };
     if (type === 'IMAGE' || type === 'FILE') {
@@ -56,6 +57,9 @@ export const chatAPI = {
     if (encryptionVersion != null && encryptionVersion > 0) {
       body.encryptionVersion = encryptionVersion;
     }
+    if (extra.stickerId) body.stickerId = extra.stickerId;
+    if (extra.gifId) body.gifId = extra.gifId;
+    if (extra.customEmojiId) body.customEmojiId = extra.customEmojiId;
     return apiRequest(`/chats/${chatId}/messages`, { method: 'POST', body });
   },
   getMessage: async (chatId, messageId) => apiRequest(`/chats/${chatId}/messages/${messageId}`),
@@ -86,6 +90,16 @@ export const chatAPI = {
   },
   getImageFileUrl: (filePath, download = false, filename = null) => {
     if (!filePath) return null;
+    if (filePath.startsWith('/system/')) {
+      let url = getApiUrl(filePath);
+      const params = new URLSearchParams();
+      if (download) {
+        params.append('download', 'true');
+        if (filename) params.append('filename', filename);
+      }
+      const q = params.toString();
+      return q ? `${url}?${q}` : url;
+    }
     const cleanPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
     let url = getApiUrl(`/chats/files/${cleanPath}`);
     const params = new URLSearchParams();

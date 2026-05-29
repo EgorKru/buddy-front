@@ -32,6 +32,8 @@ export default function MessageList({
   handleNavigateToMessage,
   chats,
   chatId: _chatId,
+  customEmojisByKey,
+  onToggleReaction,
 }) {
   const visibleMessages = (() => {
     if (searchMode && searchResults && searchResults.length > 0) {
@@ -128,6 +130,8 @@ export default function MessageList({
                   setFileViewerModal={setFileViewerModal}
                   handleNavigateToMessage={handleNavigateToMessage}
                   chats={chats}
+                  customEmojisByKey={customEmojisByKey}
+                  onToggleReaction={onToggleReaction}
                 />
               );
             })}

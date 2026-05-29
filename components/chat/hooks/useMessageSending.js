@@ -64,7 +64,7 @@ export const useMessageSending = ({
   );
 
   const sendFileMessage = useCallback(
-    async (file, content = '', replyToId = null, onProgress = null) => {
+    async (file, content = '', replyToId = null, onProgress = null, replyToMessage = null) => {
       if (!file || !user || !chatId) return null;
 
       try {
@@ -149,6 +149,27 @@ export const useMessageSending = ({
     [chatId, user, sendMessageHook, addOptimistic, newMessageIdsRef]
   );
 
+  const sendMultipleFileMessages = useCallback(
+    async (files, content = '', replyToId = null, replyToMessage = null) => {
+      if (!files?.length || !user || !chatId) return [];
+
+      const results = [];
+      for (let i = 0; i < files.length; i++) {
+        const caption = i === 0 ? content : '';
+        const result = await sendFileMessage(
+          files[i],
+          caption,
+          i === 0 ? replyToId : null,
+          null,
+          i === 0 ? replyToMessage : null
+        );
+        results.push(result);
+      }
+      return results;
+    },
+    [chatId, user, sendFileMessage]
+  );
+
   const prepareScrollForSending = useCallback(() => {
     if (messagesContainerRef?.current) {
       scrollHeightBeforeMessageRef.current = messagesContainerRef.current.scrollHeight;
@@ -207,6 +228,7 @@ export const useMessageSending = ({
   return {
     sendTextMessage,
     sendFileMessage,
+    sendMultipleFileMessages,
     prepareScrollForSending,
   };
 };

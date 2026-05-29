@@ -9,6 +9,8 @@ import ForwardedMessage from './ForwardedMessage';
 import E2eeTextContent from './E2eeTextContent';
 import ReplyMessage from './ReplyMessage';
 import SystemCallMessage from './SystemCallMessage';
+import MessageReactionsList from '@/component/MessageReactions/MessageReactionsList';
+import { chatAPI } from '@/utils/api';
 import {
   shouldShowDate,
   isSearchMatch as checkSearchMatch,
@@ -44,6 +46,8 @@ const MessageRow = React.memo(
     setFileViewerModal,
     handleNavigateToMessage,
     chats,
+    customEmojisByKey,
+    onToggleReaction,
   }) => {
     const showDate = useMemo(() => {
       return shouldShowDate(index, msg, visibleMessages);
@@ -298,6 +302,28 @@ const MessageRow = React.memo(
                       )}
                     </div>
                   </div>
+                ) : (msg.type === 'STICKER' || msg.type === 'GIF') && msg.fileUrl ? (
+                  <div
+                    className={`${styles.messageText} ${msg.isOptimistic ? styles.messagePending : ''}`}
+                    data-testid={msg.type === 'GIF' ? 'chat-message-gif' : 'chat-message-sticker'}
+                  >
+                    <img
+                      src={chatAPI.getImageFileUrl(msg.fileUrl)}
+                      alt={msg.type === 'GIF' ? 'GIF' : 'Sticker'}
+                      className={
+                        msg.type === 'GIF' ? styles.gifMessageImg : styles.stickerMessageImg
+                      }
+                    />
+                    <div className={styles.messageTextMeta}>
+                      <span className={styles.messageTime}>{formatChatTime(msg.createdAt)}</span>
+                      {statusIcon}
+                    </div>
+                    <MessageReactionsList
+                      reactions={msg.reactions}
+                      customEmojisByKey={customEmojisByKey}
+                      onToggle={(emoji) => onToggleReaction?.(msg, emoji)}
+                    />
+                  </div>
                 ) : msg.type === 'FILE' && msg.fileUrl ? (
                   <div
                     className={`${styles.messageText} ${msg.isOptimistic ? styles.messagePending : ''} ${msg.status === MESSAGE_STATUS.FAILED ? styles.messageFailed : ''}`}
@@ -431,6 +457,11 @@ const MessageRow = React.memo(
                         )}
                       </div>
                     </div>
+                    <MessageReactionsList
+                      reactions={msg.reactions}
+                      customEmojisByKey={customEmojisByKey}
+                      onToggle={(emoji) => onToggleReaction?.(msg, emoji)}
+                    />
                   </div>
                 )}
               </>

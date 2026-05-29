@@ -14,6 +14,8 @@ import { useVoiceSendAndStop } from '@/components/chat/hooks/useVoiceSendAndStop
 import { useChatModals } from '@/components/chat/hooks/useChatModals';
 import { useChatContextMenu } from '@/components/chat/hooks/useChatContextMenu';
 import { useChatSelection } from '@/components/chat/hooks/useChatSelection';
+import { useEmojiMedia } from '@/components/chat/hooks/useEmojiMedia';
+import { useChats } from '@/context/messaging';
 import { useCall } from '@/context/CallContext';
 import { useTypingIndicator } from '@/hooks/useTypingIndicator';
 import CallTypeModal from '@/component/CallTypeModal';
@@ -149,6 +151,7 @@ const ChatContainer = ({ chatId }) => {
     handleForwardSelected,
     sendTextMessage,
     sendFileMessage,
+    sendMultipleFileMessages,
     sendMessageHook,
     sending,
     syncQueue,
@@ -195,10 +198,15 @@ const ChatContainer = ({ chatId }) => {
   const {
     uploadingFile,
     setUploadingFile,
+    selectedFiles,
+    setSelectedFiles,
     selectedFile,
     setSelectedFile,
-    selectedFileUrlRef,
+    addSelectedFiles,
+    removeSelectedFileAt,
+    previewUrlsRef,
     fileInputRef,
+    clearSelectedFiles,
     clearSelectedFile,
   } = fileUpload;
 
@@ -206,9 +214,10 @@ const ChatContainer = ({ chatId }) => {
     connected,
     readAtByChatIdByUserId,
     addOptimistic,
+    updateMessage,
     chats,
     upsertMessage: _upsertMessage,
-  } = chatContext;
+  } = useChats();
 
   // Обертка для setNewMessage с typing indicator
   const handleNewMessageChange = useCallback(
@@ -314,7 +323,7 @@ const ChatContainer = ({ chatId }) => {
     editingMessageId,
     handleSaveEdit,
     newMessage,
-    selectedFile,
+    selectedFiles,
     user,
     sending,
     uploadingFile,
@@ -325,11 +334,11 @@ const ChatContainer = ({ chatId }) => {
     dismissLocalTyping,
     prepareScrollForSending,
     sendFileMessage,
+    sendMultipleFileMessages,
     sendTextMessage,
-    clearSelectedFile,
-    setSelectedFile,
+    clearSelectedFiles,
+    setSelectedFiles,
     setUploadingFile,
-    selectedFileUrlRef,
   });
 
   const { handleKeyDown } = useChatKeyboard({
@@ -338,7 +347,7 @@ const ChatContainer = ({ chatId }) => {
     isRecording,
     editingContent,
     newMessage,
-    selectedFile,
+    selectedFiles,
     handleSaveEdit,
     handleCancelEdit,
     sendMessage,
@@ -437,6 +446,24 @@ const ChatContainer = ({ chatId }) => {
     user,
   });
 
+  const emojiMedia = useEmojiMedia({
+    chatId,
+    user,
+    sendMessageHook,
+    addOptimistic,
+    updateMessage,
+    contextMenu,
+    setContextMenu,
+  });
+
+  const handleInsertEmoji = useCallback(
+    (emoji) => {
+      setNewMessage((prev) => `${prev}${emoji}`);
+      messageInputRef.current?.focus();
+    },
+    [setNewMessage, messageInputRef]
+  );
+
   return (
     <>
       <ChatPresenter
@@ -496,9 +523,13 @@ const ChatContainer = ({ chatId }) => {
         editingContent={editingContent}
         setEditingContent={setEditingContent}
         replyingToMessage={replyingToMessage}
+        selectedFiles={selectedFiles}
+        addSelectedFiles={addSelectedFiles}
+        removeSelectedFileAt={removeSelectedFileAt}
+        previewUrlsRef={previewUrlsRef}
+        clearSelectedFiles={clearSelectedFiles}
         selectedFile={selectedFile}
         setSelectedFile={setSelectedFile}
-        selectedFileUrlRef={selectedFileUrlRef}
         isRecording={isRecording}
         isLocked={isLocked}
         isHolding={isHolding}
@@ -546,6 +577,15 @@ const ChatContainer = ({ chatId }) => {
         handleSelectMessage={handleSelectMessage}
         onStartCall={handleOpenCallModal}
         typingUserIds={typingUserIds}
+        emojiButtonRef={emojiMedia.emojiButtonRef}
+        emojiPickerOpen={emojiMedia.emojiPickerOpen}
+        setEmojiPickerOpen={emojiMedia.setEmojiPickerOpen}
+        onSelectEmoji={(emoji) => emojiMedia.handleSelectEmoji(emoji, handleInsertEmoji)}
+        onSelectCustomEmoji={emojiMedia.handleSelectCustomEmoji}
+        onSelectSticker={emojiMedia.handleSelectSticker}
+        onSelectGif={emojiMedia.handleSelectGif}
+        customEmojisByKey={emojiMedia.customEmojisByKey}
+        onToggleReaction={emojiMedia.handleToggleReaction}
       />
 
       {}

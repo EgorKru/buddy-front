@@ -79,6 +79,7 @@ export function AttachAndVoiceButtons({
     <>
       <button
         type="button"
+        data-testid="chat-attach-button"
         onClick={onAttachClick}
         className={styles.attachButton}
         title="Прикрепить файл или изображение"
@@ -89,6 +90,7 @@ export function AttachAndVoiceButtons({
       <input
         ref={fileInputRef}
         type="file"
+        multiple
         style={{ display: 'none' }}
         onChange={(e) => onFileSelect?.(e)}
         accept="*/*"
@@ -105,6 +107,7 @@ export function AttachAndVoiceButtons({
         <button
           ref={buttonRef}
           type="button"
+          data-testid="chat-voice-button"
           onMouseDown={onMouseDown}
           onTouchStart={onTouchStart}
           className={`${styles.voiceButton} ${getVoiceButtonClassName(isRecording, isLocked, isHolding, dragDistance, reachedLockThreshold)}`}

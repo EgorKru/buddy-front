@@ -1,5 +1,7 @@
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { adjustMenuPosition, getMenuItems } from './utils';
+import ReactionPickerRow from './ReactionPickerRow';
 import styles from './index.module.css';
 
 export default function MessageContextMenu({
@@ -17,8 +19,15 @@ export default function MessageContextMenu({
   onEdit,
   onSelect,
   onNavigate,
+  onToggleReaction,
+  customEmojisByKey,
 }) {
   const menuRef = useRef(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -87,10 +96,22 @@ export default function MessageContextMenu({
     onNavigate,
   ]);
 
-  if (!position) return null;
+  if (!position || !mounted) return null;
 
-  return (
-    <div ref={menuRef} className={styles.contextMenu} style={{ left: position.x, top: position.y }}>
+  const menu = (
+    <div
+      ref={menuRef}
+      className={styles.contextMenu}
+      style={{ left: position.x, top: position.y }}
+      data-testid="message-context-menu"
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      <ReactionPickerRow
+        message={message}
+        activeReactions={message?.reactions || []}
+        customEmojisByKey={customEmojisByKey}
+        onToggleReaction={onToggleReaction}
+      />
       {menuItems.map((item, index) => {
         const Icon = item.icon;
         return (
@@ -111,4 +132,6 @@ export default function MessageContextMenu({
       })}
     </div>
   );
+
+  return createPortal(menu, document.body);
 }

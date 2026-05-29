@@ -1,6 +1,6 @@
 .contextMenu {
   position: fixed;
-  z-index: 1000;
+  z-index: 1200;
   background: white;
   border-radius: 12px;
   box-shadow:
@@ -12,6 +12,46 @@
   flex-direction: column;
   gap: 2px;
   animation: fadeIn 0.15s ease-out;
+}
+
+.reactionsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 6px 10px;
+  background: #f6f7f9;
+  border-bottom: 1px solid #e5e7eb;
+  margin: -2px -2px 4px;
+  border-radius: 10px 10px 0 0;
+}
+
+.reactionBtn {
+  border: none;
+  background: transparent;
+  font-size: 22px;
+  line-height: 1;
+  padding: 6px 8px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    transform 0.1s ease;
+}
+
+.reactionBtn:hover {
+  background: #f0f4ff;
+  transform: scale(1.12);
+}
+
+.reactionBtnActive {
+  background: #e8f2ff;
+}
+
+.reactionCustomImg {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  display: block;
 }
 
 @keyframes fadeIn {

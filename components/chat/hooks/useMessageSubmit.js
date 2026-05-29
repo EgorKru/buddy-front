@@ -1,13 +1,13 @@
 import { useCallback } from 'react';
 
 /**
- * Возвращает колбэк отправки сообщения (текст, файл или сохранение редактирования).
+ * Возвращает колбэк отправки сообщения (текст, файл(ы) или сохранение редактирования).
  */
 export function useMessageSubmit({
   editingMessageId,
   handleSaveEdit,
   newMessage,
-  selectedFile,
+  selectedFiles = [],
   user,
   sending,
   uploadingFile,
@@ -18,12 +18,14 @@ export function useMessageSubmit({
   dismissLocalTyping,
   prepareScrollForSending,
   sendFileMessage,
+  sendMultipleFileMessages,
   sendTextMessage,
-  clearSelectedFile,
-  setSelectedFile,
+  clearSelectedFiles,
+  setSelectedFiles,
   setUploadingFile,
-  selectedFileUrlRef,
 }) {
+  const hasFiles = selectedFiles.length > 0;
+
   return useCallback(
     async (e) => {
       e.preventDefault();
@@ -34,30 +36,41 @@ export function useMessageSubmit({
         return;
       }
 
-      if ((!newMessage.trim() && !selectedFile) || !user || sending || uploadingFile) return;
+      if ((!newMessage.trim() && !hasFiles) || !user || sending || uploadingFile) return;
 
       const messageText = newMessage.trimEnd();
       const replyToId = replyingToMessageId;
-      const fileToSend = selectedFile;
+      const filesToSend = [...selectedFiles];
 
       dismissLocalTyping?.();
 
       setNewMessage('');
       prepareScrollForSending();
 
-      if (fileToSend) {
+      if (filesToSend.length > 0) {
         setUploadingFile(true);
         try {
-          await sendFileMessage(fileToSend, messageText, replyToId, null, replyingToMessage);
-          clearSelectedFile();
+          if (filesToSend.length === 1) {
+            await sendFileMessage(filesToSend[0], messageText, replyToId, null, replyingToMessage);
+          } else if (sendMultipleFileMessages) {
+            await sendMultipleFileMessages(filesToSend, messageText, replyToId, replyingToMessage);
+          } else {
+            for (let i = 0; i < filesToSend.length; i++) {
+              await sendFileMessage(
+                filesToSend[i],
+                i === 0 ? messageText : '',
+                i === 0 ? replyToId : null,
+                null,
+                i === 0 ? replyingToMessage : null
+              );
+            }
+          }
+          clearSelectedFiles();
           messageActions.setReplyingToMessageId?.(null);
           messageActions.setReplyingToMessage?.(null);
         } catch (error) {
           alert(`Не удалось отправить файл: ${error.message || 'Неизвестная ошибка'}`);
-          setSelectedFile(fileToSend);
-          if (fileToSend.type?.startsWith('image/') && !selectedFileUrlRef?.current) {
-            selectedFileUrlRef.current = URL.createObjectURL(fileToSend);
-          }
+          setSelectedFiles(filesToSend);
         } finally {
           setUploadingFile(false);
         }
@@ -74,7 +87,8 @@ export function useMessageSubmit({
       editingMessageId,
       handleSaveEdit,
       newMessage,
-      selectedFile,
+      hasFiles,
+      selectedFiles,
       user,
       sending,
       uploadingFile,
@@ -85,11 +99,11 @@ export function useMessageSubmit({
       dismissLocalTyping,
       prepareScrollForSending,
       sendFileMessage,
+      sendMultipleFileMessages,
       sendTextMessage,
-      clearSelectedFile,
-      setSelectedFile,
+      clearSelectedFiles,
+      setSelectedFiles,
       setUploadingFile,
-      selectedFileUrlRef,
     ]
   );
 }

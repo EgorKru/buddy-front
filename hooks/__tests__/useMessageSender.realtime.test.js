@@ -160,7 +160,15 @@ describe('useMessageSender realtime delivery', () => {
       await result.current.sendMessage('Persist me', 'TEXT');
     });
 
-    expect(chatAPI.sendMessage).toHaveBeenCalledWith('5', 'Persist me', 'TEXT', null, null, null);
+    expect(chatAPI.sendMessage).toHaveBeenCalledWith(
+      '5',
+      'Persist me',
+      'TEXT',
+      null,
+      null,
+      null,
+      null
+    );
     expect(publishMock).not.toHaveBeenCalled();
   });
 });

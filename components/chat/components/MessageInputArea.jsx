@@ -11,8 +11,9 @@ export default function MessageInputArea({
   editingMessageId,
   editingContent,
   replyingToMessage,
+  selectedFiles,
+  previewUrlsRef,
   selectedFile,
-  selectedFileUrlRef,
   isRecording,
   isLocked,
   isHolding,
@@ -34,7 +35,7 @@ export default function MessageInputArea({
   onCancelEdit,
   onCancelReply,
   onFileSelect,
-  onRemoveFile,
+  onRemoveFileAt,
   onMouseDown,
   onTouchStart,
   onKeyDown,
@@ -44,6 +45,13 @@ export default function MessageInputArea({
   onCancelRecording,
   onPlayPreview,
   recordingTime,
+  emojiButtonRef,
+  emojiPickerOpen,
+  setEmojiPickerOpen,
+  onSelectEmoji,
+  onSelectCustomEmoji,
+  onSelectSticker,
+  onSelectGif,
 }) {
   const { currentTime, setCurrentTime, duration } = useAudioPreviewDuration(
     audioPreviewRef,
@@ -74,9 +82,9 @@ export default function MessageInputArea({
       />
 
       <FilePreviewBar
-        selectedFile={selectedFile}
-        selectedFileUrlRef={selectedFileUrlRef}
-        onRemoveFile={onRemoveFile}
+        selectedFiles={selectedFiles}
+        previewUrlsRef={previewUrlsRef}
+        onRemoveFileAt={onRemoveFileAt}
       />
 
       <div className={styles.messageFormRow}>
@@ -102,7 +110,7 @@ export default function MessageInputArea({
         )}
 
         {showTextRow && (
-          <>
+          <div className={styles.messageInputRow}>
             <TextInputRow
               newMessage={newMessage}
               editingMessageId={editingMessageId}
@@ -124,16 +132,24 @@ export default function MessageInputArea({
               onFileSelect={onFileSelect}
               onMouseDown={onMouseDown}
               onTouchStart={onTouchStart}
+              emojiButtonRef={emojiButtonRef}
+              emojiPickerOpen={emojiPickerOpen}
+              setEmojiPickerOpen={setEmojiPickerOpen}
+              onSelectEmoji={onSelectEmoji}
+              onSelectCustomEmoji={onSelectCustomEmoji}
+              onSelectSticker={onSelectSticker}
+              onSelectGif={onSelectGif}
             />
             <SendButton
               editingMessageId={editingMessageId}
               hasContent={!!newMessage.trim()}
+              hasSelectedFiles={selectedFiles?.length > 0}
               selectedFile={selectedFile}
               isRecording={isRecording}
               sending={sending}
               uploadingFile={uploadingFile}
             />
-          </>
+          </div>
         )}
       </div>
 

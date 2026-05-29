@@ -66,6 +66,27 @@ async function attachFileInChat(page, file) {
 
 /**
  * @param {import('@playwright/test').Page} page
+ * @param {Array<{ name: string, mimeType: string, buffer: Buffer }>} files
+ */
+async function attachMultipleFilesInChat(page, files) {
+  await page.getByTestId(T.attachInput).setInputFiles(
+    files.map((file) => ({
+      name: file.name,
+      mimeType: file.mimeType,
+      buffer: file.buffer,
+    }))
+  );
+}
+
+/**
+ * @param {import('@playwright/test').Page} page
+ */
+async function expectFilePreviewCount(page, count) {
+  await expect(page.getByTestId('chat-file-preview-item')).toHaveCount(count);
+}
+
+/**
+ * @param {import('@playwright/test').Page} page
  * @param {'txt'|'png'|'pdf'|'mp4'|'docx'} kind
  */
 async function sendFixtureAndWait(page, kind) {
@@ -87,5 +108,7 @@ module.exports = {
   T,
   FIXTURES,
   attachFileInChat,
+  attachMultipleFilesInChat,
+  expectFilePreviewCount,
   sendFixtureAndWait,
 };

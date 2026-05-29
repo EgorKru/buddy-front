@@ -13,6 +13,7 @@ import MessageInputArea from '@/components/chat/components/MessageInputArea';
 import SearchBar from '@/components/chat/components/SearchBar';
 import { ErrorMessage } from '@/components/chat/components/ErrorMessage';
 import TypingIndicator from '@/components/chat/components/TypingIndicator';
+import { filesFromInputEvent } from '@/shared/lib/chat/multiFileSelection';
 
 const ChatPresenter = ({
   chat,
@@ -67,9 +68,12 @@ const ChatPresenter = ({
   editingContent,
   setEditingContent,
   replyingToMessage,
+  selectedFiles,
+  addSelectedFiles,
+  removeSelectedFileAt,
+  previewUrlsRef,
   selectedFile,
   setSelectedFile,
-  selectedFileUrlRef,
   isRecording,
   isLocked,
   isHolding,
@@ -121,6 +125,15 @@ const ChatPresenter = ({
   handleSelectMessage,
   onStartCall,
   typingUserIds,
+  emojiButtonRef,
+  emojiPickerOpen,
+  setEmojiPickerOpen,
+  onSelectEmoji,
+  onSelectCustomEmoji,
+  onSelectSticker,
+  onSelectGif,
+  customEmojisByKey,
+  onToggleReaction,
 }) => {
   const selectedMessagesList = selectionMode
     ? Array.from(selectedMessages)
@@ -257,6 +270,8 @@ const ChatPresenter = ({
           handleNavigateToMessage={handleNavigateToMessage}
           chats={chats}
           chatId={chatId}
+          customEmojisByKey={customEmojisByKey}
+          onToggleReaction={onToggleReaction}
         />
 
         {voiceError && <ErrorMessage>{voiceError}</ErrorMessage>}
@@ -272,8 +287,9 @@ const ChatPresenter = ({
           editingMessageId={editingMessageId}
           editingContent={editingContent}
           replyingToMessage={replyingToMessage}
+          selectedFiles={selectedFiles}
+          previewUrlsRef={previewUrlsRef}
           selectedFile={selectedFile}
-          selectedFileUrlRef={selectedFileUrlRef}
           isRecording={isRecording}
           isLocked={isLocked}
           isHolding={isHolding}
@@ -295,27 +311,15 @@ const ChatPresenter = ({
           onCancelEdit={handleCancelEdit}
           onCancelReply={handleCancelReply}
           onFileSelect={(e) => {
-            const file = e?.target?.files?.[0];
-            if (file) {
-              if (file.type.startsWith('image/')) {
-                if (selectedFileUrlRef.current) {
-                  URL.revokeObjectURL(selectedFileUrlRef.current);
-                }
-                selectedFileUrlRef.current = URL.createObjectURL(file);
-              }
-              setSelectedFile(file);
+            const picked = filesFromInputEvent(e);
+            if (picked.length) {
+              addSelectedFiles(picked);
             }
             if (e?.target) {
               e.target.value = '';
             }
           }}
-          onRemoveFile={() => {
-            if (selectedFileUrlRef.current) {
-              URL.revokeObjectURL(selectedFileUrlRef.current);
-              selectedFileUrlRef.current = null;
-            }
-            setSelectedFile(null);
-          }}
+          onRemoveFileAt={removeSelectedFileAt}
           onMouseDown={handleMouseDown}
           onTouchStart={handleTouchStart}
           onKeyDown={handleKeyDown}
@@ -326,6 +330,13 @@ const ChatPresenter = ({
           onPlayPreview={handlePlayPreview}
           recordingTime={recordingTime}
           audioLevel={audioLevel}
+          emojiButtonRef={emojiButtonRef}
+          emojiPickerOpen={emojiPickerOpen}
+          setEmojiPickerOpen={setEmojiPickerOpen}
+          onSelectEmoji={onSelectEmoji}
+          onSelectCustomEmoji={onSelectCustomEmoji}
+          onSelectSticker={onSelectSticker}
+          onSelectGif={onSelectGif}
         />
       </div>
 
@@ -340,6 +351,8 @@ const ChatPresenter = ({
           })}
           isSearchResult={!!(searchMode && searchText.trim())}
           onClose={handleCloseContextMenu}
+          onToggleReaction={onToggleReaction}
+          customEmojisByKey={customEmojisByKey}
           onReply={() => handleReplyMessage(contextMenu.message)}
           onPin={() => handlePinMessage(contextMenu.message)}
           onCopy={() => handleCopyMessage(contextMenu.message)}

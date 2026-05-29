@@ -1229,6 +1229,21 @@
   padding: 1rem;
 }
 
+.messageInputRow {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  gap: 0.5rem;
+  align-items: flex-end;
+}
+
+.messageInputActions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
 .editIndicator {
   position: absolute;
   top: -32px;
@@ -1372,6 +1387,29 @@
   opacity: 1;
   background: rgba(156, 163, 175, 0.1);
   transform: scale(1.05);
+}
+
+.filePreviewList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f5f7fa;
+  border-bottom: 1px solid var(--home-border);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.filePreviewList .filePreview {
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 160px;
+  max-width: 220px;
+  border: 1px solid var(--home-border);
+  border-radius: 8px;
+  border-bottom: none;
+  padding: 6px 8px;
+  min-height: auto;
 }
 
 .filePreview {
@@ -2011,6 +2049,50 @@
 
 .attachButton:active:not(:disabled) {
   transform: scale(0.95);
+}
+
+.emojiButtonWrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.emojiButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border: none;
+  background: var(--home-menu-hover-bg);
+  color: var(--home-text-secondary);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.emojiButton:hover:not(:disabled) {
+  background: var(--home-border);
+  transform: scale(1.05);
+}
+
+.emojiButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.stickerMessageImg {
+  max-width: 180px;
+  max-height: 180px;
+  object-fit: contain;
+}
+
+.gifMessageImg {
+  max-width: 280px;
+  max-height: 200px;
+  border-radius: 8px;
 }
 
 .attachButton:disabled {

@@ -1,7 +1,7 @@
 import { Send, Loader2 } from 'lucide-react';
 import { usePasteHandler } from '../../hooks/usePasteHandler';
 import { MessageTextarea } from './MessageTextarea';
-import { AttachAndVoiceButtons } from './AttachAndVoiceButtons';
+import { MessageInputActions } from './MessageInputActions';
 import styles from '@/styles/chat.module.css';
 
 export function TextInputRow({
@@ -25,6 +25,13 @@ export function TextInputRow({
   onFileSelect,
   onMouseDown,
   onTouchStart,
+  emojiButtonRef,
+  emojiPickerOpen,
+  setEmojiPickerOpen,
+  onSelectEmoji,
+  onSelectCustomEmoji,
+  onSelectSticker,
+  onSelectGif,
 }) {
   const handlePaste = usePasteHandler(editingMessageId, isRecording, sending, onFileSelect);
   const textareaValue = editingMessageId ? editingContent : newMessage;
@@ -45,24 +52,31 @@ export function TextInputRow({
         onPaste={handlePaste}
       />
 
-      {isEmpty && (
-        <AttachAndVoiceButtons
-          fileInputRef={fileInputRef}
-          buttonRef={buttonRef}
-          sending={sending}
-          uploadingFile={uploadingFile}
-          isRecording={isRecording}
-          isLocked={isLocked}
-          isHolding={isHolding}
-          dragDistance={dragDistance}
-          reachedLockThreshold={reachedLockThreshold}
-          lockThreshold={lockThreshold}
-          onAttachClick={handleAttachClick}
-          onFileSelect={onFileSelect}
-          onMouseDown={onMouseDown}
-          onTouchStart={onTouchStart}
-        />
-      )}
+      <MessageInputActions
+        showAttachAndVoice={isEmpty}
+        sending={sending}
+        uploadingFile={uploadingFile}
+        editingMessageId={editingMessageId}
+        emojiButtonRef={emojiButtonRef}
+        emojiPickerOpen={emojiPickerOpen}
+        setEmojiPickerOpen={setEmojiPickerOpen}
+        onSelectEmoji={onSelectEmoji}
+        onSelectCustomEmoji={onSelectCustomEmoji}
+        onSelectSticker={onSelectSticker}
+        onSelectGif={onSelectGif}
+        fileInputRef={fileInputRef}
+        buttonRef={buttonRef}
+        isRecording={isRecording}
+        isLocked={isLocked}
+        isHolding={isHolding}
+        dragDistance={dragDistance}
+        reachedLockThreshold={reachedLockThreshold}
+        lockThreshold={lockThreshold}
+        onAttachClick={handleAttachClick}
+        onFileSelect={onFileSelect}
+        onMouseDown={onMouseDown}
+        onTouchStart={onTouchStart}
+      />
     </>
   );
 }
@@ -70,12 +84,14 @@ export function TextInputRow({
 export function SendButton({
   editingMessageId,
   hasContent,
+  hasSelectedFiles,
   selectedFile,
   isRecording,
   sending,
   uploadingFile,
 }) {
-  const showSend = (hasContent || editingMessageId || selectedFile) && !isRecording;
+  const showSend =
+    (hasContent || editingMessageId || hasSelectedFiles || selectedFile) && !isRecording;
   if (!showSend) return null;
 
   return (

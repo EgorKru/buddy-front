@@ -6,7 +6,7 @@ describe('useMessageSubmit', () => {
     editingMessageId: null,
     handleSaveEdit: jest.fn().mockResolvedValue(undefined),
     newMessage: 'hello',
-    selectedFile: null,
+    selectedFiles: [],
     user: { id: 1 },
     sending: false,
     uploadingFile: false,
@@ -19,10 +19,10 @@ describe('useMessageSubmit', () => {
     prepareScrollForSending: jest.fn(),
     sendFileMessage: jest.fn().mockResolvedValue(undefined),
     sendTextMessage: jest.fn().mockResolvedValue(undefined),
-    clearSelectedFile: jest.fn(),
-    setSelectedFile: jest.fn(),
+    clearSelectedFiles: jest.fn(),
+    setSelectedFiles: jest.fn(),
+    sendMultipleFileMessages: jest.fn().mockResolvedValue([]),
     setUploadingFile: jest.fn(),
-    selectedFileUrlRef: { current: null },
     dismissLocalTyping: jest.fn(),
   };
 
@@ -52,7 +52,7 @@ describe('useMessageSubmit', () => {
       useMessageSubmit({
         ...defaultProps,
         newMessage: '',
-        selectedFile: null,
+        selectedFiles: [],
         user: null,
       })
     );

@@ -43,6 +43,7 @@ export const messagingActionTypes = {
   SET_READ_RECEIPTS_FOR_CHAT: 'SET_READ_RECEIPTS_FOR_CHAT',
   MARK_CHAT_READ_LOCAL: 'MARK_CHAT_READ_LOCAL',
   UPDATE_PRESENCE: 'UPDATE_PRESENCE',
+  UPDATE_MESSAGE_REACTIONS: 'UPDATE_MESSAGE_REACTIONS',
 };
 
 /** @deprecated internal alias */
@@ -436,6 +437,22 @@ export const messagingReducer = (state, action) => {
         chatsById: {
           ...state.chatsById,
           [cid]: { ...chat, unreadCount: 0 },
+        },
+      };
+    }
+
+    case actionTypes.UPDATE_MESSAGE_REACTIONS: {
+      const { chatId, messageId, reactions } = action.payload || {};
+      if (!chatId || !messageId) return state;
+      const cid = String(chatId);
+      const mid = String(messageId);
+      const existing = state.messagesById[mid];
+      if (!existing) return state;
+      return {
+        ...state,
+        messagesById: {
+          ...state.messagesById,
+          [mid]: { ...existing, reactions: reactions || [] },
         },
       };
     }

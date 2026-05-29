@@ -39,6 +39,10 @@ const createOptimisticMessage = (
   } else if (type === 'IMAGE' || type === 'FILE') {
     messageContent =
       content && content.trim() ? content.trim() : type === 'IMAGE' ? '📷 Фото' : '📎 Файл';
+  } else if (type === 'STICKER') {
+    messageContent = '🎨 Стикер';
+  } else if (type === 'GIF') {
+    messageContent = 'GIF';
   } else if (e2ee?.wireContent != null) {
     messageContent = e2ee.wireContent;
   } else {
@@ -178,12 +182,30 @@ export const useMessageSender = (chatId, onMessageSent, options = {}) => {
       fileName = null,
       fileSize = null,
       mimeType = null,
-      replyToMessage = null
+      replyToMessage = null,
+      mediaExtra = null
     ) => {
       if (type === 'VOICE' && !fileUrl && !voiceData) return null;
       if (type === 'IMAGE' && !fileUrl) return null;
       if (type === 'FILE' && !fileUrl) return null;
-      if (type !== 'VOICE' && type !== 'IMAGE' && type !== 'FILE' && !content.trim()) return null;
+      const isStickerOrGif = type === 'STICKER' || type === 'GIF';
+      if (
+        isStickerOrGif &&
+        !mediaExtra?.stickerId &&
+        !mediaExtra?.gifId &&
+        !mediaExtra?.customEmojiId
+      ) {
+        return null;
+      }
+      if (
+        !isStickerOrGif &&
+        type !== 'VOICE' &&
+        type !== 'IMAGE' &&
+        type !== 'FILE' &&
+        !content?.trim()
+      ) {
+        return null;
+      }
       if (sending) return null;
 
       let encryptionVersionToSend = null;
@@ -229,7 +251,11 @@ export const useMessageSender = (chatId, onMessageSent, options = {}) => {
             ? content?.trim() || '📷 Фото'
             : type === 'FILE'
               ? content?.trim() || '📎 Файл'
-              : (textWireContent ?? content.trim());
+              : type === 'STICKER'
+                ? '🎨 Стикер'
+                : type === 'GIF'
+                  ? 'GIF'
+                  : (textWireContent ?? content.trim());
 
       const e2eeWire =
         type === 'TEXT' && encryptionVersionToSend != null
@@ -349,11 +375,16 @@ export const useMessageSender = (chatId, onMessageSent, options = {}) => {
 
         const serverMessage = await chatAPI.sendMessage(
           chatId,
-          type === 'TEXT' ? (textWireContent ?? content.trim()) : messageContent,
+          type === 'TEXT'
+            ? (textWireContent ?? content.trim())
+            : isStickerOrGif
+              ? ''
+              : messageContent,
           type,
           fileUrl,
           replyToMessageId,
-          encryptionVersionToSend
+          encryptionVersionToSend,
+          mediaExtra
         );
 
         updateMessageStatus(optimisticMessage.tempId, MESSAGE_STATUS.SENT, serverMessage);

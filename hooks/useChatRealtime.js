@@ -27,6 +27,7 @@ export const useChatRealtime = (chatId, { onPeerMessage } = {}) => {
 
   const topicSubRef = useRef(null);
   const voiceTopicSubRef = useRef(null);
+  const reactionsSubRef = useRef(null);
   const messageIdsByChatIdRef = useRef(messageIdsByChatId);
   const messagesByIdRef = useRef(messagesById);
   messageIdsByChatIdRef.current = messageIdsByChatId;
@@ -269,6 +270,10 @@ export const useChatRealtime = (chatId, { onPeerMessage } = {}) => {
         safeUnsubscribe(voiceTopicSubRef.current);
         voiceTopicSubRef.current = null;
       }
+      if (reactionsSubRef.current) {
+        safeUnsubscribe(reactionsSubRef.current);
+        reactionsSubRef.current = null;
+      }
       return;
     }
 
@@ -282,7 +287,26 @@ export const useChatRealtime = (chatId, { onPeerMessage } = {}) => {
       voiceTopicSubRef.current = null;
     }
 
+    if (reactionsSubRef.current) {
+      safeUnsubscribe(reactionsSubRef.current);
+      reactionsSubRef.current = null;
+    }
+
     try {
+      const reactionsSub = client.subscribe(`/topic/chat/${chatId}/reactions`, (message) => {
+        const data = safeJsonParse(message.body);
+        if (!data?.messageId) return;
+        updateMessage(
+          {
+            id: data.messageId,
+            chatId: Number(chatId),
+            reactions: data.reactions || [],
+          },
+          { unreadDelta: 0 }
+        );
+      });
+      reactionsSubRef.current = reactionsSub;
+
       const sub = client.subscribe(`/topic/chat/${chatId}`, (message) => {
         const data = safeJsonParse(message.body);
         if (!data) return;
@@ -487,6 +511,10 @@ export const useChatRealtime = (chatId, { onPeerMessage } = {}) => {
       if (voiceTopicSubRef.current) {
         safeUnsubscribe(voiceTopicSubRef.current);
         voiceTopicSubRef.current = null;
+      }
+      if (reactionsSubRef.current) {
+        safeUnsubscribe(reactionsSubRef.current);
+        reactionsSubRef.current = null;
       }
       if (markReadTimeoutRef.current) {
         clearTimeout(markReadTimeoutRef.current);

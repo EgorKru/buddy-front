@@ -6,11 +6,13 @@ export const useChatKeyboard = ({
   isRecording,
   editingContent,
   newMessage,
-  selectedFile,
+  selectedFiles = [],
   handleSaveEdit,
   handleCancelEdit,
   sendMessage,
 }) => {
+  const hasFiles = selectedFiles.length > 0;
+
   const handleKeyDown = useCallback(
     (e) => {
       if (e.key === 'Escape' && editingMessageId) {
@@ -26,7 +28,7 @@ export const useChatKeyboard = ({
             handleSaveEdit();
           }
         } else {
-          if (!sending && !isRecording && (newMessage.trim() || selectedFile)) {
+          if (!sending && !isRecording && (newMessage.trim() || hasFiles)) {
             sendMessage(e);
           }
         }
@@ -38,7 +40,7 @@ export const useChatKeyboard = ({
       isRecording,
       editingContent,
       newMessage,
-      selectedFile,
+      hasFiles,
       handleSaveEdit,
       handleCancelEdit,
       sendMessage,
