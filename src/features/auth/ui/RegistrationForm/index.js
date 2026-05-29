@@ -1,16 +1,17 @@
 /**
- * Registration form — v2 design system.
+ * Форма регистрации — v2 design system.
  */
 import { useState } from 'react';
 import Link from 'next/link';
 import { Eye, EyeOff } from 'lucide-react';
 import { VerificationCodeModal } from '../VerificationCodeModal';
 import ds from '@/design-system/primitives.module.css';
+import styles from '../authForms.module.css';
 
 function RegisterUsernameField({ formData, handleChange, handleBlur, usernameError }) {
   return (
-    <div className={ds.field}>
-      <label htmlFor="register-username">Username</label>
+    <div className={`${ds.field} ${styles.field}`}>
+      <label htmlFor="register-username">Имя пользователя</label>
       <input
         type="text"
         id="register-username"
@@ -18,9 +19,9 @@ function RegisterUsernameField({ formData, handleChange, handleBlur, usernameErr
         value={formData.username}
         onChange={handleChange}
         onBlur={handleBlur}
-        placeholder="Choose a username"
+        placeholder="Выберите имя пользователя"
         autoComplete="username"
-        className={`${ds.input} ${usernameError ? ds.inputInvalid : ''}`}
+        className={`${ds.input} ${styles.input} ${usernameError ? ds.inputInvalid : ''}`}
         aria-invalid={usernameError ? 'true' : 'false'}
         aria-describedby={usernameError ? 'register-username-error' : undefined}
       />
@@ -35,8 +36,8 @@ function RegisterUsernameField({ formData, handleChange, handleBlur, usernameErr
 
 function RegisterEmailField({ formData, handleChange, handleBlur, emailError }) {
   return (
-    <div className={ds.field}>
-      <label htmlFor="register-email">Email</label>
+    <div className={`${ds.field} ${styles.field}`}>
+      <label htmlFor="register-email">Эл. почта</label>
       <input
         type="email"
         id="register-email"
@@ -44,9 +45,9 @@ function RegisterEmailField({ formData, handleChange, handleBlur, emailError }) 
         value={formData.email}
         onChange={handleChange}
         onBlur={handleBlur}
-        placeholder="you@company.com"
+        placeholder="email@example.com"
         autoComplete="email"
-        className={`${ds.input} ${emailError ? ds.inputInvalid : ''}`}
+        className={`${ds.input} ${styles.input} ${emailError ? ds.inputInvalid : ''}`}
         aria-invalid={emailError ? 'true' : 'false'}
         aria-describedby={emailError ? 'register-email-error' : undefined}
       />
@@ -63,9 +64,9 @@ function RegisterPasswordField({ formData, handleChange, handleBlur, passwordErr
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <div className={ds.field}>
-      <label htmlFor="register-password">Password</label>
-      <span className={ds.fieldHint}>At least 6 characters.</span>
+    <div className={`${ds.field} ${styles.field}`}>
+      <label htmlFor="register-password">Пароль</label>
+      <span className={`${ds.fieldHint} ${styles.fieldHint}`}>Не менее 6 символов.</span>
       <div className={ds.passwordWrap}>
         <input
           type={showPassword ? 'text' : 'password'}
@@ -74,17 +75,17 @@ function RegisterPasswordField({ formData, handleChange, handleBlur, passwordErr
           value={formData.password}
           onChange={handleChange}
           onBlur={handleBlur}
-          placeholder="Create a password"
+          placeholder="Придумайте пароль"
           autoComplete="new-password"
-          className={`${ds.input} ${passwordError ? ds.inputInvalid : ''}`}
+          className={`${ds.input} ${styles.input} ${passwordError ? ds.inputInvalid : ''}`}
           aria-invalid={passwordError ? 'true' : 'false'}
           aria-describedby={passwordError ? 'register-password-error' : undefined}
         />
         <button
           type="button"
-          className={ds.passwordToggle}
+          className={`${ds.passwordToggle} ${styles.passwordToggle}`}
           onClick={() => setShowPassword(!showPassword)}
-          aria-label={showPassword ? 'Hide password' : 'Show password'}
+          aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
         >
           {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
         </button>
@@ -107,8 +108,8 @@ function RegisterPasswordConfirmationField({
   const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false);
 
   return (
-    <div className={ds.field}>
-      <label htmlFor="register-passwordConfirmation">Confirm password</label>
+    <div className={`${ds.field} ${styles.field}`}>
+      <label htmlFor="register-passwordConfirmation">Подтверждение пароля</label>
       <div className={ds.passwordWrap}>
         <input
           type={showPasswordConfirmation ? 'text' : 'password'}
@@ -117,9 +118,9 @@ function RegisterPasswordConfirmationField({
           value={formData.passwordConfirmation}
           onChange={handleChange}
           onBlur={handleBlur}
-          placeholder="Repeat your password"
+          placeholder="Повторите пароль"
           autoComplete="new-password"
-          className={`${ds.input} ${passwordConfirmationError ? ds.inputInvalid : ''}`}
+          className={`${ds.input} ${styles.input} ${passwordConfirmationError ? ds.inputInvalid : ''}`}
           aria-invalid={passwordConfirmationError ? 'true' : 'false'}
           aria-describedby={
             passwordConfirmationError ? 'register-passwordConfirmation-error' : undefined
@@ -127,9 +128,9 @@ function RegisterPasswordConfirmationField({
         />
         <button
           type="button"
-          className={ds.passwordToggle}
+          className={`${ds.passwordToggle} ${styles.passwordToggle}`}
           onClick={() => setShowPasswordConfirmation(!showPasswordConfirmation)}
-          aria-label={showPasswordConfirmation ? 'Hide password' : 'Show password'}
+          aria-label={showPasswordConfirmation ? 'Скрыть пароль' : 'Показать пароль'}
         >
           {showPasswordConfirmation ? <EyeOff size={18} /> : <Eye size={18} />}
         </button>
@@ -165,15 +166,11 @@ export function RegistrationForm({
   handleResendCode,
   formatTime,
 }) {
-  const submitLabel = loading
-    ? sendingCode
-      ? 'Sending code...'
-      : 'Creating account...'
-    : 'Get started';
+  const submitLabel = loading ? (sendingCode ? 'Отправка кода…' : 'Создание аккаунта…') : 'Начать';
 
   return (
     <>
-      <form className={ds.formStack} onSubmit={handleRegister} noValidate>
+      <form className={`${ds.formStack} ${styles.formStack}`} onSubmit={handleRegister} noValidate>
         <RegisterUsernameField
           formData={formData}
           handleChange={handleChange}
@@ -199,13 +196,20 @@ export function RegistrationForm({
           passwordConfirmationError={passwordConfirmationError}
         />
         {!showCodeModal && error ? (
-          <div className={ds.formError} role="alert">
+          <div className={`${ds.formError} ${styles.formError}`} role="alert">
             {error}
           </div>
         ) : null}
-        <button type="submit" disabled={loading} className={ds.btnPrimary}>
-          {submitLabel}
-        </button>
+        <div className={ds.formActions}>
+          <button
+            type="submit"
+            disabled={loading}
+            className={`${ds.btnPrimary} ${styles.btnPrimary}`}
+            aria-busy={loading}
+          >
+            {submitLabel}
+          </button>
+        </div>
       </form>
 
       {showCodeModal ? (
@@ -227,8 +231,12 @@ export function RegistrationForm({
         />
       ) : null}
 
-      <p className={ds.footerLink}>
-        Already have an account? <Link href="/login">Log in</Link>
+      <p className={`${ds.footerLink} ${styles.footerLink}`}>
+        Уже есть аккаунт? <Link href="/login">Войти</Link>
+      </p>
+      <p className={`${ds.trustNote} ${styles.trustNote}`}>
+        Перед созданием аккаунта мы подтверждаем email. Шифрование личных чатов остаётся на вашем
+        устройстве.
       </p>
     </>
   );

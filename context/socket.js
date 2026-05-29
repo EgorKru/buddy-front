@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useRef } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, useRef } from 'react';
 import { Client } from '@stomp/stompjs';
 import { getToken } from '@/utils/api';
 import { config } from '@/utils/config';
@@ -40,13 +40,6 @@ const ensureNativeWsUrl = (url) => {
   return url;
 };
 
-const withTokenQuery = (url, token) => {
-  if (!url || !token) return url;
-  const hasQuery = url.includes('?');
-  const sep = hasQuery ? '&' : '?';
-  return `${url}${sep}token=${encodeURIComponent(token)}`;
-};
-
 const getTransportPreference = () => {
   const pref = process.env.NEXT_PUBLIC_STOMP_TRANSPORT;
   if (pref === 'native') return pref;
@@ -77,14 +70,14 @@ export const StompProvider = (props) => {
 
     const connect = (token) => {
       transportRef.current = getTransportPreference();
-      const wsUrl = withTokenQuery(ensureNativeWsUrl(config.stomp.nativeUrl), token);
-
-      const createFactory = () => {
-        return () => new WebSocket(wsUrl);
-      };
+      // JWT только в STOMP CONNECT headers — query ?token= блокируется WebSocketAuthInterceptor
+      const wsUrl = ensureNativeWsUrl(config.stomp.nativeUrl);
+      if (typeof window !== 'undefined') {
+        window.__stompBrokerUrl = wsUrl;
+      }
 
       const stompClient = new Client({
-        webSocketFactory: createFactory(),
+        brokerURL: wsUrl,
         connectHeaders: {
           Authorization: `Bearer ${token}`,
           'X-Authorization': `Bearer ${token}`,
@@ -96,7 +89,9 @@ export const StompProvider = (props) => {
         debug: () => {},
         onConnect: () => {
           if (destroyed) return;
+          setClient(stompClient);
           setConnected(true);
+          syncStompDebugFlags();
           try {
             stompClient.subscribe('/user/queue/errors', (error) => {
               const errorData = safeJsonParse(error.body);
@@ -117,7 +112,9 @@ export const StompProvider = (props) => {
         },
         onDisconnect: () => {
           if (destroyed) return;
+          setClient(null);
           setConnected(false);
+          syncStompDebugFlags();
         },
         onStompError: (frame) => {
           const errorBody = safeJsonParse(frame.body || '{}');
@@ -131,24 +128,38 @@ export const StompProvider = (props) => {
           }
 
           if (!destroyed) {
+            setClient(null);
             setConnected(false);
           }
         },
         onWebSocketError: () => {
           if (!destroyed) {
+            setClient(null);
             setConnected(false);
           }
         },
         onWebSocketClose: () => {
           if (!destroyed) {
+            setClient(null);
             setConnected(false);
           }
         },
       });
 
       clientRef.current = stompClient;
-      setClient(stompClient);
       stompClient.activate();
+    };
+
+    const isClientLive = () => {
+      const c = clientRef.current;
+      return Boolean(c && c.connected && c.active);
+    };
+
+    const syncStompDebugFlags = () => {
+      if (typeof window === 'undefined') return;
+      const live = isClientLive();
+      window.__stompConnected = live;
+      window.__stompClient = live ? clientRef.current : null;
     };
 
     const ensureConnection = () => {
@@ -157,6 +168,7 @@ export const StompProvider = (props) => {
       if (disableWebSocket) {
         disconnect();
         tokenRef.current = getToken();
+        syncStompDebugFlags();
         return;
       }
 
@@ -165,6 +177,7 @@ export const StompProvider = (props) => {
       if (!token) {
         tokenRef.current = null;
         disconnect();
+        syncStompDebugFlags();
         return;
       }
 
@@ -176,17 +189,37 @@ export const StompProvider = (props) => {
       if (!clientRef.current) {
         connect(tokenRef.current);
       }
+
+      syncStompDebugFlags();
     };
 
     ensureConnection();
-    const interval = setInterval(ensureConnection, 1000);
+
+    const onStorage = (event) => {
+      if (event.key === 'token' || event.key === 'user') {
+        ensureConnection();
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', onStorage);
+    }
 
     return () => {
       destroyed = true;
-      clearInterval(interval);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('storage', onStorage);
+      }
       disconnect();
     };
   }, []);
 
-  return <StompContext.Provider value={{ client, connected }}>{children}</StompContext.Provider>;
+  const stompValue = useMemo(() => ({ client, connected }), [client, connected]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.__stompConnected = connected;
+    window.__stompClient = connected ? clientRef.current : null;
+  }, [connected, client]);
+
+  return <StompContext.Provider value={stompValue}>{children}</StompContext.Provider>;
 };

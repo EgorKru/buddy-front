@@ -1,7 +1,7 @@
 import '@/styles/globals.css';
 import '@/styles/animations.css';
 
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { StompProvider } from '@/context/socket';
@@ -12,28 +12,37 @@ import GlobalNotifications from '@/component/GlobalNotifications';
 import GlobalCallHandler from '@/component/GlobalCallHandler';
 import { isAuthenticated } from '@/utils/api';
 
-function registerServiceWorker() {
-  if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker
-        .register('/sw.js')
-        .then((registration) => {
-          registration.addEventListener('updatefound', () => {
-            const newWorker = registration.installing;
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              }
-            });
-          });
-        })
-        .catch((_error) => {});
+function unregisterServiceWorkersInDev() {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
 
-      navigator.serviceWorker.addEventListener('message', (event) => {
-        if (event.data && event.data.type === 'SW_READY') {
-        }
-      });
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    registrations.forEach((registration) => registration.unregister());
+  });
+}
+
+function registerServiceWorker() {
+  if (process.env.NODE_ENV !== 'production') return;
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('/sw.js')
+      .then((registration) => {
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            }
+          });
+        });
+      })
+      .catch((_error) => {});
+
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'SW_READY') {
+      }
     });
-  }
+  });
 }
 
 export default function App({ Component, pageProps }) {
@@ -43,11 +52,38 @@ export default function App({ Component, pageProps }) {
     return path === '/' || path === '/login' || path === '/register';
   }, [router?.pathname]);
 
-  const authed = isAuthenticated();
+  const [authReady, setAuthReady] = useState(false);
+  const [authed, setAuthed] = useState(false);
 
   useEffect(() => {
+    const syncAuthed = () => setAuthed(isAuthenticated());
+    syncAuthed();
+    setAuthReady(true);
+    router.events.on('routeChangeComplete', syncAuthed);
+    return () => router.events.off('routeChangeComplete', syncAuthed);
+  }, [router.events]);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'production') {
+      unregisterServiceWorkersInDev();
+      return;
+    }
     registerServiceWorker();
   }, []);
+
+  if (!authReady) {
+    return (
+      <>
+        <Head>
+          <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes"
+          />
+        </Head>
+        <div style={{ minHeight: '100vh' }} />
+      </>
+    );
+  }
 
   return (
     <>

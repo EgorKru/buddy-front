@@ -12,6 +12,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { useMediaDevices } from '@/hooks/useMediaDevices';
+import { BACKGROUND_EFFECT } from '@/shared/lib/media';
 import styles from './MediaPreviewModal.module.css';
 
 export default function MediaPreviewModal({
@@ -48,6 +49,8 @@ export default function MediaPreviewModal({
     switchMicrophone,
     getStream,
     setError,
+    backgroundEffect,
+    setBackgroundEffect,
   } = useMediaDevices();
 
   useEffect(() => {
@@ -245,8 +248,12 @@ export default function MediaPreviewModal({
   if (!isOpen) return null;
 
   return (
-    <div className={styles.overlay} onClick={handleClose}>
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+    <div className={styles.overlay} onClick={handleClose} data-testid="meet-preview-overlay">
+      <div
+        className={styles.modal}
+        onClick={(e) => e.stopPropagation()}
+        data-testid="meet-preview-modal"
+      >
         <div className={styles.header}>
           <h2 className={styles.title}>{title}</h2>
           <button className={styles.closeButton} onClick={handleClose}>
@@ -279,7 +286,14 @@ export default function MediaPreviewModal({
               </div>
             ) : (
               <>
-                <video ref={videoRef} autoPlay playsInline muted className={styles.video} />
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className={styles.video}
+                  data-testid="media-preview-video"
+                />
               </>
             )}
           </div>
@@ -312,6 +326,32 @@ export default function MediaPreviewModal({
                   ))}
                 </div>
               </div>
+            </div>
+          )}
+
+          {permissionGranted && videoEnabled && (
+            <div className={styles.backgroundFilters} data-testid="media-background-filters">
+              <span className={styles.backgroundFiltersLabel}>Фон</span>
+              <button
+                type="button"
+                className={`${styles.backgroundFilterBtn} ${
+                  backgroundEffect === BACKGROUND_EFFECT.NONE ? styles.backgroundFilterActive : ''
+                }`}
+                data-testid="media-background-none"
+                onClick={() => setBackgroundEffect(BACKGROUND_EFFECT.NONE)}
+              >
+                Без эффекта
+              </button>
+              <button
+                type="button"
+                className={`${styles.backgroundFilterBtn} ${
+                  backgroundEffect === BACKGROUND_EFFECT.BLUR ? styles.backgroundFilterActive : ''
+                }`}
+                data-testid="media-background-blur"
+                onClick={() => setBackgroundEffect(BACKGROUND_EFFECT.BLUR)}
+              >
+                Размытие
+              </button>
             </div>
           )}
 
@@ -384,10 +424,21 @@ export default function MediaPreviewModal({
         </div>
 
         <div className={styles.footer}>
-          <button className={styles.cancelButton} onClick={handleClose}>
+          <button
+            className={styles.cancelButton}
+            onClick={handleClose}
+            data-testid="meet-preview-cancel"
+            type="button"
+          >
             Отмена
           </button>
-          <button className={styles.confirmButton} onClick={handleConfirm} disabled={isCreating}>
+          <button
+            className={styles.confirmButton}
+            onClick={handleConfirm}
+            disabled={isCreating}
+            data-testid="meet-preview-confirm"
+            type="button"
+          >
             {isCreating ? (
               <>
                 <Loader2 className={styles.buttonSpinner} size={18} />

@@ -111,9 +111,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (STATIC_RESOURCES.some(resource => url.pathname === resource)) {
-    
-    event.respondWith(fetch(event.request));
+  if (STATIC_RESOURCES.some((resource) => url.pathname === resource)) {
+    // Let the browser handle navigation; do not intercept (avoids dev/stale-cache issues).
     return;
   }
   

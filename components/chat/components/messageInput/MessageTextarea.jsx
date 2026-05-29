@@ -27,6 +27,7 @@ export function MessageTextarea({
     <textarea
       ref={messageInputRef}
       id="chat-message-input"
+      data-testid="chat-message-input"
       name="message"
       value={value}
       onChange={handleChange}

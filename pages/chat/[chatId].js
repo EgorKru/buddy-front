@@ -1,5 +1,10 @@
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/router';
-import ChatContainer from '@/components/chat/components/ChatContainer';
+
+const ChatContainer = dynamic(() => import('@/components/chat/components/ChatContainer'), {
+  ssr: false,
+  loading: () => <div style={loadingStyle}>Загрузка чата...</div>,
+});
 
 const loadingStyle = {
   minHeight: '60vh',
@@ -8,11 +13,17 @@ const loadingStyle = {
   justifyContent: 'center',
 };
 
+function chatIdFromPath() {
+  if (typeof window === 'undefined') return null;
+  const match = window.location.pathname.match(/\/chat\/([^/]+)/);
+  return match?.[1] ?? null;
+}
+
 export default function ChatPage() {
   const router = useRouter();
-  const { chatId } = router.query;
+  const chatId = router.query.chatId || chatIdFromPath();
 
-  if (!router.isReady || chatId == null || chatId === '') {
+  if (chatId == null || chatId === '') {
     return <div style={loadingStyle}>Загрузка чата...</div>;
   }
 

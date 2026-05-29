@@ -18,6 +18,7 @@ import {
   highlightSearchText,
 } from './utils';
 import { messageRowComparison } from './memoComparison';
+import { isE2eeEnabled } from '@/shared/lib/e2ee/directTextE2ee';
 import styles from '@/styles/chat.module.css';
 
 const MessageRow = React.memo(
@@ -371,11 +372,20 @@ const MessageRow = React.memo(
                       />
                     )}
                     {msg.replyTo && (
-                      <ReplyMessage replyTo={msg.replyTo} onNavigate={handleNavigateToMessage} />
+                      <ReplyMessage
+                        replyTo={msg.replyTo}
+                        onNavigate={handleNavigateToMessage}
+                        chat={chats?.find((c) => String(c.id) === String(msg.chatId))}
+                        user={user}
+                      />
                     )}
                     <div className={styles.messageTextContentWrapper}>
-                      <div className={styles.messageTextContent}>
-                        {Number(msg.encryptionVersion) > 0 ? (
+                      <div
+                        className={styles.messageTextContent}
+                        data-testid="chat-message-text"
+                        data-message-id={msg.id}
+                      >
+                        {Number(msg.encryptionVersion) > 0 && isE2eeEnabled() ? (
                           <E2eeTextContent
                             msg={msg}
                             user={user}
@@ -386,7 +396,7 @@ const MessageRow = React.memo(
                             styles={styles}
                           />
                         ) : (
-                          highlightedContent
+                          <span data-testid="chat-message-text-body">{highlightedContent}</span>
                         )}
                       </div>
                       <div className={styles.messageTextMeta}>

@@ -232,6 +232,7 @@ export default function ImageMessage({
               className={`${styles.image} ${imageLoaded ? styles.loaded : ''}`}
               onClick={handleImageClick}
               loading="lazy"
+              data-testid="chat-message-image"
               onError={() => {
                 setError('Не удалось загрузить изображение');
                 setLoading(false);

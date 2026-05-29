@@ -87,6 +87,7 @@ function MinimizedView({
         </button>
         <button
           className={`${s.minimizedControlButton} ${s.endCall}`}
+          data-testid="outgoing-call-cancel"
           onClick={(e) => {
             e.stopPropagation();
             onCancel?.();
@@ -111,7 +112,7 @@ function FullView({
   styles: s,
 }) {
   return (
-    <div className={s.overlay}>
+    <div className={s.overlay} data-testid="outgoing-call-modal">
       <div className={s.container}>
         <button className={s.minimizeButton} onClick={onMinimize} title="Свернуть">
           <Minimize2 size={20} />
@@ -140,7 +141,11 @@ function FullView({
             <span className={s.controlLabel}>{videoEnabled ? 'Выкл. видео' : 'Вкл. видео'}</span>
           </div>
           <div className={s.controlItem}>
-            <button className={`${s.controlButton} ${s.endCall}`} onClick={onCancel}>
+            <button
+              className={`${s.controlButton} ${s.endCall}`}
+              data-testid="outgoing-call-cancel"
+              onClick={onCancel}
+            >
               <PhoneOff size={24} />
             </button>
             <span className={s.controlLabel}>Завершить</span>

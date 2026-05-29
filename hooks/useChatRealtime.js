@@ -3,9 +3,14 @@ import { useStomp } from '@/context/socket';
 import { chatAPI, getCurrentUser } from '@/utils/api';
 import { safeJsonParse, safeUnsubscribe } from '@/utils/safe';
 import { useChats } from '@/context/messaging';
+import {
+  extractChatMessageFromStompPayload,
+  planOwnIncomingStompMessage,
+} from '@/shared/lib/chat/realtimePayload';
+import { enrichMessageWithReply } from '@/shared/lib/chat/replyTo';
 import { MESSAGE_STATUS } from '@/utils/messageQueue';
 
-export const useChatRealtime = (chatId) => {
+export const useChatRealtime = (chatId, { onPeerMessage } = {}) => {
   const { client, connected } = useStomp();
   const {
     setActiveChatId,
@@ -22,8 +27,24 @@ export const useChatRealtime = (chatId) => {
 
   const topicSubRef = useRef(null);
   const voiceTopicSubRef = useRef(null);
-  const lastMarkedReadRef = useRef(null);
+  const messageIdsByChatIdRef = useRef(messageIdsByChatId);
+  const messagesByIdRef = useRef(messagesById);
+  messageIdsByChatIdRef.current = messageIdsByChatId;
+  messagesByIdRef.current = messagesById;
   const markReadTimeoutRef = useRef(null);
+
+  const scheduleMarkChatAsRead = useCallback(() => {
+    if (!chatId) return;
+    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+
+    if (markReadTimeoutRef.current) {
+      clearTimeout(markReadTimeoutRef.current);
+    }
+    markReadTimeoutRef.current = setTimeout(() => {
+      markReadTimeoutRef.current = null;
+      markChatAsRead(chatId);
+    }, 300);
+  }, [chatId, markChatAsRead]);
   const loadingInitialRef = useRef(false);
   const lastLoadedChatIdRef = useRef(null);
 
@@ -46,10 +67,21 @@ export const useChatRealtime = (chatId) => {
           switch (update.eventType) {
             case 'MESSAGE_NEW':
               if (eventData.message) {
-                upsertMessage(
+                const senderId = eventData.message.senderId;
+                const currentUserId = getCurrentUser()?.id;
+                if (
+                  senderId != null &&
+                  onPeerMessage &&
+                  currentUserId != null &&
+                  Number(senderId) !== Number(currentUserId)
+                ) {
+                  onPeerMessage(senderId);
+                }
+                const hydrated = enrichMessageWithReply(
                   { ...eventData.message, status: MESSAGE_STATUS.SENT, isOptimistic: false },
-                  { unreadDelta: 0 }
+                  messagesByIdRef.current
                 );
+                upsertMessage(hydrated, { unreadDelta: 0 });
               }
               break;
             case 'MESSAGE_EDITED':
@@ -62,7 +94,7 @@ export const useChatRealtime = (chatId) => {
               break;
             case 'MESSAGE_DELETED_FOR_ALL':
               if (eventData.messageId) {
-                removeMessage(eventData.messageId);
+                removeMessage(chatId, eventData.messageId);
               }
               break;
             case 'MESSAGE_DELETED_FOR_ME': {
@@ -74,7 +106,7 @@ export const useChatRealtime = (chatId) => {
                 currentUserId != null &&
                 Number(actorId) === Number(currentUserId)
               ) {
-                removeMessage(eventData.messageId);
+                removeMessage(chatId, eventData.messageId);
               }
               break;
             }
@@ -101,7 +133,7 @@ export const useChatRealtime = (chatId) => {
         }
       } catch (error) {}
     },
-    [upsertMessage, updateMessage, removeMessage]
+    [upsertMessage, updateMessage, removeMessage, onPeerMessage]
   );
 
   const loadInitial = useCallback(async () => {
@@ -203,14 +235,32 @@ export const useChatRealtime = (chatId) => {
     const chatIdStr = String(chatId);
     setActiveChatId(chatId);
 
-    // НЕ вызываем markChatAsRead при открытии - Intersection Observer сделает это автоматически
-    // когда сообщения станут видимыми
-
     return () => setActiveChatId(null);
   }, [chatId, setActiveChatId]);
 
   useEffect(() => {
-    if (!chatId || !client || !connected || !client.connected || !client.active) {
+    if (!chatId || !connected) return;
+    const chatIdStr = String(chatId);
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const chatState = await chatAPI.getChatState(chatId);
+        if (!cancelled && chatState?.pts !== undefined) {
+          localPtsRef.current.set(chatIdStr, chatState.pts);
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [chatId, connected]);
+
+  useEffect(() => {
+    if (!chatId || !client || !connected) {
       if (topicSubRef.current) {
         safeUnsubscribe(topicSubRef.current);
         topicSubRef.current = null;
@@ -242,7 +292,11 @@ export const useChatRealtime = (chatId) => {
         const chatIdStr = String(chatId);
         const currentLocalPts = localPtsRef.current.get(chatIdStr) || 0;
 
-        if (receivedPts !== undefined && receivedPts > currentLocalPts + receivedPtsCount) {
+        if (
+          receivedPts !== undefined &&
+          currentLocalPts > 0 &&
+          receivedPts > currentLocalPts + receivedPtsCount
+        ) {
           const gapKey = `${chatIdStr}_${currentLocalPts}`;
           if (!gapRecoveryInProgressRef.current.has(gapKey)) {
             gapRecoveryInProgressRef.current.add(gapKey);
@@ -314,7 +368,7 @@ export const useChatRealtime = (chatId) => {
           data.eventType === 'MESSAGE_DELETED_FOR_ME'
         ) {
           if (data.messageId) {
-            removeMessage(data.messageId);
+            removeMessage(chatId, data.messageId);
           }
           return;
         }
@@ -329,16 +383,18 @@ export const useChatRealtime = (chatId) => {
           return;
         }
 
-        const dto = data;
+        const rawDto = extractChatMessageFromStompPayload(data);
+        if (!rawDto?.id || !rawDto?.chatId) return;
+
+        const dto = enrichMessageWithReply(
+          { ...rawDto, status: MESSAGE_STATUS.SENT, isOptimistic: false },
+          messagesByIdRef.current
+        );
 
         if (dto.type === 'SYSTEM') {
           if (Number(dto.chatId) !== Number(chatId)) return;
 
-          // Добавляем системное сообщение без задержки
-          upsertMessage(
-            { ...dto, status: MESSAGE_STATUS.SENT, isOptimistic: false },
-            { unreadDelta: 0 }
-          );
+          upsertMessage(dto, { unreadDelta: 0 });
           return;
         }
 
@@ -350,38 +406,27 @@ export const useChatRealtime = (chatId) => {
             currentUser?.id && dto?.senderId && Number(currentUser.id) === Number(dto.senderId);
 
           if (isOwn && dto.id) {
-            const cid = String(chatId);
-            const messageIds = messageIdsByChatId?.[cid] || [];
+            const plan = planOwnIncomingStompMessage({
+              dto,
+              chatId,
+              messageIdsByChatId: messageIdsByChatIdRef.current,
+              messagesById: messagesByIdRef.current,
+              currentUserId: currentUser?.id,
+            });
 
-            let optimisticMessages = messageIds
-              .map((id) => messagesById?.[String(id)])
-              .filter((msg) => msg && msg.isOptimistic && msg.tempId && msg.type === dto.type);
-
-            if (dto.type === 'FILE' || dto.type === 'IMAGE') {
-              if (dto.fileUrl) {
-                optimisticMessages = optimisticMessages.filter(
-                  (msg) => msg.fileUrl === dto.fileUrl
-                );
-              }
+            if (plan.action === 'replace' && plan.tempId) {
+              replaceOptimistic(chatId, plan.tempId, plan.dto, MESSAGE_STATUS.SENT);
+              return;
             }
-
-            optimisticMessages.sort(
-              (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-            );
-
-            if (optimisticMessages.length > 0) {
-              const latestOptimistic = optimisticMessages[0];
-              const now = Date.now();
-              const optimisticTime = new Date(latestOptimistic.createdAt || Date.now()).getTime();
-              const timeDiff = now - optimisticTime;
-
-              if (timeDiff < 30000) {
-                replaceOptimistic(chatId, latestOptimistic.tempId, dto, MESSAGE_STATUS.SENT);
-                return;
-              }
+            if (plan.action === 'upsert') {
+              upsertMessage(plan.dto, { unreadDelta: 0 });
+              return;
             }
-
             return;
+          }
+
+          if (!isOwn && dto.senderId != null && onPeerMessage) {
+            onPeerMessage(dto.senderId);
           }
 
           if (
@@ -420,50 +465,19 @@ export const useChatRealtime = (chatId) => {
 
           const isVisible =
             typeof document !== 'undefined' && document.visibilityState === 'visible';
-          upsertMessage(
-            { ...dto, status: MESSAGE_STATUS.SENT, isOptimistic: false },
-            { unreadDelta: isVisible ? 0 : undefined }
-          );
+          upsertMessage(dto, { unreadDelta: isVisible ? 0 : undefined });
 
-          // НЕ вызываем markChatAsRead - за это отвечает Intersection Observer
+          if (isVisible) {
+            scheduleMarkChatAsRead();
+          }
         };
 
-        if (typeof window !== 'undefined' && window.requestIdleCallback) {
-          window.requestIdleCallback(processMessage, { timeout: 1000 });
-        } else {
-          setTimeout(processMessage, 0);
-        }
+        processMessage();
       });
       topicSubRef.current = sub;
     } catch (e) {}
 
-    if (typeof window !== 'undefined') {
-      try {
-        const voiceSub = client.subscribe(`/topic/voice/${chatId}`, (message) => {
-          const data = safeJsonParse(message.body);
-          if (!data) return;
-          if (Number(data.chatId) !== Number(chatId)) return;
-
-          if (data.audioData) {
-            try {
-              const audioBlob = new Blob(
-                [Uint8Array.from(atob(data.audioData), (c) => c.charCodeAt(0))],
-                { type: 'audio/webm' }
-              );
-
-              const audioUrl = URL.createObjectURL(audioBlob);
-              const audio = new Audio(audioUrl);
-              audio.play().catch(() => {});
-
-              audio.onended = () => {
-                URL.revokeObjectURL(audioUrl);
-              };
-            } catch (e) {}
-          }
-        });
-        voiceTopicSubRef.current = voiceSub;
-      } catch (e) {}
-    }
+    // /topic/voice/* требует разрешения на бэкенде (StompSubscriptionAuthorizer)
 
     return () => {
       if (topicSubRef.current) {
@@ -485,9 +499,9 @@ export const useChatRealtime = (chatId) => {
     connected,
     upsertMessage,
     updateMessage,
-    markChatAsRead,
     replaceOptimistic,
-    messageIdsByChatId,
-    messagesById,
+    removeMessage,
+    scheduleMarkChatAsRead,
+    onPeerMessage,
   ]);
 };

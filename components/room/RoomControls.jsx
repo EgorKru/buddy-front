@@ -42,8 +42,14 @@ export default function RoomControls({ chatId, chatType }) {
 
   return (
     <>
-      <div className={styles.callControlsBar}>
-        <button onClick={handleOpenPreview} className={styles.callButton} title="Создать видеомит">
+      <div className={styles.callControlsBar} data-testid="chat-meet-button-bar">
+        <button
+          onClick={handleOpenPreview}
+          className={styles.callButton}
+          title="Создать видеомит"
+          data-testid="chat-meet-button"
+          type="button"
+        >
           <Video size={18} />
         </button>
       </div>

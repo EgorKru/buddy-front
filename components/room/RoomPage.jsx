@@ -317,11 +317,13 @@ export default function RoomPage() {
 
   if (shouldShowLoading) {
     return (
-      <div className={styles.roomContainer}>
-        <div className={styles.topBar}>
-          <div className={styles.logo}>Pager Meet</div>
+      <div className={styles.roomContainer} data-testid="room-page">
+        <div className={styles.topBar} data-testid="room-top-bar">
+          <div className={styles.logo} data-testid="room-logo">
+            Pager Meet
+          </div>
         </div>
-        <div className={styles.centerContent}>
+        <div className={styles.centerContent} data-testid="room-loading">
           <div className={styles.loader}></div>
           <p className={styles.loadingText}>Подключение к комнате...</p>
         </div>
@@ -330,16 +332,22 @@ export default function RoomPage() {
   }
 
   return (
-    <div className={styles.roomContainer}>
+    <div className={styles.roomContainer} data-testid="room-page">
       <RoomToast notifications={toastNotifications} onDismiss={dismissToast} />
-      <div className={styles.topBar}>
-        <div className={styles.logo}>Pager Meet</div>
-        <div className={styles.meetingInfo}>
-          <span className={styles.timer}>{formatTime(meetingTime)}</span>
-          <span className={styles.roomCode}>{actualRoomId}</span>
+      <div className={styles.topBar} data-testid="room-top-bar">
+        <div className={styles.logo} data-testid="room-logo">
+          Pager Meet
+        </div>
+        <div className={styles.meetingInfo} data-testid="room-meeting-info">
+          <span className={styles.timer} data-testid="room-timer">
+            {formatTime(meetingTime)}
+          </span>
+          <span className={styles.roomCode} data-testid="room-code">
+            {actualRoomId}
+          </span>
         </div>
       </div>
-      <div className={styles.videoGrid}>
+      <div className={styles.videoGrid} data-testid="room-video-grid">
         {isScreenSharing && screenStream && (
           <div className={styles.screenSharePreview}>
             <video

@@ -18,16 +18,22 @@ export default function Home() {
   }, [router]);
 
   if (!ready) {
-    return <Loader fullPage text="Loading..." />;
+    return <Loader fullPage text="Загрузка…" />;
   }
 
   return (
     <>
       <Head>
-        <title>Pager — Secure messaging and calls</title>
+        <title>Pager — Цифровой ассистент для жизни и работы</title>
         <meta
           name="description"
-          content="Secure messaging and calls for focused teams. Real-time chat, reliable reconnect, and private direct conversations."
+          content="Pager помогает организовывать задачи, встречи, коммуникацию и рабочие процессы — автоматически, с AI-помощью и без хаоса."
+        />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Alexandria:wght@400;500;600&family=Anybody:wght@600;700&family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+          rel="stylesheet"
         />
       </Head>
       <LandingPage />

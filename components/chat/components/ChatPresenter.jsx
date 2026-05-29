@@ -396,6 +396,7 @@ const ChatPresenter = ({
           fileUrl={fileViewerModal.fileUrl}
           fileName={fileViewerModal.fileName}
           mimeType={fileViewerModal.mimeType}
+          previewKind={fileViewerModal.previewKind}
           onClose={() => setFileViewerModal(null)}
         />
       )}

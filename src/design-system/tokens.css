@@ -20,14 +20,19 @@
   --pager-accent-soft: #eef4ff;
   --pager-success: #0f9d58;
 
-  --pager-showcase-bg: #f0e4ea;
-  --pager-showcase-bg-deep: #e8d8df;
+  --pager-showcase-bg: #e8e4de;
+  --pager-showcase-bg-deep: #ddd8d0;
 
-  --pager-panel-warm: #f4d96b;
-  --pager-panel-warm-text: #1a1408;
-  --pager-panel-deep: #1c3347;
-  --pager-panel-deep-text: #f4f7fb;
-  --pager-panel-light: #ffffff;
+  --pager-panel-stone: #ddd5c8;
+  --pager-panel-stone-text: #2c2924;
+  --pager-panel-sand: #ebe4d6;
+  --pager-panel-sand-text: #2f2c27;
+  --pager-panel-warm: #e8dfd0;
+  --pager-panel-warm-text: #2c2924;
+  --pager-panel-deep: #141c26;
+  --pager-panel-deep-text: #e8edf2;
+  --pager-panel-deep-muted: #8a96a3;
+  --pager-panel-light: #f7f5f1;
 
   --pager-header-btn-bg: #eceae6;
   --pager-header-btn-bg-hover: #e2e0dc;
@@ -41,6 +46,7 @@
   --pager-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --pager-font-display: clamp(3.35rem, 7vw, 5.65rem);
   --pager-font-h2: clamp(2rem, 3.2vw, 2.65rem);
+  --pager-font-h3: clamp(1.25rem, 2vw, 1.5rem);
   --pager-font-body: 1.0625rem;
   --pager-font-small: 0.9375rem;
   --pager-font-caption: 0.8125rem;
@@ -53,6 +59,7 @@
   --pager-max-width: 1280px;
   --pager-gutter: clamp(24px, 5vw, 64px);
   --pager-header-height: 72px;
+  --pager-section-y: clamp(88px, 11vh, 120px);
 
   /* Spacing */
   --pager-space-1: 8px;
@@ -65,17 +72,18 @@
   --pager-space-8: 112px;
 
   /* Radii */
-  --pager-radius-sm: 10px;
-  --pager-radius-md: 14px;
-  --pager-radius-lg: 20px;
-  --pager-radius-xl: 28px;
+  --pager-radius-sm: 6px;
+  --pager-radius-md: 10px;
+  --pager-radius-lg: 14px;
+  --pager-radius-xl: 18px;
   --pager-radius-pill: 999px;
 
   /* Shadows */
-  --pager-shadow-sm: 0 1px 2px rgba(18, 19, 26, 0.06);
-  --pager-shadow-md: 0 12px 32px rgba(18, 19, 26, 0.08);
-  --pager-shadow-lg: 0 24px 48px rgba(18, 19, 26, 0.1);
-  --pager-shadow-xl: 0 36px 72px rgba(18, 19, 26, 0.12);
+  --pager-shadow-sm: 0 1px 2px rgba(18, 19, 26, 0.04);
+  --pager-shadow-md: 0 8px 24px rgba(18, 19, 26, 0.06);
+  --pager-shadow-lg: 0 16px 40px rgba(18, 19, 26, 0.07);
+  --pager-shadow-xl: 0 24px 56px rgba(18, 19, 26, 0.09);
 
   --pager-focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.28);
+  --pager-focus-ring-error: 0 0 0 3px rgba(185, 28, 28, 0.22);
 }

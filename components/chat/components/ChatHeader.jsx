@@ -79,8 +79,16 @@ export default function ChatHeader({
         <h1>{getDisplayChatName()}</h1>
         {status.text && (
           <div className={styles.onlineStatus}>
-            {status.online && <span className={styles.onlineDot} />}
-            <span className={status.online ? styles.onlineText : styles.offlineText}>
+            {status.online && <span className={status.busy ? styles.busyDot : styles.onlineDot} />}
+            <span
+              className={
+                status.busy
+                  ? styles.busyText
+                  : status.online
+                    ? styles.onlineText
+                    : styles.offlineText
+              }
+            >
               {status.text}
             </span>
           </div>
@@ -99,6 +107,7 @@ export default function ChatHeader({
             }}
             className={styles.callButton}
             disabled={!canCall}
+            data-testid="chat-call-button"
             title={canCall ? 'Позвонить' : 'Вы уже в активном звонке'}
           >
             <Phone size={20} />

@@ -1,16 +1,19 @@
 /**
- * Login form — v2 design system.
+ * Форма входа — v2 design system.
  */
 import { useState } from 'react';
 import Link from 'next/link';
 import { Eye, EyeOff } from 'lucide-react';
 import ds from '@/design-system/primitives.module.css';
+import styles from '../authForms.module.css';
 
 function LoginUsernameField({ formData, handleChange, handleBlur, usernameError }) {
   return (
-    <div className={ds.field}>
-      <label htmlFor="login-username">Email or username</label>
-      <span className={ds.fieldHint}>Use the same identifier you registered with.</span>
+    <div className={`${ds.field} ${styles.field}`}>
+      <label htmlFor="login-username">Имя пользователя</label>
+      <span className={`${ds.fieldHint} ${styles.fieldHint}`}>
+        Используйте имя пользователя, указанное при регистрации.
+      </span>
       <input
         type="text"
         id="login-username"
@@ -18,9 +21,9 @@ function LoginUsernameField({ formData, handleChange, handleBlur, usernameError 
         value={formData.username}
         onChange={handleChange}
         onBlur={handleBlur}
-        placeholder="you@company.com or username"
+        placeholder="Введите имя пользователя"
         autoComplete="username"
-        className={`${ds.input} ${usernameError ? ds.inputInvalid : ''}`}
+        className={`${ds.input} ${styles.input} ${usernameError ? ds.inputInvalid : ''}`}
         aria-invalid={usernameError ? 'true' : 'false'}
         aria-describedby={usernameError ? 'login-username-error' : undefined}
       />
@@ -41,8 +44,8 @@ function LoginPasswordField({ formData, handleChange, handleBlur, passwordError,
     .join(' ');
 
   return (
-    <div className={ds.field}>
-      <label htmlFor="login-password">Password</label>
+    <div className={`${ds.field} ${styles.field}`}>
+      <label htmlFor="login-password">Пароль</label>
       <div className={ds.passwordWrap}>
         <input
           type={showPassword ? 'text' : 'password'}
@@ -51,17 +54,17 @@ function LoginPasswordField({ formData, handleChange, handleBlur, passwordError,
           value={formData.password}
           onChange={handleChange}
           onBlur={handleBlur}
-          placeholder="Enter your password"
+          placeholder="Введите пароль"
           autoComplete="current-password"
-          className={`${ds.input} ${passwordError ? ds.inputInvalid : ''}`}
+          className={`${ds.input} ${styles.input} ${passwordError ? ds.inputInvalid : ''}`}
           aria-invalid={passwordError ? 'true' : 'false'}
           aria-describedby={describedBy || undefined}
         />
         <button
           type="button"
-          className={ds.passwordToggle}
+          className={`${ds.passwordToggle} ${styles.passwordToggle}`}
           onClick={() => setShowPassword(!showPassword)}
-          aria-label={showPassword ? 'Hide password' : 'Show password'}
+          aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
         >
           {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
         </button>
@@ -87,7 +90,7 @@ export function LoginForm({
 }) {
   return (
     <>
-      <form className={ds.formStack} onSubmit={handleLogin} noValidate>
+      <form className={`${ds.formStack} ${styles.formStack}`} onSubmit={handleLogin} noValidate>
         <LoginUsernameField
           formData={formData}
           handleChange={handleChange}
@@ -102,16 +105,26 @@ export function LoginForm({
           error={error}
         />
         {error ? (
-          <div id="login-error" className={ds.formError} role="alert">
+          <div id="login-error" className={`${ds.formError} ${styles.formError}`} role="alert">
             {error}
           </div>
         ) : null}
-        <button type="submit" disabled={loading} className={ds.btnPrimary}>
-          {loading ? 'Signing in...' : 'Log in'}
-        </button>
+        <div className={ds.formActions}>
+          <button
+            type="submit"
+            disabled={loading}
+            className={`${ds.btnPrimary} ${styles.btnPrimary}`}
+            aria-busy={loading}
+          >
+            {loading ? 'Вход…' : 'Войти'}
+          </button>
+        </div>
       </form>
-      <p className={ds.footerLink}>
-        Don&apos;t have an account? <Link href="/register">Get started</Link>
+      <p className={`${ds.footerLink} ${styles.footerLink}`}>
+        Нет аккаунта? <Link href="/register">Начать</Link>
+      </p>
+      <p className={`${ds.trustNote} ${styles.trustNote}`}>
+        Сессия защищена при передаче. Личные сообщения остаются приватными на вашем устройстве.
       </p>
     </>
   );

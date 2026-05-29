@@ -6,7 +6,9 @@
 export {
   getChatName,
   getChatAvatar,
+  getMessagePreview,
   getLastMessagePreview,
   getLastMessageReadMeta,
   getOtherParticipantOnline,
+  getOtherParticipantPresence,
 } from '../src/entities/chat';

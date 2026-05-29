@@ -1,13 +1,11 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 
-jest.mock('@/shared/lib/e2ee/directTextE2ee', () => ({
-  __esModule: true,
-  isE2eeEnabled: jest.fn(),
-  decryptDirectText: jest.fn(),
+jest.mock('@/shared/lib/e2ee/messageTextPreview', () => ({
+  decryptMessagePlainText: jest.fn(),
 }));
 
-import * as directTextE2ee from '@/shared/lib/e2ee/directTextE2ee';
+import { decryptMessagePlainText } from '@/shared/lib/e2ee/messageTextPreview';
 import E2eeTextContent from '../E2eeTextContent';
 
 const styles = { e2eeFailed: 'e2eeFailed', e2eePending: 'e2eePending' };
@@ -18,72 +16,39 @@ const directChat = {
   participants: [{ id: 1 }, { id: 2 }],
 };
 
+const e2eeMsg = (overrides) => ({
+  id: 'm1',
+  chatId: 'chat-1',
+  senderId: 2,
+  content: '{"v":1}',
+  encryptionVersion: 1,
+  ...overrides,
+});
+
 describe('E2eeTextContent', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it('shows raw content when E2EE is disabled', async () => {
-    directTextE2ee.isE2eeEnabled.mockReturnValue(false);
+  it('shows decrypted text when decryption succeeds', async () => {
+    decryptMessagePlainText.mockResolvedValue({ text: 'decrypted hello' });
 
     render(
-      <E2eeTextContent
-        msg={{ id: 'm1', chatId: 'chat-1', senderId: 2, content: 'plain body' }}
-        user={{ id: 1 }}
-        chats={[directChat]}
-        styles={styles}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('plain body')).toBeInTheDocument();
-    });
-    expect(directTextE2ee.decryptDirectText).not.toHaveBeenCalled();
-  });
-
-  it('shows decrypted text when E2EE is enabled', async () => {
-    directTextE2ee.isE2eeEnabled.mockReturnValue(true);
-    directTextE2ee.decryptDirectText.mockResolvedValue('decrypted hello');
-
-    render(
-      <E2eeTextContent
-        msg={{ id: 'm2', chatId: 'chat-1', senderId: 2, content: '{"v":1}' }}
-        user={{ id: 1 }}
-        chats={[directChat]}
-        styles={styles}
-      />
+      <E2eeTextContent msg={e2eeMsg()} user={{ id: 1 }} chats={[directChat]} styles={styles} />
     );
 
     await waitFor(() => {
       expect(screen.getByText('decrypted hello')).toBeInTheDocument();
     });
-    expect(directTextE2ee.decryptDirectText).toHaveBeenCalledWith(2, '{"v":1}');
-  });
-
-  it('uses peer as counterparty when message is outgoing', async () => {
-    directTextE2ee.isE2eeEnabled.mockReturnValue(true);
-    directTextE2ee.decryptDirectText.mockResolvedValue('ok');
-
-    render(
-      <E2eeTextContent
-        msg={{ id: 'm3', chatId: 'chat-1', senderId: 1, content: '{}' }}
-        user={{ id: 1 }}
-        chats={[directChat]}
-        styles={styles}
-      />
-    );
-
-    await waitFor(() => {
-      expect(directTextE2ee.decryptDirectText).toHaveBeenCalledWith(2, '{}');
-    });
+    expect(decryptMessagePlainText).toHaveBeenCalled();
   });
 
   it('shows failure when peer cannot be resolved', async () => {
-    directTextE2ee.isE2eeEnabled.mockReturnValue(true);
+    decryptMessagePlainText.mockResolvedValue({ text: null, reason: 'no_peer' });
 
     render(
       <E2eeTextContent
-        msg={{ id: 'm4', chatId: 'chat-1', senderId: 1, content: '{}' }}
+        msg={e2eeMsg({ senderId: 1 })}
         user={{ id: 1 }}
         chats={[{ id: 'chat-1', type: 'DIRECT', participants: [{ id: 1 }] }]}
         styles={styles}
@@ -91,26 +56,31 @@ describe('E2eeTextContent', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/Не удалось расшифровать/)).toBeInTheDocument();
+      expect(screen.getByText(/собеседника для расшифровки/)).toBeInTheDocument();
     });
-    expect(directTextE2ee.decryptDirectText).not.toHaveBeenCalled();
   });
 
-  it('shows failure when decrypt throws', async () => {
-    directTextE2ee.isE2eeEnabled.mockReturnValue(true);
-    directTextE2ee.decryptDirectText.mockRejectedValue(new Error('bad key'));
+  it('shows failure when decrypt fails', async () => {
+    decryptMessagePlainText.mockResolvedValue({ text: null, reason: 'decrypt_failed' });
 
     render(
-      <E2eeTextContent
-        msg={{ id: 'm5', chatId: 'chat-1', senderId: 2, content: '{}' }}
-        user={{ id: 1 }}
-        chats={[directChat]}
-        styles={styles}
-      />
+      <E2eeTextContent msg={e2eeMsg()} user={{ id: 1 }} chats={[directChat]} styles={styles} />
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/Не удалось расшифровать/)).toBeInTheDocument();
+      expect(screen.getByText(/Не удалось загрузить сообщение/)).toBeInTheDocument();
+    });
+  });
+
+  it('shows key-lost message when local E2EE key is missing', async () => {
+    decryptMessagePlainText.mockResolvedValue({ text: null, reason: 'local_key_lost' });
+
+    render(
+      <E2eeTextContent msg={e2eeMsg()} user={{ id: 1 }} chats={[directChat]} styles={styles} />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Ключ шифрования недоступен/)).toBeInTheDocument();
     });
   });
 });

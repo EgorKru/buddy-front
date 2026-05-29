@@ -1,0 +1,67 @@
+.formStack {
+  gap: 22px;
+}
+
+.field label {
+  color: #2a2640;
+}
+
+.fieldHint {
+  color: #6a6683;
+}
+
+.input {
+  border-color: rgba(142, 127, 174, 0.42);
+  background: rgba(255, 255, 255, 0.96);
+  color: #1e1a33;
+}
+
+.input::placeholder {
+  color: #8a84a3;
+}
+
+.input:focus,
+.input:focus-visible {
+  border-color: #8f4cc2;
+  box-shadow: 0 0 0 3px rgba(143, 76, 194, 0.2);
+}
+
+.passwordToggle {
+  color: #6b6489;
+}
+
+.passwordToggle:hover {
+  color: #3b3355;
+  background: rgba(238, 231, 249, 0.7);
+}
+
+.btnPrimary {
+  border: 1px solid rgba(255, 222, 255, 0.62);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #d98ef0 0%, #b75bd6 100%);
+  box-shadow:
+    0 10px 22px rgba(160, 87, 190, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #d27de9 0%, #ab4ccb 100%);
+}
+
+.formError {
+  border-color: rgba(234, 108, 108, 0.42);
+  background: #fff7f7;
+}
+
+.footerLink {
+  border-top-color: rgba(162, 145, 189, 0.32);
+  color: #5f5a78;
+}
+
+.footerLink a {
+  color: #2f2a47;
+}
+
+.trustNote {
+  color: #6c6782;
+}

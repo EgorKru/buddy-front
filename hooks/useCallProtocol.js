@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useStomp } from '@/context/socket';
 import { safeJsonParse } from '@/utils/safe';
 import { getCurrentUser, turnAPI } from '@/utils/api';
+import { acquireMediaStream, buildProcessedMediaStream, stopMediaStream } from '@/shared/lib/media';
 
 const SIGNAL_TYPES = {
   CALL_INITIATE: 'CALL_INITIATE',
@@ -86,6 +87,7 @@ export const useCallProtocol = () => {
   const subscriptionsRef = useRef([]);
   const iceCandidatesQueueRef = useRef([]);
   const turnCredentialsRef = useRef(null);
+  const backgroundEffectStopRef = useRef(null);
 
   const currentUser = getCurrentUser();
   const myUserId = currentUser?.id;
@@ -173,14 +175,24 @@ export const useCallProtocol = () => {
     if (!isBrowser) return null;
 
     try {
-      const constraints = {
-        audio: true,
-        video: isVideo
-          ? { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }
-          : false,
-      };
+      if (localStreamRef.current) {
+        stopMediaStream(localStreamRef.current);
+        localStreamRef.current = null;
+      }
+      backgroundEffectStopRef.current?.();
+      backgroundEffectStopRef.current = null;
 
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      const { stream: raw } = await acquireMediaStream({
+        audio: true,
+        video: isVideo,
+        onMicReady: () => {
+          setAudioEnabled(true);
+        },
+      });
+
+      const stream = buildProcessedMediaStream(raw, {
+        effectStopRef: backgroundEffectStopRef,
+      });
       localStreamRef.current = stream;
       setLocalStream(stream);
       setAudioEnabled(true);
@@ -288,8 +300,10 @@ export const useCallProtocol = () => {
   }, []);
 
   const cleanup = useCallback(() => {
+    backgroundEffectStopRef.current?.();
+    backgroundEffectStopRef.current = null;
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((track) => track.stop());
+      stopMediaStream(localStreamRef.current);
       localStreamRef.current = null;
     }
     setLocalStream(null);
@@ -474,17 +488,16 @@ export const useCallProtocol = () => {
               response.call.status === CALL_STATUS.ENDED &&
               response.call.endReason === END_REASON.BUSY
             ) {
-              // Пользователь занят
               setIsRinging(false);
               const busyTargetName =
                 response.call.callee?.displayName ||
                 response.call.callee?.username ||
                 'Пользователь';
-              setError(`${busyTargetName} занят и не может ответить`);
               cleanup();
+              setError(`${busyTargetName} занят и не может ответить`);
               return;
             } else if (response.call.status === CALL_STATUS.CALLING) {
-              // Звонок инициирован успешно
+              setIsRinging(true);
               setCall(response.call);
               callIdRef.current = response.call.id;
               // Добавляем в список активных звонков

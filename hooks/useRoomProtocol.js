@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useStomp } from '@/context/socket';
 import { safeJsonParse, safeUnsubscribe } from '@/utils/safe';
 import { turnAPI } from '@/utils/api';
+import { acquireMediaStream, buildProcessedMediaStream, stopMediaStream } from '@/shared/lib/media';
 
 const SIGNAL_TYPES = {
   ROOM_CREATE: 'ROOM_CREATE',
@@ -104,6 +105,7 @@ export const useRoomProtocol = (initialRoomId = null) => {
   const negotiationTimeoutRef = useRef(new Set());
   const connectedRef = useRef(connected);
   const turnCredentialsRef = useRef(null);
+  const backgroundEffectStopRef = useRef(null);
 
   const lastSeqRef = useRef(0);
   const eventQueueRef = useRef([]);
@@ -768,8 +770,10 @@ export const useRoomProtocol = (initialRoomId = null) => {
     peerConnectionsRef.current.forEach((pc) => pc.close());
     peerConnectionsRef.current.clear();
 
+    backgroundEffectStopRef.current?.();
+    backgroundEffectStopRef.current = null;
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((track) => track.stop());
+      stopMediaStream(localStreamRef.current);
       localStreamRef.current = null;
     }
     if (screenStreamRef.current) {
@@ -844,23 +848,26 @@ export const useRoomProtocol = (initialRoomId = null) => {
       }
 
       try {
-        const constraints = {
-          audio: audio
-            ? {
-                deviceId: selectedMicrophone ? { exact: selectedMicrophone } : undefined,
-                echoCancellation: true,
-                noiseSuppression: true,
-              }
-            : false,
-          video: video
-            ? {
-                deviceId: selectedCamera ? { exact: selectedCamera } : undefined,
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
-              }
-            : false,
-        };
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        if (localStreamRef.current) {
+          stopMediaStream(localStreamRef.current);
+          localStreamRef.current = null;
+        }
+        backgroundEffectStopRef.current?.();
+        backgroundEffectStopRef.current = null;
+
+        const { stream: raw } = await acquireMediaStream({
+          audio,
+          video,
+          cameraDeviceId: selectedCamera || undefined,
+          microphoneDeviceId: selectedMicrophone || undefined,
+          onMicReady: () => {
+            if (audio) setAudioEnabled(true);
+          },
+        });
+
+        const stream = buildProcessedMediaStream(raw, {
+          effectStopRef: backgroundEffectStopRef,
+        });
 
         localStreamRef.current = stream;
         setLocalStream(stream);
@@ -878,7 +885,7 @@ export const useRoomProtocol = (initialRoomId = null) => {
         return null;
       }
     },
-    [isBrowser]
+    [isBrowser, selectedCamera, selectedMicrophone]
   );
 
   const createRoom = useCallback(async (options = {}) => {

@@ -10,6 +10,42 @@
   margin: 0;
 }
 
+.videoWrapper {
+  max-width: 400px;
+  margin-bottom: 0.5rem;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: #000;
+}
+
+.inlineVideo {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+}
+
+.videoLoading,
+.videoError {
+  padding: 2rem;
+  text-align: center;
+  color: #666;
+  background: #f5f7fa;
+}
+
+.videoError {
+  color: #c62828;
+}
+
+.fileContainer.viewable {
+  cursor: pointer;
+}
+
+.fileHint {
+  font-size: 0.75rem;
+  color: #666;
+  margin-top: 0.25rem;
+}
+
 .fileContainer.embeddedContainer {
   background: transparent;
   box-shadow: none;

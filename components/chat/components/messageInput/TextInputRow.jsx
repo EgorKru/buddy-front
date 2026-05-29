@@ -81,6 +81,7 @@ export function SendButton({
   return (
     <button
       type="submit"
+      data-testid="chat-send-button"
       className={styles.sendButton}
       disabled={sending || uploadingFile}
       title={editingMessageId ? 'Сохранить изменения' : 'Отправить сообщение'}

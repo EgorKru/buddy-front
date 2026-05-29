@@ -92,6 +92,7 @@ export function AttachAndVoiceButtons({
         style={{ display: 'none' }}
         onChange={(e) => onFileSelect?.(e)}
         accept="*/*"
+        data-testid="chat-attach-input"
       />
       <div className={styles.voiceButtonWrapper} style={{ position: 'relative' }}>
         {showLockIndicator && (

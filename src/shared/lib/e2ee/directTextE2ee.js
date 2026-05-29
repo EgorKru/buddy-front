@@ -11,6 +11,16 @@ const E2EE_VERSION = 1;
 
 const spkiCache = new Map();
 
+export const E2EE_LOCAL_KEY_LOST = 'E2EE_LOCAL_KEY_LOST';
+
+export function clearPeerSpkiCache(peerUserId) {
+  if (peerUserId != null) {
+    spkiCache.delete(String(peerUserId));
+  } else {
+    spkiCache.clear();
+  }
+}
+
 /**
  * Явно выключить: NEXT_PUBLIC_E2EE_ENABLED=false (или 0).
  * Явно включить: true / 1.
@@ -128,6 +138,17 @@ export async function ensureIdentityKeyPublished() {
   let rec = await idbGet(storageKey);
 
   if (!rec?.privJwk) {
+    let serverHasKey = false;
+    try {
+      const dto = await cryptoAPI.getUserIdentityKey(userId);
+      serverHasKey = Boolean(dto?.identityKeyPublic);
+    } catch {
+      serverHasKey = false;
+    }
+    if (serverHasKey) {
+      throw new Error(E2EE_LOCAL_KEY_LOST);
+    }
+
     const pair = await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, true, [
       'deriveBits',
     ]);
@@ -156,8 +177,9 @@ async function loadMyPrivateKey() {
   ]);
 }
 
-async function getPeerSpkiB64(peerUserId) {
+async function getPeerSpkiB64(peerUserId, { refresh = false } = {}) {
   const k = String(peerUserId);
+  if (refresh) spkiCache.delete(k);
   if (spkiCache.has(k)) return spkiCache.get(k);
   const dto = await cryptoAPI.getUserIdentityKey(peerUserId);
   const b64 = dto?.identityKeyPublic;
@@ -181,7 +203,9 @@ export async function encryptDirectText(peerUserId, plainText) {
 
   let peerPub;
   try {
-    peerPub = await importPeerPublicFromSpkiB64(await getPeerSpkiB64(peerUserId));
+    peerPub = await importPeerPublicFromSpkiB64(
+      await getPeerSpkiB64(peerUserId, { refresh: true })
+    );
   } catch {
     return null;
   }
@@ -205,12 +229,7 @@ export async function encryptDirectText(peerUserId, plainText) {
  * @param {number} otherUserId — ECDH-собеседник (для входящего: senderId; для исходящего: peer в direct)
  * @param {string} content — JSON конверт
  */
-export async function decryptDirectText(otherUserId, content) {
-  if (!isE2eeEnabled() || typeof window === 'undefined' || !crypto?.subtle) {
-    throw new Error('E2EE unavailable');
-  }
-  if (!otherUserId) throw new Error('Missing peer id');
-
+async function decryptDirectTextOnce(otherUserId, content, { refreshPeerKey = false } = {}) {
   let envelope;
   try {
     envelope = JSON.parse(content);
@@ -224,10 +243,35 @@ export async function decryptDirectText(otherUserId, content) {
   const myPrivate = await loadMyPrivateKey();
   if (!myPrivate) throw new Error('No local E2EE key');
 
-  const peerPub = await importPeerPublicFromSpkiB64(await getPeerSpkiB64(otherUserId));
+  const peerPub = await importPeerPublicFromSpkiB64(
+    await getPeerSpkiB64(otherUserId, { refresh: refreshPeerKey })
+  );
   const aesKey = await deriveSharedAes(myPrivate, peerPub);
   const iv = b64ToBytes(envelope.iv);
   const ct = b64ToBytes(envelope.ct);
   const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, aesKey, ct);
   return new TextDecoder().decode(plainBuf);
+}
+
+/**
+ * @param {number} otherUserId — ECDH-собеседник (для входящего: senderId; для исходящего: peer в direct)
+ * @param {string} content — JSON конверт
+ */
+export async function decryptDirectText(otherUserId, content) {
+  if (!isE2eeEnabled() || typeof window === 'undefined' || !crypto?.subtle) {
+    throw new Error('E2EE unavailable');
+  }
+  if (!otherUserId) throw new Error('Missing peer id');
+
+  await ensureIdentityKeyPublished();
+
+  try {
+    return await decryptDirectTextOnce(otherUserId, content);
+  } catch (firstError) {
+    try {
+      return await decryptDirectTextOnce(otherUserId, content, { refreshPeerKey: true });
+    } catch {
+      throw firstError;
+    }
+  }
 }
