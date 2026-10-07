@@ -4,6 +4,21 @@
  */
 import { apiRequest } from './client';
 
+export const clearAuthSession = async () => {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('token');
+  localStorage.removeItem('refreshToken');
+  localStorage.removeItem('tokenExpiresAt');
+  localStorage.removeItem('user');
+
+  if ('serviceWorker' in navigator) {
+    const registrations = await navigator.serviceWorker.getRegistrations().catch(() => []);
+    registrations.forEach((registration) => {
+      registration.active?.postMessage({ type: 'CLEAR_CACHE' });
+    });
+  }
+};
+
 export const authAPI = {
   login: async (username, password) => {
     return apiRequest('/auth/login', {
@@ -26,10 +41,21 @@ export const authAPI = {
     });
   },
 
-  logout: () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+  logout: async () => {
+    const refreshToken =
+      typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
+    try {
+      if (refreshToken) {
+        await apiRequest('/auth/logout', {
+          method: 'POST',
+          body: { refreshToken },
+          skipAuthRefresh: true,
+        });
+      }
+    } catch {
+      // Local logout must still succeed when the token is expired or the API is offline.
+    } finally {
+      await clearAuthSession();
     }
   },
 
@@ -53,9 +79,13 @@ export const getCurrentUser = () => {
  * @param {object|null} user
  * @param {string|null} token
  */
-export const setCurrentUser = (user, token) => {
+export const setCurrentUser = (user, token, refreshToken = null, expiresIn = null) => {
   if (typeof window !== 'undefined') {
     if (token) localStorage.setItem('token', token);
+    if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
+    if (expiresIn) {
+      localStorage.setItem('tokenExpiresAt', String(Date.now() + Number(expiresIn) * 1000));
+    }
     if (user) localStorage.setItem('user', JSON.stringify(user));
   }
 };

@@ -1,5 +1,12 @@
 export { apiRequest } from './client';
-export { authAPI, getCurrentUser, setCurrentUser, isAuthenticated, getToken } from './auth';
+export {
+  authAPI,
+  clearAuthSession,
+  getCurrentUser,
+  setCurrentUser,
+  isAuthenticated,
+  getToken,
+} from './auth';
 export { roomAPI } from './room';
 export { chatAPI } from './chat';
 export { userAPI } from './user';

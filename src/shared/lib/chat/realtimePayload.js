@@ -70,6 +70,15 @@ export function planOwnIncomingStompMessage({
     .map((id) => messagesById[String(id)])
     .filter((msg) => msg && msg.isOptimistic && msg.tempId && msg.type === dto.type);
 
+  if (dto.clientMessageId) {
+    const exact = optimisticMessages.find(
+      (message) => message.clientMessageId === dto.clientMessageId
+    );
+    if (exact) {
+      return { action: 'replace', tempId: exact.tempId, dto };
+    }
+  }
+
   if (dto.type === 'FILE' || dto.type === 'IMAGE') {
     if (dto.fileUrl) {
       optimisticMessages = optimisticMessages.filter((msg) => msg.fileUrl === dto.fileUrl);

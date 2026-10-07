@@ -58,8 +58,7 @@ async function main() {
   process.env.NEXT_PUBLIC_E2EE_ENABLED = 'false';
   process.env.NEXT_PUBLIC_API_URL =
     process.env.NEXT_PUBLIC_API_URL || process.env.E2E_API_URL || 'http://localhost:8080/api';
-  process.env.NEXT_PUBLIC_WS_URL =
-    process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:8080/ws';
+  process.env.NEXT_PUBLIC_WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:8080/ws';
 
   const port = process.env.E2E_PORT || '3002';
   const baseUrl = (process.env.E2E_BASE_URL || `http://127.0.0.1:${port}`).replace(/\/$/, '');

@@ -80,7 +80,7 @@ export function useLogin() {
 
     try {
       const data = await authAPI.login(username, password);
-      setCurrentUser(data.user, data.token);
+      setCurrentUser(data.user, data.token, data.refreshToken, data.expiresIn);
       if (typeof window !== 'undefined') {
         import('@/shared/lib/e2ee/directTextE2ee')
           .then((m) => {

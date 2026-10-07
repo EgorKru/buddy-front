@@ -2,8 +2,6 @@
 
 const CACHE_VERSION = 'v3';
 const CACHE_NAME = `buddy-chat-${CACHE_VERSION}`;
-const IMAGE_CACHE_NAME = `buddy-images-${CACHE_VERSION}`;
-const MEDIA_CACHE_NAME = `buddy-media-${CACHE_VERSION}`;
 
 const STATIC_RESOURCES = [
   '/',
@@ -30,9 +28,7 @@ self.addEventListener('activate', (event) => {
           }
           
           if (cacheName.startsWith('buddy-') && 
-              cacheName !== CACHE_NAME && 
-              cacheName !== IMAGE_CACHE_NAME && 
-              cacheName !== MEDIA_CACHE_NAME) {
+              cacheName !== CACHE_NAME) {
             return caches.delete(cacheName);
           }
         })
@@ -57,66 +53,14 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (url.pathname.includes('/api/chats/') && 
-      (url.pathname.includes('/files/') || url.pathname.includes('/images/'))) {
-    if (event.request.method !== 'GET') {
-      return;
-    }
-    
-    event.respondWith(
-      caches.open(IMAGE_CACHE_NAME).then((cache) => {
-        return cache.match(event.request).then((response) => {
-          if (response) {
-            return response;
-          }
-          
-          return fetch(event.request).then((fetchResponse) => {
-            if (fetchResponse.status === 200 && event.request.method === 'GET') {
-              cache.put(event.request, fetchResponse.clone());
-            }
-            return fetchResponse;
-          }).catch(() => {
-            return new Response('', { status: 408 });
-          });
-        });
-      })
-    );
-    return;
-  }
-
-  if (url.pathname.includes('/api/chats/') && 
-      (url.pathname.includes('/voice/') || url.pathname.includes('/audio/'))) {
-    if (event.request.method !== 'GET') {
-      return;
-    }
-    
-    event.respondWith(
-      caches.open(MEDIA_CACHE_NAME).then((cache) => {
-        return cache.match(event.request).then((response) => {
-          if (response) {
-            return response;
-          }
-          
-          return fetch(event.request).then((fetchResponse) => {
-            if (fetchResponse.status === 200 && event.request.method === 'GET') {
-              cache.put(event.request, fetchResponse.clone());
-            }
-            return fetchResponse;
-          }).catch(() => {
-            return new Response('', { status: 408 });
-          });
-        });
-      })
-    );
-    return;
-  }
-
   if (STATIC_RESOURCES.some((resource) => url.pathname === resource)) {
     // Let the browser handle navigation; do not intercept (avoids dev/stale-cache issues).
     return;
   }
   
   if (url.pathname.startsWith('/api/')) {
+    // Authenticated API responses and attachments must never be shared through
+    // Cache Storage between accounts on the same device.
     return;
   }
 });

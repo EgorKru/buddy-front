@@ -129,10 +129,20 @@ async function main() {
     'recipient'
   );
   subscribeJson(recipientClient, topicDest, recipientFlag, recipientRx, 'topicMessage');
-  subscribeJson(recipientClient, '/user/queue/messages', recipientFlag, recipientRx, 'queueMessage');
+  subscribeJson(
+    recipientClient,
+    '/user/queue/messages',
+    recipientFlag,
+    recipientRx,
+    'queueMessage'
+  );
 
   await waitFor(() => senderClient.connected && recipientClient.connected, 5000, 'connected');
-  await waitFor(() => senderRx.presence || presenceFlag.current, 5000, 'sender presence after recipient connect');
+  await waitFor(
+    () => senderRx.presence || presenceFlag.current,
+    5000,
+    'sender presence after recipient connect'
+  );
   console.log('✓ sender got /user/queue/presence');
 
   const unique = `ws-smoke-${Date.now()}`;

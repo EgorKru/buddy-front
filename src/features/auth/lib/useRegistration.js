@@ -179,7 +179,7 @@ export function useRegistration() {
       };
       if (formData.displayName.trim()) registerData.displayName = formData.displayName.trim();
       const data = await authAPI.register(registerData);
-      setCurrentUser(data.user, data.token);
+      setCurrentUser(data.user, data.token, data.refreshToken, data.expiresIn);
       if (typeof window !== 'undefined') {
         import('@/shared/lib/e2ee/directTextE2ee')
           .then((m) => {

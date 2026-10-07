@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { chatAPI } from '@/utils/api';
 import { MESSAGE_STATUS } from '@/utils/messageQueue';
 
+const GAP_RECOVERY_LIMIT = 100;
+
 export const useStateSync = ({
   upsertMessage,
   localSeqRef,
@@ -16,16 +18,10 @@ export const useStateSync = ({
       if (!stateData || stateData.eventType !== 'STATE_SYNC') return;
 
       if (stateData.seq !== undefined && stateData.seq > localSeqRef.current) {
-        const oldSeq = localSeqRef.current;
         localSeqRef.current = stateData.seq;
 
-        if (stateData.seq > oldSeq + 1 && oldSeq > 0) {
-          try {
-            const updates = await chatAPI.getUserUpdates(oldSeq + 1, GAP_RECOVERY_LIMIT);
-            if (updates?.updates && Array.isArray(updates.updates)) {
-            }
-          } catch (error) {}
-        }
+        // There is no user-level journal endpoint yet. Chat-level PTS recovery
+        // below is the source of truth for message events.
       }
 
       if (stateData.chats && Array.isArray(stateData.chats)) {

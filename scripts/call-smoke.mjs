@@ -168,11 +168,7 @@ async function main() {
   publishSignal(caller, { type: 'CALL_END', callId });
   console.log('→ CALL_END');
 
-  await waitFor(
-    () => calleeState.lastEvent?.eventType === 'CALL_ENDED',
-    5000,
-    'callee CALL_ENDED'
-  );
+  await waitFor(() => calleeState.lastEvent?.eventType === 'CALL_ENDED', 5000, 'callee CALL_ENDED');
   console.log('✓ callee got CALL_ENDED');
 
   caller.deactivate();
