@@ -56,8 +56,7 @@ async function main() {
   process.env.NEXT_PUBLIC_E2EE_ENABLED = 'false';
   process.env.NEXT_PUBLIC_API_URL =
     process.env.NEXT_PUBLIC_API_URL || process.env.E2E_API_URL || 'http://localhost:8080/api';
-  process.env.NEXT_PUBLIC_WS_URL =
-    process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:8080/ws';
+  process.env.NEXT_PUBLIC_WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:8080/ws';
   process.env.NEXT_PUBLIC_WS_NATIVE_URL =
     process.env.NEXT_PUBLIC_WS_NATIVE_URL || 'ws://localhost:8080/ws-native';
 
