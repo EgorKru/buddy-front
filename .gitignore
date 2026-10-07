@@ -16,6 +16,10 @@
 
 # production
 /build
+/dist-desktop
+/ios/App/Pods
+/ios/App/App/public
+/ios/DerivedData
 
 # misc
 .DS_Store

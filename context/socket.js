@@ -27,6 +27,8 @@ const isAuthError = (message) => {
 const handleAuthError = () => {
   if (typeof window !== 'undefined') {
     localStorage.removeItem('token');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('tokenExpiresAt');
     localStorage.removeItem('user');
     window.location.href = '/login';
   }
@@ -202,12 +204,14 @@ export const StompProvider = (props) => {
     };
     if (typeof window !== 'undefined') {
       window.addEventListener('storage', onStorage);
+      window.addEventListener('auth-token-updated', ensureConnection);
     }
 
     return () => {
       destroyed = true;
       if (typeof window !== 'undefined') {
         window.removeEventListener('storage', onStorage);
+        window.removeEventListener('auth-token-updated', ensureConnection);
       }
       disconnect();
     };

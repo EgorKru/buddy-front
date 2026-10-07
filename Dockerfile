@@ -1,5 +1,5 @@
 # Этап 1: Сборка приложения
-FROM node:18-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Копируем файлы зависимостей
@@ -13,16 +13,16 @@ COPY . .
 
 # Собираем приложение (переменные окружения должны быть установлены во время сборки)
 ARG NEXT_PUBLIC_API_URL=https://pager.website/api
-ARG NEXT_PUBLIC_WS_URL=wss://pager.website/ws
+ARG NEXT_PUBLIC_WS_NATIVE_URL=wss://pager.website/ws-native
 
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
-ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL
+ENV NEXT_PUBLIC_WS_NATIVE_URL=$NEXT_PUBLIC_WS_NATIVE_URL
 ENV NODE_ENV=production
 
 RUN npm run build
 
 # Этап 2: Финальный образ
-FROM node:18-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
@@ -35,8 +35,8 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/package-lock.json ./package-lock.json
 
-# Устанавливаем только production зависимости.ю
-RUN npm ci --only=production && npm cache clean --force
+# Устанавливаем только production зависимости.
+RUN npm ci --omit=dev && npm cache clean --force
 
 # Копируем собранное приложение
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next

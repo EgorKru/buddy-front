@@ -11,7 +11,9 @@ const nextConfig = {
       process.env.NEXT_PUBLIC_E2EE_ENABLED ?? (prodLike || e2eDev ? 'false' : 'true'),
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api',
     NEXT_PUBLIC_WS_NATIVE_URL:
-      process.env.NEXT_PUBLIC_WS_NATIVE_URL || 'ws://localhost:8080/ws-native',
+      process.env.NEXT_PUBLIC_WS_NATIVE_URL ||
+      process.env.NEXT_PUBLIC_WS_URL?.replace(/\/ws\/?$/, '/ws-native') ||
+      'ws://localhost:8080/ws-native',
   },
 };
 

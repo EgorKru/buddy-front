@@ -11,6 +11,9 @@ const getApiBaseURL = () => {
 /** WebSocket URL для нативного STOMP (без SockJS). */
 const getNativeWsUrl = () => {
   if (process.env.NEXT_PUBLIC_WS_NATIVE_URL) return process.env.NEXT_PUBLIC_WS_NATIVE_URL;
+  if (process.env.NEXT_PUBLIC_WS_URL) {
+    return process.env.NEXT_PUBLIC_WS_URL.replace(/\/ws\/?$/, '/ws-native');
+  }
   if (process.env.NEXT_PUBLIC_SOCKET_URL) return `${process.env.NEXT_PUBLIC_SOCKET_URL}/ws-native`;
   if (process.env.NEXT_PUBLIC_API_URL)
     return process.env.NEXT_PUBLIC_API_URL.replace('/api', '/ws-native').replace(/^http/, 'ws');
@@ -58,6 +61,15 @@ export const config = {
 export const validateConfig = () => {
   if (process.env.NODE_ENV === 'production' && !process.env.NEXT_PUBLIC_API_URL) {
     throw new Error('NEXT_PUBLIC_API_URL must be defined in production');
+  }
+  if (
+    process.env.NODE_ENV === 'production' &&
+    !process.env.NEXT_PUBLIC_WS_NATIVE_URL &&
+    !process.env.NEXT_PUBLIC_WS_URL
+  ) {
+    throw new Error(
+      'NEXT_PUBLIC_WS_NATIVE_URL or NEXT_PUBLIC_WS_URL must be defined in production'
+    );
   }
 };
 

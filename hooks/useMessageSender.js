@@ -32,7 +32,11 @@ const createOptimisticMessage = (
   replyToMessageId = null,
   replyToMessage = null
 ) => {
-  const tempId = `temp-${Date.now()}-${Math.random()}`;
+  const clientMessageId =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const tempId = `temp-${clientMessageId}`;
   let messageContent;
   if (type === 'VOICE') {
     messageContent = '🎤 Голосовое сообщение';
@@ -47,6 +51,7 @@ const createOptimisticMessage = (
   const message = {
     id: tempId,
     tempId,
+    clientMessageId,
     chatId: parseInt(chatId),
     content: messageContent,
     type,
@@ -138,7 +143,8 @@ export const useMessageSender = (chatId, onMessageSent, options = {}) => {
             message.type,
             message.fileUrl,
             message.replyToMessageId ?? null,
-            message.encryptionVersion ?? null
+            message.encryptionVersion ?? null,
+            message.clientMessageId
           );
 
           updateMessageStatus(message.tempId, MESSAGE_STATUS.SENT, serverMessage);
@@ -266,6 +272,7 @@ export const useMessageSender = (chatId, onMessageSent, options = {}) => {
             const payload = {
               chatId: parseInt(chatId),
               type,
+              clientMessageId: optimisticMessage.clientMessageId,
             };
 
             if (type === 'VOICE') {
@@ -353,7 +360,8 @@ export const useMessageSender = (chatId, onMessageSent, options = {}) => {
           type,
           fileUrl,
           replyToMessageId,
-          encryptionVersionToSend
+          encryptionVersionToSend,
+          optimisticMessage.clientMessageId
         );
 
         updateMessageStatus(optimisticMessage.tempId, MESSAGE_STATUS.SENT, serverMessage);
@@ -418,6 +426,7 @@ export const useMessageSender = (chatId, onMessageSent, options = {}) => {
               chatId: parseInt(messageChatId),
               type: message.type,
               fileUrl: message.fileUrl,
+              clientMessageId: message.clientMessageId,
             };
             if (message.type === 'VOICE' && message.duration) {
               payload.duration = message.duration;
@@ -441,6 +450,7 @@ export const useMessageSender = (chatId, onMessageSent, options = {}) => {
             chatId: parseInt(messageChatId),
             content: message.content,
             type: message.type,
+            clientMessageId: message.clientMessageId,
           };
           if (message.encryptionVersion != null && message.encryptionVersion > 0) {
             textPayload.encryptionVersion = message.encryptionVersion;
@@ -466,7 +476,8 @@ export const useMessageSender = (chatId, onMessageSent, options = {}) => {
         message.type,
         message.fileUrl,
         message.replyToMessageId ?? null,
-        message.encryptionVersion ?? null
+        message.encryptionVersion ?? null,
+        message.clientMessageId
       );
     };
 

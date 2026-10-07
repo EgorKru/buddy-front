@@ -1,0 +1,30 @@
+name: iOS unsigned build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    runs-on: macos-15
+    permissions:
+      contents: read
+    env:
+      HUSKY: '0'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run ios:sync
+      - name: Compile for iOS Simulator
+        run: >-
+          xcodebuild
+          -workspace ios/App/App.xcworkspace
+          -scheme App
+          -configuration Debug
+          -sdk iphonesimulator
+          -derivedDataPath ios/DerivedData
+          CODE_SIGNING_ALLOWED=NO
+          build

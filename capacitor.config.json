@@ -1,0 +1,15 @@
+{
+  "appId": "ru.pager.mobile",
+  "appName": "Pager",
+  "webDir": "native-shell",
+  "server": {
+    "url": "https://pager.website",
+    "cleartext": false,
+    "allowNavigation": ["pager.website"]
+  },
+  "ios": {
+    "contentInset": "automatic",
+    "allowsLinkPreview": false,
+    "preferredContentMode": "mobile"
+  }
+}

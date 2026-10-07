@@ -89,9 +89,9 @@ export default function AppHome() {
     setInputError('');
   }, []);
 
-  const handleLogout = useCallback(() => {
-    logout();
-    router.push('/login');
+  const handleLogout = useCallback(async () => {
+    await logout().catch(() => {});
+    await router.push('/login');
   }, [logout, router]);
 
   const displayError = inputError || createError;

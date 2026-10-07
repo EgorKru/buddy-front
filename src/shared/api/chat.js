@@ -42,7 +42,8 @@ export const chatAPI = {
     type = 'TEXT',
     fileUrl = null,
     replyToMessageId = null,
-    encryptionVersion = null
+    encryptionVersion = null,
+    clientMessageId = null
   ) => {
     const body = { type };
     if (type === 'IMAGE' || type === 'FILE') {
@@ -56,6 +57,7 @@ export const chatAPI = {
     if (encryptionVersion != null && encryptionVersion > 0) {
       body.encryptionVersion = encryptionVersion;
     }
+    if (clientMessageId) body.clientMessageId = clientMessageId;
     return apiRequest(`/chats/${chatId}/messages`, { method: 'POST', body });
   },
   getMessage: async (chatId, messageId) => apiRequest(`/chats/${chatId}/messages/${messageId}`),
