@@ -1137,6 +1137,60 @@
   min-width: 0;
 }
 
+.animatedEmojiMessage {
+  display: inline-block;
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+  font-size: clamp(2.55rem, 7vw, 4.1rem);
+  line-height: 1.12;
+  letter-spacing: 0.04em;
+  transform-origin: 50% 80%;
+  filter: drop-shadow(0 7px 11px rgba(58, 92, 170, 0.14));
+  animation:
+    emojiMessageArrive 680ms cubic-bezier(0.2, 1.45, 0.35, 1) both,
+    emojiMessageFloat 3.4s ease-in-out 800ms infinite;
+}
+
+.animatedEmojiMessage[data-emoji-count='2'] {
+  font-size: clamp(2.35rem, 6.2vw, 3.7rem);
+}
+
+.animatedEmojiMessage[data-emoji-count='3'] {
+  font-size: clamp(2.1rem, 5.5vw, 3.25rem);
+}
+
+.animatedEmojiGlyph {
+  width: 1em;
+  height: 1em;
+  display: inline-block;
+  object-fit: contain;
+  vertical-align: -0.12em;
+  filter: drop-shadow(0 7px 11px rgba(58, 92, 170, 0.14));
+}
+
+@keyframes emojiMessageArrive {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.55) rotate(-9deg);
+  }
+  58% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1.12) rotate(3deg);
+  }
+  100% {
+    transform: translateY(0) scale(1) rotate(0);
+  }
+}
+
+@keyframes emojiMessageFloat {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0);
+  }
+  50% {
+    transform: translateY(-3px) rotate(1.5deg);
+  }
+}
+
 .e2eePending {
   opacity: 0.75;
   font-style: italic;
@@ -1175,6 +1229,20 @@
   background: #f5f7fa;
   color: var(--home-text-primary);
   border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.messageText.emojiOnlyBubble,
+.message.ownMessage .messageText.emojiOnlyBubble {
+  padding: 0.15rem 0.2rem 0.1rem;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  gap: 0;
+}
+
+.emojiOnlyBubble .messageTextContentWrapper {
+  align-items: flex-end;
+  gap: 0.25rem;
 }
 
 .messageText.messagePending {
@@ -1227,6 +1295,342 @@
   gap: 0.5rem;
   align-items: flex-end;
   padding: 1rem;
+}
+
+.composerUtilityButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--home-text-secondary);
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition:
+    color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.composerUtilityButton:hover:not(:disabled),
+.composerUtilityButtonActive {
+  color: var(--accent-blue);
+  background: color-mix(in srgb, var(--accent-blue) 11%, transparent);
+  transform: scale(1.06);
+}
+
+.composerUtilityButton:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.composerUtilityButton:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.emojiPickerRoot {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.emojiPicker {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 12px);
+  z-index: 80;
+  width: min(368px, calc(100vw - 24px));
+  height: min(480px, calc(100dvh - 180px));
+  min-height: 340px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--home-text-primary);
+  background: color-mix(in srgb, var(--home-bg) 94%, transparent);
+  border: 1px solid color-mix(in srgb, var(--home-border) 78%, white);
+  border-radius: 24px;
+  box-shadow:
+    0 24px 70px rgba(18, 30, 61, 0.22),
+    0 8px 24px rgba(18, 30, 61, 0.1);
+  backdrop-filter: blur(28px) saturate(1.35);
+  animation: emojiPickerReveal 240ms cubic-bezier(0.2, 0.9, 0.25, 1) both;
+}
+
+@keyframes emojiPickerReveal {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.emojiPickerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 17px 10px;
+}
+
+.emojiPickerHeader > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.emojiPickerHeader strong {
+  font-size: 1.16rem;
+  letter-spacing: -0.02em;
+}
+
+.emojiPickerEyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--accent-blue);
+  font-size: 0.69rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.emojiPickerClose {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--home-menu-hover-bg);
+  color: var(--home-text-secondary);
+  cursor: pointer;
+}
+
+.emojiSearch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 14px 10px;
+  padding: 0 12px;
+  min-height: 40px;
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--home-menu-hover-bg) 80%, transparent);
+  color: var(--home-text-muted);
+  transition:
+    box-shadow 160ms ease,
+    background 160ms ease;
+}
+
+.emojiSearch:focus-within {
+  background: var(--home-bg);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-blue) 22%, transparent);
+  color: var(--accent-blue);
+}
+
+.emojiSearch input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--home-text-primary);
+  font: inherit;
+  font-size: 0.88rem;
+}
+
+.emojiSearch input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.emojiCategoryTabs {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+  padding: 0 12px 9px;
+  border-bottom: 1px solid color-mix(in srgb, var(--home-border) 72%, transparent);
+}
+
+.emojiCategoryTabs button {
+  position: relative;
+  min-width: 0;
+  height: 35px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--home-text-secondary);
+  cursor: pointer;
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+  font-size: 1.05rem;
+  transition:
+    background 150ms ease,
+    transform 150ms ease;
+}
+
+.emojiCategoryTabs img {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
+.emojiCategoryTabs button:hover,
+.emojiCategoryTabs .emojiCategoryActive {
+  background: color-mix(in srgb, var(--accent-blue) 12%, transparent);
+  transform: translateY(-1px);
+}
+
+.emojiCategoryTabs .emojiCategoryActive::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  width: 17px;
+  height: 3px;
+  border-radius: 99px;
+  background: var(--accent-blue);
+}
+
+.emojiGridScroller {
+  flex: 1;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 5px 10px 14px;
+  scrollbar-width: thin;
+}
+
+.emojiGroup {
+  scroll-margin-top: 5px;
+}
+
+.emojiGroup h3 {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0;
+  padding: 9px 5px 6px;
+  color: var(--home-text-secondary);
+  background: color-mix(in srgb, var(--home-bg) 93%, transparent);
+  backdrop-filter: blur(12px);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.emojiGrid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.emojiChoice {
+  aspect-ratio: 1;
+  min-width: 0;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  cursor: pointer;
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
+  font-size: 1.72rem;
+  line-height: 1;
+  transition:
+    background 130ms ease,
+    transform 130ms ease;
+}
+
+.emojiChoice span {
+  display: block;
+  transform-origin: 50% 78%;
+}
+
+.emojiChoice img {
+  width: 30px;
+  height: 30px;
+  display: block;
+  object-fit: contain;
+  transform-origin: 50% 78%;
+  user-select: none;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 3px rgba(20, 35, 70, 0.1));
+}
+
+.emojiChoice:hover {
+  z-index: 2;
+  background: color-mix(in srgb, var(--accent-blue) 12%, transparent);
+  transform: scale(1.13);
+}
+
+.emojiChoice:hover span,
+.emojiChoice:hover img {
+  animation: emojiChoiceDance 520ms var(--emoji-delay) cubic-bezier(0.2, 1.4, 0.35, 1);
+}
+
+@keyframes emojiChoiceDance {
+  0% {
+    transform: scale(0.82) rotate(-8deg);
+  }
+  45% {
+    transform: scale(1.22) rotate(7deg) translateY(-3px);
+  }
+  72% {
+    transform: scale(0.96) rotate(-2deg);
+  }
+  100% {
+    transform: scale(1) rotate(0);
+  }
+}
+
+.emojiEmpty {
+  display: grid;
+  min-height: 150px;
+  place-items: center;
+  color: var(--home-text-secondary);
+  font-size: 0.88rem;
+}
+
+.emojiPickerFooter {
+  padding: 9px 14px 11px;
+  border-top: 1px solid color-mix(in srgb, var(--home-border) 72%, transparent);
+  color: var(--home-text-muted);
+  font-size: 0.7rem;
+  text-align: center;
+}
+
+@media (max-width: 600px) {
+  .emojiPicker {
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    bottom: calc(74px + env(safe-area-inset-bottom));
+    width: auto;
+    height: min(460px, calc(100dvh - 120px));
+    border-radius: 22px;
+  }
+
+  .emojiGrid {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .emojiPicker,
+  .animatedEmojiMessage,
+  .emojiChoice:hover span,
+  .emojiChoice:hover img,
+  .videoNotePreviewShell,
+  .videoNotePreview,
+  .videoNoteWave i {
+    animation: none;
+  }
 }
 
 .editIndicator {
@@ -1969,14 +2373,260 @@
   cursor: not-allowed;
 }
 
+.videoNoteStartButton {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #6f7cff, #8c6ff7);
+  color: white;
+  cursor: pointer;
+  box-shadow: 0 5px 16px rgba(111, 124, 255, 0.25);
+  transition:
+    transform 170ms ease,
+    box-shadow 170ms ease,
+    filter 170ms ease;
+}
+
+.videoNoteStartButton:hover:not(:disabled) {
+  transform: translateY(-1px) scale(1.04);
+  filter: saturate(1.12);
+  box-shadow: 0 8px 21px rgba(111, 124, 255, 0.34);
+}
+
+.videoNoteStartButton:active:not(:disabled) {
+  transform: scale(0.93);
+}
+
+.videoNoteStartButton:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.videoNoteComposer {
+  width: 100%;
+  min-height: 112px;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 11px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent-blue) 20%, var(--home-border));
+  border-radius: 24px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent-blue) 7%, var(--home-bg)),
+    var(--home-bg)
+  );
+  box-shadow: 0 10px 28px rgba(36, 54, 94, 0.1);
+  animation: videoComposerReveal 240ms cubic-bezier(0.2, 0.9, 0.25, 1) both;
+}
+
+@keyframes videoComposerReveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+.videoNotePreviewShell {
+  width: 86px;
+  height: 86px;
+  position: relative;
+  flex: 0 0 auto;
+  padding: 3px;
+  border-radius: 50%;
+  background: conic-gradient(from 20deg, #6f7cff, #c46dff, #f37090, #6f7cff);
+  animation: videoNoteRing 4s linear infinite;
+}
+
+@keyframes videoNoteRing {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.videoNotePreview {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  border: 3px solid var(--home-bg);
+  border-radius: 50%;
+  transform: rotate(0deg) scaleX(-1);
+  animation: videoNoteCounterRotate 4s linear infinite;
+}
+
+@keyframes videoNoteCounterRotate {
+  to {
+    transform: rotate(-360deg) scaleX(-1);
+  }
+}
+
+.videoNoteRecordDot {
+  position: absolute;
+  right: 3px;
+  bottom: 8px;
+  width: 13px;
+  height: 13px;
+  border: 3px solid var(--home-bg);
+  border-radius: 50%;
+  background: #ff3b5c;
+  animation: recordingPulse 1.2s ease-in-out infinite;
+}
+
+.videoNoteRecordingInfo {
+  min-width: 115px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.videoNoteRecordingInfo strong {
+  font-size: 1.3rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.025em;
+}
+
+.videoNoteRecordingInfo > span:last-child {
+  color: var(--home-text-muted);
+  font-size: 0.72rem;
+}
+
+.videoNoteRecordingLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #6f7cff;
+  font-size: 0.76rem;
+  font-weight: 750;
+}
+
+.videoNoteWave {
+  height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex: 1;
+  min-width: 34px;
+}
+
+.videoNoteWave i {
+  width: 3px;
+  height: var(--wave-min);
+  display: block;
+  border-radius: 99px;
+  background: linear-gradient(#8c6ff7, #5f8fff);
+  animation: videoNoteWave 760ms calc(var(--wave-index) * -60ms) ease-in-out infinite alternate;
+}
+
+@keyframes videoNoteWave {
+  to {
+    height: var(--wave-max);
+    opacity: 0.55;
+  }
+}
+
+.videoNoteCancel,
+.videoNoteSend {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    background 160ms ease;
+}
+
+.videoNoteCancel {
+  color: #f0445e;
+  background: color-mix(in srgb, #f0445e 10%, var(--home-bg));
+}
+
+.videoNoteSend {
+  color: white;
+  background: linear-gradient(145deg, #4e9cff, #6f7cff);
+  box-shadow: 0 6px 17px rgba(78, 156, 255, 0.3);
+}
+
+.videoNoteCancel:hover,
+.videoNoteSend:hover {
+  transform: scale(1.06);
+}
+
+.videoNoteUploading {
+  position: absolute;
+  right: 16px;
+  bottom: calc(100% + 9px);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 11px;
+  border: 1px solid var(--home-border);
+  border-radius: 999px;
+  background: var(--home-bg);
+  color: var(--home-text-secondary);
+  box-shadow: 0 8px 22px rgba(20, 35, 70, 0.13);
+  font-size: 0.76rem;
+}
+
+.videoNoteUploading span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #6f7cff;
+  animation: recordingPulse 1s ease-in-out infinite;
+}
+
+@media (max-width: 620px) {
+  .videoNoteComposer {
+    gap: 9px;
+    min-height: 96px;
+    padding: 9px;
+  }
+
+  .videoNotePreviewShell {
+    width: 72px;
+    height: 72px;
+  }
+
+  .videoNoteWave {
+    display: none;
+  }
+
+  .videoNoteRecordingInfo > span:last-child {
+    display: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .videoNoteRecordingInfo {
+    min-width: 84px;
+  }
+
+  .videoNoteCancel,
+  .videoNoteSend {
+    width: 40px;
+    height: 40px;
+  }
+}
+
 .attachButton {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border: none;
-  background: var(--home-menu-hover-bg);
+  background: transparent;
   color: var(--home-text-secondary);
   border-radius: 50%;
   cursor: pointer;
@@ -1984,7 +2634,7 @@
   flex-shrink: 0;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: none;
 }
 
 @media (max-width: 768px) {

@@ -62,8 +62,15 @@ async function idbGet(key) {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, 'readonly');
     const r = tx.objectStore(STORE).get(key);
-    r.onsuccess = () => resolve(r.result ?? null);
-    r.onerror = () => reject(r.error);
+    r.onsuccess = () => {
+      const value = r.result ?? null;
+      db.close();
+      resolve(value);
+    };
+    r.onerror = () => {
+      db.close();
+      reject(r.error);
+    };
   });
 }
 
@@ -72,8 +79,14 @@ async function idbSet(key, value) {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, 'readwrite');
     tx.objectStore(STORE).put(value, key);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
+    tx.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    tx.onerror = () => {
+      db.close();
+      reject(tx.error);
+    };
   });
 }
 

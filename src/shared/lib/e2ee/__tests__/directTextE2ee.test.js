@@ -58,8 +58,14 @@ async function seedIdentity(userId, { privJwk, spkiB64 }) {
       const db = req.result;
       const tx = db.transaction(STORE, 'readwrite');
       tx.objectStore(STORE).put({ privJwk, spkiB64 }, `ecdh-${userId}`);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
+      tx.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      tx.onerror = () => {
+        db.close();
+        reject(tx.error);
+      };
     };
   });
 }
@@ -75,8 +81,9 @@ describe('directTextE2ee', () => {
     process.env.NEXT_PUBLIC_E2EE_ENABLED = 'true';
   });
 
-  afterAll(() => {
+  afterAll(async () => {
     process.env.NEXT_PUBLIC_E2EE_ENABLED = prevE2ee;
+    await deleteTestDb();
   });
 
   it('isE2eeEnabled is false without env flag (NODE_ENV=test)', () => {

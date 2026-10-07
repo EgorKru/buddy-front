@@ -2,6 +2,7 @@ import { Send, Loader2 } from 'lucide-react';
 import { usePasteHandler } from '../../hooks/usePasteHandler';
 import { MessageTextarea } from './MessageTextarea';
 import { AttachAndVoiceButtons } from './AttachAndVoiceButtons';
+import { EmojiPicker } from './EmojiPicker';
 import styles from '@/styles/chat.module.css';
 
 export function TextInputRow({
@@ -25,6 +26,7 @@ export function TextInputRow({
   onFileSelect,
   onMouseDown,
   onTouchStart,
+  onStartVideoNote,
 }) {
   const handlePaste = usePasteHandler(editingMessageId, isRecording, sending, onFileSelect);
   const textareaValue = editingMessageId ? editingContent : newMessage;
@@ -32,8 +34,42 @@ export function TextInputRow({
 
   const handleAttachClick = () => fileInputRef.current?.click();
 
+  const handleEmojiChange = (value) => {
+    if (editingMessageId) {
+      onEditingContentChange(value);
+    } else {
+      onMessageChange(value);
+    }
+  };
+
   return (
     <>
+      <EmojiPicker
+        value={textareaValue}
+        inputRef={messageInputRef}
+        disabled={sending || uploadingFile}
+        onChange={handleEmojiChange}
+      />
+
+      <AttachAndVoiceButtons
+        fileInputRef={fileInputRef}
+        buttonRef={buttonRef}
+        sending={sending}
+        uploadingFile={uploadingFile}
+        showVoice={isEmpty}
+        isRecording={isRecording}
+        isLocked={isLocked}
+        isHolding={isHolding}
+        dragDistance={dragDistance}
+        reachedLockThreshold={reachedLockThreshold}
+        lockThreshold={lockThreshold}
+        onAttachClick={handleAttachClick}
+        onFileSelect={onFileSelect}
+        onMouseDown={onMouseDown}
+        onTouchStart={onTouchStart}
+        onStartVideoNote={onStartVideoNote}
+      />
+
       <MessageTextarea
         value={textareaValue}
         messageInputRef={messageInputRef}
@@ -44,25 +80,6 @@ export function TextInputRow({
         onKeyDown={onKeyDown}
         onPaste={handlePaste}
       />
-
-      {isEmpty && (
-        <AttachAndVoiceButtons
-          fileInputRef={fileInputRef}
-          buttonRef={buttonRef}
-          sending={sending}
-          uploadingFile={uploadingFile}
-          isRecording={isRecording}
-          isLocked={isLocked}
-          isHolding={isHolding}
-          dragDistance={dragDistance}
-          reachedLockThreshold={reachedLockThreshold}
-          lockThreshold={lockThreshold}
-          onAttachClick={handleAttachClick}
-          onFileSelect={onFileSelect}
-          onMouseDown={onMouseDown}
-          onTouchStart={onTouchStart}
-        />
-      )}
     </>
   );
 }

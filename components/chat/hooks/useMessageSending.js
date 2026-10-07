@@ -64,7 +64,13 @@ export const useMessageSending = ({
   );
 
   const sendFileMessage = useCallback(
-    async (file, content = '', replyToId = null, onProgress = null) => {
+    async (
+      file,
+      content = '',
+      replyToId = null,
+      onProgress = null,
+      replyToMessage = null
+    ) => {
       if (!file || !user || !chatId) return null;
 
       try {

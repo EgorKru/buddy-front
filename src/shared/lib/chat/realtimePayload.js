@@ -2,6 +2,8 @@
  * Разбор STOMP payload и план обработки своих/чужих сообщений (без React).
  */
 
+const CHAT_MESSAGE_TYPES = new Set(['TEXT', 'IMAGE', 'VOICE', 'FILE', 'SYSTEM']);
+
 /**
  * @param {object|null|undefined} data — тело STOMP / chat update
  * @returns {object|null}
@@ -20,14 +22,20 @@ export function extractChatMessageFromStompPayload(data) {
  */
 export function extractNotificationMessage(notification) {
   if (!notification) return null;
+
+  const nestedMessage = notification.message ?? notification.payload?.message;
+  if (nestedMessage?.id != null && nestedMessage?.chatId != null) {
+    return nestedMessage;
+  }
+
   if (
     notification.id != null &&
     notification.chatId != null &&
-    (notification.type != null || notification.content != null)
+    (CHAT_MESSAGE_TYPES.has(notification.type) || notification.content != null)
   ) {
     return notification;
   }
-  return notification.message ?? notification.payload?.message ?? null;
+  return null;
 }
 
 /**

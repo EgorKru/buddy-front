@@ -4,6 +4,7 @@ const { expect } = require('@playwright/test');
 const T = {
   chatCallButton: 'chat-call-button',
   callTypeAudio: 'call-type-audio',
+  callTypeVideo: 'call-type-video',
   incomingCall: 'incoming-call-modal',
   incomingAccept: 'incoming-call-accept',
   incomingReject: 'incoming-call-reject',

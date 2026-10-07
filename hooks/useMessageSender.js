@@ -11,6 +11,7 @@ import {
   MESSAGE_STATUS,
 } from '@/utils/messageQueue';
 import { messageToReplyToDto } from '@/shared/lib/chat/replyTo';
+import { isVideoNoteMessage } from '@/shared/lib/chat/videoNote';
 
 const STOMP_CONNECTED_STATE = 1;
 const RETRY_DELAYS = [2000, 5000, 10000];
@@ -38,7 +39,9 @@ const createOptimisticMessage = (
       : `${Date.now()}_${Math.random().toString(36).slice(2)}`;
   const tempId = `temp-${clientMessageId}`;
   let messageContent;
-  if (type === 'VOICE') {
+  if (isVideoNoteMessage({ type, fileName, mimeType })) {
+    messageContent = '🎥 Видеокружок';
+  } else if (type === 'VOICE') {
     messageContent = '🎤 Голосовое сообщение';
   } else if (type === 'IMAGE' || type === 'FILE') {
     messageContent =

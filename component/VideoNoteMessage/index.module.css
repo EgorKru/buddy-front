@@ -1,0 +1,87 @@
+.videoNote {
+  --video-note-progress: 0deg;
+  width: clamp(190px, 34vw, 270px);
+  aspect-ratio: 1;
+  position: relative;
+  padding: 4px;
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--accent-blue) var(--video-note-progress),
+    rgba(148, 163, 184, 0.25) 0
+  );
+  box-shadow: 0 14px 34px rgba(22, 42, 83, 0.2);
+}
+
+.own {
+  --accent-blue: #5f8fff;
+}
+
+.videoButton {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: block;
+  overflow: hidden;
+  padding: 0;
+  border: 3px solid var(--home-bg);
+  border-radius: 50%;
+  background: #111827;
+  cursor: pointer;
+}
+
+.videoButton video {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.videoOverlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: white;
+  background: rgba(10, 18, 38, 0.16);
+  opacity: 0;
+  transition:
+    opacity 160ms ease,
+    background 160ms ease;
+}
+
+.videoButton:hover .videoOverlay,
+.videoButton:focus-visible .videoOverlay,
+.videoOverlayVisible {
+  opacity: 1;
+  background: rgba(10, 18, 38, 0.32);
+}
+
+.spinner {
+  animation: spin 900ms linear infinite;
+}
+
+.error {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  width: 80%;
+  transform: translateX(-50%);
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.75);
+  color: white;
+  font-size: 0.72rem;
+  text-align: center;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 480px) {
+  .videoNote {
+    width: min(66vw, 230px);
+  }
+}

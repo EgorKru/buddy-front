@@ -1,10 +1,12 @@
-import { spawn, spawnSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import processTree from './e2e-process.cjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const spec = process.env.E2E_MEDIA_SPEC || 'e2e/media.spec.js';
+const { manageServer, resolveServerAddress, runNextBuild, runPlaywright, startNextServer } =
+  processTree;
 
 function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return;
@@ -60,27 +62,17 @@ async function main() {
     process.env.NEXT_PUBLIC_API_URL || process.env.E2E_API_URL || 'http://localhost:8080/api';
   process.env.NEXT_PUBLIC_WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:8080/ws';
 
-  const port = process.env.E2E_PORT || '3002';
-  const baseUrl = (process.env.E2E_BASE_URL || `http://127.0.0.1:${port}`).replace(/\/$/, '');
+  const { port, baseUrl } = resolveServerAddress('3002');
 
   if (process.env.E2E_SKIP_BUILD !== '1') {
     console.log('[e2e-media] production build…');
-    const build = spawnSync('npm', ['run', 'build'], {
-      cwd: root,
-      stdio: 'inherit',
-      shell: true,
-      env: process.env,
-    });
+    const build = runNextBuild(root, process.env);
     if (build.status !== 0) process.exit(build.status ?? 1);
   }
 
   console.log('[e2e-media] starting production server…');
-  const server = spawn('npm', ['run', 'start', '--', '-p', port], {
-    cwd: root,
-    env: { ...process.env, PORT: port },
-    stdio: 'inherit',
-    shell: true,
-  });
+  const server = startNextServer(root, port);
+  const serverController = manageServer(server);
 
   const deadline = Date.now() + Number(process.env.E2E_SERVER_WAIT_MS || 120_000);
   try {
@@ -91,21 +83,16 @@ async function main() {
     }
   } catch (e) {
     console.error(e.message);
-    server.kill();
+    serverController.stop();
     process.exit(1);
   }
 
   process.env.E2E_SKIP_WEB_SERVER = '1';
   process.env.E2E_BASE_URL = baseUrl;
 
-  const tests = spawnSync('npx', ['playwright', 'test', spec], {
-    cwd: root,
-    stdio: 'inherit',
-    shell: true,
-    env: process.env,
-  });
+  const tests = runPlaywright(root, ['test', spec], process.env);
 
-  server.kill();
+  serverController.stop();
   process.exit(tests.status ?? 1);
 }
 

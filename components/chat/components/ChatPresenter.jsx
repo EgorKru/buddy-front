@@ -121,6 +121,7 @@ const ChatPresenter = ({
   handleSelectMessage,
   onStartCall,
   typingUserIds,
+  videoNote,
 }) => {
   const selectedMessagesList = selectionMode
     ? Array.from(selectedMessages)
@@ -259,7 +260,9 @@ const ChatPresenter = ({
           chatId={chatId}
         />
 
-        {voiceError && <ErrorMessage>{voiceError}</ErrorMessage>}
+        {(voiceError || videoNote?.error) && (
+          <ErrorMessage>{videoNote?.error || voiceError}</ErrorMessage>
+        )}
 
         <TypingIndicator
           participants={chat?.participants || []}
@@ -326,6 +329,7 @@ const ChatPresenter = ({
           onPlayPreview={handlePlayPreview}
           recordingTime={recordingTime}
           audioLevel={audioLevel}
+          videoNote={videoNote}
         />
       </div>
 

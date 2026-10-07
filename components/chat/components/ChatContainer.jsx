@@ -16,6 +16,7 @@ import { useChatContextMenu } from '@/components/chat/hooks/useChatContextMenu';
 import { useChatSelection } from '@/components/chat/hooks/useChatSelection';
 import { useCall } from '@/context/CallContext';
 import { useTypingIndicator } from '@/hooks/useTypingIndicator';
+import { useVideoNoteRecorder } from '@/components/chat/hooks/useVideoNoteRecorder';
 import CallTypeModal from '@/component/CallTypeModal';
 import ChatPresenter from './ChatPresenter';
 
@@ -332,6 +333,16 @@ const ChatContainer = ({ chatId }) => {
     selectedFileUrlRef,
   });
 
+  const sendVideoNote = useCallback(
+    async (file) => {
+      prepareScrollForSending();
+      return sendFileMessage(file, '', replyingToMessageId, null, replyingToMessage);
+    },
+    [prepareScrollForSending, replyingToMessage, replyingToMessageId, sendFileMessage]
+  );
+
+  const videoNote = useVideoNoteRecorder({ onSend: sendVideoNote });
+
   const { handleKeyDown } = useChatKeyboard({
     editingMessageId,
     sending,
@@ -546,6 +557,7 @@ const ChatContainer = ({ chatId }) => {
         handleSelectMessage={handleSelectMessage}
         onStartCall={handleOpenCallModal}
         typingUserIds={typingUserIds}
+        videoNote={videoNote}
       />
 
       {}

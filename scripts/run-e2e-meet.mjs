@@ -1,24 +1,13 @@
-import { spawn, spawnSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import processTree from './e2e-process.cjs';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const spec = process.env.E2E_MEET_SPEC || 'e2e/meet.spec.js';
 const grep = process.env.E2E_MEET_GREP;
-const nextCli = path.join(root, 'node_modules', 'next', 'dist', 'bin', 'next');
-
-function stopProcessTree(child) {
-  if (!child?.pid) return;
-  if (process.platform === 'win32') {
-    spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], {
-      stdio: 'ignore',
-      shell: false,
-    });
-    return;
-  }
-  child.kill('SIGTERM');
-}
+const { manageServer, resolveServerAddress, runNextBuild, runPlaywright, startNextServer } =
+  processTree;
 
 function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return;
@@ -75,27 +64,17 @@ async function main() {
   process.env.NEXT_PUBLIC_WS_NATIVE_URL =
     process.env.NEXT_PUBLIC_WS_NATIVE_URL || 'ws://localhost:8080/ws-native';
 
-  const port = process.env.E2E_PORT || '3003';
-  const baseUrl = (process.env.E2E_BASE_URL || `http://127.0.0.1:${port}`).replace(/\/$/, '');
+  const { port, baseUrl } = resolveServerAddress('3003');
 
   if (process.env.E2E_SKIP_BUILD !== '1') {
     console.log('[e2e-meet] production build…');
-    const build = spawnSync('npm', ['run', 'build'], {
-      cwd: root,
-      stdio: 'inherit',
-      shell: true,
-      env: process.env,
-    });
+    const build = runNextBuild(root, process.env);
     if (build.status !== 0) process.exit(build.status ?? 1);
   }
 
   console.log('[e2e-meet] starting production server…');
-  const server = spawn(process.execPath, [nextCli, 'start', '-p', port], {
-    cwd: root,
-    env: { ...process.env, PORT: port },
-    stdio: 'inherit',
-    shell: false,
-  });
+  const server = startNextServer(root, port);
+  const serverController = manageServer(server);
 
   const deadline = Date.now() + Number(process.env.E2E_SERVER_WAIT_MS || 120_000);
   try {
@@ -106,7 +85,7 @@ async function main() {
     }
   } catch (e) {
     console.error(e.message);
-    stopProcessTree(server);
+    serverController.stop();
     process.exit(1);
   }
 
@@ -115,14 +94,9 @@ async function main() {
 
   const playwrightArgs = ['playwright', 'test', spec];
   if (grep) playwrightArgs.push('--grep', grep);
-  const tests = spawnSync('npx', playwrightArgs, {
-    cwd: root,
-    stdio: 'inherit',
-    shell: true,
-    env: process.env,
-  });
+  const tests = runPlaywright(root, playwrightArgs, process.env);
 
-  stopProcessTree(server);
+  serverController.stop();
   process.exit(tests.status ?? 1);
 }
 

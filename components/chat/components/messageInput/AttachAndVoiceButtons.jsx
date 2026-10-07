@@ -1,4 +1,4 @@
-import { Paperclip, Mic, Lock, Unlock, ChevronUp } from 'lucide-react';
+import { Paperclip, Mic, Lock, Unlock, ChevronUp, Video } from 'lucide-react';
 import styles from '@/styles/chat.module.css';
 
 function LockIndicator({ dragDistance, reachedLockThreshold, lockThreshold }) {
@@ -57,6 +57,7 @@ export function AttachAndVoiceButtons({
   buttonRef,
   sending,
   uploadingFile,
+  showVoice = true,
   isRecording,
   isLocked,
   isHolding,
@@ -67,6 +68,7 @@ export function AttachAndVoiceButtons({
   onFileSelect,
   onMouseDown,
   onTouchStart,
+  onStartVideoNote,
 }) {
   const showLockIndicator = !isLocked && (isHolding || isRecording);
   const voiceTitle =
@@ -94,32 +96,46 @@ export function AttachAndVoiceButtons({
         accept="*/*"
         data-testid="chat-attach-input"
       />
-      <div className={styles.voiceButtonWrapper} style={{ position: 'relative' }}>
-        {showLockIndicator && (
-          <LockIndicator
-            dragDistance={dragDistance}
-            reachedLockThreshold={reachedLockThreshold}
-            lockThreshold={lockThreshold}
-          />
-        )}
-        <button
-          ref={buttonRef}
-          type="button"
-          onMouseDown={onMouseDown}
-          onTouchStart={onTouchStart}
-          className={`${styles.voiceButton} ${getVoiceButtonClassName(isRecording, isLocked, isHolding, dragDistance, reachedLockThreshold)}`}
-          title={voiceTitle}
-          disabled={voiceDisabled}
-        >
-          {isRecording && !isLocked ? (
-            <div className={styles.recordingIndicator}>
-              <div className={styles.recordingDot} />
-            </div>
-          ) : (
-            <Mic size={20} />
-          )}
-        </button>
-      </div>
+      {showVoice && (
+        <>
+          <div className={styles.voiceButtonWrapper} style={{ position: 'relative' }}>
+            {showLockIndicator && (
+              <LockIndicator
+                dragDistance={dragDistance}
+                reachedLockThreshold={reachedLockThreshold}
+                lockThreshold={lockThreshold}
+              />
+            )}
+            <button
+              ref={buttonRef}
+              type="button"
+              onMouseDown={onMouseDown}
+              onTouchStart={onTouchStart}
+              className={`${styles.voiceButton} ${getVoiceButtonClassName(isRecording, isLocked, isHolding, dragDistance, reachedLockThreshold)}`}
+              title={voiceTitle}
+              disabled={voiceDisabled}
+            >
+              {isRecording && !isLocked ? (
+                <div className={styles.recordingIndicator}>
+                  <div className={styles.recordingDot} />
+                </div>
+              ) : (
+                <Mic size={20} />
+              )}
+            </button>
+          </div>
+          <button
+            type="button"
+            className={styles.videoNoteStartButton}
+            title="Записать видеокружок"
+            aria-label="Записать видеокружок"
+            disabled={sending || uploadingFile}
+            onClick={onStartVideoNote}
+          >
+            <Video size={20} />
+          </button>
+        </>
+      )}
     </>
   );
 }

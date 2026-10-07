@@ -4,6 +4,7 @@ import { EditReplyBar } from './messageInput/EditReplyBar';
 import { FilePreviewBar } from './messageInput/FilePreviewBar';
 import { RecordingControls } from './messageInput/RecordingControls';
 import { TextInputRow, SendButton } from './messageInput/TextInputRow';
+import { VideoNoteComposer } from './messageInput/VideoNoteComposer';
 import styles from '@/styles/chat.module.css';
 
 export default function MessageInputArea({
@@ -44,6 +45,7 @@ export default function MessageInputArea({
   onCancelRecording,
   onPlayPreview,
   recordingTime,
+  videoNote,
 }) {
   const { currentTime, setCurrentTime, duration } = useAudioPreviewDuration(
     audioPreviewRef,
@@ -62,7 +64,7 @@ export default function MessageInputArea({
     return '';
   }, [audioPreviewRef, isRecording, isLocked, isPaused, isPlayingPreview]);
 
-  const showTextRow = !isRecording;
+  const showTextRow = !isRecording && !videoNote?.isRecording;
 
   return (
     <form onSubmit={editingMessageId ? onSaveEdit : onSendMessage} className={styles.messageForm}>
@@ -80,6 +82,8 @@ export default function MessageInputArea({
       />
 
       <div className={styles.messageFormRow}>
+        {videoNote?.isRecording && <VideoNoteComposer videoNote={videoNote} />}
+
         {isRecording && (
           <RecordingControls
             isRecording={isRecording}
@@ -124,6 +128,7 @@ export default function MessageInputArea({
               onFileSelect={onFileSelect}
               onMouseDown={onMouseDown}
               onTouchStart={onTouchStart}
+              onStartVideoNote={videoNote?.start}
             />
             <SendButton
               editingMessageId={editingMessageId}
@@ -136,6 +141,12 @@ export default function MessageInputArea({
           </>
         )}
       </div>
+
+      {videoNote?.isUploading && (
+        <div className={styles.videoNoteUploading} role="status">
+          <span /> Отправляем видеокружок…
+        </div>
+      )}
 
       {isRecording && isLocked && audioPreviewRef && (
         <audio

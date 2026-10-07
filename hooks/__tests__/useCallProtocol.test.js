@@ -141,10 +141,85 @@ describe('useCallProtocol', () => {
     );
     expect(JSON.parse(publishMock.mock.calls[0][0].body)).toMatchObject({
       type: 'CALL_INITIATE',
+      signalId: expect.any(String),
       targetUserId: 20,
       callType: 'AUDIO',
       chatId: 4,
     });
+  });
+
+  it('does not initiate a call when it is cancelled while media access is pending', async () => {
+    let resolveMedia;
+    const pendingMedia = new Promise((resolve) => {
+      resolveMedia = resolve;
+    });
+    navigator.mediaDevices.getUserMedia.mockReturnValueOnce(pendingMedia);
+    const audioTrack = { kind: 'audio', enabled: true, stop: jest.fn() };
+    const mediaStream = {
+      getTracks: () => [audioTrack],
+      getAudioTracks: () => [audioTrack],
+      getVideoTracks: () => [],
+    };
+    const { result } = renderHook(() => useCallProtocol());
+
+    let initiation;
+    await act(async () => {
+      initiation = result.current.initiateCall(20, 'AUDIO', 4);
+      await Promise.resolve();
+    });
+
+    expect(result.current.isRinging).toBe(true);
+
+    await act(async () => {
+      result.current.cancelCall();
+      resolveMedia(mediaStream);
+      await initiation;
+    });
+
+    expect(result.current.isRinging).toBe(false);
+    expect(result.current.call).toBeNull();
+    expect(audioTrack.stop).toHaveBeenCalled();
+    expect(publishMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ body: expect.stringContaining('"type":"CALL_INITIATE"') })
+    );
+  });
+
+  it('cancels the server call when an initiation ack arrives after local cancellation', async () => {
+    const { result } = renderHook(() => useCallProtocol());
+
+    await act(async () => {
+      await result.current.initiateCall(20, 'AUDIO', 4);
+    });
+
+    const initiateSignal = JSON.parse(publishMock.mock.calls[0][0].body);
+    publishMock.mockClear();
+
+    await act(async () => {
+      result.current.cancelCall();
+    });
+
+    expect(result.current.isRinging).toBe(false);
+
+    await act(async () => {
+      signalHandler({
+        body: JSON.stringify({
+          success: true,
+          type: 'CALL_INITIATE',
+          signalId: initiateSignal.signalId,
+          callId: 321,
+          call: { id: 321, status: CALL_STATUS.CALLING, type: 'AUDIO' },
+        }),
+      });
+    });
+
+    expect(publishMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        destination: '/app/call.signal',
+        body: JSON.stringify({ type: 'CALL_CANCEL', callId: 321 }),
+      })
+    );
+    expect(result.current.isRinging).toBe(false);
+    expect(result.current.call).toBeNull();
   });
 
   it('call-signal ack with CALLING sets ringing state', async () => {

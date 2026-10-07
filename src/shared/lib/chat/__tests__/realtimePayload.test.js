@@ -59,6 +59,18 @@ describe('extractNotificationMessage', () => {
     ).toEqual(serverMessage);
   });
 
+  it('unwraps a CHAT_MESSAGE notification even when the wrapper has a chatId', () => {
+    expect(
+      extractNotificationMessage({
+        id: 501,
+        chatId: 5,
+        type: 'CHAT_MESSAGE',
+        content: '',
+        message: { ...serverMessage, type: 'IMAGE', fileUrl: 'images/pixel.png' },
+      })
+    ).toEqual({ ...serverMessage, type: 'IMAGE', fileUrl: 'images/pixel.png' });
+  });
+
   it('returns null when no message', () => {
     expect(extractNotificationMessage({ id: 1 })).toBeNull();
     expect(extractNotificationMessage(null)).toBeNull();

@@ -124,3 +124,9 @@ Workflow **CI/CD Pipeline** (`.github/workflows/ci.yml`):
 | TURN                  | `GET /api/turn/credentials`       |
 
 Документация API: после запуска бэкенда открой Swagger UI и выбери сервер **Development (localhost)**.
+
+## Эмодзи
+
+Пикер и крупные emoji-сообщения используют локальные SVG из Twemoji, поэтому не зависят от системного шрифта или CDN. Пересобрать выбранный набор: `npm run emoji:sync`.
+
+Графика Twemoji распространяется по [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); текст лицензии сохранён в `public/emoji/twemoji/LICENSE`.

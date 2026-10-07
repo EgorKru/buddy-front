@@ -117,3 +117,75 @@ test.describe('1-on-1 video call media', () => {
     await senderPage.getByTestId(CALL_T.outgoingCancel).click({ force: true });
   });
 });
+
+test.describe('Rich chat composer', () => {
+  test.skip(!hasDirectEnv, 'Set E2E_SENDER_*, E2E_RECIPIENT_*, E2E_CHAT_ID');
+  test.setTimeout(180_000);
+
+  let senderContext;
+  let recipientContext;
+  let senderPage;
+  let recipientPage;
+
+  test.beforeAll(async ({ browser }) => {
+    const senderAuth = await loginViaApi(senderUser, senderPass);
+    const recipientAuth = await loginViaApi(recipientUser, recipientPass);
+    senderContext = await browser.newContext({ permissions: ['microphone', 'camera'] });
+    recipientContext = await browser.newContext({ permissions: ['microphone', 'camera'] });
+    await seedAuthContext(senderContext, senderAuth);
+    await seedAuthContext(recipientContext, recipientAuth);
+    senderPage = await senderContext.newPage();
+    recipientPage = await recipientContext.newPage();
+  });
+
+  test.afterAll(async () => {
+    await senderContext?.close();
+    await recipientContext?.close();
+  });
+
+  test.beforeEach(async () => {
+    await openChat(recipientPage, chatId);
+    await openChat(senderPage, chatId);
+    await waitForChatReady(recipientPage, { requireStomp: true });
+    await waitForChatReady(senderPage, { requireStomp: true });
+  });
+
+  test('local SVG emoji picker sends an animated emoji message', async () => {
+    await senderPage.getByRole('button', { name: 'Открыть эмодзи' }).click();
+    const picker = senderPage.getByTestId('emoji-picker');
+    await expect(picker).toBeVisible();
+    await picker.getByRole('searchbox', { name: 'Поиск эмодзи' }).fill('огонь');
+    const fire = picker.getByRole('button', { name: 'Добавить 🔥' });
+    await expect(fire.locator('img')).toHaveAttribute('src', /\/emoji\/twemoji\/1f525\.svg$/);
+    expect(await fire.locator('img').evaluate((image) => image.naturalWidth)).toBeGreaterThan(0);
+    await fire.click();
+    await senderPage.getByTestId('chat-send-button').click();
+
+    const receivedEmoji = recipientPage
+      .locator('[data-testid="chat-message-text-body"][data-emoji-count="1"]')
+      .filter({ has: recipientPage.locator('img[src$="/emoji/twemoji/1f525.svg"]') })
+      .last();
+    await expect(receivedEmoji).toBeVisible({ timeout: 15_000 });
+  });
+
+  test('records, uploads and delivers a circular video note', async () => {
+    await senderPage.getByRole('button', { name: 'Записать видеокружок' }).click();
+    await expect(senderPage.getByTestId('video-note-composer')).toBeVisible();
+    await senderPage.waitForTimeout(700);
+
+    const upload = senderPage.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        response.url().includes(`/chats/${chatId}/files/file`) &&
+        response.status() < 400
+    );
+    await senderPage.getByRole('button', { name: 'Отправить видеокружок' }).click();
+    await upload;
+
+    const recipientNote = recipientPage.getByTestId('chat-video-note').last();
+    await expect(recipientNote).toBeVisible({ timeout: 20_000 });
+    await expect(
+      recipientNote.getByRole('button', { name: 'Воспроизвести видеокружок' })
+    ).toBeVisible();
+  });
+});

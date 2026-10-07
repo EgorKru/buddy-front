@@ -66,6 +66,13 @@ const STUN_SERVERS = [
 
 const isBrowser = typeof window !== 'undefined';
 
+const createSignalId = () => {
+  if (isBrowser && typeof window.crypto?.randomUUID === 'function') {
+    return window.crypto.randomUUID();
+  }
+  return `call-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
 export const useCallProtocol = () => {
   const { client: stompClient, connected: isConnected } = useStomp();
 
@@ -88,6 +95,10 @@ export const useCallProtocol = () => {
   const iceCandidatesQueueRef = useRef([]);
   const turnCredentialsRef = useRef(null);
   const backgroundEffectStopRef = useRef(null);
+  const callAttemptRef = useRef(0);
+  const outgoingSignalIdRef = useRef(null);
+  const sentInitiationIdsRef = useRef(new Set());
+  const cancelledInitiationIdsRef = useRef(new Set());
 
   const currentUser = getCurrentUser();
   const myUserId = currentUser?.id;
@@ -460,6 +471,30 @@ export const useCallProtocol = () => {
       const response = safeJsonParse(message.body);
       if (!response) return;
 
+      if (response.type === SIGNAL_TYPES.CALL_INITIATE && response.signalId) {
+        sentInitiationIdsRef.current.delete(response.signalId);
+
+        if (cancelledInitiationIdsRef.current.delete(response.signalId)) {
+          const cancelledCallId = response.call?.id || response.callId;
+          if (response.success === true && cancelledCallId) {
+            sendSignal({
+              type: SIGNAL_TYPES.CALL_CANCEL,
+              callId: cancelledCallId,
+            });
+          }
+          return;
+        }
+
+        if (
+          outgoingSignalIdRef.current &&
+          response.signalId !== outgoingSignalIdRef.current
+        ) {
+          return;
+        }
+
+        outgoingSignalIdRef.current = null;
+      }
+
       // Обработка ошибок
       if (response.success === false) {
         if (response.errorMessage) {
@@ -550,7 +585,7 @@ export const useCallProtocol = () => {
       });
       subscriptionsRef.current = [];
     };
-  }, [isConnected, stompClient, handleCallEvent]);
+  }, [isConnected, stompClient, handleCallEvent, sendSignal, cleanup]);
 
   const initiateCall = useCallback(
     async (targetUserId, callType = CALL_TYPE.AUDIO, chatId = null, targetUserInfo = null) => {
@@ -571,6 +606,10 @@ export const useCallProtocol = () => {
       }
 
       try {
+        const attempt = ++callAttemptRef.current;
+        const signalId = createSignalId();
+        outgoingSignalIdRef.current = signalId;
+
         const tempCall = {
           id: null,
           caller: currentUser,
@@ -585,11 +624,36 @@ export const useCallProtocol = () => {
 
         const stream = await startLocalStream(callType === CALL_TYPE.VIDEO);
 
+        if (attempt !== callAttemptRef.current) {
+          stopMediaStream(stream);
+          if (localStreamRef.current === stream) {
+            localStreamRef.current = null;
+            setLocalStream(null);
+          }
+          return;
+        }
+
         const pc = await createPeerConnection();
+
+        if (attempt !== callAttemptRef.current) {
+          pc?.close();
+          if (peerConnectionRef.current === pc) {
+            peerConnectionRef.current = null;
+          }
+          stopMediaStream(stream);
+          if (localStreamRef.current === stream) {
+            localStreamRef.current = null;
+            setLocalStream(null);
+          }
+          return;
+        }
+
         addTracksToPC(stream, pc);
 
+        sentInitiationIdsRef.current.add(signalId);
         sendSignal({
           type: SIGNAL_TYPES.CALL_INITIATE,
+          signalId,
           targetUserId,
           callType,
           chatId,
@@ -653,11 +717,17 @@ export const useCallProtocol = () => {
   );
 
   const cancelCall = useCallback(() => {
+    callAttemptRef.current += 1;
+    const outgoingSignalId = outgoingSignalIdRef.current;
+    outgoingSignalIdRef.current = null;
+
     if (callIdRef.current) {
       sendSignal({
         type: SIGNAL_TYPES.CALL_CANCEL,
         callId: callIdRef.current,
       });
+    } else if (outgoingSignalId && sentInitiationIdsRef.current.has(outgoingSignalId)) {
+      cancelledInitiationIdsRef.current.add(outgoingSignalId);
     }
     cleanup();
   }, [sendSignal, cleanup]);

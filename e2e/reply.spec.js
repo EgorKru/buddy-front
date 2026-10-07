@@ -89,7 +89,7 @@ test.describe('Reply preview (immediate for recipient)', () => {
     await replyPost;
 
     const replyRow = recipientPage
-      .locator('[data-testid="chat-message-text"]')
+      .getByTestId('chat-message-row')
       .filter({ hasText: replyText });
 
     const sentAt = Date.now();

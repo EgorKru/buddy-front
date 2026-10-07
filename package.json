@@ -53,7 +53,8 @@
     "test:call-smoke": "node scripts/call-smoke.mjs",
     "test:media": "jest --testPathPattern=\"shared/lib/media\"",
     "test:media:all": "npm run test:media && npm run test:media-smoke && npm run test:e2e:media",
-    "test:media-smoke": "node scripts/media-smoke.mjs"
+    "test:media-smoke": "node scripts/media-smoke.mjs",
+    "emoji:sync": "node scripts/copy-chat-emoji-assets.mjs"
   },
   "build": {
     "appId": "ru.pager.desktop",
@@ -120,6 +121,7 @@
     "@playwright/test": "^1.60.0",
     "@testing-library/jest-dom": "^6.4.2",
     "@testing-library/react": "^14.2.1",
+    "@twemoji/svg": "^15.0.0",
     "autoprefixer": "^10",
     "babel-jest": "^29.7.0",
     "electron": "44.7.0",

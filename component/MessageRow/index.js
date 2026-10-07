@@ -4,6 +4,7 @@ import { formatChatDate, formatChatTime } from '@/utils/dateHelpers';
 import VoiceMessagePlayer from '@/component/VoiceMessagePlayer';
 import ImageMessage from '@/component/ImageMessage';
 import FileMessage from '@/component/FileMessage';
+import VideoNoteMessage from '@/component/VideoNoteMessage';
 import { Pin } from 'lucide-react';
 import ForwardedMessage from './ForwardedMessage';
 import E2eeTextContent from './E2eeTextContent';
@@ -19,6 +20,9 @@ import {
 } from './utils';
 import { messageRowComparison } from './memoComparison';
 import { isE2eeEnabled } from '@/shared/lib/e2ee/directTextE2ee';
+import { getEmojiOnlyCount, splitEmojiGraphemes } from '@/shared/lib/chat/emoji';
+import { EmojiGlyph } from '@/shared/ui/EmojiGlyph';
+import { isVideoNoteMessage } from '@/shared/lib/chat/videoNote';
 import styles from '@/styles/chat.module.css';
 
 const MessageRow = React.memo(
@@ -53,6 +57,13 @@ const MessageRow = React.memo(
       if (Number(msg.encryptionVersion) > 0) return false;
       return checkSearchMatch(searchOpen, searchText, msg.content);
     }, [searchOpen, searchText, msg.content, msg.encryptionVersion]);
+    const emojiOnlyCount = useMemo(
+      () =>
+        msg.type === 'TEXT' && Number(msg.encryptionVersion) === 0
+          ? getEmojiOnlyCount(msg.content)
+          : 0,
+      [msg.content, msg.encryptionVersion, msg.type]
+    );
 
     const status = useMemo(() => {
       return getMessageStatus(msg);
@@ -189,6 +200,7 @@ const MessageRow = React.memo(
           onDragStart={handleDragStart}
           onDrag={handleDragStart}
           data-message-id={msg.id}
+          data-testid="chat-message-row"
         >
           {selectionMode && (
             <div className={styles.messageCheckbox}>
@@ -310,23 +322,27 @@ const MessageRow = React.memo(
                         user={user}
                       />
                     )}
-                    {msg.content && msg.content.trim() && (
+                    {!isVideoNoteMessage(msg) && msg.content && msg.content.trim() && (
                       <div className={styles.messageTextContentWrapper}>
                         <div className={styles.messageTextContent}>{msg.content}</div>
                       </div>
                     )}
-                    <FileMessage
-                      fileUrl={msg.fileUrl}
-                      content={null}
-                      fileSize={msg.fileSize}
-                      mimeType={msg.mimeType}
-                      messageTime={null}
-                      fileName={msg.fileName}
-                      setFileViewerModal={setFileViewerModal}
-                      isOwn={isOwn}
-                      statusIcon={null}
-                      isPinned={false}
-                    />
+                    {isVideoNoteMessage(msg) ? (
+                      <VideoNoteMessage fileUrl={msg.fileUrl} isOwn={isOwn} />
+                    ) : (
+                      <FileMessage
+                        fileUrl={msg.fileUrl}
+                        content={null}
+                        fileSize={msg.fileSize}
+                        mimeType={msg.mimeType}
+                        messageTime={null}
+                        fileName={msg.fileName}
+                        setFileViewerModal={setFileViewerModal}
+                        isOwn={isOwn}
+                        statusIcon={null}
+                        isPinned={false}
+                      />
+                    )}
                     <div className={styles.messageTextMeta}>
                       {isPinned && (
                         <Pin size={12} className={styles.messagePinnedIcon} title="Закреплено" />
@@ -361,7 +377,7 @@ const MessageRow = React.memo(
                   </div>
                 ) : (
                   <div
-                    className={`${styles.messageText} ${msg.isOptimistic ? styles.messagePending : ''} ${msg.status === MESSAGE_STATUS.FAILED ? styles.messageFailed : ''}`}
+                    className={`${styles.messageText} ${emojiOnlyCount ? styles.emojiOnlyBubble : ''} ${msg.isOptimistic ? styles.messagePending : ''} ${msg.status === MESSAGE_STATUS.FAILED ? styles.messageFailed : ''}`}
                   >
                     {msg.forwardedFrom && (
                       <ForwardedMessage
@@ -396,7 +412,22 @@ const MessageRow = React.memo(
                             styles={styles}
                           />
                         ) : (
-                          <span data-testid="chat-message-text-body">{highlightedContent}</span>
+                          <span
+                            data-testid="chat-message-text-body"
+                            className={emojiOnlyCount ? styles.animatedEmojiMessage : undefined}
+                            data-emoji-count={emojiOnlyCount || undefined}
+                          >
+                            {emojiOnlyCount
+                              ? splitEmojiGraphemes(msg.content).map((emoji, emojiIndex) => (
+                                  <EmojiGlyph
+                                    key={`${emoji}-${emojiIndex}`}
+                                    emoji={emoji}
+                                    className={styles.animatedEmojiGlyph}
+                                    decorative={false}
+                                  />
+                                ))
+                              : highlightedContent}
+                          </span>
                         )}
                       </div>
                       <div className={styles.messageTextMeta}>

@@ -61,6 +61,12 @@ export const getMessagePreview = (message, options = {}) => {
     }
     return '…';
   }
+  if (
+    message.type === 'FILE' &&
+    String(message.mimeType || '').startsWith('video/') &&
+    String(message.fileName || '').startsWith('pager-video-note-')
+  )
+    return '🎥 Видеокружок';
   if (message.type === 'VOICE' && !message.content) return '🎤 Голосовое сообщение';
   if ((message.type === 'FILE' || message.type === 'IMAGE') && !message.content) {
     if (message.fileName) {
