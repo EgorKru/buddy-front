@@ -1,57 +1,135 @@
 .roomContainer {
+  position: relative;
   display: flex;
-  flex-direction: column;
   width: 100%;
   height: 100vh;
   height: 100dvh;
-  background: var(--bg-main);
+  flex-direction: column;
   overflow: hidden;
+  background: radial-gradient(circle at 50% -22%, rgba(55, 80, 120, 0.3), transparent 42%), #0d1016;
+  color: #f7f9fc;
 }
 
-/* Верхняя панель */
 .topBar {
+  position: relative;
+  z-index: 80;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 24px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border-light);
-  flex-shrink: 0;
+  gap: 20px;
+  min-height: 68px;
+  padding: 10px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(17, 20, 27, 0.82);
+  backdrop-filter: blur(22px) saturate(145%);
+}
+
+.brandGroup,
+.logo,
+.meetingInfo,
+.connectionStatus,
+.roomCodeButton {
+  display: flex;
+  align-items: center;
+}
+
+.brandGroup {
+  min-width: 0;
+  gap: 14px;
 }
 
 .logo {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-primary);
-  letter-spacing: -0.5px;
+  flex: 0 0 auto;
+  gap: 9px;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 720;
+  letter-spacing: -0.025em;
+}
+
+.logoMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: linear-gradient(145deg, #2779ff, #0a55dd);
+  box-shadow: 0 7px 20px rgba(23, 105, 255, 0.28);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.roomTitle {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 13px;
+  font-weight: 550;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .meetingInfo {
-  display: flex;
-  align-items: center;
-  gap: 16px;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.connectionStatus {
+  gap: 6px;
+  min-height: 32px;
+  padding: 6px 9px;
+  border: 1px solid rgba(105, 230, 160, 0.14);
+  border-radius: 10px;
+  background: rgba(40, 177, 98, 0.1);
+  color: #8ce4b3;
+  font-size: 11px;
+  font-weight: 650;
 }
 
 .timer {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-secondary);
+  min-width: 46px;
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 12px;
+  font-weight: 650;
   font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.roomCodeButton {
+  gap: 6px;
+  min-height: 34px;
+  padding: 6px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.065);
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.roomCodeButton:hover {
+  background: rgba(255, 255, 255, 0.11);
+  color: #fff;
+}
+
+.roomCodeButton:focus-visible {
+  outline: 2px solid #79aaff;
+  outline-offset: 2px;
 }
 
 .roomCode {
-  font-size: 13px;
-  color: var(--text-muted);
-  background: var(--room-code-bg);
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-family: monospace;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
 }
 
-/* Центральный контент (загрузка/ошибка) */
 .centerContent {
-  flex: 1;
   display: flex;
+  flex: 1;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -59,203 +137,377 @@
 }
 
 .loader {
-  width: 48px;
-  height: 48px;
-  border: 3px solid var(--loader-track);
-  border-top-color: var(--primary);
+  width: 42px;
+  height: 42px;
+  border: 3px solid rgba(59, 130, 246, 0.2);
+  border-top-color: #4d8eff;
   border-radius: 50%;
-  animation: spin 1s linear infinite;
+  animation: spin 0.9s linear infinite;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .loader {
-    animation: none;
-    border-top-color: var(--primary);
-    border-right-color: var(--primary);
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
 .loadingText {
-  color: var(--text-secondary);
-  font-size: 15px;
-}
-
-.errorBox {
-  text-align: center;
-  padding: 40px;
-  max-width: 400px;
-}
-
-.errorBox h2 {
-  color: var(--danger);
-  font-size: 20px;
-  margin-bottom: 12px;
-}
-
-.errorBox p {
-  color: var(--text-secondary);
+  color: rgba(255, 255, 255, 0.62);
   font-size: 14px;
-  margin-bottom: 24px;
-  line-height: 1.5;
 }
 
-.errorActions {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  flex-wrap: wrap;
+.errorBanner {
+  position: absolute;
+  top: 78px;
+  left: 50%;
+  z-index: 120;
+  max-width: min(520px, calc(100vw - 32px));
+  padding: 10px 14px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 126, 135, 0.22);
+  border-radius: 12px;
+  background: rgba(112, 26, 35, 0.92);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.3);
+  color: #ffdadd;
+  font-size: 13px;
+  font-weight: 600;
+  backdrop-filter: blur(16px);
 }
 
-.primaryButton {
-  padding: 12px 24px;
-  background: var(--primary);
-  border: none;
-  border-radius: 8px;
-  color: var(--text-primary);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.primaryButton:hover {
-  background: var(--primary-button-hover);
-}
-
-.secondaryButton {
-  padding: 12px 24px;
-  background: transparent;
-  border: 1px solid var(--secondary-button-border);
-  border-radius: 8px;
-  color: var(--text-primary);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.secondaryButton:hover {
-  background: var(--secondary-button-hover-bg);
-  border-color: var(--secondary-button-hover-border);
-}
-
-/* Сетка видео: центр при малом числе колонок */
 .videoGrid {
-  flex: 1;
+  position: relative;
   display: grid;
-  gap: 12px;
-  padding: 16px;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  grid-auto-rows: minmax(200px, auto);
-  overflow: auto;
-  align-content: start;
+  flex: 1;
+  min-height: 0;
+  gap: clamp(8px, 1vw, 14px);
+  align-content: center;
   justify-content: center;
+  padding: clamp(10px, 1.5vw, 20px) clamp(10px, 1.5vw, 20px) 112px;
+  overflow: auto;
+  transition: padding-right 180ms ease;
 }
 
-/* Превью демонстрации экрана */
+.videoItem,
 .screenSharePreview {
   position: relative;
-  grid-column: 1 / -1;
-  min-height: 300px;
-  max-height: 60vh;
-  border-radius: 12px;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
-  background: var(--screen-bg);
-  border: 2px solid var(--success-accent);
-  box-shadow: 0 0 30px var(--success-glow);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: #090b10;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.2);
+}
+
+.videoItem {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 16 / 9;
+}
+
+.videoItem:focus-within {
+  outline: 2px solid #4f8fff;
+  outline-offset: 2px;
+}
+
+.grid1 {
+  grid-template-columns: minmax(320px, min(100%, 1120px));
+  grid-template-rows: minmax(280px, min(72vh, 720px));
+}
+
+.grid2 {
+  grid-template-columns: repeat(2, minmax(280px, 1fr));
+  grid-template-rows: minmax(260px, min(68vh, 680px));
+}
+
+.grid3,
+.grid4 {
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  grid-template-rows: repeat(2, minmax(210px, 1fr));
+}
+
+.grid5,
+.grid6 {
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  grid-template-rows: repeat(2, minmax(190px, 1fr));
+}
+
+.grid7,
+.grid8,
+.grid9 {
+  grid-template-columns: repeat(3, minmax(200px, 1fr));
+  grid-template-rows: repeat(3, minmax(150px, 1fr));
+}
+
+.grid3 .localVideoItem {
+  grid-column: 1 / -1;
+  justify-self: center;
+  max-width: calc(50% - 7px);
+}
+
+.screenShareMode {
+  grid-template-columns: minmax(0, 3.2fr) minmax(180px, 0.8fr);
+  grid-template-rows: repeat(auto-fit, minmax(120px, 1fr));
+  align-content: stretch;
+}
+
+.screenSharePreview {
+  grid-row: 1 / -1;
+  min-height: 360px;
+  background: #05070a;
+  border-color: rgba(83, 219, 142, 0.36);
 }
 
 .screenShareVideo {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  background: var(--screen-video-bg);
+  background: #05070a;
 }
 
 .screenShareLabel {
   position: absolute;
-  top: 12px;
-  left: 12px;
+  top: 13px;
+  left: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(16, 20, 26, 0.82);
+  color: #dff9ea;
+  font-size: 12px;
+  font-weight: 700;
+  backdrop-filter: blur(14px);
+}
+
+.liveDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #47db87;
+  box-shadow: 0 0 0 4px rgba(71, 219, 135, 0.13);
+}
+
+.presenterTile {
+  border-color: rgba(77, 142, 255, 0.54);
+  box-shadow:
+    0 0 0 1px rgba(77, 142, 255, 0.16),
+    0 14px 38px rgba(0, 0, 0, 0.24);
+}
+
+.soloInvite {
+  position: absolute;
+  bottom: 126px;
+  left: 50%;
+  z-index: 20;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  background: var(--success-badge-bg);
+  gap: 8px;
+  max-width: calc(100% - 32px);
+  padding: 8px 9px 8px 12px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 13px;
+  background: rgba(18, 21, 28, 0.84);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.27);
+  color: rgba(255, 255, 255, 0.67);
+  font-size: 12px;
+  white-space: nowrap;
+  backdrop-filter: blur(20px);
+}
+
+.soloInvite svg {
+  color: #8cb6ff;
+}
+
+.soloInvite button {
+  min-height: 30px;
+  padding: 6px 9px;
+  border: none;
   border-radius: 8px;
-  color: var(--text-primary);
+  background: #1769ff;
+  color: #fff;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sidePanelOpen .videoGrid {
+  padding-right: 390px;
+}
+
+.errorBox {
+  max-width: 420px;
+  padding: 36px;
+  text-align: center;
+}
+
+.errorBox h2 {
+  margin-bottom: 12px;
+  color: #ff7c86;
+  font-size: 20px;
+}
+
+.errorBox p {
+  margin-bottom: 24px;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.errorActions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.primaryButton,
+.secondaryButton {
+  min-height: 44px;
+  padding: 10px 18px;
+  border-radius: 11px;
+  color: #fff;
   font-size: 13px;
-  font-weight: 600;
-  box-shadow: 0 4px 12px var(--success-badge-shadow);
+  font-weight: 650;
+  cursor: pointer;
 }
 
-.videoItem {
-  min-height: 200px;
-  aspect-ratio: 16 / 9;
-  border-radius: 12px;
-  overflow: hidden;
-  background: var(--video-item-bg);
-  position: relative;
+.primaryButton {
+  border: none;
+  background: #1769ff;
 }
 
-.videoItemFull {
-  min-height: 300px;
-  border-radius: 12px;
-  overflow: hidden;
-  background: var(--video-item-bg);
-  grid-column: 1 / -1;
-  max-height: calc(100vh - 200px);
+.secondaryButton {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
 }
 
-/* Адаптивность */
-@media (max-width: 768px) {
+@media (max-width: 1180px) {
+  .sidePanelOpen .videoGrid {
+    padding-right: 352px;
+  }
+
+  .connectionStatus {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .sidePanelOpen .videoGrid {
+    padding-right: 14px;
+  }
+
+  .grid5,
+  .grid6,
+  .grid7,
+  .grid8,
+  .grid9 {
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
+    grid-template-rows: repeat(auto-fit, minmax(190px, 1fr));
+  }
+
+  .screenShareMode {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(300px, 1fr) auto;
+  }
+
+  .screenSharePreview {
+    grid-row: auto;
+  }
+}
+
+@media (max-width: 720px) {
   .topBar {
-    padding: 12px 16px;
+    min-height: 60px;
+    padding: 8px 12px;
   }
 
-  .logo {
-    font-size: 16px;
-  }
-
-  .meetingInfo {
-    gap: 12px;
-  }
-
-  .timer {
-    font-size: 13px;
-  }
-
-  .roomCode {
+  .roomTitle,
+  .roomCodeButton > svg:last-child {
     display: none;
   }
 
-  .videoGrid {
-    padding: 12px;
-    gap: 8px;
-    grid-template-columns: 1fr;
+  .logo {
+    font-size: 14px;
   }
 
-  .videoItem,
-  .videoItemFull {
-    min-height: 150px;
+  .logoMark {
+    width: 28px;
+    height: 28px;
+  }
+
+  .meetingInfo {
+    gap: 5px;
+  }
+
+  .roomCodeButton {
+    padding: 6px 8px;
+  }
+
+  .videoGrid,
+  .grid1,
+  .grid2,
+  .grid3,
+  .grid4,
+  .grid5,
+  .grid6,
+  .grid7,
+  .grid8,
+  .grid9 {
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(auto-fit, minmax(190px, 1fr));
+    align-content: start;
+    padding: 9px 9px 84px;
+  }
+
+  .videoItem {
+    min-height: 190px;
+    max-height: 46vh;
+  }
+
+  .grid3 .localVideoItem {
+    grid-column: auto;
+    max-width: none;
+  }
+
+  .soloInvite {
+    bottom: 82px;
   }
 }
 
 @media (max-width: 480px) {
-  .topBar {
-    padding: 10px 12px;
+  .roomCode {
+    max-width: 68px;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
-  .videoGrid {
-    padding: 8px;
-    gap: 6px;
+  .timer {
+    min-width: 38px;
   }
 
-  .errorActions {
-    flex-direction: column;
+  .videoItem,
+  .screenSharePreview {
+    border-radius: 14px;
   }
 
-  .primaryButton,
-  .secondaryButton {
-    width: 100%;
+  .soloInvite span {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loader {
+    animation: none;
+    border-right-color: #4d8eff;
+  }
+
+  .videoGrid,
+  .roomCodeButton {
+    transition: none;
   }
 }

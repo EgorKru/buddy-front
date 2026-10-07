@@ -1,17 +1,15 @@
-const { app, BrowserWindow, session, shell } = require('electron');
+const { app, BrowserWindow, desktopCapturer, session, shell } = require('electron');
 const path = require('node:path');
+const {
+  createTrustedOrigins,
+  isExternalHttpUrl,
+  isTrustedUrl,
+  selectDisplaySource,
+} = require('./security.cjs');
 
 const productionUrl = process.env.PAGER_APP_URL || 'https://pager.website';
 const appUrl = process.env.PAGER_DESKTOP_DEV_URL || productionUrl;
-const trustedOrigins = new Set([new URL(appUrl).origin, new URL(productionUrl).origin]);
-
-function isTrustedUrl(value) {
-  try {
-    return trustedOrigins.has(new URL(value).origin);
-  } catch {
-    return false;
-  }
-}
+const trustedOrigins = createTrustedOrigins([appUrl, productionUrl]);
 
 function configurePermissions() {
   session.defaultSession.setPermissionRequestHandler(
@@ -23,9 +21,20 @@ function configurePermissions() {
         'notifications',
         'fullscreen',
       ]);
-      callback(isTrustedUrl(requestingUrl) && allowedPermissions.has(permission));
+      callback(isTrustedUrl(requestingUrl, trustedOrigins) && allowedPermissions.has(permission));
     }
   );
+
+  session.defaultSession.setDisplayMediaRequestHandler(async (request, callback) => {
+    if (!isTrustedUrl(request.securityOrigin, trustedOrigins) || !request.videoRequested) {
+      callback({});
+      return;
+    }
+
+    const sources = await desktopCapturer.getSources({ types: ['screen', 'window'] });
+    const source = selectDisplaySource(sources);
+    callback(source ? { video: source } : {});
+  });
 }
 
 function createWindow() {
@@ -48,15 +57,15 @@ function createWindow() {
 
   window.once('ready-to-show', () => window.show());
   window.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('https://') || url.startsWith('http://')) {
+    if (isExternalHttpUrl(url)) {
       void shell.openExternal(url);
     }
     return { action: 'deny' };
   });
   window.webContents.on('will-navigate', (event, url) => {
-    if (!isTrustedUrl(url)) {
+    if (!isTrustedUrl(url, trustedOrigins)) {
       event.preventDefault();
-      if (url.startsWith('https://') || url.startsWith('http://')) void shell.openExternal(url);
+      if (isExternalHttpUrl(url)) void shell.openExternal(url);
     }
   });
 

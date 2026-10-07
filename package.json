@@ -11,6 +11,10 @@
     "desktop:dev": "set PAGER_DESKTOP_DEV_URL=http://localhost:3000&& electron .",
     "desktop:start": "electron .",
     "desktop:build:win": "electron-builder --win nsis",
+    "desktop:build:mac": "electron-builder --mac dmg",
+    "android:add": "cap add android",
+    "android:sync": "cap sync android",
+    "android:open": "cap open android",
     "ios:add": "cap add ios",
     "ios:sync": "cap sync ios",
     "ios:open": "cap open ios",
@@ -69,6 +73,12 @@
         "nsis"
       ]
     },
+    "mac": {
+      "category": "public.app-category.business",
+      "target": [
+        "dmg"
+      ]
+    },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
@@ -104,6 +114,7 @@
     "@babel/core": "^7.24.0",
     "@babel/preset-env": "^7.24.0",
     "@babel/preset-react": "^7.24.0",
+    "@capacitor/android": "^8.5.3",
     "@capacitor/cli": "8.5.3",
     "@capacitor/ios": "8.5.3",
     "@playwright/test": "^1.60.0",

@@ -1,4 +1,4 @@
-name: Windows desktop
+name: Desktop apps
 
 on:
   workflow_dispatch:
@@ -26,4 +26,26 @@ jobs:
         with:
           name: pager-windows-${{ github.ref_name }}
           path: dist-desktop/*.exe
+          if-no-files-found: error
+
+  build-macos:
+    runs-on: macos-15
+    permissions:
+      contents: read
+    env:
+      HUSKY: '0'
+      PAGER_APP_URL: https://pager.website
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run test:ci
+      - run: npm run desktop:build:mac
+      - uses: actions/upload-artifact@v7
+        with:
+          name: pager-macos-${{ github.ref_name }}
+          path: dist-desktop/*.dmg
           if-no-files-found: error

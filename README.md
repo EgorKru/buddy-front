@@ -4,7 +4,7 @@
 
 ## Требования
 
-- **Node.js 20** (LTS)
+- **Node.js 22** (LTS)
 - npm 9+
 - Запущенный бэкенд (`http://localhost:8080`) и Redis/PostgreSQL (см. README бэкенда)
 
@@ -44,6 +44,12 @@ npm run dev
 | `npm run format:check` | Prettier (как в CI)    |
 | `npm test`             | Все Jest-тесты         |
 | `npm run test:ci`      | Jest для CI + coverage |
+
+## Нативные приложения
+
+Один интерфейс поставляется как web, Electron для Windows/macOS и Capacitor для Android/iOS.
+Команды сборки, CI и ограничения мобильного шаринга экрана описаны в
+[`docs/NATIVE_APPS.md`](docs/NATIVE_APPS.md).
 
 ### Тесты по областям (Jest)
 

@@ -83,6 +83,7 @@ export const useRoomProtocol = (initialRoomId = null) => {
 
   const [localStream, setLocalStream] = useState(null);
   const [remoteStreams, setRemoteStreams] = useState(new Map());
+  const [remoteScreenStreams, setRemoteScreenStreams] = useState(new Map());
   const [screenStream, setScreenStream] = useState(null);
 
   const [audioEnabled, setAudioEnabled] = useState(true);
@@ -99,17 +100,31 @@ export const useRoomProtocol = (initialRoomId = null) => {
   const roomSubscriptionRef = useRef(null);
   const userQueueSubscriptionRef = useRef(null);
   const localStreamRef = useRef(null);
+  const audioEnabledRef = useRef(true);
+  const videoEnabledRef = useRef(true);
   const screenStreamRef = useRef(null);
+  const screenSendersRef = useRef(new Map());
+  const screenSharingUsersRef = useRef(new Set());
   const roomIdRef = useRef(initialRoomId);
   const pendingCallbacksRef = useRef(new Map());
+  const pendingIceCandidatesRef = useRef(new Map());
   const negotiationTimeoutRef = useRef(new Set());
+  const clientRef = useRef(client);
   const connectedRef = useRef(connected);
   const turnCredentialsRef = useRef(null);
   const backgroundEffectStopRef = useRef(null);
 
   const lastSeqRef = useRef(0);
-  const eventQueueRef = useRef([]);
-  const isRecoveringRef = useRef(false);
+
+  const commitAudioEnabled = useCallback((enabled) => {
+    audioEnabledRef.current = enabled;
+    setAudioEnabled(enabled);
+  }, []);
+
+  const commitVideoEnabled = useCallback((enabled) => {
+    videoEnabledRef.current = enabled;
+    setVideoEnabled(enabled);
+  }, []);
 
   const getCurrentUser = useCallback(() => {
     if (!isBrowser) return null;
@@ -128,27 +143,25 @@ export const useRoomProtocol = (initialRoomId = null) => {
   }, [initialRoomId]);
 
   useEffect(() => {
+    clientRef.current = client;
     connectedRef.current = connected;
-  }, [connected]);
+  }, [client, connected]);
 
-  const sendSignal = useCallback(
-    (signal, callback) => {
-      if (!client || !connected) {
-        return;
-      }
+  const sendSignal = useCallback((signal, callback) => {
+    const activeClient = clientRef.current;
+    if (!activeClient || !connectedRef.current) return false;
 
-      const signalId = Date.now().toString();
-      if (callback) {
-        pendingCallbacksRef.current.set(signalId, callback);
-      }
+    const signalId = Date.now().toString();
+    if (callback) {
+      pendingCallbacksRef.current.set(signalId, callback);
+    }
 
-      client.publish({
-        destination: '/app/room.signal',
-        body: JSON.stringify({ ...signal, signalId }),
-      });
-    },
-    [client, connected]
-  );
+    activeClient.publish({
+      destination: '/app/room.signal',
+      body: JSON.stringify({ ...signal, signalId }),
+    });
+    return true;
+  }, []);
 
   const createPeerConnection = useCallback(
     async (userId) => {
@@ -157,6 +170,7 @@ export const useRoomProtocol = (initialRoomId = null) => {
       const existingPc = peerConnectionsRef.current.get(userId);
       if (existingPc) {
         existingPc.close();
+        screenSendersRef.current.delete(userId);
       }
 
       // Получить TURN credentials если еще не получены
@@ -189,9 +203,10 @@ export const useRoomProtocol = (initialRoomId = null) => {
       }
 
       if (screenStreamRef.current) {
-        screenStreamRef.current.getTracks().forEach((track) => {
-          pc.addTrack(track, screenStreamRef.current);
-        });
+        const senders = screenStreamRef.current
+          .getTracks()
+          .map((track) => pc.addTrack(track, screenStreamRef.current));
+        screenSendersRef.current.set(userId, senders);
       }
 
       pc.onicecandidate = (event) => {
@@ -208,9 +223,7 @@ export const useRoomProtocol = (initialRoomId = null) => {
       };
 
       pc.onnegotiationneeded = async () => {
-        if (pc.signalingState !== 'stable' && pc.signalingState !== 'have-local-offer') {
-          return;
-        }
+        if (pc.signalingState !== 'stable') return;
 
         const negotiationTimeout = `negotiation_${userId}`;
         if (negotiationTimeoutRef.current?.has(negotiationTimeout)) {
@@ -221,7 +234,7 @@ export const useRoomProtocol = (initialRoomId = null) => {
         try {
           await new Promise((resolve) => setTimeout(resolve, 50));
 
-          if (pc.signalingState === 'stable' || pc.signalingState === 'have-local-offer') {
+          if (pc.signalingState === 'stable') {
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
 
@@ -243,6 +256,31 @@ export const useRoomProtocol = (initialRoomId = null) => {
       pc.ontrack = (event) => {
         const stream = event.streams[0];
         if (stream) {
+          const trackLabel = event.track?.label?.toLowerCase() || '';
+          const isPresentationTrack =
+            event.track?.kind === 'video' &&
+            (screenSharingUsersRef.current.has(userId) ||
+              trackLabel.includes('screen') ||
+              trackLabel.includes('display') ||
+              trackLabel.includes('window'));
+
+          if (isPresentationTrack) {
+            setRemoteScreenStreams((prev) => {
+              const next = new Map(prev);
+              next.set(userId, stream);
+              return next;
+            });
+
+            event.track.onended = () => {
+              setRemoteScreenStreams((prev) => {
+                const next = new Map(prev);
+                next.delete(userId);
+                return next;
+              });
+            };
+            return;
+          }
+
           setRemoteStreams((prev) => {
             const newMap = new Map(prev);
             const existingStream = newMap.get(userId);
@@ -311,7 +349,13 @@ export const useRoomProtocol = (initialRoomId = null) => {
         if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
           pc.close();
           peerConnectionsRef.current.delete(userId);
+          screenSendersRef.current.delete(userId);
           setRemoteStreams((prev) => {
+            const newMap = new Map(prev);
+            newMap.delete(userId);
+            return newMap;
+          });
+          setRemoteScreenStreams((prev) => {
             const newMap = new Map(prev);
             newMap.delete(userId);
             return newMap;
@@ -348,13 +392,27 @@ export const useRoomProtocol = (initialRoomId = null) => {
     [createPeerConnection, sendSignal]
   );
 
+  const flushPendingIceCandidates = useCallback(async (userId, pc) => {
+    const pending = pendingIceCandidatesRef.current.get(userId) || [];
+    pendingIceCandidatesRef.current.delete(userId);
+    for (const candidate of pending) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (_err) {}
+    }
+  }, []);
+
   const handleOffer = useCallback(
     async (fromUserId, sdp) => {
-      const pc = await createPeerConnection(fromUserId);
+      let pc = peerConnectionsRef.current.get(fromUserId);
+      if (!pc || pc.signalingState === 'closed') {
+        pc = await createPeerConnection(fromUserId);
+      }
       if (!pc) return;
 
       try {
         await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp }));
+        await flushPendingIceCandidates(fromUserId, pc);
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
 
@@ -369,21 +427,30 @@ export const useRoomProtocol = (initialRoomId = null) => {
         peerConnectionsRef.current.delete(fromUserId);
       }
     },
-    [createPeerConnection, sendSignal]
+    [createPeerConnection, flushPendingIceCandidates, sendSignal]
   );
 
-  const handleAnswer = useCallback(async (fromUserId, sdp) => {
-    const pc = peerConnectionsRef.current.get(fromUserId);
-    if (!pc) return;
+  const handleAnswer = useCallback(
+    async (fromUserId, sdp) => {
+      const pc = peerConnectionsRef.current.get(fromUserId);
+      if (!pc) return;
 
-    try {
-      await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp }));
-    } catch (err) {}
-  }, []);
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp }));
+        await flushPendingIceCandidates(fromUserId, pc);
+      } catch (err) {}
+    },
+    [flushPendingIceCandidates]
+  );
 
   const handleIceCandidate = useCallback(async (fromUserId, candidate) => {
     const pc = peerConnectionsRef.current.get(fromUserId);
-    if (!pc) return;
+    if (!pc || !pc.remoteDescription) {
+      const pending = pendingIceCandidatesRef.current.get(fromUserId) || [];
+      pending.push(candidate);
+      pendingIceCandidatesRef.current.set(fromUserId, pending);
+      return;
+    }
 
     try {
       await pc.addIceCandidate(new RTCIceCandidate(candidate));
@@ -396,7 +463,15 @@ export const useRoomProtocol = (initialRoomId = null) => {
       pc.close();
       peerConnectionsRef.current.delete(userId);
     }
+    screenSendersRef.current.delete(userId);
+    screenSharingUsersRef.current.delete(userId);
+    pendingIceCandidatesRef.current.delete(userId);
     setRemoteStreams((prev) => {
+      const newMap = new Map(prev);
+      newMap.delete(userId);
+      return newMap;
+    });
+    setRemoteScreenStreams((prev) => {
       const newMap = new Map(prev);
       newMap.delete(userId);
       return newMap;
@@ -405,42 +480,6 @@ export const useRoomProtocol = (initialRoomId = null) => {
 
   const processEventRef = useRef(null);
   const cleanupRef = useRef(null);
-
-  const eventQueueMapRef = useRef(new Map());
-
-  const requestRoomState = useCallback(() => {
-    if (!client || !connected || !roomIdRef.current || isRecoveringRef.current) return;
-
-    isRecoveringRef.current = true;
-    sendSignal(
-      {
-        type: 'ROOM_GET_STATE',
-        roomId: roomIdRef.current,
-      },
-      (response) => {
-        isRecoveringRef.current = false;
-        if (response.room) {
-          setRoom(response.room);
-          setParticipants(response.room.participants || []);
-          lastSeqRef.current = response.seq || 0;
-
-          const myParticipant = response.room.participants?.find((p) => p.user?.id === myUserId);
-          if (myParticipant) {
-            setIsInRoom(true);
-          }
-
-          while (eventQueueMapRef.current.has(lastSeqRef.current + 1)) {
-            const nextEvent = eventQueueMapRef.current.get(lastSeqRef.current + 1);
-            eventQueueMapRef.current.delete(lastSeqRef.current + 1);
-            if (processEventRef.current) {
-              processEventRef.current(nextEvent);
-            }
-            lastSeqRef.current++;
-          }
-        }
-      }
-    );
-  }, [client, connected, sendSignal, myUserId]);
 
   const processEvent = useCallback(
     (event) => {
@@ -488,13 +527,6 @@ export const useRoomProtocol = (initialRoomId = null) => {
               }
               return [...prev, event.participant];
             });
-
-            const newUserId = event.participant.user?.id || eventUserId;
-            if (newUserId && newUserId !== myUserId && isInRoom) {
-              requestAnimationFrame(() => {
-                sendOffer(newUserId);
-              });
-            }
           }
           break;
 
@@ -569,6 +601,7 @@ export const useRoomProtocol = (initialRoomId = null) => {
           break;
 
         case EVENT_TYPES.PARTICIPANT_SCREEN_SHARE_STARTED:
+          if (eventUserId) screenSharingUsersRef.current.add(eventUserId);
           if (event.participant) {
             setParticipants((prev) =>
               prev.map((p) => (p.user?.id === eventUserId ? { ...p, ...event.participant } : p))
@@ -582,6 +615,12 @@ export const useRoomProtocol = (initialRoomId = null) => {
           break;
 
         case EVENT_TYPES.PARTICIPANT_SCREEN_SHARE_STOPPED:
+          if (eventUserId) screenSharingUsersRef.current.delete(eventUserId);
+          setRemoteScreenStreams((prev) => {
+            const next = new Map(prev);
+            next.delete(eventUserId);
+            return next;
+          });
           if (event.participant) {
             setParticipants((prev) =>
               prev.map((p) => (p.user?.id === eventUserId ? { ...p, ...event.participant } : p))
@@ -633,7 +672,7 @@ export const useRoomProtocol = (initialRoomId = null) => {
             localStreamRef.current.getAudioTracks().forEach((track) => {
               track.enabled = false;
             });
-            setAudioEnabled(false);
+            commitAudioEnabled(false);
           }
           if (event.participant) {
             setParticipants((prev) =>
@@ -694,19 +733,9 @@ export const useRoomProtocol = (initialRoomId = null) => {
       handleOffer,
       handleAnswer,
       handleIceCandidate,
+      commitAudioEnabled,
     ]
   );
-
-  const processQueuedEvents = useCallback(() => {
-    while (eventQueueMapRef.current.has(lastSeqRef.current + 1)) {
-      const nextEvent = eventQueueMapRef.current.get(lastSeqRef.current + 1);
-      eventQueueMapRef.current.delete(lastSeqRef.current + 1);
-      if (processEventRef.current) {
-        processEventRef.current(nextEvent);
-      }
-      lastSeqRef.current++;
-    }
-  }, []);
 
   const handleRoomEvent = useCallback(
     (message) => {
@@ -718,20 +747,14 @@ export const useRoomProtocol = (initialRoomId = null) => {
 
       const eventSeq = event.seq;
       if (eventSeq) {
-        if (eventSeq === lastSeqRef.current + 1) {
-          processEvent(event);
-          lastSeqRef.current = eventSeq;
-
-          processQueuedEvents();
-        } else if (eventSeq > lastSeqRef.current + 1) {
-          eventQueueMapRef.current.set(eventSeq, event);
-          requestRoomState();
-        }
+        if (eventSeq <= lastSeqRef.current) return;
+        processEvent(event);
+        lastSeqRef.current = eventSeq;
       } else {
         processEvent(event);
       }
     },
-    [processEvent, requestRoomState, processQueuedEvents]
+    [processEvent]
   );
 
   const handleUserQueueMessage = useCallback(
@@ -769,6 +792,9 @@ export const useRoomProtocol = (initialRoomId = null) => {
   const cleanup = useCallback(() => {
     peerConnectionsRef.current.forEach((pc) => pc.close());
     peerConnectionsRef.current.clear();
+    screenSendersRef.current.clear();
+    screenSharingUsersRef.current.clear();
+    pendingIceCandidatesRef.current.clear();
 
     backgroundEffectStopRef.current?.();
     backgroundEffectStopRef.current = null;
@@ -787,6 +813,7 @@ export const useRoomProtocol = (initialRoomId = null) => {
     setLocalStream(null);
     setScreenStream(null);
     setRemoteStreams(new Map());
+    setRemoteScreenStreams(new Map());
     setIsInRoom(false);
     setIsScreenSharing(false);
     setHandRaised(false);
@@ -797,9 +824,6 @@ export const useRoomProtocol = (initialRoomId = null) => {
     roomIdRef.current = null;
 
     lastSeqRef.current = 0;
-    eventQueueRef.current = [];
-    eventQueueMapRef.current.clear();
-    isRecoveringRef.current = false;
   }, []);
 
   useEffect(() => {
@@ -811,22 +835,22 @@ export const useRoomProtocol = (initialRoomId = null) => {
   }, [processEvent]);
 
   const ensureUserQueueSubscription = useCallback(() => {
-    if (!client || !connected) return false;
+    const activeClient = clientRef.current;
+    if (!activeClient || !connectedRef.current) return false;
 
     if (!userQueueSubscriptionRef.current) {
-      userQueueSubscriptionRef.current = client.subscribe(
+      userQueueSubscriptionRef.current = activeClient.subscribe(
         '/user/queue/room-signal',
         handleUserQueueMessage
       );
     }
     return true;
-  }, [client, connected, handleUserQueueMessage]);
+  }, [handleUserQueueMessage]);
 
   const subscribeToRoom = useCallback(
     (roomId) => {
-      if (!client || !connected || !roomId) {
-        return;
-      }
+      const activeClient = clientRef.current;
+      if (!activeClient || !connectedRef.current || !roomId) return false;
 
       if (roomSubscriptionRef.current) {
         safeUnsubscribe(roomSubscriptionRef);
@@ -834,11 +858,12 @@ export const useRoomProtocol = (initialRoomId = null) => {
 
       const topic = `/topic/room/${roomId}`;
 
-      roomSubscriptionRef.current = client.subscribe(topic, handleRoomEvent);
+      roomSubscriptionRef.current = activeClient.subscribe(topic, handleRoomEvent);
 
       ensureUserQueueSubscription();
+      return true;
     },
-    [client, connected, handleRoomEvent, ensureUserQueueSubscription]
+    [handleRoomEvent, ensureUserQueueSubscription]
   );
 
   const startLocalStream = useCallback(
@@ -861,7 +886,7 @@ export const useRoomProtocol = (initialRoomId = null) => {
           cameraDeviceId: selectedCamera || undefined,
           microphoneDeviceId: selectedMicrophone || undefined,
           onMicReady: () => {
-            if (audio) setAudioEnabled(true);
+            if (audio && audioEnabledRef.current) commitAudioEnabled(true);
           },
         });
 
@@ -871,8 +896,17 @@ export const useRoomProtocol = (initialRoomId = null) => {
 
         localStreamRef.current = stream;
         setLocalStream(stream);
-        setAudioEnabled(audio);
-        setVideoEnabled(video);
+
+        const shouldEnableAudio = audio && audioEnabledRef.current;
+        const shouldEnableVideo = video && videoEnabledRef.current;
+        stream.getAudioTracks().forEach((track) => {
+          track.enabled = shouldEnableAudio;
+        });
+        stream.getVideoTracks().forEach((track) => {
+          track.enabled = shouldEnableVideo;
+        });
+        commitAudioEnabled(shouldEnableAudio);
+        commitVideoEnabled(shouldEnableVideo);
 
         peerConnectionsRef.current.forEach((pc) => {
           stream.getTracks().forEach((track) => {
@@ -885,7 +919,13 @@ export const useRoomProtocol = (initialRoomId = null) => {
         return null;
       }
     },
-    [isBrowser, selectedCamera, selectedMicrophone]
+    [
+      isBrowser,
+      selectedCamera,
+      selectedMicrophone,
+      commitAudioEnabled,
+      commitVideoEnabled,
+    ]
   );
 
   const createRoom = useCallback(async (options = {}) => {
@@ -911,19 +951,21 @@ export const useRoomProtocol = (initialRoomId = null) => {
     async (roomId, requestMedia = true, initialAudio = true, initialVideo = true) => {
       const startTime = Date.now();
       let websocketSubscriptionEstablished = false;
+      const finalAudio = requestMedia && !initialAudio && !initialVideo ? true : initialAudio;
+      const finalVideo = requestMedia && !initialAudio && !initialVideo ? false : initialVideo;
 
       try {
         lastSeqRef.current = 0;
-        eventQueueRef.current = [];
-        eventQueueMapRef.current.clear();
         roomIdRef.current = roomId;
+        commitAudioEnabled(finalAudio);
+        commitVideoEnabled(finalVideo);
 
-        if (!client) {
+        if (!clientRef.current) {
           const clientWaitStartTime = Date.now();
           const maxClientWaitTime = 10000;
-          await new Promise((resolve, reject) => {
+          await new Promise((resolve) => {
             const checkClientInterval = setInterval(() => {
-              if (client) {
+              if (clientRef.current) {
                 clearInterval(checkClientInterval);
                 resolve();
               } else if (Date.now() - clientWaitStartTime >= maxClientWaitTime) {
@@ -934,14 +976,11 @@ export const useRoomProtocol = (initialRoomId = null) => {
           });
         }
 
-        if (!client) {
-        }
-
-        if (!connected && client) {
+        if (clientRef.current && !connectedRef.current) {
           const waitStartTime = Date.now();
           const maxWaitTime = 15000;
 
-          await new Promise((resolve, reject) => {
+          await new Promise((resolve) => {
             const checkInterval = setInterval(() => {
               if (connectedRef.current) {
                 clearInterval(checkInterval);
@@ -952,16 +991,6 @@ export const useRoomProtocol = (initialRoomId = null) => {
               }
             }, 100);
           });
-        } else if (!client) {
-        }
-
-        if (client) {
-          ensureUserQueueSubscription();
-
-          subscribeToRoom(roomId);
-
-          websocketSubscriptionEstablished = true;
-        } else {
         }
 
         const beforeSetInRoom = Date.now();
@@ -972,11 +1001,6 @@ export const useRoomProtocol = (initialRoomId = null) => {
         }, 0);
 
         const { roomAPI } = await import('@/utils/api');
-
-        const shouldRequestMedia = requestMedia && (initialAudio || initialVideo);
-
-        const finalAudio = requestMedia && !initialAudio && !initialVideo ? true : initialAudio;
-        const finalVideo = requestMedia && !initialAudio && !initialVideo ? false : initialVideo;
 
         const apiStartTime = Date.now();
         const [roomData, mediaResult] = await Promise.allSettled([
@@ -1021,6 +1045,11 @@ export const useRoomProtocol = (initialRoomId = null) => {
               (p) => p.user?.id !== myUserId && p.isActive !== false
             ) || [];
 
+          if (clientRef.current && connectedRef.current) {
+            ensureUserQueueSubscription();
+            websocketSubscriptionEstablished = subscribeToRoom(roomId);
+          }
+
           otherParticipants.forEach((p) => {
             requestAnimationFrame(() => {
               sendOffer(p.user.id);
@@ -1056,8 +1085,8 @@ export const useRoomProtocol = (initialRoomId = null) => {
       sendOffer,
       startLocalStream,
       ensureUserQueueSubscription,
-      client,
-      connected,
+      commitAudioEnabled,
+      commitVideoEnabled,
     ]
   );
 
@@ -1082,13 +1111,15 @@ export const useRoomProtocol = (initialRoomId = null) => {
   }, [cleanup]);
 
   const toggleAudio = useCallback(async () => {
-    const newEnabled = !audioEnabled;
+    const previousEnabled = audioEnabledRef.current;
+    const newEnabled = !previousEnabled;
+    commitAudioEnabled(newEnabled);
 
     if (!localStreamRef.current && newEnabled) {
       try {
         const stream = await startLocalStream(true, videoEnabled);
         if (stream) {
-          setAudioEnabled(true);
+          commitAudioEnabled(true);
           if (roomIdRef.current) {
             sendSignal({
               type: SIGNAL_TYPES.ROOM_UNMUTE_AUDIO,
@@ -1096,13 +1127,15 @@ export const useRoomProtocol = (initialRoomId = null) => {
             });
           }
         }
-      } catch (err) {}
+      } catch (err) {
+        commitAudioEnabled(previousEnabled);
+      }
       return;
     }
 
     if (!localStreamRef.current) {
       if (!newEnabled) {
-        setAudioEnabled(false);
+        commitAudioEnabled(false);
         if (roomIdRef.current) {
           sendSignal({
             type: SIGNAL_TYPES.ROOM_MUTE_AUDIO,
@@ -1119,7 +1152,7 @@ export const useRoomProtocol = (initialRoomId = null) => {
         track.enabled = newEnabled;
       });
 
-      setAudioEnabled(newEnabled);
+      commitAudioEnabled(newEnabled);
     } else if (newEnabled) {
       try {
         const audioStream = await navigator.mediaDevices.getUserMedia({
@@ -1140,12 +1173,13 @@ export const useRoomProtocol = (initialRoomId = null) => {
           });
         });
 
-        setAudioEnabled(true);
+        commitAudioEnabled(true);
       } catch (err) {
+        commitAudioEnabled(previousEnabled);
         return;
       }
     } else {
-      setAudioEnabled(false);
+      commitAudioEnabled(false);
     }
 
     if (roomIdRef.current) {
@@ -1154,16 +1188,24 @@ export const useRoomProtocol = (initialRoomId = null) => {
         roomId: roomIdRef.current,
       });
     }
-  }, [audioEnabled, videoEnabled, sendSignal, startLocalStream, selectedMicrophone]);
+  }, [
+    videoEnabled,
+    sendSignal,
+    startLocalStream,
+    selectedMicrophone,
+    commitAudioEnabled,
+  ]);
 
   const toggleVideo = useCallback(async () => {
-    const newEnabled = !videoEnabled;
+    const previousEnabled = videoEnabledRef.current;
+    const newEnabled = !previousEnabled;
+    commitVideoEnabled(newEnabled);
 
     if (!localStreamRef.current && newEnabled) {
       try {
         const stream = await startLocalStream(audioEnabled, true);
         if (stream) {
-          setVideoEnabled(true);
+          commitVideoEnabled(true);
           if (roomIdRef.current) {
             sendSignal({
               type: SIGNAL_TYPES.ROOM_UNMUTE_VIDEO,
@@ -1171,13 +1213,15 @@ export const useRoomProtocol = (initialRoomId = null) => {
             });
           }
         }
-      } catch (err) {}
+      } catch (err) {
+        commitVideoEnabled(previousEnabled);
+      }
       return;
     }
 
     if (!localStreamRef.current) {
       if (!newEnabled) {
-        setVideoEnabled(false);
+        commitVideoEnabled(false);
         if (roomIdRef.current) {
           sendSignal({
             type: SIGNAL_TYPES.ROOM_MUTE_VIDEO,
@@ -1194,7 +1238,7 @@ export const useRoomProtocol = (initialRoomId = null) => {
         track.enabled = newEnabled;
       });
 
-      setVideoEnabled(newEnabled);
+      commitVideoEnabled(newEnabled);
     } else if (newEnabled) {
       try {
         const constraints = {
@@ -1218,12 +1262,13 @@ export const useRoomProtocol = (initialRoomId = null) => {
           });
         });
 
-        setVideoEnabled(true);
+        commitVideoEnabled(true);
       } catch (err) {
+        commitVideoEnabled(previousEnabled);
         return;
       }
     } else {
-      setVideoEnabled(false);
+      commitVideoEnabled(false);
     }
 
     if (roomIdRef.current) {
@@ -1232,7 +1277,13 @@ export const useRoomProtocol = (initialRoomId = null) => {
         roomId: roomIdRef.current,
       });
     }
-  }, [videoEnabled, audioEnabled, sendSignal, startLocalStream, selectedCamera]);
+  }, [
+    audioEnabled,
+    sendSignal,
+    startLocalStream,
+    selectedCamera,
+    commitVideoEnabled,
+  ]);
 
   const raiseHand = useCallback(() => {
     if (!roomIdRef.current) return;
@@ -1382,51 +1433,23 @@ export const useRoomProtocol = (initialRoomId = null) => {
     [isBrowser, audioEnabled]
   );
 
-  const startScreenShare = useCallback(async () => {
-    if (!isBrowser || !navigator.mediaDevices?.getDisplayMedia) {
-      setError('Демонстрация экрана не поддерживается');
-      return;
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: { cursor: 'always' },
-        audio: false,
-      });
-
-      screenStreamRef.current = stream;
-      setScreenStream(stream);
-
-      setIsScreenSharing(true);
-
-      sendSignal({
-        type: SIGNAL_TYPES.ROOM_START_SCREEN_SHARE,
-        roomId: roomIdRef.current,
-      });
-
-      stream.getVideoTracks()[0].onended = () => {
-        stopScreenShare();
-      };
-
-      peerConnectionsRef.current.forEach((pc) => {
-        if (pc.signalingState === 'stable' || pc.signalingState === 'have-local-offer') {
-          stream.getTracks().forEach((track) => {
-            try {
-              pc.addTrack(track, stream);
-            } catch (err) {}
-          });
-        }
-      });
-    } catch (err) {
-      if (err.name !== 'NotAllowedError') {
-        setError('Ошибка демонстрации экрана');
-      }
-    }
-  }, [isBrowser, sendSignal]);
-
   const stopScreenShare = useCallback(() => {
+    screenSendersRef.current.forEach((senders, userId) => {
+      const pc = peerConnectionsRef.current.get(userId);
+      if (!pc || pc.signalingState === 'closed') return;
+      senders.forEach((sender) => {
+        try {
+          pc.removeTrack(sender);
+        } catch (_err) {}
+      });
+    });
+    screenSendersRef.current.clear();
+
     if (screenStreamRef.current) {
-      screenStreamRef.current.getTracks().forEach((track) => track.stop());
+      screenStreamRef.current.getTracks().forEach((track) => {
+        track.onended = null;
+        track.stop();
+      });
       screenStreamRef.current = null;
     }
     setScreenStream(null);
@@ -1439,6 +1462,53 @@ export const useRoomProtocol = (initialRoomId = null) => {
       });
     }
   }, [sendSignal]);
+
+  const startScreenShare = useCallback(async () => {
+    if (!isBrowser || !navigator.mediaDevices?.getDisplayMedia) {
+      setError('Демонстрация экрана не поддерживается этим браузером');
+      return false;
+    }
+
+    setError(null);
+
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { cursor: 'always' },
+        audio: false,
+      });
+      const videoTrack = stream.getVideoTracks()[0];
+
+      if (!videoTrack) {
+        stream.getTracks().forEach((track) => track.stop());
+        setError('Не удалось получить изображение экрана');
+        return false;
+      }
+
+      screenStreamRef.current = stream;
+      setScreenStream(stream);
+      setIsScreenSharing(true);
+
+      sendSignal({
+        type: SIGNAL_TYPES.ROOM_START_SCREEN_SHARE,
+        roomId: roomIdRef.current,
+      });
+
+      videoTrack.onended = stopScreenShare;
+
+      peerConnectionsRef.current.forEach((pc, userId) => {
+        if (pc.signalingState === 'closed') return;
+        const senders = stream.getTracks().map((track) => pc.addTrack(track, stream));
+        screenSendersRef.current.set(userId, senders);
+      });
+
+      return true;
+    } catch (err) {
+      if (err?.name !== 'NotAllowedError' && err?.name !== 'AbortError') {
+        setError('Не удалось начать демонстрацию экрана');
+      }
+      return false;
+    }
+  }, [isBrowser, sendSignal, stopScreenShare]);
 
   const promoteParticipant = useCallback(
     (targetUserId) => {
@@ -1504,6 +1574,7 @@ export const useRoomProtocol = (initialRoomId = null) => {
 
     localStream,
     remoteStreams,
+    remoteScreenStreams,
     screenStream,
     audioEnabled,
     videoEnabled,

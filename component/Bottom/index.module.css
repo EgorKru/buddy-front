@@ -1,149 +1,345 @@
 .bottomMenu {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 90;
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) auto minmax(150px, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding: 14px 22px 18px;
+  pointer-events: none;
+}
+
+.leftSection,
+.centerSection,
+.rightSection {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 16px 24px;
-  background: rgba(25, 25, 30, 0.95);
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  flex-shrink: 0;
-  position: relative;
-  z-index: 100;
+  min-width: 0;
+  pointer-events: auto;
 }
 
 .leftSection {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 100px;
+  justify-content: flex-start;
 }
 
 .centerSection {
-  display: flex;
-  align-items: center;
   justify-content: center;
-  gap: 12px;
 }
 
 .rightSection {
-  min-width: 100px;
+  justify-content: flex-end;
 }
 
-.participantInfo {
+.controlDock {
   display: flex;
+  align-items: stretch;
+  gap: 7px;
+  padding: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  background: rgba(24, 27, 34, 0.88);
+  box-shadow:
+    0 18px 50px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(24px) saturate(150%);
+}
+
+.participantButton,
+.secureStatus {
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 14px;
+  min-height: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: rgba(24, 27, 34, 0.82);
+  color: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(18px);
 }
 
 .participantButton {
-  display: flex;
-  align-items: center;
   gap: 8px;
-  padding: 10px 16px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 24px;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 14px;
-  font-weight: 500;
+  padding: 9px 12px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition:
+    background 140ms ease,
+    transform 120ms ease;
 }
 
 .participantButton:hover {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.25);
-  transform: scale(1.02);
+  background: rgba(42, 46, 56, 0.94);
 }
 
 .participantButton:active {
   transform: scale(0.98);
 }
 
-.icon {
-  display: flex;
+.participantCount {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 11px;
+}
+
+.secureStatus {
+  gap: 7px;
+  padding: 9px 12px;
+  color: #a8dbbf;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.splitControl {
+  display: flex;
+  overflow: hidden;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.splitControl .icon {
+  border-radius: 13px 5px 5px 13px;
+}
+
+.deviceChevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 27px;
+  min-height: 48px;
   padding: 0;
-  border-radius: 50%;
-  background: rgb(40, 40, 45);
-  border: 1px solid rgb(50, 50, 60);
-  color: rgb(255, 255, 255);
+  border: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 5px 13px 13px 5px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.58);
   cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
-  z-index: 101;
-  pointer-events: auto;
+  transition:
+    color 140ms ease,
+    background 140ms ease;
 }
 
-.icon:hover {
-  background: rgb(50, 50, 60);
-  border-color: rgb(60, 60, 70);
-  transform: scale(1.1);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+.deviceChevron:hover {
+  background: rgba(255, 255, 255, 0.09);
+  color: #fff;
 }
 
-.icon:active {
-  transform: scale(0.95);
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 50px;
+  min-height: 48px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    border-color 140ms ease,
+    transform 120ms ease;
 }
 
-.icon.active {
-  background: rgb(217, 4, 41);
-  border-color: rgb(240, 20, 60);
-  box-shadow: 0 0 20px rgba(217, 4, 41, 0.5);
+.icon:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.13);
 }
 
-.icon.active:hover {
-  background: rgb(240, 20, 60);
-  box-shadow: 0 0 25px rgba(217, 4, 41, 0.7);
+.icon:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.icon:focus-visible,
+.deviceChevron:focus-visible,
+.participantButton:focus-visible {
+  outline: 2px solid #79aaff;
+  outline-offset: 2px;
+}
+
+.icon:disabled {
+  opacity: 0.58;
+  cursor: wait;
+}
+
+.controlLabel {
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.mediaOff {
+  border-color: rgba(255, 116, 124, 0.16);
+  background: rgba(221, 63, 72, 0.2);
+  color: #ffb6ba;
+}
+
+.mediaOff:hover:not(:disabled) {
+  background: rgba(221, 63, 72, 0.29);
+}
+
+.handRaised {
+  border-color: rgba(255, 201, 79, 0.35);
+  background: rgba(255, 193, 43, 0.2);
+  color: #ffd978;
+}
+
+.screenSharing {
+  border-color: rgba(97, 225, 151, 0.34);
+  background: rgba(32, 171, 94, 0.22);
+  color: #8defb4;
 }
 
 .leaveButton {
-  background: rgb(217, 4, 41) !important;
-  border-color: rgb(240, 20, 60) !important;
+  min-width: 88px;
+  border-color: rgba(255, 255, 255, 0.08);
+  background: #ec4654;
+  color: #fff;
 }
 
-.leaveButton:hover {
-  background: rgb(240, 20, 60) !important;
-  box-shadow: 0 0 25px rgba(217, 4, 41, 0.7) !important;
+.leaveButton:hover:not(:disabled) {
+  background: #ff5360;
 }
 
-/* Поднятая рука */
-.handRaised {
-  background: rgb(255, 193, 7) !important;
-  border-color: rgb(255, 213, 79) !important;
-  color: rgb(30, 30, 35) !important;
-  box-shadow: 0 0 20px rgba(255, 193, 7, 0.5);
-  animation: handPulse 1.5s ease-in-out infinite;
+.spinner {
+  animation: spin 0.9s linear infinite;
 }
 
-.handRaised:hover {
-  background: rgb(255, 213, 79) !important;
-  box-shadow: 0 0 25px rgba(255, 193, 7, 0.7);
-}
-
-@keyframes handPulse {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.08);
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 
-/* Демонстрация экрана */
-.screenSharing {
-  background: rgb(76, 217, 100) !important;
-  border-color: rgb(100, 240, 130) !important;
-  color: rgb(30, 30, 35) !important;
-  box-shadow: 0 0 20px rgba(76, 217, 100, 0.5);
+@media (max-width: 1120px) {
+  .bottomMenu {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 10px;
+    padding-inline: 14px;
+  }
+
+  .participantLabel,
+  .secureStatus,
+  .controlLabel {
+    display: none;
+  }
+
+  .leaveButton {
+    min-width: 50px;
+  }
 }
 
-.screenSharing:hover {
-  background: rgb(100, 240, 130) !important;
-  box-shadow: 0 0 25px rgba(76, 217, 100, 0.7);
+@media (max-width: 720px) {
+  .bottomMenu {
+    position: absolute;
+    grid-template-columns: auto minmax(0, 1fr);
+    padding: 10px max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom))
+      max(10px, env(safe-area-inset-left));
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+    background: rgba(16, 18, 24, 0.93);
+    backdrop-filter: blur(20px);
+  }
+
+  .rightSection {
+    display: none;
+  }
+
+  .centerSection {
+    justify-content: flex-end;
+    min-width: 0;
+  }
+
+  .controlDock {
+    width: 100%;
+    justify-content: space-between;
+    gap: 4px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+
+  .icon {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 9px;
+  }
+
+  .splitControl .icon {
+    min-width: 39px;
+  }
+
+  .deviceChevron {
+    display: none;
+  }
+
+  .participantButton {
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
+    padding: 8px;
+    border-radius: 13px;
+    box-shadow: none;
+  }
+
+  .participantCount {
+    position: absolute;
+    margin: -28px 0 0 27px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border: 2px solid #11131a;
+    border-radius: 6px;
+    background: #1769ff;
+    font-size: 9px;
+  }
+}
+
+@media (max-width: 470px) {
+  .bottomMenu {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .centerSection {
+    justify-content: center;
+  }
+
+  .icon {
+    min-width: 42px;
+    min-height: 42px;
+    padding: 0 7px;
+  }
+
+  .splitControl .icon {
+    min-width: 42px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icon,
+  .deviceChevron,
+  .participantButton {
+    transition: none;
+  }
+
+  .spinner {
+    animation: none;
+  }
 }

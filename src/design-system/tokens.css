@@ -1,24 +1,30 @@
 /**
- * Pager v2 design tokens — warm light product surface.
+ * Pager v3 design tokens — calm, high-contrast product surfaces.
+ * The product UI intentionally uses one strong cobalt accent and lets
+ * spacing, typography and state changes carry the hierarchy.
  */
 
 :root {
   /* Color */
-  --pager-bg: #faf7f2;
+  --pager-bg: #f4f6f9;
   --pager-bg-elevated: #ffffff;
-  --pager-text: #12131a;
-  --pager-text-muted: #5f6470;
-  --pager-text-subtle: #8b909c;
-  --pager-border: #e6e2dc;
-  --pager-border-strong: #d4cfc7;
+  --pager-bg-soft: #eef1f6;
+  --pager-text: #11131a;
+  --pager-text-muted: #5e6472;
+  --pager-text-subtle: #8d94a3;
+  --pager-border: #e4e8ef;
+  --pager-border-strong: #cfd5df;
 
-  --pager-cta-bg: #12131a;
-  --pager-cta-bg-hover: #2a2b35;
+  --pager-cta-bg: #11131a;
+  --pager-cta-bg-hover: #272a33;
   --pager-cta-text: #ffffff;
 
-  --pager-accent: #2563eb;
-  --pager-accent-soft: #eef4ff;
+  --pager-accent: #1769ff;
+  --pager-accent-hover: #0959e6;
+  --pager-accent-soft: #eaf1ff;
+  --pager-accent-border: #bfd2ff;
   --pager-success: #0f9d58;
+  --pager-warning: #d97706;
 
   --pager-showcase-bg: #e8e4de;
   --pager-showcase-bg-deep: #ddd8d0;
@@ -34,8 +40,8 @@
   --pager-panel-deep-muted: #8a96a3;
   --pager-panel-light: #f7f5f1;
 
-  --pager-header-btn-bg: #eceae6;
-  --pager-header-btn-bg-hover: #e2e0dc;
+  --pager-header-btn-bg: #eef1f6;
+  --pager-header-btn-bg-hover: #e2e7ef;
   --pager-header-btn-text: #12131a;
 
   --pager-error-bg: #fef2f2;
@@ -43,7 +49,8 @@
   --pager-error-text: #b91c1c;
 
   /* Typography */
-  --pager-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --pager-font-sans:
+    Inter, -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
   --pager-font-display: clamp(3.35rem, 7vw, 5.65rem);
   --pager-font-h2: clamp(2rem, 3.2vw, 2.65rem);
   --pager-font-h3: clamp(1.25rem, 2vw, 1.5rem);
@@ -57,7 +64,7 @@
 
   /* Layout */
   --pager-max-width: 1280px;
-  --pager-gutter: clamp(24px, 5vw, 64px);
+  --pager-gutter: clamp(18px, 3vw, 42px);
   --pager-header-height: 72px;
   --pager-section-y: clamp(88px, 11vh, 120px);
 
@@ -72,18 +79,18 @@
   --pager-space-8: 112px;
 
   /* Radii */
-  --pager-radius-sm: 6px;
-  --pager-radius-md: 10px;
-  --pager-radius-lg: 14px;
-  --pager-radius-xl: 18px;
+  --pager-radius-sm: 8px;
+  --pager-radius-md: 12px;
+  --pager-radius-lg: 16px;
+  --pager-radius-xl: 22px;
   --pager-radius-pill: 999px;
 
   /* Shadows */
-  --pager-shadow-sm: 0 1px 2px rgba(18, 19, 26, 0.04);
-  --pager-shadow-md: 0 8px 24px rgba(18, 19, 26, 0.06);
-  --pager-shadow-lg: 0 16px 40px rgba(18, 19, 26, 0.07);
-  --pager-shadow-xl: 0 24px 56px rgba(18, 19, 26, 0.09);
+  --pager-shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.04);
+  --pager-shadow-md: 0 10px 30px rgba(16, 24, 40, 0.07);
+  --pager-shadow-lg: 0 18px 48px rgba(16, 24, 40, 0.1);
+  --pager-shadow-xl: 0 28px 72px rgba(16, 24, 40, 0.13);
 
-  --pager-focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.28);
+  --pager-focus-ring: 0 0 0 3px rgba(23, 105, 255, 0.24);
   --pager-focus-ring-error: 0 0 0 3px rgba(185, 28, 28, 0.22);
 }

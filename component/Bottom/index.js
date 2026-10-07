@@ -1,105 +1,44 @@
 import cx from 'classnames';
 import {
-  Mic,
-  Video,
-  PhoneOff,
-  MicOff,
-  VideoOff,
-  Users,
+  ChevronUp,
   Hand,
+  Loader2,
+  Mic,
+  MicOff,
   Monitor,
   MonitorOff,
+  PhoneOff,
   Settings,
+  ShieldCheck,
+  Users,
+  Video,
+  VideoOff,
 } from 'lucide-react';
 
 import styles from '@/component/Bottom/index.module.css';
 
-const Bottom = (props) => {
-  const {
-    muted,
-    playing,
-    toggleAudio,
-    toggleVideo,
-    leaveRoom,
-    participantCount,
-    onParticipantsClick,
-    handRaised,
-    onRaiseHand,
-    isScreenSharing,
-    onToggleScreenShare,
-    onSettingsClick,
-  } = props;
-
+const Bottom = ({
+  muted,
+  playing,
+  toggleAudio,
+  toggleVideo,
+  leaveRoom,
+  participantCount,
+  onParticipantsClick,
+  handRaised,
+  onRaiseHand,
+  isScreenSharing,
+  onToggleScreenShare,
+  screenShareBusy = false,
+  onSettingsClick,
+}) => {
   const isMuted = muted ?? true;
   const isPlaying = playing ?? true;
 
-  const handleToggleAudio = (e) => {
-    e?.preventDefault?.();
-    e?.stopPropagation?.();
-
-    if (toggleAudio) {
-      toggleAudio();
-    } else {
-    }
-  };
-
-  const handleToggleVideo = (e) => {
-    e?.preventDefault?.();
-    e?.stopPropagation?.();
-
-    if (toggleVideo) {
-      toggleVideo();
-    } else {
-    }
-  };
-
-  const handleLeaveRoom = (e) => {
-    e?.preventDefault?.();
-    e?.stopPropagation?.();
-
-    if (leaveRoom) {
-      leaveRoom();
-    } else {
-    }
-  };
-
-  const handleRaiseHand = (e) => {
-    e?.preventDefault?.();
-    e?.stopPropagation?.();
-
-    if (onRaiseHand) {
-      onRaiseHand();
-    } else {
-    }
-  };
-
-  const handleToggleScreenShare = (e) => {
-    e?.preventDefault?.();
-    e?.stopPropagation?.();
-
-    if (onToggleScreenShare) {
-      onToggleScreenShare();
-    } else {
-    }
-  };
-
-  const handleParticipantsClick = (e) => {
-    e?.preventDefault?.();
-    e?.stopPropagation?.();
-
-    if (onParticipantsClick) {
-      onParticipantsClick();
-    } else {
-    }
-  };
-
-  const handleSettingsClick = (e) => {
-    e?.preventDefault?.();
-    e?.stopPropagation?.();
-
-    if (onSettingsClick) {
-      onSettingsClick();
-    }
+  const run = (callback) => (event) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    callback?.();
   };
 
   return (
@@ -107,105 +46,135 @@ const Bottom = (props) => {
       <div className={styles.leftSection} data-testid="room-controls-left">
         <button
           className={styles.participantButton}
-          onClick={handleParticipantsClick}
+          onClick={run(onParticipantsClick)}
           title="Показать участников"
           type="button"
           data-testid="room-participants-button"
+          aria-label={`Участники: ${participantCount || 1}`}
         >
-          <Users size={18} />
-          <span>{participantCount || 1}</span>
+          <Users size={18} aria-hidden />
+          <span className={styles.participantLabel}>Участники</span>
+          <span className={styles.participantCount}>{participantCount || 1}</span>
         </button>
       </div>
 
       <div className={styles.centerSection} data-testid="room-controls-center">
-        {isMuted ? (
+        <div className={styles.controlDock}>
+          <div className={styles.splitControl}>
+            <button
+              className={cx(styles.icon, { [styles.mediaOff]: isMuted })}
+              aria-label={isMuted ? 'Включить микрофон' : 'Выключить микрофон'}
+              aria-pressed={!isMuted}
+              title={isMuted ? 'Включить микрофон' : 'Выключить микрофон'}
+              onClick={run(toggleAudio)}
+              type="button"
+              data-testid="room-mic-toggle"
+            >
+              {isMuted ? <MicOff size={21} aria-hidden /> : <Mic size={21} aria-hidden />}
+              <span className={styles.controlLabel}>{isMuted ? 'Микрофон выкл.' : 'Микрофон'}</span>
+            </button>
+            <button
+              className={styles.deviceChevron}
+              aria-label="Выбрать микрофон"
+              title="Выбрать микрофон"
+              onClick={run(onSettingsClick)}
+              type="button"
+            >
+              <ChevronUp size={15} aria-hidden />
+            </button>
+          </div>
+
+          <div className={styles.splitControl}>
+            <button
+              className={cx(styles.icon, { [styles.mediaOff]: !isPlaying })}
+              aria-label={isPlaying ? 'Выключить камеру' : 'Включить камеру'}
+              aria-pressed={isPlaying}
+              title={isPlaying ? 'Выключить камеру' : 'Включить камеру'}
+              onClick={run(toggleVideo)}
+              type="button"
+              data-testid="room-video-toggle"
+            >
+              {isPlaying ? <Video size={21} aria-hidden /> : <VideoOff size={21} aria-hidden />}
+              <span className={styles.controlLabel}>{isPlaying ? 'Камера' : 'Камера выкл.'}</span>
+            </button>
+            <button
+              className={styles.deviceChevron}
+              aria-label="Выбрать камеру"
+              title="Выбрать камеру"
+              onClick={run(onSettingsClick)}
+              type="button"
+            >
+              <ChevronUp size={15} aria-hidden />
+            </button>
+          </div>
+
           <button
-            className={cx(styles.icon, styles.active)}
-            title="Включить микрофон"
-            onClick={handleToggleAudio}
+            className={cx(styles.icon, styles.wideControl, {
+              [styles.screenSharing]: isScreenSharing,
+            })}
+            aria-label={isScreenSharing ? 'Остановить демонстрацию' : 'Показать экран'}
+            aria-pressed={isScreenSharing}
+            title={isScreenSharing ? 'Остановить демонстрацию' : 'Показать экран'}
+            onClick={run(onToggleScreenShare)}
             type="button"
-            data-testid="room-mic-toggle"
+            data-testid="room-screen-share-toggle"
+            disabled={screenShareBusy}
           >
-            <MicOff size={22} />
+            {screenShareBusy ? (
+              <Loader2 size={21} className={styles.spinner} aria-hidden />
+            ) : isScreenSharing ? (
+              <MonitorOff size={21} aria-hidden />
+            ) : (
+              <Monitor size={21} aria-hidden />
+            )}
+            <span className={styles.controlLabel}>{isScreenSharing ? 'Остановить' : 'Экран'}</span>
           </button>
-        ) : (
+
+          <button
+            className={cx(styles.icon, { [styles.handRaised]: handRaised })}
+            aria-label={handRaised ? 'Опустить руку' : 'Поднять руку'}
+            aria-pressed={handRaised}
+            title={handRaised ? 'Опустить руку' : 'Поднять руку'}
+            onClick={run(onRaiseHand)}
+            type="button"
+            data-testid="room-hand-toggle"
+          >
+            <Hand size={21} aria-hidden />
+            <span className={styles.controlLabel}>Рука</span>
+          </button>
+
           <button
             className={styles.icon}
-            title="Выключить микрофон"
-            onClick={handleToggleAudio}
+            aria-label="Настройки устройств"
+            title="Настройки устройств"
+            onClick={run(onSettingsClick)}
             type="button"
-            data-testid="room-mic-toggle"
+            data-testid="room-settings-button"
           >
-            <Mic size={22} />
+            <Settings size={21} aria-hidden />
+            <span className={styles.controlLabel}>Устройства</span>
           </button>
-        )}
-        {isPlaying ? (
+
           <button
-            className={styles.icon}
-            title="Выключить камеру"
-            onClick={handleToggleVideo}
+            className={cx(styles.icon, styles.leaveButton)}
+            aria-label="Покинуть встречу"
+            title="Покинуть встречу"
+            onClick={run(leaveRoom)}
             type="button"
-            data-testid="room-video-toggle"
+            data-testid="room-leave-button"
           >
-            <Video size={22} />
+            <PhoneOff size={21} aria-hidden />
+            <span className={styles.controlLabel}>Выйти</span>
           </button>
-        ) : (
-          <button
-            className={cx(styles.icon, styles.active)}
-            title="Включить камеру"
-            onClick={handleToggleVideo}
-            type="button"
-            data-testid="room-video-toggle"
-          >
-            <VideoOff size={22} />
-          </button>
-        )}
-
-        {}
-        <button
-          className={cx(styles.icon, { [styles.handRaised]: handRaised })}
-          title={handRaised ? 'Опустить руку' : 'Поднять руку'}
-          onClick={handleRaiseHand}
-          type="button"
-          data-testid="room-hand-toggle"
-        >
-          <Hand size={22} />
-        </button>
-
-        {}
-        <button
-          className={cx(styles.icon, { [styles.screenSharing]: isScreenSharing })}
-          title={isScreenSharing ? 'Остановить демонстрацию' : 'Показать экран'}
-          onClick={handleToggleScreenShare}
-          type="button"
-          data-testid="room-screen-share-toggle"
-        >
-          {isScreenSharing ? <MonitorOff size={22} /> : <Monitor size={22} />}
-        </button>
-
-        {}
-        <button
-          className={styles.icon}
-          title="Настройки устройств"
-          onClick={handleSettingsClick}
-          type="button"
-          data-testid="room-settings-button"
-        >
-          <Settings size={22} />
-        </button>
-
-        <button
-          className={cx(styles.icon, styles.leaveButton)}
-          title="Покинуть встречу"
-          onClick={handleLeaveRoom}
-          type="button"
-          data-testid="room-leave-button"
-        >
-          <PhoneOff size={22} />
-        </button>
+        </div>
       </div>
 
-      <div className={styles.rightSection} data-testid="room-controls-right"></div>
+      <div className={styles.rightSection} data-testid="room-controls-right">
+        <span className={styles.secureStatus} title="Медиа передаётся напрямую между участниками">
+          <ShieldCheck size={16} aria-hidden />
+          Защищено
+        </span>
+      </div>
     </div>
   );
 };

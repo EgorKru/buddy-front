@@ -1,134 +1,276 @@
 .overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  backdrop-filter: blur(4px);
+  inset: 68px 0 0;
+  z-index: 110;
+  background: rgba(4, 6, 10, 0.16);
+  animation: overlayIn 160ms ease;
 }
 
 .modal {
-  background: #1a1a1a;
-  border-radius: 12px;
-  width: 90%;
-  max-width: 500px;
-  max-height: 90vh;
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  bottom: 104px;
   display: flex;
+  width: min(360px, calc(100vw - 28px));
   flex-direction: column;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  background: rgba(24, 27, 35, 0.96);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(26px) saturate(145%);
+  animation: drawerIn 180ms cubic-bezier(0.2, 0.75, 0.2, 1);
+}
+
+@keyframes overlayIn {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes drawerIn {
+  from {
+    opacity: 0;
+    transform: translateX(18px) scale(0.985);
+  }
 }
 
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  gap: 12px;
+  padding: 20px;
+}
+
+.eyebrow {
+  display: block;
+  margin-bottom: 3px;
+  color: #78a8ff;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .title {
   margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-  color: #ffffff;
+  color: #fff;
+  font-size: 19px;
+  font-weight: 720;
+  letter-spacing: -0.025em;
 }
 
 .closeButton {
-  background: none;
-  border: none;
-  color: #ffffff;
-  cursor: pointer;
-  padding: 4px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
-  transition: background-color 0.2s;
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.68);
+  cursor: pointer;
 }
 
 .closeButton:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.11);
+  color: #fff;
 }
 
 .content {
-  padding: 24px;
   flex: 1;
+  min-height: 0;
+  padding: 0 14px 18px;
   overflow-y: auto;
+}
+
+.statusCard {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding: 12px;
+  border: 1px solid rgba(104, 224, 155, 0.14);
+  border-radius: 14px;
+  background: rgba(49, 174, 102, 0.08);
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.statusCard span:nth-child(2) {
+  display: grid;
+  gap: 2px;
+}
+
+.statusCard strong {
+  color: #ccefdc;
+  font-size: 12px;
+}
+
+.statusDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #4bdd8b;
+  box-shadow: 0 0 0 4px rgba(75, 221, 139, 0.12);
+}
+
+.statusCard button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.62);
+  cursor: pointer;
+}
+
+.statusCard button:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .settingsPanel {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 18px;
 }
 
 .settingGroup {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 9px;
 }
 
 .settingLabel {
-  font-size: 14px;
-  font-weight: 500;
-  color: #ffffff;
-  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.settingLabel > span {
+  display: grid;
+  gap: 1px;
+}
+
+.settingLabel strong {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
+}
+
+.settingLabel small {
+  color: rgba(255, 255, 255, 0.38);
+  font-size: 10px;
 }
 
 .select {
-  background: #2a2a2a;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 12px 16px;
-  color: #ffffff;
-  font-size: 14px;
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 36px 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 12px;
+  outline: none;
+  background: #222630;
+  color: rgba(255, 255, 255, 0.9);
+  font: inherit;
+  font-size: 12px;
   cursor: pointer;
   transition:
-    border-color 0.2s,
-    background-color 0.2s;
-  outline: none;
+    border-color 140ms ease,
+    box-shadow 140ms ease;
 }
 
-.select:hover {
-  border-color: rgba(255, 255, 255, 0.2);
-  background: #333333;
+.select:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.17);
 }
 
-.select:focus {
-  border-color: #3b82f6;
-  background: #333333;
+.select:focus-visible {
+  border-color: #5d96ff;
+  box-shadow: 0 0 0 3px rgba(68, 132, 251, 0.15);
+}
+
+.select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .select option {
-  background: #2a2a2a;
-  color: #ffffff;
+  background: #252934;
+  color: #fff;
 }
 
 .footer {
-  padding: 16px 24px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  display: flex;
-  justify-content: flex-end;
+  padding: 13px 14px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
 }
 
-.footer .closeButton {
-  background: #3b82f6;
-  color: #ffffff;
+.doneButton {
+  width: 100%;
+  min-height: 44px;
   border: none;
-  padding: 10px 24px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
+  border-radius: 12px;
+  background: #1769ff;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
-  transition: background-color 0.2s;
 }
 
-.footer .closeButton:hover {
-  background: #2563eb;
+.doneButton:hover {
+  background: #2b78ff;
+}
+
+.closeButton:focus-visible,
+.statusCard button:focus-visible,
+.doneButton:focus-visible {
+  outline: 2px solid #79aaff;
+  outline-offset: 2px;
+}
+
+@media (max-width: 900px) {
+  .overlay {
+    background: rgba(4, 6, 10, 0.48);
+    backdrop-filter: blur(3px);
+  }
+}
+
+@media (max-width: 560px) {
+  .overlay {
+    inset: 60px 0 0;
+  }
+
+  .modal {
+    inset: auto 0 0;
+    width: 100%;
+    max-height: min(72vh, 620px);
+    border-right: none;
+    border-bottom: none;
+    border-left: none;
+    border-radius: 22px 22px 0 0;
+    animation-name: sheetIn;
+  }
+
+  @keyframes sheetIn {
+    from {
+      opacity: 0;
+      transform: translateY(22px);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .modal {
+    animation: none;
+  }
 }

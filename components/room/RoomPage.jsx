@@ -3,15 +3,16 @@
  */
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/router';
+import { Check, Copy, Hash, LockKeyhole, Wifi } from 'lucide-react';
 import { useRoomProtocol } from '@/hooks/useRoomProtocol';
 import { getCurrentUser } from '@/utils/api';
 
 import Player from '@/component/Player';
 import Bottom from '@/component/Bottom';
-import CopySection from '@/component/CopySection';
 import ParticipantsModal from '@/component/ParticipantsModal';
 import RoomToast from '@/component/RoomToast';
 import RoomSettingsModal from '@/components/room/RoomSettingsModal';
+import { parseRoomLocation } from '@/components/room/roomLocation';
 
 import styles from '@/styles/room.module.css';
 
@@ -19,31 +20,36 @@ export default function RoomPage() {
   const router = useRouter();
   const { roomId, audio, video } = router.query;
 
-  const [roomIdFromPath, setRoomIdFromPath] = useState(null);
+  const [roomLocationFromWindow, setRoomLocationFromWindow] = useState({
+    roomId: null,
+    audio: undefined,
+    video: undefined,
+  });
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const match = window.location.pathname.match(/\/room\/([^/?]+)/);
-      if (match && match[1]) {
-        setRoomIdFromPath(match[1]);
-      }
+      setRoomLocationFromWindow(parseRoomLocation(window.location));
     }
   }, []);
 
-  const isRouterReady = router.isReady || !!roomIdFromPath;
-  const actualRoomId = roomId || roomIdFromPath || undefined;
+  const isRouterReady = router.isReady || !!roomLocationFromWindow.roomId;
+  const actualRoomId = roomId || roomLocationFromWindow.roomId || undefined;
+  const requestedAudio = audio !== undefined ? audio : roomLocationFromWindow.audio;
+  const requestedVideo = video !== undefined ? video : roomLocationFromWindow.video;
 
-  const initialAudio = audio !== undefined ? audio !== '0' : true;
-  const initialVideo = video !== undefined ? video !== '0' : false;
+  const initialAudio = requestedAudio !== undefined ? requestedAudio !== '0' : true;
+  const initialVideo = requestedVideo !== undefined ? requestedVideo !== '0' : false;
 
   const {
+    room,
     participants,
     localStream,
     remoteStreams,
+    remoteScreenStreams,
     audioEnabled,
     videoEnabled,
     isInRoom,
-    error: _error,
+    error,
     toggleAudio,
     toggleVideo,
     leaveRoom,
@@ -76,6 +82,8 @@ export default function RoomPage() {
   const [meetingTime, setMeetingTime] = useState(0);
   const [showParticipants, setShowParticipants] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [screenShareBusy, setScreenShareBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [toastNotifications, setToastNotifications] = useState([]);
   const hasJoinedRef = useRef(false);
   const prevParticipantsRef = useRef([]);
@@ -272,6 +280,39 @@ export default function RoomPage() {
     } catch (_err) {}
   };
 
+  const handleToggleScreenShare = useCallback(async () => {
+    if (screenShareBusy) return;
+    setScreenShareBusy(true);
+    try {
+      if (isScreenSharing) await stopScreenShare();
+      else await startScreenShare();
+    } finally {
+      setScreenShareBusy(false);
+    }
+  }, [isScreenSharing, screenShareBusy, startScreenShare, stopScreenShare]);
+
+  const handleCopyInvite = useCallback(async () => {
+    if (typeof window === 'undefined') return;
+    const inviteUrl = window.location.href;
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopied(false);
+    }
+  }, []);
+
+  const openParticipants = useCallback(() => {
+    setShowSettings(false);
+    setShowParticipants(true);
+  }, []);
+
+  const openSettings = useCallback(() => {
+    setShowParticipants(false);
+    setShowSettings(true);
+  }, []);
+
   const playerHighlighted = useMemo(() => players[currentUserIdStr], [players, currentUserIdStr]);
   const nonHighlightedPlayers = useMemo(() => {
     return Object.keys(players).reduce((acc, playerId) => {
@@ -283,6 +324,9 @@ export default function RoomPage() {
     () => participants.length || Object.keys(players).length || 1,
     [participants.length, players]
   );
+  const gridDensity = `grid${Math.min(Math.max(participantCount, 1), 9)}`;
+  const sidePanelOpen = showParticipants || showSettings;
+  const roomTitle = room?.title || 'Командная встреча';
 
   const [showLoadingTimeout, setShowLoadingTimeout] = useState(false);
   const [forceShowInterface, setForceShowInterface] = useState(false);
@@ -332,24 +376,54 @@ export default function RoomPage() {
   }
 
   return (
-    <div className={styles.roomContainer} data-testid="room-page">
+    <div
+      className={`${styles.roomContainer} ${sidePanelOpen ? styles.sidePanelOpen : ''}`}
+      data-testid="room-page"
+    >
       <RoomToast notifications={toastNotifications} onDismiss={dismissToast} />
       <div className={styles.topBar} data-testid="room-top-bar">
-        <div className={styles.logo} data-testid="room-logo">
-          Pager Meet
+        <div className={styles.brandGroup}>
+          <div className={styles.logo} data-testid="room-logo">
+            <span className={styles.logoMark}>P</span>
+            Pager Meet
+          </div>
+          <span className={styles.roomTitle}>{roomTitle}</span>
         </div>
         <div className={styles.meetingInfo} data-testid="room-meeting-info">
+          <span className={styles.connectionStatus}>
+            <Wifi size={15} aria-hidden />
+            Стабильно
+          </span>
           <span className={styles.timer} data-testid="room-timer">
             {formatTime(meetingTime)}
           </span>
-          <span className={styles.roomCode} data-testid="room-code">
-            {actualRoomId}
-          </span>
+          <button
+            type="button"
+            className={styles.roomCodeButton}
+            onClick={handleCopyInvite}
+            aria-label={copied ? 'Ссылка скопирована' : 'Скопировать ссылку на комнату'}
+            title={copied ? 'Ссылка скопирована' : 'Скопировать приглашение'}
+          >
+            <Hash size={14} aria-hidden />
+            <span className={styles.roomCode} data-testid="room-code">
+              {actualRoomId}
+            </span>
+            {copied ? <Check size={15} aria-hidden /> : <Copy size={15} aria-hidden />}
+          </button>
         </div>
       </div>
-      <div className={styles.videoGrid} data-testid="room-video-grid">
+      {error ? (
+        <div className={styles.errorBanner} role="alert" data-testid="room-error">
+          <span>{error}</span>
+        </div>
+      ) : null}
+      <div
+        className={`${styles.videoGrid} ${styles[gridDensity]} ${isScreenSharing && screenStream ? styles.screenShareMode : ''}`}
+        data-testid="room-video-grid"
+        data-participant-count={participantCount}
+      >
         {isScreenSharing && screenStream && (
-          <div className={styles.screenSharePreview}>
+          <div className={styles.screenSharePreview} data-testid="room-screen-preview">
             <video
               autoPlay
               playsInline
@@ -359,14 +433,13 @@ export default function RoomPage() {
               }}
               className={styles.screenShareVideo}
             />
-            <div className={styles.screenShareLabel}>Ваша демонстрация</div>
+            <div className={styles.screenShareLabel}>
+              <span className={styles.liveDot} aria-hidden />
+              Вы показываете экран
+            </div>
           </div>
         )}
-        <div
-          className={
-            Object.keys(nonHighlightedPlayers).length > 0 ? styles.videoItem : styles.videoItemFull
-          }
-        >
+        <div className={`${styles.videoItem} ${styles.localVideoItem}`}>
           <Player
             stream={playerHighlighted?.stream || null}
             muted={true}
@@ -395,27 +468,38 @@ export default function RoomPage() {
             const player =
               nonHighlightedPlayers[participantIdStr] ||
               (participantId && nonHighlightedPlayers[participantId]);
+            const presentationStream =
+              remoteScreenStreams.get(participantId) ||
+              remoteScreenStreams.get(participantIdStr) ||
+              null;
             const participantName =
               participant?.user?.displayName ||
               participant?.user?.username ||
               (player && playerNames[participantIdStr]) ||
               `Участник ${participantIdStr?.substring(0, 6) || ''}`;
             const hasScreenShareTracks =
-              player?.stream &&
-              player.stream
-                .getVideoTracks()
-                .some(
-                  (t) =>
-                    t.readyState === 'live' &&
-                    (t.label?.toLowerCase().includes('screen') ||
-                      t.label?.toLowerCase().includes('display'))
-                );
+              presentationStream ||
+              (player?.stream &&
+                player.stream
+                  .getVideoTracks()
+                  .some(
+                    (t) =>
+                      t.readyState === 'live' &&
+                      (t.label?.toLowerCase().includes('screen') ||
+                        t.label?.toLowerCase().includes('display'))
+                  ));
             const isParticipantScreenSharing =
               participant?.screenSharing === true || hasScreenShareTracks;
             return (
-              <div key={participantIdStr || participant.id} className={styles.videoItem}>
+              <div
+                key={participantIdStr || participant.id}
+                className={`${styles.videoItem} ${isParticipantScreenSharing ? styles.presenterTile : ''}`}
+                data-screen-sharing={isParticipantScreenSharing ? 'true' : 'false'}
+                data-presentation-stream={presentationStream ? 'true' : 'false'}
+              >
                 <Player
-                  stream={player?.stream || null}
+                  stream={presentationStream || player?.stream || null}
+                  audioStream={presentationStream ? player?.stream || null : null}
                   muted={false}
                   playing={player?.playing || false}
                   isActive={false}
@@ -429,7 +513,15 @@ export default function RoomPage() {
               </div>
             );
           })}
-        {participantCount <= 1 && <CopySection roomId={actualRoomId} />}
+        {participantCount <= 1 && (
+          <div className={styles.soloInvite} data-testid="room-solo-invite">
+            <LockKeyhole size={16} aria-hidden />
+            <span>Вы пока один</span>
+            <button type="button" onClick={handleCopyInvite}>
+              {copied ? 'Ссылка скопирована' : 'Пригласить команду'}
+            </button>
+          </div>
+        )}
       </div>
       <Bottom
         muted={!audioEnabled}
@@ -438,12 +530,13 @@ export default function RoomPage() {
         toggleVideo={handleToggleVideo}
         leaveRoom={handleLeaveRoom}
         participantCount={participantCount}
-        onParticipantsClick={() => setShowParticipants(true)}
+        onParticipantsClick={openParticipants}
         handRaised={handRaised}
         onRaiseHand={raiseHand}
         isScreenSharing={isScreenSharing}
-        onToggleScreenShare={isScreenSharing ? stopScreenShare : startScreenShare}
-        onSettingsClick={() => setShowSettings(true)}
+        onToggleScreenShare={handleToggleScreenShare}
+        screenShareBusy={screenShareBusy}
+        onSettingsClick={openSettings}
       />
       <ParticipantsModal
         isOpen={showParticipants}

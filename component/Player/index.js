@@ -7,6 +7,7 @@ import styles from '@/component/Player/index.module.css';
 const Player = (props) => {
   const {
     stream,
+    audioStream,
     muted,
     playing,
     isActive,
@@ -18,6 +19,7 @@ const Player = (props) => {
     isScreenSharing = false,
   } = props;
   const videoRef = useRef(null);
+  const audioRef = useRef(null);
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
   const animationFrameRef = useRef(null);
@@ -38,12 +40,18 @@ const Player = (props) => {
   }, [stream]);
 
   useEffect(() => {
-    if (!stream) {
+    if (!audioRef.current) return;
+    audioRef.current.srcObject = audioStream || null;
+  }, [audioStream]);
+
+  useEffect(() => {
+    const speakingStream = audioStream || stream;
+    if (!speakingStream) {
       setIsSpeaking(false);
       return;
     }
 
-    const audioTracks = stream.getAudioTracks();
+    const audioTracks = speakingStream.getAudioTracks();
     if (audioTracks.length === 0) {
       setIsSpeaking(false);
       return;
@@ -60,7 +68,7 @@ const Player = (props) => {
       analyserRef.current.fftSize = 256;
       analyserRef.current.smoothingTimeConstant = 0.3;
 
-      const source = audioContextRef.current.createMediaStreamSource(stream);
+      const source = audioContextRef.current.createMediaStreamSource(speakingStream);
       source.connect(analyserRef.current);
 
       const bufferLength = analyserRef.current.frequencyBinCount;
@@ -107,7 +115,7 @@ const Player = (props) => {
         }
       };
     } catch (err) {}
-  }, [stream, isMicOn]);
+  }, [stream, audioStream, isMicOn]);
 
   const getInitials = (name) => {
     if (!name) return '?';
@@ -153,13 +161,19 @@ const Player = (props) => {
       })}
     >
       {shouldShowVideo && stream ? (
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted={isLocal || muted}
-          className={styles.video}
-        />
+        <>
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted={Boolean(audioStream) || isLocal || muted}
+            className={cx(styles.video, {
+              [styles.localVideo]: isLocal && !isScreenSharing,
+              [styles.presentationVideo]: isScreenSharing,
+            })}
+          />
+          {audioStream ? <audio ref={audioRef} autoPlay /> : null}
+        </>
       ) : (
         <div className={styles.avatarContainer}>
           <div

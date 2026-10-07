@@ -11,5 +11,9 @@
     "contentInset": "automatic",
     "allowsLinkPreview": false,
     "preferredContentMode": "mobile"
+  },
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#07101f"
   }
 }

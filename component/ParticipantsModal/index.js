@@ -13,6 +13,7 @@ import {
   UserMinus,
   VolumeX,
   UserPlus,
+  Search,
 } from 'lucide-react';
 import styles from './index.module.css';
 
@@ -29,6 +30,7 @@ const ParticipantsModal = ({
   onKick,
 }) => {
   const [menuOpenFor, setMenuOpenFor] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   if (!isOpen) return null;
 
@@ -75,6 +77,15 @@ const ParticipantsModal = ({
     if (!a.handRaised && b.handRaised) return 1;
     return 0;
   });
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const visibleParticipants = normalizedQuery
+    ? sortedParticipants.filter((participant) => {
+        const user = participant.user || {};
+        return [user.displayName, user.username, user.email]
+          .filter(Boolean)
+          .some((value) => value.toLowerCase().includes(normalizedQuery));
+      })
+    : sortedParticipants;
 
   const handleMenuClick = (e, participantId) => {
     e.stopPropagation();
@@ -87,17 +98,44 @@ const ParticipantsModal = ({
   };
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+    <div className={styles.overlay} onClick={onClose} data-testid="room-participants-panel">
+      <div
+        className={styles.modal}
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="participants-title"
+      >
         <div className={styles.header}>
-          <h2 className={styles.title}>Участники ({participants?.length || 0})</h2>
-          <button className={styles.closeButton} onClick={onClose}>
+          <div>
+            <span className={styles.eyebrow}>Встреча</span>
+            <h2 id="participants-title" className={styles.title}>
+              Участники <span>{participants?.length || 0}</span>
+            </h2>
+          </div>
+          <button
+            type="button"
+            className={styles.closeButton}
+            onClick={onClose}
+            aria-label="Закрыть список участников"
+          >
             <X size={20} />
           </button>
         </div>
 
+        <label className={styles.searchBox}>
+          <Search size={17} aria-hidden />
+          <span className={styles.visuallyHidden}>Найти участника</span>
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Найти участника"
+          />
+        </label>
+
         <div className={styles.participantsList}>
-          {sortedParticipants.map((participant) => {
+          {visibleParticipants.map((participant) => {
             const user = participant.user || {};
             const userId = user.id;
             const isMe = userId === currentUserId;
@@ -157,8 +195,11 @@ const ParticipantsModal = ({
                 {canManageThis && (
                   <div className={styles.actionMenu}>
                     <button
+                      type="button"
                       className={styles.menuButton}
                       onClick={(e) => handleMenuClick(e, participant.id || userId)}
+                      aria-label={`Действия: ${displayName}`}
+                      aria-expanded={menuOpenFor === (participant.id || userId)}
                     >
                       <MoreVertical size={18} />
                     </button>
@@ -212,10 +253,10 @@ const ParticipantsModal = ({
             );
           })}
 
-          {(!participants || participants.length === 0) && (
+          {visibleParticipants.length === 0 && (
             <div className={styles.emptyState}>
               <User size={48} />
-              <p>Нет участников</p>
+              <p>{normalizedQuery ? 'Никого не нашли' : 'Нет участников'}</p>
             </div>
           )}
         </div>

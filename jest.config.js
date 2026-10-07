@@ -4,12 +4,12 @@ const config = {
   setupFiles: ['<rootDir>/jest.polyfills.js'],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   moduleNameMapper: {
+    '^.+\\.module\\.(css|scss|sass)$': 'identity-obj-proxy',
     '^@/shared/(.*)$': '<rootDir>/src/shared/$1',
     '^@/entities/(.*)$': '<rootDir>/src/entities/$1',
     '^@/features/(.*)$': '<rootDir>/src/features/$1',
     '^@/widgets/(.*)$': '<rootDir>/src/widgets/$1',
     '^@/(.*)$': '<rootDir>/$1',
-    '^.+\\.module\\.(css|scss|sass)$': 'identity-obj-proxy',
   },
   testMatch: ['**/__tests__/**/*.test.js', '**/__tests__/**/*.test.jsx'],
   collectCoverageFrom: [

@@ -1,3 +1,5 @@
+const { expect } = require('@playwright/test');
+
 const T = {
   chatMeetButton: 'chat-meet-button',
   meetPreviewModal: 'meet-preview-modal',
@@ -15,11 +17,16 @@ const T = {
   roomControlsCenter: 'room-controls-center',
   roomControlsRight: 'room-controls-right',
   roomParticipants: 'room-participants-button',
+  roomParticipantsPanel: 'room-participants-panel',
   roomMic: 'room-mic-toggle',
   roomVideo: 'room-video-toggle',
   roomHand: 'room-hand-toggle',
   roomScreenShare: 'room-screen-share-toggle',
   roomSettings: 'room-settings-button',
+  roomSettingsPanel: 'room-settings-panel',
+  roomCameraSelect: 'room-camera-select',
+  roomMicrophoneSelect: 'room-microphone-select',
+  roomScreenPreview: 'room-screen-preview',
   roomLeave: 'room-leave-button',
   roomLoading: 'room-loading',
 };
@@ -30,7 +37,9 @@ async function openMeetPreview(page) {
 }
 
 async function confirmMeetPreview(page) {
-  await page.getByTestId(T.meetPreviewConfirm).click();
+  const confirmButton = page.getByTestId(T.meetPreviewConfirm);
+  await expect(confirmButton).toBeEnabled({ timeout: 15_000 });
+  await confirmButton.click();
 }
 
 async function cancelMeetPreview(page) {

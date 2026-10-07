@@ -5,6 +5,20 @@ import { fileURLToPath } from 'url';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const spec = process.env.E2E_MEET_SPEC || 'e2e/meet.spec.js';
+const grep = process.env.E2E_MEET_GREP;
+const nextCli = path.join(root, 'node_modules', 'next', 'dist', 'bin', 'next');
+
+function stopProcessTree(child) {
+  if (!child?.pid) return;
+  if (process.platform === 'win32') {
+    spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], {
+      stdio: 'ignore',
+      shell: false,
+    });
+    return;
+  }
+  child.kill('SIGTERM');
+}
 
 function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return;
@@ -76,11 +90,11 @@ async function main() {
   }
 
   console.log('[e2e-meet] starting production server…');
-  const server = spawn('npm', ['run', 'start', '--', '-p', port], {
+  const server = spawn(process.execPath, [nextCli, 'start', '-p', port], {
     cwd: root,
     env: { ...process.env, PORT: port },
     stdio: 'inherit',
-    shell: true,
+    shell: false,
   });
 
   const deadline = Date.now() + Number(process.env.E2E_SERVER_WAIT_MS || 120_000);
@@ -92,21 +106,23 @@ async function main() {
     }
   } catch (e) {
     console.error(e.message);
-    server.kill();
+    stopProcessTree(server);
     process.exit(1);
   }
 
   process.env.E2E_SKIP_WEB_SERVER = '1';
   process.env.E2E_BASE_URL = baseUrl;
 
-  const tests = spawnSync('npx', ['playwright', 'test', spec], {
+  const playwrightArgs = ['playwright', 'test', spec];
+  if (grep) playwrightArgs.push('--grep', grep);
+  const tests = spawnSync('npx', playwrightArgs, {
     cwd: root,
     stdio: 'inherit',
     shell: true,
     env: process.env,
   });
 
-  server.kill();
+  stopProcessTree(server);
   process.exit(tests.status ?? 1);
 }
 

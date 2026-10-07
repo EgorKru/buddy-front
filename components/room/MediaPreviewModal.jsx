@@ -27,6 +27,7 @@ export default function MediaPreviewModal({
   const previousVideoTrackIdRef = useRef(null);
   const isUpdatingRef = useRef(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [isPreviewReady, setIsPreviewReady] = useState(false);
 
   const {
     devices,
@@ -52,6 +53,7 @@ export default function MediaPreviewModal({
 
   useEffect(() => {
     if (isOpen) {
+      setIsPreviewReady(false);
       previousStreamRef.current = null;
       previousVideoTrackIdRef.current = null;
       startPreview(true, true)
@@ -65,8 +67,10 @@ export default function MediaPreviewModal({
             }, 100);
           }
         })
-        .catch(() => {});
+        .catch(() => {})
+        .finally(() => setIsPreviewReady(true));
     } else {
+      setIsPreviewReady(false);
       stopPreview();
       setShowSettings(false);
       previousStreamRef.current = null;
@@ -233,6 +237,7 @@ export default function MediaPreviewModal({
   };
 
   const handleClose = () => {
+    setIsPreviewReady(false);
     stopPreview();
     onClose();
   };
@@ -388,11 +393,15 @@ export default function MediaPreviewModal({
           <button className={styles.cancelButton} onClick={handleClose}>
             Отмена
           </button>
-          <button className={styles.confirmButton} onClick={handleConfirm} disabled={isCreating}>
-            {isCreating ? (
+          <button
+            className={styles.confirmButton}
+            onClick={handleConfirm}
+            disabled={isCreating || isLoading || !isPreviewReady}
+          >
+            {isCreating || isLoading || !isPreviewReady ? (
               <>
                 <Loader2 className={styles.buttonSpinner} size={18} />
-                Создание...
+                {isCreating ? 'Создание...' : 'Проверяем устройства...'}
               </>
             ) : (
               confirmText
