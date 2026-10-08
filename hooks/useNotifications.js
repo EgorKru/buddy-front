@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useStomp } from '@/context/socket';
 import { isAuthenticated, notificationAPI } from '@/utils/api';
 import { safeJsonParse, safeUnsubscribe } from '@/utils/safe';
+import { showDesktopNotification } from '@/features/notifications/lib/desktop';
 
 const SUBSCRIPTION_DELAY = 100;
 const DEFAULT_PAGE_SIZE = 50;
@@ -96,6 +97,7 @@ export const useNotifications = () => {
   };
 
   const addNotification = (notification) => {
+    showDesktopNotification(notification);
     setNotifications((prev) => {
       const exists = prev.find((n) => n.id === notification.id);
       if (exists) {

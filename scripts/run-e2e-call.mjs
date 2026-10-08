@@ -63,15 +63,16 @@ async function main() {
     process.env.NEXT_PUBLIC_WS_NATIVE_URL || 'ws://localhost:8080/ws-native';
 
   const { port, baseUrl } = resolveServerAddress('3002');
+  const nextEnv = { ...process.env, NEXT_DIST_DIR: process.env.NEXT_DIST_DIR || '.next-e2e' };
 
   if (process.env.E2E_SKIP_BUILD !== '1') {
     console.log('[e2e-call] production build…');
-    const build = runNextBuild(root, process.env);
+    const build = runNextBuild(root, nextEnv);
     if (build.status !== 0) process.exit(build.status ?? 1);
   }
 
   console.log('[e2e-call] starting production server…');
-  const server = startNextServer(root, port);
+  const server = startNextServer(root, port, nextEnv);
   const serverController = manageServer(server);
 
   const deadline = Date.now() + Number(process.env.E2E_SERVER_WAIT_MS || 120_000);

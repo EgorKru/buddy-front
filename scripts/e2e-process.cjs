@@ -14,8 +14,8 @@ function createNextServerLaunch(root, port, env = process.env) {
   };
 }
 
-function startNextServer(root, port, spawnImpl = spawn) {
-  const launch = createNextServerLaunch(root, port);
+function startNextServer(root, port, env = process.env, spawnImpl = spawn) {
+  const launch = createNextServerLaunch(root, port, env);
   return spawnImpl(launch.command, launch.args, launch.options);
 }
 

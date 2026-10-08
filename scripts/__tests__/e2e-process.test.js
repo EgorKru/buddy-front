@@ -3,6 +3,7 @@ const {
   createNextServerLaunch,
   createNodeCliLaunch,
   resolveServerAddress,
+  startNextServer,
   stopProcessTree,
 } = require('../e2e-process.cjs');
 
@@ -23,6 +24,19 @@ describe('E2E server process management', () => {
       shell: false,
       env: { TEST_ENV: 'yes', PORT: '3010' },
     });
+  });
+
+  it('passes an isolated build directory to the production server', () => {
+    const spawnImpl = jest.fn(() => ({ pid: 17 }));
+    const root = path.join('C:', 'workspace', 'pager');
+
+    startNextServer(root, '3010', { NEXT_DIST_DIR: '.next-e2e' }, spawnImpl);
+
+    expect(spawnImpl).toHaveBeenCalledWith(
+      process.execPath,
+      expect.arrayContaining(['start', '-p', '3010']),
+      expect.objectContaining({ env: expect.objectContaining({ NEXT_DIST_DIR: '.next-e2e' }) })
+    );
   });
 
   it('runs build and Playwright CLIs through Node without shell argument concatenation', () => {

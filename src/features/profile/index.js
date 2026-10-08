@@ -2,10 +2,7 @@
  * Фича "профиль пользователя": форма настроек, сохранение. FSD: features/profile
  */
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/router';
 import { userAPI, setCurrentUser, getToken } from '@/shared/api';
-
-const REDIRECT_DELAY_MS = 2000;
 
 function getFriendlyErrorMessage(err) {
   const msg = err?.message || '';
@@ -29,9 +26,7 @@ function getFriendlyErrorMessage(err) {
  * }}
  */
 export function useProfile(user) {
-  const router = useRouter();
   const initialFormDataRef = useRef(null);
-  const redirectTimeoutRef = useRef(null);
 
   const [formData, setFormData] = useState({
     displayName: '',
@@ -42,6 +37,7 @@ export function useProfile(user) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [savedUser, setSavedUser] = useState(user || null);
 
   useEffect(() => {
     if (user) {
@@ -54,17 +50,12 @@ export function useProfile(user) {
         initialFormDataRef.current = { ...data };
       }
       setFormData(data);
+      setSavedUser(user);
       setLoading(false);
     } else {
       setLoading(true);
     }
   }, [user]);
-
-  useEffect(() => {
-    return () => {
-      if (redirectTimeoutRef.current) clearTimeout(redirectTimeoutRef.current);
-    };
-  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -98,6 +89,7 @@ export function useProfile(user) {
 
       const updatedUser = await userAPI.updateProfile(updateData);
       setCurrentUser(updatedUser, getToken());
+      setSavedUser(updatedUser);
       initialFormDataRef.current = {
         displayName: updatedUser.displayName || '',
         email: updatedUser.email || '',
@@ -105,10 +97,6 @@ export function useProfile(user) {
       };
       setFormData(initialFormDataRef.current);
       setSuccess('Профиль успешно обновлён!');
-
-      redirectTimeoutRef.current = setTimeout(() => {
-        router.push('/app');
-      }, REDIRECT_DELAY_MS);
     } catch (err) {
       setError(getFriendlyErrorMessage(err));
     } finally {
@@ -116,13 +104,29 @@ export function useProfile(user) {
     }
   };
 
+  const resetForm = () => {
+    if (!initialFormDataRef.current) return;
+    setFormData({ ...initialFormDataRef.current });
+    setError('');
+    setSuccess('');
+  };
+
+  const initial = initialFormDataRef.current;
+  const dirty = Boolean(
+    initial &&
+    (formData.displayName !== initial.displayName || formData.avatarUrl !== initial.avatarUrl)
+  );
+
   return {
     formData,
     loading,
     saving,
     error,
     success,
+    dirty,
+    savedUser,
     handleChange,
     handleSubmit,
+    resetForm,
   };
 }

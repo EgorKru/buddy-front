@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Send, MessageCircle } from 'lucide-react';
 import { getCurrentUser } from '@/utils/api';
 import styles from '@/component/ChatPanel/index.module.css';
+import { isEnterToSendEnabled } from '@/features/preferences';
 
 const ChatPanel = ({ roomId, isOpen, onClose }) => {
   const [messages, setMessages] = useState([]);
@@ -59,7 +60,14 @@ const ChatPanel = ({ roomId, isOpen, onClose }) => {
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+    const enterToSend = isEnterToSendEnabled();
+    const isSendShortcut =
+      e.key === 'Enter' &&
+      (enterToSend
+        ? !e.shiftKey && !e.ctrlKey && !e.metaKey
+        : !e.shiftKey && (e.ctrlKey || e.metaKey));
+
+    if (isSendShortcut) {
       e.preventDefault();
       if (newMessage.trim()) {
         sendMessage(e);

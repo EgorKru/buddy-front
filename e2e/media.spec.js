@@ -25,6 +25,7 @@ const groupChatId = process.env.E2E_GROUP_CHAT_ID;
 
 const hasDirectEnv = senderUser && senderPass && recipientUser && recipientPass && chatId;
 const hasGroupEnv = senderUser && senderPass && groupChatId;
+const hasSenderEnv = senderUser && senderPass;
 
 test.describe.configure({ mode: 'serial' });
 
@@ -33,6 +34,81 @@ test.use({
   launchOptions: {
     args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'],
   },
+});
+
+test.describe('Settings center', () => {
+  test.skip(!hasSenderEnv, 'Set E2E_SENDER_USERNAME and E2E_SENDER_PASSWORD');
+  test.setTimeout(120_000);
+
+  let context;
+  let page;
+
+  test.beforeAll(async ({ browser }) => {
+    const auth = await loginViaApi(senderUser, senderPass);
+    context = await browser.newContext({ permissions: ['microphone', 'camera'] });
+    await seedAuthContext(context, auth);
+    page = await context.newPage();
+  });
+
+  test.afterAll(async () => {
+    await context?.close();
+  });
+
+  test.beforeEach(async () => {
+    await page.setViewportSize({ width: 1280, height: 850 });
+    await page.goto('/settings');
+    await expect(page.getByRole('heading', { name: 'Настройки' })).toBeVisible();
+  });
+
+  test('interface and notification preferences apply immediately and survive reload', async () => {
+    await page.getByRole('button', { name: /Интерфейс/ }).click();
+    await page.getByRole('button', { name: 'Компактно' }).click();
+    await page.getByRole('button', { name: 'Справа' }).click();
+    await expect(page.locator('body')).toHaveAttribute('data-ui-density', 'compact');
+    await expect(page.locator('body')).toHaveAttribute('data-sidebar-position', 'right');
+
+    await page.reload();
+    await expect(page.locator('body')).toHaveAttribute('data-ui-density', 'compact');
+    await expect(page.locator('body')).toHaveAttribute('data-sidebar-position', 'right');
+
+    await page.getByRole('button', { name: /Уведомления/ }).click();
+    const sound = page.getByRole('switch', { name: /Звук новых сообщений/ });
+    await sound.click();
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem('disable_notification_sound')))
+      .toBe('true');
+    await sound.click();
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem('disable_notification_sound')))
+      .toBeNull();
+  });
+
+  test('saved media devices can be previewed and released', async () => {
+    await page.getByRole('button', { name: /Устройства/ }).click();
+    await page.getByRole('button', { name: 'Проверить устройства' }).click();
+    const preview = page.locator('video');
+    await expect(preview).toBeVisible();
+    await expect
+      .poll(() => preview.evaluate((video) => video.srcObject?.getTracks().length || 0))
+      .toBeGreaterThan(0);
+
+    await page.getByRole('button', { name: 'Остановить' }).click();
+    await expect(preview).toHaveCount(0);
+  });
+
+  test('mobile settings have no horizontal overflow and keep every section one tap away', async () => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload();
+    const metrics = await page.evaluate(() => ({
+      innerWidth: window.innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+    }));
+    expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.innerWidth);
+
+    for (const section of ['Профиль', 'Интерфейс', 'Уведомления', 'Устройства']) {
+      await expect(page.getByRole('button', { name: new RegExp(section) })).toBeVisible();
+    }
+  });
 });
 
 test.describe('Media preview (meet)', () => {

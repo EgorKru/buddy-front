@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { isEnterToSendEnabled } from '@/features/preferences';
 
 export const useChatKeyboard = ({
   editingMessageId,
@@ -19,7 +20,14 @@ export const useChatKeyboard = ({
         return;
       }
 
-      if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+      const enterToSend = isEnterToSendEnabled();
+      const isSendShortcut =
+        e.key === 'Enter' &&
+        (enterToSend
+          ? !e.shiftKey && !e.ctrlKey && !e.metaKey
+          : !e.shiftKey && (e.ctrlKey || e.metaKey));
+
+      if (isSendShortcut) {
         e.preventDefault();
         if (editingMessageId) {
           if (!sending && !isRecording && editingContent.trim()) {

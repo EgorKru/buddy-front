@@ -11,6 +11,7 @@ import { CallProvider } from '@/context/CallContext';
 import GlobalNotifications from '@/component/GlobalNotifications';
 import GlobalCallHandler from '@/component/GlobalCallHandler';
 import { isAuthenticated } from '@/utils/api';
+import { applyPreferences, loadPreferences } from '@/features/preferences';
 
 function unregisterServiceWorkersInDev() {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
@@ -62,6 +63,17 @@ export default function App({ Component, pageProps }) {
     router.events.on('routeChangeComplete', syncAuthed);
     return () => router.events.off('routeChangeComplete', syncAuthed);
   }, [router.events]);
+
+  useEffect(() => {
+    const syncPreferences = () => applyPreferences(loadPreferences());
+    syncPreferences();
+    window.addEventListener('storage', syncPreferences);
+    window.addEventListener('pager:preferences-changed', syncPreferences);
+    return () => {
+      window.removeEventListener('storage', syncPreferences);
+      window.removeEventListener('pager:preferences-changed', syncPreferences);
+    };
+  }, []);
 
   useEffect(() => {
     if (process.env.NODE_ENV !== 'production') {

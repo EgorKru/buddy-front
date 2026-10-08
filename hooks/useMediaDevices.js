@@ -7,11 +7,16 @@ import {
   setBackgroundEffect as persistBackgroundEffect,
   BACKGROUND_EFFECT,
 } from '@/shared/lib/media';
+import { loadPreferences, updateStoredPreference } from '@/features/preferences';
 
 export function useMediaDevices() {
   const [devices, setDevices] = useState({ cameras: [], microphones: [], speakers: [] });
-  const [selectedCamera, setSelectedCamera] = useState('');
-  const [selectedMicrophone, setSelectedMicrophone] = useState('');
+  const [selectedCamera, setSelectedCamera] = useState(
+    () => loadPreferences().cameraDeviceId || ''
+  );
+  const [selectedMicrophone, setSelectedMicrophone] = useState(
+    () => loadPreferences().microphoneDeviceId || ''
+  );
   const [localStream, setLocalStream] = useState(null);
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [videoEnabled, setVideoEnabled] = useState(false);
@@ -52,11 +57,20 @@ export function useMediaDevices() {
 
       setDevices({ cameras, microphones, speakers });
 
-      if (cameras.length > 0 && !selectedCamera) {
-        setSelectedCamera(cameras[0].deviceId);
+      const nextCamera = cameras.some((device) => device.deviceId === selectedCamera)
+        ? selectedCamera
+        : cameras[0]?.deviceId || '';
+      const nextMicrophone = microphones.some((device) => device.deviceId === selectedMicrophone)
+        ? selectedMicrophone
+        : microphones[0]?.deviceId || '';
+
+      if (nextCamera !== selectedCamera) {
+        setSelectedCamera(nextCamera);
+        updateStoredPreference('cameraDeviceId', nextCamera);
       }
-      if (microphones.length > 0 && !selectedMicrophone) {
-        setSelectedMicrophone(microphones[0].deviceId);
+      if (nextMicrophone !== selectedMicrophone) {
+        setSelectedMicrophone(nextMicrophone);
+        updateStoredPreference('microphoneDeviceId', nextMicrophone);
       }
 
       return { cameras, microphones, speakers };
@@ -351,6 +365,7 @@ export function useMediaDevices() {
   const switchCamera = useCallback(
     async (deviceId) => {
       setSelectedCamera(deviceId);
+      updateStoredPreference('cameraDeviceId', deviceId);
       if (localStream && videoEnabled) {
         try {
           const newStream = await navigator.mediaDevices.getUserMedia({
@@ -398,6 +413,7 @@ export function useMediaDevices() {
   const switchMicrophone = useCallback(
     async (deviceId) => {
       setSelectedMicrophone(deviceId);
+      updateStoredPreference('microphoneDeviceId', deviceId);
       if (localStream && audioEnabled) {
         try {
           const newStream = await navigator.mediaDevices.getUserMedia({

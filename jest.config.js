@@ -9,6 +9,7 @@ const config = {
     '^@/entities/(.*)$': '<rootDir>/src/entities/$1',
     '^@/features/(.*)$': '<rootDir>/src/features/$1',
     '^@/widgets/(.*)$': '<rootDir>/src/widgets/$1',
+    '^@/surface/(.*)$': '<rootDir>/src/surface/$1',
     '^@/(.*)$': '<rootDir>/$1',
   },
   testMatch: ['**/__tests__/**/*.test.js', '**/__tests__/**/*.test.jsx'],

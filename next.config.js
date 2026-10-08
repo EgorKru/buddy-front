@@ -6,6 +6,7 @@ const e2eDev =
   process.env.NEXT_PUBLIC_E2EE_ENABLED === 'false';
 
 const nextConfig = {
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   env: {
     NEXT_PUBLIC_E2EE_ENABLED:
       process.env.NEXT_PUBLIC_E2EE_ENABLED ?? (prodLike || e2eDev ? 'false' : 'true'),

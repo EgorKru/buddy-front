@@ -115,6 +115,23 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+body[data-ui-density='compact'] {
+  --pager-gutter: clamp(14px, 2.2vw, 30px);
+  --pager-space-2: 12px;
+  --pager-space-3: 18px;
+  --pager-space-4: 24px;
+  --pager-space-5: 36px;
+}
+
+body[data-reduce-motion='true'] *,
+body[data-reduce-motion='true'] *::before,
+body[data-reduce-motion='true'] *::after {
+  scroll-behavior: auto !important;
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
+
 /* Скролл на уровне контейнера приложения — страницы (home и др.) могут прокручиваться */
 #__next {
   height: 100%;
