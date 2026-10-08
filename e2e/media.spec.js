@@ -62,14 +62,13 @@ test.describe('Settings center', () => {
 
   test('interface and notification preferences apply immediately and survive reload', async () => {
     await page.getByRole('button', { name: /Интерфейс/ }).click();
-    await page.getByRole('button', { name: 'Компактно' }).click();
-    await page.getByRole('button', { name: 'Справа' }).click();
-    await expect(page.locator('body')).toHaveAttribute('data-ui-density', 'compact');
-    await expect(page.locator('body')).toHaveAttribute('data-sidebar-position', 'right');
+    await expect(page.getByText('Плотность')).toHaveCount(0);
+    await expect(page.getByText('Панель чатов')).toHaveCount(0);
+    await page.getByRole('switch', { name: /Уменьшить анимацию/ }).click();
+    await expect(page.locator('body')).toHaveAttribute('data-reduce-motion', 'true');
 
     await page.reload();
-    await expect(page.locator('body')).toHaveAttribute('data-ui-density', 'compact');
-    await expect(page.locator('body')).toHaveAttribute('data-sidebar-position', 'right');
+    await expect(page.locator('body')).toHaveAttribute('data-reduce-motion', 'true');
 
     await page.getByRole('button', { name: /Уведомления/ }).click();
     const sound = page.getByRole('switch', { name: /Звук новых сообщений/ });
@@ -81,6 +80,13 @@ test.describe('Settings center', () => {
     await expect
       .poll(() => page.evaluate(() => localStorage.getItem('disable_notification_sound')))
       .toBeNull();
+  });
+
+  test('back to workspace replaces the settings screen', async () => {
+    await page.getByRole('link', { name: 'Рабочее пространство' }).click();
+    await expect(page).toHaveURL(/\/app$/);
+    await expect(page.getByRole('heading', { name: 'Настройки' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: /команда уже рядом/i })).toBeVisible();
   });
 
   test('saved media devices can be previewed and released', async () => {

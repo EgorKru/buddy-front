@@ -54,4 +54,18 @@ describe('useProfile', () => {
     expect(result.current.formData.displayName).toBe('Demo User');
     expect(result.current.dirty).toBe(false);
   });
+
+  it('stabilizes when auth returns an equivalent new user object on every render', async () => {
+    let renderCount = 0;
+    const { result } = renderHook(() => {
+      renderCount += 1;
+      return useProfile({ ...user });
+    });
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => Promise.resolve());
+
+    expect(renderCount).toBeLessThan(8);
+    expect(result.current.formData.displayName).toBe('Demo User');
+  });
 });

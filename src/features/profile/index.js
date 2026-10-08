@@ -27,6 +27,11 @@ function getFriendlyErrorMessage(err) {
  */
 export function useProfile(user) {
   const initialFormDataRef = useRef(null);
+  const userId = user?.id ?? null;
+  const userUsername = user?.username || '';
+  const userDisplayName = user?.displayName || '';
+  const userEmail = user?.email || '';
+  const userAvatarUrl = user?.avatarUrl || '';
 
   const [formData, setFormData] = useState({
     displayName: '',
@@ -40,22 +45,28 @@ export function useProfile(user) {
   const [savedUser, setSavedUser] = useState(user || null);
 
   useEffect(() => {
-    if (user) {
+    if (userId != null) {
       const data = {
-        displayName: user.displayName || '',
-        email: user.email || '',
-        avatarUrl: user.avatarUrl || '',
+        displayName: userDisplayName,
+        email: userEmail,
+        avatarUrl: userAvatarUrl,
       };
       if (!initialFormDataRef.current) {
         initialFormDataRef.current = { ...data };
       }
       setFormData(data);
-      setSavedUser(user);
+      setSavedUser({
+        id: userId,
+        username: userUsername,
+        displayName: userDisplayName,
+        email: userEmail,
+        avatarUrl: userAvatarUrl,
+      });
       setLoading(false);
     } else {
       setLoading(true);
     }
-  }, [user]);
+  }, [userId, userUsername, userDisplayName, userEmail, userAvatarUrl]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;

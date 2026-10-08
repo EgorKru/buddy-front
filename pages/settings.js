@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import {
   ArrowLeft,
   Bell,
@@ -7,7 +8,6 @@ import {
   Check,
   ChevronRight,
   Keyboard,
-  LayoutPanelLeft,
   Mic,
   MonitorUp,
   Palette,
@@ -61,35 +61,6 @@ function ToggleRow({ icon: Icon, label, description, checked, onChange, disabled
         <span />
       </span>
     </button>
-  );
-}
-
-function SegmentedSetting({ label, description, icon: Icon, value, options, onChange }) {
-  return (
-    <div className={styles.segmentedRow}>
-      <div className={styles.segmentedHeading}>
-        <span className={styles.settingIcon} aria-hidden>
-          <Icon size={19} />
-        </span>
-        <span className={styles.settingCopy}>
-          <strong>{label}</strong>
-          <span>{description}</span>
-        </span>
-      </div>
-      <div className={styles.segmented} role="group" aria-label={label}>
-        {options.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            className={value === option.value ? styles.segmentActive : ''}
-            aria-pressed={value === option.value}
-            onClick={() => onChange(option.value)}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-    </div>
   );
 }
 
@@ -268,10 +239,10 @@ export default function Settings() {
       >
         <div className={styles.page}>
           <header className={styles.pageHeader}>
-            <button type="button" className={styles.backButton} onClick={() => router.push('/app')}>
+            <Link href="/app" className={styles.backButton}>
               <ArrowLeft size={18} aria-hidden />
               Рабочее пространство
-            </button>
+            </Link>
             <div className={styles.titleRow}>
               <div>
                 <span className={styles.eyebrow}>Персонализация Pager</span>
@@ -444,28 +415,6 @@ export default function Settings() {
                     </div>
                   </div>
                   <div className={styles.settingsGroup}>
-                    <SegmentedSetting
-                      icon={Sparkles}
-                      label="Плотность"
-                      description="Больше воздуха или больше информации на экране"
-                      value={preferences.density}
-                      onChange={(value) => updatePreference('density', value)}
-                      options={[
-                        { value: 'comfortable', label: 'Комфортно' },
-                        { value: 'compact', label: 'Компактно' },
-                      ]}
-                    />
-                    <SegmentedSetting
-                      icon={LayoutPanelLeft}
-                      label="Панель чатов"
-                      description="Расположение списка чатов на широком экране"
-                      value={preferences.sidebarPosition}
-                      onChange={(value) => updatePreference('sidebarPosition', value)}
-                      options={[
-                        { value: 'left', label: 'Слева' },
-                        { value: 'right', label: 'Справа' },
-                      ]}
-                    />
                     <ToggleRow
                       icon={Sparkles}
                       label="Уменьшить анимацию"

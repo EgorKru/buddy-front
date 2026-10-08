@@ -92,11 +92,17 @@ describe('settings page', () => {
     expect(await screen.findByTestId('app-shell')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Настройки' })).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Профиль' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Рабочее пространство' })).toHaveAttribute(
+      'href',
+      '/app'
+    );
 
     fireEvent.click(screen.getByRole('button', { name: /Интерфейс/ }));
     expect(screen.getByRole('heading', { name: 'Интерфейс' })).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Компактно' }));
-    expect(updatePreference).toHaveBeenCalledWith('density', 'compact');
+    expect(screen.queryByText('Плотность')).not.toBeInTheDocument();
+    expect(screen.queryByText('Панель чатов')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('switch', { name: /Уменьшить анимацию/ }));
+    expect(updatePreference).toHaveBeenCalledWith('reduceMotion', true);
 
     fireEvent.click(screen.getByRole('button', { name: /Уведомления/ }));
     const soundToggle = screen.getByRole('switch', { name: /Звук новых сообщений/ });

@@ -28,6 +28,7 @@
   padding: 6px 0;
   font-size: 13px;
   font-weight: 650;
+  text-decoration: none;
 }
 
 .backButton:hover,
@@ -495,8 +496,7 @@
   padding-top: 10px;
 }
 
-.settingRow,
-.segmentedRow {
+.settingRow {
   display: flex;
   align-items: center;
   gap: 13px;
@@ -579,45 +579,6 @@
 
 .settingRow:focus-visible .switch {
   box-shadow: var(--pager-focus-ring);
-}
-
-.segmentedRow {
-  justify-content: space-between;
-}
-
-.segmentedHeading {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  flex: 1;
-  gap: 13px;
-}
-
-.segmented {
-  display: flex;
-  gap: 3px;
-  padding: 3px;
-  border-radius: 11px;
-  background: var(--pager-bg-soft);
-}
-
-.segmented button {
-  min-height: 35px;
-  padding: 7px 11px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--pager-text-muted);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 650;
-  cursor: pointer;
-}
-
-.segmented .segmentActive {
-  background: #fff;
-  color: var(--pager-text);
-  box-shadow: 0 2px 8px rgba(20, 25, 35, 0.1);
 }
 
 .inlineAction,
@@ -752,7 +713,6 @@
 .primaryButton:focus-visible,
 .secondaryButton:focus-visible,
 .inlineAction button:focus-visible,
-.segmented button:focus-visible,
 .notice button:focus-visible {
   outline: none;
   box-shadow: var(--pager-focus-ring);
@@ -771,11 +731,6 @@
   .previewCard,
   .previewCard video {
     min-height: 310px;
-  }
-
-  .segmentedRow {
-    align-items: flex-start;
-    flex-direction: column;
   }
 }
 
@@ -883,14 +838,6 @@
   .formActions button,
   .deviceActions button {
     width: 100%;
-  }
-
-  .segmented {
-    width: 100%;
-  }
-
-  .segmented button {
-    flex: 1;
   }
 
   .inlineAction {
